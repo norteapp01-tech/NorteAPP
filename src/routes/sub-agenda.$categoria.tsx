@@ -799,11 +799,11 @@ function ExerciseModal({
     draftValues[idx] ?? { weight: String(exercise.loadTarget), reps: String(exercise.repsTarget) };
   const setDraftFor = (idx: number, patch: Partial<{ weight: string; reps: string }>) =>
     setDraftValues((d) => ({ ...d, [idx]: { ...draftFor(idx), ...patch } }));
-  const registerPlanned = (idx: number) => {
+  const registerPlanned = async (idx: number) => {
     const d = draftFor(idx);
     const w = parseFloat(d.weight) || 0;
     const r = parseInt(d.reps, 10) || 0;
-    logSet(liveSession.id, exercise.id, w, r);
+    await logSet(liveSession.id, exercise.id, w, r);
     onLogged(exercise.restSeconds);
   };
 
@@ -812,10 +812,10 @@ function ExerciseModal({
   const [showHistory, setShowHistory] = useState(false);
   const series = exerciseWeightSeries(sessions, exercise.planId, exercise.id);
 
-  const addExtraSet = () => {
+  const addExtraSet = async () => {
     const w = parseFloat(extraWeight) || 0;
     const r = parseInt(extraReps, 10) || 0;
-    logSet(liveSession.id, exercise.id, w, r);
+    await logSet(liveSession.id, exercise.id, w, r);
     onLogged(exercise.restSeconds);
   };
 
@@ -852,7 +852,7 @@ function ExerciseModal({
                 type="number"
                 value={s.weight}
                 onChange={(e) =>
-                  updateSet(liveSession.id, exercise.id, s.setIndex, {
+                  void updateSet(liveSession.id, exercise.id, s.setIndex, {
                     weight: parseFloat(e.target.value) || 0,
                   })
                 }
@@ -863,7 +863,7 @@ function ExerciseModal({
                 type="number"
                 value={s.reps}
                 onChange={(e) =>
-                  updateSet(liveSession.id, exercise.id, s.setIndex, {
+                  void updateSet(liveSession.id, exercise.id, s.setIndex, {
                     reps: parseInt(e.target.value, 10) || 0,
                   })
                 }

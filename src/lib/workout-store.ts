@@ -458,13 +458,19 @@ export async function startSession(planId: string): Promise<string> {
   return row.id;
 }
 
+/** Autocura: se por algum motivo a sessão não tiver o log deste exercício (ex.: exercício
+ * adicionado ao treino depois da sessão já ter começado), cria na hora em vez de travar
+ * "Finalizar treino" pra sempre num loading que nunca resolve. */
 async function findExerciseLogId(sessionId: string, exerciseId: string): Promise<string> {
+  const userId = await ensureSession();
   const row = unwrap<{ id: string }>(
     await supabase
       .from("workout_exercise_logs")
+      .upsert(
+        { user_id: userId, session_id: sessionId, exercise_id: exerciseId },
+        { onConflict: "session_id,exercise_id", ignoreDuplicates: false },
+      )
       .select("id")
-      .eq("session_id", sessionId)
-      .eq("exercise_id", exerciseId)
       .single(),
   );
   return row.id;

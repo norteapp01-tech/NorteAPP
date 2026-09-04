@@ -24,6 +24,11 @@ supabase/.temp
 .wrangler/
 .dev.vars
 
+# Resultados da simulação de personas (gerados a cada execução, não versionados)
+scripts/persona-sim/reports/
+# Sessões anônimas salvas das personas (tokens de sessão — nunca versionar)
+scripts/persona-sim/.auth/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

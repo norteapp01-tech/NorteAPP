@@ -49,8 +49,13 @@ export function QuickAddSheet({ onClose }: { onClose: () => void }) {
   };
 
   const save = async () => {
+    if (saving) return;
     const value = parseFloat(amount.replace(",", "."));
-    if (!value || value <= 0 || !description.trim() || saving) return;
+    if (!value || value <= 0) {
+      setError("Informe um valor maior que zero.");
+      return;
+    }
+    if (!description.trim()) return;
     setSaving(true);
     setError("");
     try {
