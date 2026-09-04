@@ -3,6 +3,8 @@
 // Ponto de integração futuro: trocar `verseOfDay()` por uma chamada de API
 // mantendo a mesma assinatura de retorno ({ reference, text }).
 
+import { nowDate } from "./test-clock";
+
 export type Verse = { reference: string; text: string };
 
 const VERSES: Verse[] = [
@@ -68,7 +70,7 @@ function dayOfYear(date: Date): number {
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
-export function verseOfDay(date: Date = new Date()): Verse {
+export function verseOfDay(date: Date = nowDate()): Verse {
   return VERSES[dayOfYear(date) % VERSES.length];
 }
 
@@ -80,6 +82,6 @@ const MESSAGES = [
   "Um respiro antes de seguir em frente.",
 ];
 
-export function contextualMessage(date: Date = new Date()): string {
+export function contextualMessage(date: Date = nowDate()): string {
   return MESSAGES[dayOfYear(date) % MESSAGES.length];
 }

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, useSupabaseUserId, ensureSession } from "./supabase/client";
 import { queryClient } from "./query-client";
 import { toISODate, todayISO } from "./goals-store";
+import { nowDate } from "./test-clock";
 
 // ---------------------------------------------------------------------------
 // Hidratação — registros reais por dia/horário, meta lida do perfil
@@ -33,7 +34,7 @@ async function fetchTodayLogs(): Promise<HydrationLog[]> {
   return (data as Row[]).map(mapLog);
 }
 
-const QUERY_KEY = ["hydration-today", toISODate(new Date())] as const;
+const QUERY_KEY = ["hydration-today", toISODate(nowDate())] as const;
 
 export function useTodayHydration(): HydrationLog[] {
   const userId = useSupabaseUserId();

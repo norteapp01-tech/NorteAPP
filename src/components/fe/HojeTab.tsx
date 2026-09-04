@@ -20,6 +20,7 @@ import { Card } from "@/components/sub-agenda-shared";
 import { VerseOfDayCard } from "./VerseOfDayCard";
 import { PrayNowFlow } from "./PrayNowFlow";
 import { NotebookEntryEditor } from "./NotebookEntryEditor";
+import { nowDate } from "@/lib/test-clock";
 
 const dimensionLabels: { key: keyof WeeklyRhythm; label: string }[] = [
   { key: "oracao", label: "Oração" },
@@ -29,8 +30,8 @@ const dimensionLabels: { key: keyof WeeklyRhythm; label: string }[] = [
 ];
 
 function daysElapsedThisWeek(weekStart: "monday" | "sunday"): number {
-  const start = startOfWeekLocal(new Date(), weekStart);
-  const today = new Date();
+  const start = startOfWeekLocal(nowDate(), weekStart);
+  const today = nowDate();
   const ms = today.setHours(0, 0, 0, 0) - start.setHours(0, 0, 0, 0);
   return Math.round(ms / 86400000) + 1;
 }
@@ -85,7 +86,7 @@ export function HojeTab({ onOpenLogReading }: { onOpenLogReading: () => void }) 
               onClick={async () => {
                 await rescheduleExecution(
                   next.execution.id,
-                  toISODate(addDays(new Date(), 1)),
+                  toISODate(addDays(nowDate(), 1)),
                   next.execution.startTime ?? "09:00",
                 );
               }}
@@ -111,7 +112,7 @@ export function HojeTab({ onOpenLogReading }: { onOpenLogReading: () => void }) 
               <span className="text-sm font-medium">{label}</span>
               <div className="flex gap-1">
                 {Array.from({ length: elapsed }).map((_, i) => {
-                  const date = toISODate(addDays(new Date(), i - (elapsed - 1)));
+                  const date = toISODate(addDays(nowDate(), i - (elapsed - 1)));
                   const filled = rhythm[key].includes(date);
                   return (
                     <span

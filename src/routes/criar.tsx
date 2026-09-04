@@ -20,6 +20,7 @@ import {
   type Execution,
 } from "@/lib/goals-store";
 import { categoryMeta, catByArea, lifeAreas } from "@/lib/mock-data";
+import { nowDate } from "@/lib/test-clock";
 
 type Mode = "escolha" | "agenda" | "planejamento";
 
@@ -388,11 +389,11 @@ function PlanejamentoFlow({ onDone }: { onDone: (id: string) => void }) {
   };
 
   const deadlineDate: Date | undefined = (() => {
-    if (form.preset === "Semana") return addDaysLocal(new Date(), 7);
-    if (form.preset === "Mês") return addMonths(new Date(), 1);
-    if (form.preset === "90 dias") return addDaysLocal(new Date(), 90);
-    if (form.preset === "Semestre") return addMonths(new Date(), 6);
-    if (form.preset === "Ano") return addMonths(new Date(), 12);
+    if (form.preset === "Semana") return addDaysLocal(nowDate(), 7);
+    if (form.preset === "Mês") return addMonths(nowDate(), 1);
+    if (form.preset === "90 dias") return addDaysLocal(nowDate(), 90);
+    if (form.preset === "Semestre") return addMonths(nowDate(), 6);
+    if (form.preset === "Ano") return addMonths(nowDate(), 12);
     if (form.preset === "personalizado" && form.customISO)
       return new Date(form.customISO + "T00:00:00");
     return undefined;

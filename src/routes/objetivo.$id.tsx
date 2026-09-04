@@ -18,6 +18,7 @@ import {
 import { categoryMeta } from "@/lib/mock-data";
 import { useProfile } from "@/lib/profile-store";
 import { formatTime } from "@/lib/format-utils";
+import { nowDate, nowMs } from "@/lib/test-clock";
 import {
   useGoalsStore,
   useGoalsLoading,
@@ -728,7 +729,7 @@ function ExecutionRow({
   const [rescheduling, setRescheduling] = useState(false);
   const [busy, setBusy] = useState(false);
   const [schedule, setSchedule] = useState({
-    date: e.agendaDate ?? toISODate(addDays(new Date(), 1)),
+    date: e.agendaDate ?? toISODate(addDays(nowDate(), 1)),
     startTime: e.startTime ?? "",
     endTime: e.endTime ?? "",
   });
@@ -977,7 +978,7 @@ function PaceBar({
   if (goal.deadlineISO) {
     const start = new Date(goal.createdAt).getTime();
     const end = new Date(goal.deadlineISO + "T23:59:59").getTime();
-    const now = Date.now();
+    const now = nowMs();
     if (end > start) expected = Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100));
   }
   return (

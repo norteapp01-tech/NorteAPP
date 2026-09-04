@@ -16,6 +16,7 @@ import {
 import { categoryMeta } from "@/lib/mock-data";
 import { useProfile } from "@/lib/profile-store";
 import { formatTime } from "@/lib/format-utils";
+import { nowMs } from "@/lib/test-clock";
 import {
   useGoalsStore,
   createRoutine,
@@ -249,7 +250,7 @@ function AcademiaModule() {
   const currentWeight = currentBodyWeight(bodyWeights)?.weight;
   const olderWeight =
     sortedWeights.find((b) => {
-      const days = Math.round((Date.now() - new Date(b.date).getTime()) / 86400000);
+      const days = Math.round((nowMs() - new Date(b.date).getTime()) / 86400000);
       return days >= 20;
     }) ?? sortedWeights[sortedWeights.length - 1];
   const weightDelta =
@@ -402,7 +403,7 @@ function AcademiaModule() {
                 {weightDelta}kg em{" "}
                 {Math.max(
                   1,
-                  Math.round((Date.now() - new Date(olderWeight.date).getTime()) / 86400000),
+                  Math.round((nowMs() - new Date(olderWeight.date).getTime()) / 86400000),
                 )}{" "}
                 dias
               </p>

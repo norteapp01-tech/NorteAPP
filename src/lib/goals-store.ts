@@ -3,6 +3,7 @@ import { categoryMeta } from "./mock-data";
 import { supabase } from "./supabase/client";
 import { queryClient } from "./query-client";
 import { useSupabaseUserId, ensureSession } from "./supabase/client";
+import { nowDate, nowMs } from "./test-clock";
 
 // ---------------------------------------------------------------------------
 // Norte — fonte única de verdade, agora persistida no Supabase.
@@ -120,10 +121,10 @@ export function addDays(base: Date, n: number) {
   return d;
 }
 export function todayISO() {
-  return toISODate(new Date());
+  return toISODate(nowDate());
 }
 export function nowHM() {
-  const d = new Date();
+  const d = nowDate();
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 /** "YYYY-MM-DD" -> "DD/MM/YYYY" por split de string — nunca passa por `Date`,
@@ -188,7 +189,7 @@ export function goalPace(
   if (!goal.deadlineISO) return "ontrack";
   const start = new Date(goal.createdAt).getTime();
   const end = new Date(goal.deadlineISO + "T23:59:59").getTime();
-  const now = Date.now();
+  const now = nowMs();
   if (end <= start) return "ontrack";
   const expected = Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100));
   const actual = goalProgress(goal, steps, executions);
@@ -211,7 +212,7 @@ export function planningStatus(goal: Goal, steps: Step[], executions: Execution[
   if (!goal.deadlineISO) return "em_risco";
   const start = new Date(goal.createdAt).getTime();
   const end = new Date(goal.deadlineISO + "T23:59:59").getTime();
-  const now = Date.now();
+  const now = nowMs();
   const expected =
     end > start ? Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100)) : 0;
   return progress < expected - 20 ? "atrasado" : "em_risco";
@@ -310,7 +311,7 @@ export function streakForTitle(executions: Execution[], title: string): number {
       .filter((e) => e.title === title && e.status === "concluida")
       .map((e) => relevantDate(e)),
   );
-  let cursor = new Date();
+  let cursor = nowDate();
   if (!dates.has(toISODate(cursor))) cursor = addDays(cursor, -1);
   let streak = 0;
   while (dates.has(toISODate(cursor))) {
@@ -486,7 +487,7 @@ export type Range = "dia" | "semana" | "mes" | "ano";
 
 export function kpisForRange(state: State, range: Range, offsetDays = 0) {
   const days = range === "dia" ? 1 : range === "semana" ? 7 : range === "mes" ? 30 : 365;
-  const windowEnd = addDays(new Date(), -offsetDays);
+  const windowEnd = addDays(nowDate(), -offsetDays);
   const end = toISODate(windowEnd);
   const start = toISODate(addDays(windowEnd, -(days - 1)));
   const iso = todayISO();
@@ -993,10 +994,10 @@ export async function rescheduleExecution(
 }
 
 export function suggestRedistributionDate(allExecutions: Execution[]): string {
-  let best = addDays(new Date(), 1);
+  let best = addDays(nowDate(), 1);
   let bestLoad = Infinity;
   for (let i = 1; i <= 3; i++) {
-    const d = addDays(new Date(), i);
+    const d = addDays(nowDate(), i);
     const load = plannedHoursForDate(allExecutions, toISODate(d));
     if (load < bestLoad) {
       bestLoad = load;
@@ -1113,7 +1114,7 @@ async function materializeRoutineExecutions(routine: {
     .select("agenda_date")
     .eq("routine_id", routine.id);
   const already = new Set((existing ?? []).map((e) => e.agenda_date as string));
-  const today = new Date();
+  const today = nowDate();
   const toInsert: Row[] = [];
   for (let i = 0; i < ROUTINE_WEEKS_AHEAD * 7; i++) {
     const d = addDays(today, i);

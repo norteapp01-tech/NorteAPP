@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { contextualMessage } from "@/lib/verse-of-day";
+import { nowDate } from "@/lib/test-clock";
 import { HojeTab } from "./HojeTab";
 import { JornadaTab } from "./JornadaTab";
 import { OracaoTab } from "./OracaoTab";
@@ -15,7 +16,7 @@ const tabs: { key: Tab; label: string }[] = [
 ];
 
 const todayFormatted = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long" }).format(
-  new Date(),
+  nowDate(),
 );
 
 export function FeModule() {

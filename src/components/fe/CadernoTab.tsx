@@ -9,6 +9,7 @@ import {
 } from "@/lib/fe-store";
 import { Card } from "@/components/sub-agenda-shared";
 import { NotebookEntryEditor } from "./NotebookEntryEditor";
+import { nowMs } from "@/lib/test-clock";
 
 const typeMeta: Record<NotebookEntryType, string> = {
   deus_falou: "Deus falou comigo",
@@ -31,8 +32,8 @@ const typeOptions: NotebookEntryType[] = [
 ];
 
 function dayLabel(iso: string): string {
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const today = new Date(nowMs()).toISOString().slice(0, 10);
+  const yesterday = new Date(nowMs() - 86400000).toISOString().slice(0, 10);
   if (iso === today) return "Hoje";
   if (iso === yesterday) return "Ontem";
   const [, m, d] = iso.split("-");

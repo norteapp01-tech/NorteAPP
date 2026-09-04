@@ -1,4 +1,5 @@
 import { useGoalsStore, todayISO, addDays, toISODate } from "@/lib/goals-store";
+import { nowDate } from "@/lib/test-clock";
 import {
   useReadingStore,
   getBookProgress,
@@ -26,7 +27,7 @@ function milestoneLine(book: Book, current: number, planned: number): string {
 
 function nextScheduleLabel(date: string, time: string): string {
   if (date === todayISO()) return `hoje, ${time}`;
-  if (date === toISODate(addDays(new Date(), 1))) return `amanhã, ${time}`;
+  if (date === toISODate(addDays(nowDate(), 1))) return `amanhã, ${time}`;
   const [, m, d] = date.split("-");
   return `${d}/${m}, ${time}`;
 }

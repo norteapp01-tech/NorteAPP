@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { todayISO } from "./goals-store";
 import { supabase, ensureSession, useSupabaseUserId } from "./supabase/client";
 import { queryClient } from "./query-client";
+import { nowDate } from "./test-clock";
 
 // ---------------------------------------------------------------------------
 // Diário de treino da Academia — Treino (A/B/C...) -> Exercícios -> Sessões
@@ -87,7 +88,7 @@ export function exercisesForPlan(exercises: Exercise[], planId: string): Exercis
 }
 
 export function todaysPlanId(weeklyAssignment: Record<number, string | null>): string | null {
-  return weeklyAssignment[new Date().getDay()] ?? null;
+  return weeklyAssignment[nowDate().getDay()] ?? null;
 }
 
 export function sessionForToday(
@@ -548,7 +549,7 @@ export async function finishSession(sessionId: string) {
   unwrap(
     await supabase
       .from("workout_sessions")
-      .update({ status: "concluido", finished_at: new Date().toISOString() })
+      .update({ status: "concluido", finished_at: nowDate().toISOString() })
       .eq("id", sessionId)
       .select()
       .single(),

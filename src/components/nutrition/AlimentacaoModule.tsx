@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, RotateCw, Circle } from "lucide-react";
 import { todayISO } from "@/lib/goals-store";
+import { nowDate } from "@/lib/test-clock";
 import {
   useNutritionStore,
   mealsSorted,
@@ -16,7 +17,7 @@ import { MealDetailSheet } from "./MealDetailSheet";
 import { EditDietSheet } from "./EditDietSheet";
 
 const todayLabel = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long" }).format(
-  new Date(),
+  nowDate(),
 );
 
 const statusMeta: Record<MealStatus, { icon: typeof Check; label: string; className: string }> = {

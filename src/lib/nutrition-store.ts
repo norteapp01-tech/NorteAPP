@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { todayISO } from "./goals-store";
 import { supabase, ensureSession, useSupabaseUserId } from "./supabase/client";
 import { queryClient } from "./query-client";
+import { nowDate } from "./test-clock";
 
 // ---------------------------------------------------------------------------
 // Alimentação — a dieta virou rotina de execução, não um contador de
@@ -326,7 +327,7 @@ export async function confirmMealOption(
           carbs: (optRow.carbs as number) ?? 0,
           fat: (optRow.fat as number) ?? 0,
           calories: (optRow.calories as number) ?? 0,
-          confirmed_at: new Date().toISOString(),
+          confirmed_at: nowDate().toISOString(),
         },
         { onConflict: "meal_id,date" },
       )
@@ -358,7 +359,7 @@ export async function confirmMealCustom(
           carbs: macros.carbs ?? 0,
           fat: macros.fat ?? 0,
           calories: macros.calories ?? 0,
-          confirmed_at: new Date().toISOString(),
+          confirmed_at: nowDate().toISOString(),
         },
         { onConflict: "meal_id,date" },
       )

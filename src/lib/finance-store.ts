@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { todayISO } from "./goals-store";
 import { supabase, ensureSession, useSupabaseUserId } from "./supabase/client";
 import { queryClient } from "./query-client";
+import { nowDate } from "./test-clock";
 
 // ---------------------------------------------------------------------------
 // Finanças — diário financeiro, não extrato bancário. Tudo aqui é o que o
@@ -275,7 +276,7 @@ export function computeInsights(state: State, month: string): Insight[] {
     });
   }
 
-  const dayOfMonth = month === currentMonth() ? new Date().getDate() : daysInMonth(month);
+  const dayOfMonth = month === currentMonth() ? nowDate().getDate() : daysInMonth(month);
   const monthDays = daysInMonth(month);
   const expectedPace = dayOfMonth / monthDays;
   for (const l of limitsWithProgress(state.transactions, state.categoryLimits, month)) {
@@ -295,7 +296,7 @@ export function computeInsights(state: State, month: string): Insight[] {
 export function projectedMonthlyPace(goal: FinancialGoal): number | null {
   if (!goal.deadline) return null;
   const remaining = Math.max(0, goal.targetAmount - goal.savedAmount);
-  const today = new Date();
+  const today = nowDate();
   const deadline = new Date(goal.deadline + "T00:00:00");
   const months = Math.max(
     1,
@@ -608,7 +609,7 @@ export async function answerCheckIn(id: string, answer: CheckInAnswer, note?: st
   unwrap(
     await supabase
       .from("check_ins")
-      .update({ answer, note, responded_at: new Date().toISOString() })
+      .update({ answer, note, responded_at: nowDate().toISOString() })
       .eq("id", id)
       .select()
       .single(),

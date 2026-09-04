@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
+import { nowDate } from "@/lib/test-clock";
 import {
   Play,
   Check,
@@ -90,7 +91,7 @@ export function TodayScreen() {
       <header className="flex items-end justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-            {new Date().toLocaleDateString("pt-BR", {
+            {nowDate().toLocaleDateString("pt-BR", {
               weekday: "long",
               day: "2-digit",
               month: "short",
@@ -140,7 +141,7 @@ export function TodayScreen() {
             setMoodStep("converse");
           }}
           onFinish={async (action) => {
-            const tomorrow = toISODate(addDays(new Date(), 1));
+            const tomorrow = toISODate(addDays(nowDate(), 1));
             if (action === "adiar-pesados") {
               await Promise.all(
                 tasks
@@ -595,7 +596,7 @@ function FocusModal({
 function ConfrontModal({ task, onClose }: { task: Execution; onClose: () => void }) {
   const [step, setStep] = useState<"why" | "reason" | "recover">("why");
   const [reagendarOpen, setReagendarOpen] = useState(false);
-  const [date, setDate] = useState(toISODate(addDays(new Date(), 1)));
+  const [date, setDate] = useState(toISODate(addDays(nowDate(), 1)));
   const [startTime, setStartTime] = useState(task.startTime ?? "");
   const [endTime, setEndTime] = useState(task.endTime ?? "");
   const [applied, setApplied] = useState<string | null>(null);
@@ -610,7 +611,7 @@ function ConfrontModal({ task, onClose }: { task: Execution; onClose: () => void
     setBusy(true);
     try {
       if (task.rigid) {
-        const tomorrow = toISODate(addDays(new Date(), 1));
+        const tomorrow = toISODate(addDays(nowDate(), 1));
         await markMissed(task.id, reason);
         await rescheduleExecution(task.id, tomorrow, "06:00", undefined, reason, { rigid: true });
         setApplied(`Reagendado com prioridade alta para amanhã 06:00 (${reason}).`);
@@ -821,7 +822,7 @@ function EndOfDayModal({
   const profile = useProfile();
   const decide = async (t: Execution, action: string) => {
     setDecisions((p) => ({ ...p, [t.id]: action }));
-    const tomorrow = toISODate(addDays(new Date(), 1));
+    const tomorrow = toISODate(addDays(nowDate(), 1));
     await markMissed(t.id, `fechamento do dia: ${action}`);
     if (action === "reagendar")
       await rescheduleExecution(

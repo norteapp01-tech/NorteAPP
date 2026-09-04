@@ -4,6 +4,7 @@ import { startOfWeekLocal } from "./format-utils";
 import type { WeekStart } from "./profile-store";
 import { supabase, ensureSession, useSupabaseUserId } from "./supabase/client";
 import { queryClient } from "./query-client";
+import { nowDate } from "./test-clock";
 
 /** Data que rege o momento espiritual — agenda se existir, senão o prazo (mesma regra do core). */
 function relevantDate(e: { dueDate: string; agendaDate?: string }): string {
@@ -242,7 +243,7 @@ export function weeklyRhythm(
   executions: { dueDate: string; agendaDate?: string; status: string; routineId?: string }[],
   weekStart: WeekStart = "monday",
 ): WeeklyRhythm {
-  const start = toISODate(startOfWeekLocal(new Date(), weekStart));
+  const start = toISODate(startOfWeekLocal(nowDate(), weekStart));
   const today = todayISO();
   const inWeek = (d: string) => d >= start && d <= today;
 
@@ -321,7 +322,7 @@ export function activePurpose(purposes: Purpose[]): Purpose | undefined {
 }
 
 export function getResurfacingCandidate(entries: NotebookEntry[]): NotebookEntry | null {
-  const cutoff = toISODate(addDays(new Date(), -7));
+  const cutoff = toISODate(addDays(nowDate(), -7));
   const eligible = entries.filter((e) => e.createdAt.slice(0, 10) <= cutoff);
   if (eligible.length === 0) return null;
   const today = todayISO();
@@ -649,7 +650,7 @@ export async function markResurfaced(id: string) {
     await supabase
       .from("notebook_entries")
       .update({
-        last_resurfaced_at: new Date().toISOString(),
+        last_resurfaced_at: nowDate().toISOString(),
         resurface_count: ((row.resurface_count as number) ?? 0) + 1,
       })
       .eq("id", id)

@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useGoalsStore, goalProgress, goalPace } from "@/lib/goals-store";
+import { nowDate } from "@/lib/test-clock";
 
 const monthShort = [
   "Jan",
@@ -29,7 +30,7 @@ export function PlanGantt() {
   const executions = useGoalsStore((s) => s.executions);
 
   const { months, rows } = useMemo(() => {
-    const now = new Date();
+    const now = nowDate();
     let minMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     let maxMonth = new Date(now.getFullYear(), now.getMonth() + 5, 1);
     for (const g of goals) {

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase, useSupabaseUserId, ensureSession } from "./supabase/client";
 import { queryClient } from "./query-client";
+import { nowDate } from "./test-clock";
 
 // ---------------------------------------------------------------------------
 // Perfil — uma linha por usuário (Perfil + Preferências + Notificações, tudo
@@ -117,7 +118,7 @@ export async function updateProfile(patch: {
 export function ageFromBirthDate(birthDate: string | null): number | null {
   if (!birthDate) return null;
   const birth = new Date(birthDate + "T00:00:00");
-  const now = new Date();
+  const now = nowDate();
   let age = now.getFullYear() - birth.getFullYear();
   const hadBirthdayThisYear =
     now.getMonth() > birth.getMonth() ||
@@ -126,7 +127,7 @@ export function ageFromBirthDate(birthDate: string | null): number | null {
   return age;
 }
 
-export function greeting(date = new Date()): string {
+export function greeting(date = nowDate()): string {
   const hour = date.getHours();
   if (hour < 12) return "Bom dia";
   if (hour < 18) return "Boa tarde";

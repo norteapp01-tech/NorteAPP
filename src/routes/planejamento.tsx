@@ -18,6 +18,7 @@ import { PlanGantt } from "@/components/PlanGantt";
 import { useProfile } from "@/lib/profile-store";
 import type { TimeFormat, WeekStart } from "@/lib/profile-store";
 import { formatTime, startOfWeekLocal } from "@/lib/format-utils";
+import { nowDate } from "@/lib/test-clock";
 
 export const Route = createFileRoute("/planejamento")({
   head: () => ({ meta: [{ title: "Planejamento — Norte" }] }),
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/planejamento")({
 type Layer = "hoje" | "semana" | "mes" | "quarter" | "semestre" | "ano";
 
 const dayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-const sundayMode = new Date().getDay() === 0;
+const sundayMode = nowDate().getDay() === 0;
 
 const layerLabel: Record<Layer, string> = {
   hoje: "Hoje",
@@ -41,7 +42,7 @@ const layerLabel: Record<Layer, string> = {
 /** Dias entre hoje e uma data ISO (negativo se já passou). */
 function daysUntil(iso?: string): number | null {
   if (!iso) return null;
-  const today = new Date();
+  const today = nowDate();
   today.setHours(0, 0, 0, 0);
   const d = new Date(iso + "T00:00:00");
   return Math.round((d.getTime() - today.getTime()) / 86400000);
@@ -244,7 +245,7 @@ function WeekLayer({
   weekStart: WeekStart;
   timeFormat: TimeFormat;
 }) {
-  const start = useMemo(() => startOfWeekLocal(new Date(), weekStart), [weekStart]);
+  const start = useMemo(() => startOfWeekLocal(nowDate(), weekStart), [weekStart]);
   const week = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(start, i)), [start]);
   const byDate = useMemo(() => agendaByDate(executions), [executions]);
 

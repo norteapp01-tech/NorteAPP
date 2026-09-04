@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toISODate, todayISO, addDays, createRoutine, removeRoutine } from "./goals-store";
 import { supabase, ensureSession, useSupabaseUserId } from "./supabase/client";
 import { queryClient } from "./query-client";
+import { nowDate, nowMs } from "./test-clock";
 import type { SearchBookResult } from "./book-search-service";
 
 // ---------------------------------------------------------------------------
@@ -274,7 +275,7 @@ export function calculateProjectedFinishDate(
   const daily = computePlanDailyAmount(book, plan, routine).value;
   if (daily <= 0) return null;
   let remaining = getRemainingAmount(book);
-  let d = new Date();
+  let d = nowDate();
   let guard = 0;
   while (remaining > 0 && guard < 3650) {
     d = addDays(d, 1);
@@ -296,7 +297,7 @@ export function calculateSessionProgress(
   return { progressSeconds: delta };
 }
 
-function sessionElapsedSeconds(session: ReadingSession, now = Date.now()): number {
+function sessionElapsedSeconds(session: ReadingSession, now = nowMs()): number {
   const start = new Date(session.startedAt).getTime();
   const end = session.endedAt ? new Date(session.endedAt).getTime() : now;
   const activePauseSeconds = session.pausedSince
@@ -340,7 +341,7 @@ export function getTodayReadingTarget(
   const plan = planFor(state.plans, bookId);
   const routine = routineFor(state.routines, bookId);
   if (!book || !plan || !routine) return null;
-  if (!routine.weekdays.includes(new Date().getDay())) return null;
+  if (!routine.weekdays.includes(nowDate().getDay())) return null;
   const iso = todayISO();
   const existing = state.dailyTargets.find((t) => t.bookId === bookId && t.date === iso);
   if (existing)
@@ -382,7 +383,7 @@ export function getReadingStreak(state: State): number {
   const dates = new Set<string>(state.activityDates);
   for (const s of state.sessions)
     if (s.status === "completed" && s.endedAt) dates.add(toISODate(new Date(s.endedAt)));
-  let cursor = new Date();
+  let cursor = nowDate();
   if (!dates.has(toISODate(cursor))) cursor = addDays(cursor, -1);
   let streak = 0;
   while (dates.has(toISODate(cursor))) {
@@ -397,7 +398,7 @@ export function getMonthlyReadingStats(state: State): {
   totalPages: number;
   booksCompleted: number;
 } {
-  const now = new Date();
+  const now = nowDate();
   const monthStart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
   const sessionsThisMonth = state.sessions.filter(
     (s) => s.status === "completed" && s.endedAt && toISODate(new Date(s.endedAt)) >= monthStart,
@@ -438,7 +439,7 @@ export function searchReadingNotes(
 }
 
 export function getResurfacingCandidate(state: State): ReadingNote | null {
-  const cutoff = toISODate(addDays(new Date(), -7));
+  const cutoff = toISODate(addDays(nowDate(), -7));
   const eligible = state.notes.filter((n) => toISODate(new Date(n.createdAt)) <= cutoff);
   if (eligible.length === 0) return null;
   const iso = todayISO();
@@ -857,7 +858,7 @@ export async function pauseBook(bookId: string) {
   unwrap(
     await supabase
       .from("reading_books")
-      .update({ status: "paused", paused_at: new Date().toISOString() })
+      .update({ status: "paused", paused_at: nowDate().toISOString() })
       .eq("id", bookId)
       .select()
       .single(),
@@ -891,7 +892,7 @@ export async function completeBook(
       .from("reading_books")
       .update({
         status: "completed",
-        completed_at: new Date().toISOString(),
+        completed_at: nowDate().toISOString(),
         rating: extra?.rating,
         main_takeaway: extra?.mainTakeaway,
         personal_reflection: extra?.personalReflection,
@@ -998,7 +999,7 @@ export async function startSession(bookId: string): Promise<StartSessionResult> 
       .insert({
         user_id: userId,
         book_id: bookId,
-        started_at: new Date().toISOString(),
+        started_at: nowDate().toISOString(),
         paused_duration_seconds: 0,
         start_page: book?.progressMode === "pages" ? (book.currentPage ?? 0) : undefined,
         start_percentage:
@@ -1020,7 +1021,7 @@ export async function pauseSession(sessionId: string) {
   unwrap(
     await supabase
       .from("reading_sessions")
-      .update({ paused_since: new Date().toISOString() })
+      .update({ paused_since: nowDate().toISOString() })
       .eq("id", sessionId)
       .select()
       .single(),
@@ -1031,7 +1032,7 @@ export async function pauseSession(sessionId: string) {
 export async function resumeSession(sessionId: string) {
   const session = snapshot().sessions.find((s) => s.id === sessionId);
   if (!session || !session.pausedSince) return;
-  const extra = Math.max(0, (Date.now() - new Date(session.pausedSince).getTime()) / 1000);
+  const extra = Math.max(0, (nowMs() - new Date(session.pausedSince).getTime()) / 1000);
   unwrap(
     await supabase
       .from("reading_sessions")
@@ -1075,7 +1076,7 @@ export async function finishSession(
   const progress = calculateSessionProgress(book, startValue, safeEndingValue);
   const durationSeconds = sessionElapsedSeconds(session);
   const iso = todayISO();
-  const endedAt = new Date().toISOString();
+  const endedAt = nowDate().toISOString();
 
   await supabase
     .from("reading_sessions")
@@ -1180,7 +1181,7 @@ export async function markResurfaced(noteId: string) {
     await supabase
       .from("reading_notes")
       .update({
-        last_resurfaced_at: new Date().toISOString(),
+        last_resurfaced_at: nowDate().toISOString(),
         resurface_count: (note?.resurfaceCount ?? 0) + 1,
       })
       .eq("id", noteId)
@@ -1289,11 +1290,11 @@ export async function checkForMissedTargets() {
     const plan = planFor(state.plans, book.id);
     const routine = routineFor(state.routines, book.id);
     if (!plan || !routine) continue;
-    const lookbackStart = toISODate(addDays(new Date(), -14));
+    const lookbackStart = toISODate(addDays(nowDate(), -14));
     const days = plannedDaysBetween(
       routine,
       lookbackStart,
-      toISODate(addDays(new Date(), -1)),
+      toISODate(addDays(nowDate(), -1)),
     ).filter((d) => d < iso);
     for (const date of days) {
       const has = state.dailyTargets.some((t) => t.bookId === book.id && t.date === date);
@@ -1341,8 +1342,8 @@ export async function redistributeMissedTarget(dailyTargetId: string) {
     await invalidate();
     return;
   }
-  const horizonEnd = plan.deadline ?? toISODate(addDays(new Date(), 30));
-  const days = plannedDaysBetween(routine, toISODate(addDays(new Date(), 1)), horizonEnd);
+  const horizonEnd = plan.deadline ?? toISODate(addDays(nowDate(), 30));
+  const days = plannedDaysBetween(routine, toISODate(addDays(nowDate(), 1)), horizonEnd);
   if (days.length > 0) {
     const share = Math.floor(missed / days.length);
     let remainder = missed - share * days.length;

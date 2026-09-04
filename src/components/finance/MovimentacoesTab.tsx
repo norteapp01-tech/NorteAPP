@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { useFinanceStore, formatBRL, type Transaction } from "@/lib/finance-store";
 import { todayISO } from "@/lib/goals-store";
+import { nowDate } from "@/lib/test-clock";
 
 type Filter = "all" | "expense" | "income";
 
 function dayLabel(date: string): string {
   const today = todayISO();
   if (date === today) return "Hoje";
-  const yesterday = new Date();
+  const yesterday = nowDate();
   yesterday.setDate(yesterday.getDate() - 1);
   const yISO = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
   if (date === yISO) return "Ontem";

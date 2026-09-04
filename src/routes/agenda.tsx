@@ -28,6 +28,7 @@ import {
   weekStartsOnFor,
 } from "@/lib/format-utils";
 import type { TimeFormat, WeekStart } from "@/lib/profile-store";
+import { nowDate } from "@/lib/test-clock";
 
 export const Route = createFileRoute("/agenda")({
   head: () => ({ meta: [{ title: "Agenda — Norte" }] }),
@@ -58,8 +59,8 @@ function localISO(d: Date) {
 
 function AgendaScreen() {
   const [view, setView] = useState<View>("mes");
-  const [cursor, setCursor] = useState(() => new Date());
-  const [selectedDate, setSelectedDate] = useState<string>(() => localISO(new Date()));
+  const [cursor, setCursor] = useState(() => nowDate());
+  const [selectedDate, setSelectedDate] = useState<string>(() => localISO(nowDate()));
 
   const executions = useGoalsStore((s) => s.executions);
   const eventsByDate = useMemo(() => agendaByDate(executions), [executions]);
@@ -344,7 +345,7 @@ function MonthGrid({
   const cells: (Date | null)[] = [];
   for (let i = 0; i < leadingBlanks; i++) cells.push(null);
   for (let d = 1; d <= days; d++) cells.push(new Date(y, m, d));
-  const todayIso = localISO(new Date());
+  const todayIso = localISO(nowDate());
   const orderedLabels = weekdayLabelsFor(weekStart, weekLabels);
 
   return (
