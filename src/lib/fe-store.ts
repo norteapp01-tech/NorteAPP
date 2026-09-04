@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { toISODate, addDays, todayISO, createRoutine, removeRoutine } from "./goals-store";
+import { startOfWeekLocal } from "./format-utils";
+import type { WeekStart } from "./profile-store";
 
 /** Data que rege o momento espiritual — agenda se existir, senão o prazo (mesma regra do core). */
 function relevantDate(e: { dueDate: string; agendaDate?: string }): string {
@@ -216,12 +218,6 @@ export function notebookTimeline(entries: NotebookEntry[], query = ""): Notebook
   );
 }
 
-function weekStartISO(date = new Date()): string {
-  const day = date.getDay(); // 0=domingo
-  const monday = addDays(date, day === 0 ? -6 : 1 - day);
-  return toISODate(monday);
-}
-
 export type WeeklyRhythm = {
   oracao: string[];
   palavra: string[];
@@ -229,12 +225,14 @@ export type WeeklyRhythm = {
   reflexao: string[];
 };
 
-/** Nada de streak — só os dias distintos desta semana em que cada dimensão aconteceu. */
+/** Nada de streak — só os dias distintos desta semana em que cada dimensão aconteceu.
+ * "Semana" respeita a preferência de primeiro dia salva em Configurações. */
 export function weeklyRhythm(
   state: State,
   executions: { dueDate: string; agendaDate?: string; status: string; routineId?: string }[],
+  weekStart: WeekStart = "monday",
 ): WeeklyRhythm {
-  const start = weekStartISO();
+  const start = toISODate(startOfWeekLocal(new Date(), weekStart));
   const today = todayISO();
   const inWeek = (d: string) => d >= start && d <= today;
 

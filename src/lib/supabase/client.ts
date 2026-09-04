@@ -22,18 +22,26 @@ export const supabase = createClient(url, anonKey, {
 
 let bootstrapped: Promise<string> | null = null;
 
-/** Garante uma sessão anônima ativa e devolve o user_id — chamar uma vez no boot do app. */
+/** Garante uma sessão anônima ativa e devolve o user_id — chamar uma vez no boot do app.
+ * Se falhar (rede indisponível, Supabase fora do ar), a próxima chamada tenta de novo —
+ * sem isso, uma falha transitória "grudava" pra sempre e nenhum "tentar novamente"
+ * funcionava, mesmo com a rede já restabelecida. */
 export function ensureSession(): Promise<string> {
   if (!bootstrapped) {
     bootstrapped = (async () => {
-      const { data: existing } = await supabase.auth.getSession();
-      if (existing.session?.user.id) return existing.session.user.id;
+      try {
+        const { data: existing } = await supabase.auth.getSession();
+        if (existing.session?.user.id) return existing.session.user.id;
 
-      const { data, error } = await supabase.auth.signInAnonymously();
-      if (error || !data.session) {
-        throw new Error(`Falha ao iniciar sessão anônima do Supabase: ${error?.message}`);
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (error || !data.session) {
+          throw new Error(`Falha ao iniciar sessão anônima do Supabase: ${error?.message}`);
+        }
+        return data.session.user.id;
+      } catch (err) {
+        bootstrapped = null;
+        throw err;
       }
-      return data.session.user.id;
     })();
   }
   return bootstrapped;

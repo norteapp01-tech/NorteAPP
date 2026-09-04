@@ -14,6 +14,8 @@ import {
   weeklyRhythm,
   type WeeklyRhythm,
 } from "@/lib/fe-store";
+import { useProfile } from "@/lib/profile-store";
+import { startOfWeekLocal, formatTime } from "@/lib/format-utils";
 import { Card } from "@/components/sub-agenda-shared";
 import { VerseOfDayCard } from "./VerseOfDayCard";
 import { PrayNowFlow } from "./PrayNowFlow";
@@ -26,21 +28,24 @@ const dimensionLabels: { key: keyof WeeklyRhythm; label: string }[] = [
   { key: "reflexao", label: "Reflexão" },
 ];
 
-function daysElapsedThisWeek(): number {
-  const day = new Date().getDay();
-  return day === 0 ? 7 : day;
+function daysElapsedThisWeek(weekStart: "monday" | "sunday"): number {
+  const start = startOfWeekLocal(new Date(), weekStart);
+  const today = new Date();
+  const ms = today.setHours(0, 0, 0, 0) - start.setHours(0, 0, 0, 0);
+  return Math.round(ms / 86400000) + 1;
 }
 
 export function HojeTab({ onOpenLogReading }: { onOpenLogReading: () => void }) {
   const state = useFeStore((s) => s);
   const executions = useGoalsStore((s) => s.executions);
+  const profile = useProfile();
   const [praying, setPraying] = useState(false);
   const [writingReflection, setWritingReflection] = useState(false);
 
   const next = nextSpiritualMoment(state.spiritualActivities, executions);
   const purpose = activePurpose(state.purposes);
-  const rhythm = weeklyRhythm(state, executions);
-  const elapsed = daysElapsedThisWeek();
+  const rhythm = weeklyRhythm(state, executions, profile.weekStart);
+  const elapsed = daysElapsedThisWeek(profile.weekStart);
 
   return (
     <div className="space-y-5">
@@ -60,7 +65,9 @@ export function HojeTab({ onOpenLogReading }: { onOpenLogReading: () => void }) 
 
       {next && (
         <Card title="Próximo">
-          <p className="font-mono text-2xl font-bold text-primary">{next.execution.startTime}</p>
+          <p className="font-mono text-2xl font-bold text-primary">
+            {formatTime(next.execution.startTime, profile.timeFormat)}
+          </p>
           <p className="mt-1 text-sm font-semibold">{next.execution.title}</p>
           {next.activity.durationMinutes && (
             <p className="text-xs text-muted-foreground">{next.activity.durationMinutes} min</p>

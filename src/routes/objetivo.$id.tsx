@@ -16,6 +16,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { categoryMeta } from "@/lib/mock-data";
+import { useProfile } from "@/lib/profile-store";
+import { formatTime } from "@/lib/format-utils";
 import {
   useGoalsStore,
   useGoalsLoading,
@@ -394,6 +396,7 @@ export function GoalDetail() {
 }
 
 function StepRow({ step, goal, executions }: { step: Step; goal: Goal; executions: Execution[] }) {
+  const profile = useProfile();
   const [adding, setAdding] = useState(false);
   const [showSubtasks, setShowSubtasks] = useState(false);
   const [subtaskDraft, setSubtaskDraft] = useState("");
@@ -512,7 +515,7 @@ function StepRow({ step, goal, executions }: { step: Step; goal: Goal; execution
             <>
               <p className="text-[11px] text-foreground">
                 Execução "{justCreated.title}" agendada para {formatDateBR(justCreated.agendaDate!)}{" "}
-                às {justCreated.startTime} ✓
+                às {formatTime(justCreated.startTime, profile.timeFormat)} ✓
               </p>
               <button
                 onClick={() => setJustCreatedId(null)}
@@ -721,6 +724,7 @@ function ExecutionRow({
   const status = effectiveStatus(e);
   const scheduled = isScheduled(e);
   const relatedStep = steps.find((s) => s.id === e.stepId);
+  const profile = useProfile();
   const [rescheduling, setRescheduling] = useState(false);
   const [busy, setBusy] = useState(false);
   const [schedule, setSchedule] = useState({
@@ -768,8 +772,8 @@ function ExecutionRow({
                 {e.agendaDate!.slice(5).replace("-", "/")}
               </p>
               <p className="font-mono text-sm font-bold">
-                {e.startTime}
-                {e.endTime ? `–${e.endTime}` : ""}
+                {formatTime(e.startTime, profile.timeFormat)}
+                {e.endTime ? `–${formatTime(e.endTime, profile.timeFormat)}` : ""}
               </p>
             </>
           ) : (
@@ -1013,6 +1017,7 @@ function Row({ label, pct, color }: { label: string; pct: number; color: string 
 
 function ExecutionPicker({ goalId, onClose }: { goalId: string; onClose: () => void }) {
   const executions = useGoalsStore((s) => s.executions);
+  const profile = useProfile();
   const available = executions.filter((e) => e.goalId !== goalId && e.status === "planejada");
   return (
     <div
@@ -1058,7 +1063,7 @@ function ExecutionPicker({ goalId, onClose }: { goalId: string; onClose: () => v
                   <p className="text-[11px] text-muted-foreground">
                     Prazo {formatDateBR(e.dueDate)}
                     {isScheduled(e)
-                      ? ` · agendada ${formatDateBR(e.agendaDate!)} ${e.startTime}`
+                      ? ` · agendada ${formatDateBR(e.agendaDate!)} ${formatTime(e.startTime, profile.timeFormat)}`
                       : " · sem agenda"}
                     {e.goalId ? " · já vinculada a outro planejamento" : ""}
                   </p>

@@ -1,40 +1,107 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { RefreshCcw, WifiOff, AlertTriangle } from "lucide-react";
 import { supabase, ensureSession, hasLinkedAccount } from "@/lib/supabase/client";
 
-type Status = "checking" | "ready" | "needs-login";
+type Status = "checking" | "ready" | "needs-login" | "connection-error";
 
 /**
  * No boot padrão (nunca fez upgrade pra e-mail/senha), continua 100% silencioso —
  * sessão anônima automática, sem tela nenhuma. Só se ESTE navegador já teve uma
  * conta real vinculada e a sessão sumiu (ex.: logout) é que mostramos um login
  * mínimo, pra não criar uma conta anônima nova e "perder" os dados de verdade.
+ *
+ * Se a criação/verificação de sessão falhar (rede indisponível, Supabase fora do
+ * ar), nunca deixamos a tela em branco pra sempre — mostramos um estado de erro
+ * explícito com "Tentar novamente" (que reexecuta o boot de verdade, já que
+ * `ensureSession()` agora reseta seu cache interno quando falha).
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("checking");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setStatus("checking");
     (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (cancelled) return;
+        if (data.session) {
+          setStatus("ready");
+          return;
+        }
+        if (hasLinkedAccount()) {
+          setStatus("needs-login");
+          return;
+        }
+        await ensureSession();
         if (!cancelled) setStatus("ready");
-        return;
+      } catch (err) {
+        if (cancelled) return;
+        setErrorMessage(err instanceof Error ? err.message : "Falha desconhecida.");
+        setStatus("connection-error");
       }
-      if (hasLinkedAccount()) {
-        if (!cancelled) setStatus("needs-login");
-        return;
-      }
-      await ensureSession();
-      if (!cancelled) setStatus("ready");
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
-  if (status === "checking") return null;
+  if (status === "checking") return <BootScreen />;
+  if (status === "connection-error") {
+    return (
+      <ConnectionErrorScreen message={errorMessage} onRetry={() => setAttempt((a) => a + 1)} />
+    );
+  }
   if (status === "needs-login") return <SignInScreen onSuccess={() => setStatus("ready")} />;
   return <>{children}</>;
+}
+
+/** Sutil, sem "pulo" de layout — evita tela branca perceptível em conexões lentas
+ * sem competir visualmente com o app real quando a checagem é instantânea. */
+function BootScreen() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="h-6 w-6 animate-pulse rounded-full bg-primary/40" aria-hidden="true" />
+      <span className="sr-only">Carregando…</span>
+    </div>
+  );
+}
+
+function ConnectionErrorScreen({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const offline = typeof navigator !== "undefined" && !navigator.onLine;
+  return (
+    <div
+      role="alert"
+      className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-6 text-center"
+    >
+      {offline ? (
+        <WifiOff className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+      ) : (
+        <AlertTriangle className="h-8 w-8 text-warning" aria-hidden="true" />
+      )}
+      <div>
+        <h1 className="text-lg font-bold">
+          {offline ? "Sem conexão com a internet" : "Não foi possível conectar"}
+        </h1>
+        <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+          {offline
+            ? "Verifique sua internet e tente de novo. Seus dados continuam salvos com segurança."
+            : "Não deu pra confirmar sua sessão agora. Isso costuma ser temporário."}
+        </p>
+        {!offline && message && (
+          <p className="mt-2 text-[11px] text-muted-foreground/70">{message}</p>
+        )}
+      </div>
+      <button
+        onClick={onRetry}
+        className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+      >
+        <RefreshCcw className="h-4 w-4" /> Tentar novamente
+      </button>
+    </div>
+  );
 }
 
 function SignInScreen({ onSuccess }: { onSuccess: () => void }) {

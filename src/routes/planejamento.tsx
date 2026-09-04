@@ -15,6 +15,9 @@ import {
 } from "@/lib/goals-store";
 import { GripVertical, Plus, GitBranch, Target } from "lucide-react";
 import { PlanGantt } from "@/components/PlanGantt";
+import { useProfile } from "@/lib/profile-store";
+import type { TimeFormat, WeekStart } from "@/lib/profile-store";
+import { formatTime, startOfWeekLocal } from "@/lib/format-utils";
 
 export const Route = createFileRoute("/planejamento")({
   head: () => ({ meta: [{ title: "Planejamento — Norte" }] }),
@@ -59,6 +62,7 @@ function PlanScreen() {
   const goals = useGoalsStore((s) => s.goals);
   const steps = useGoalsStore((s) => s.steps);
   const executions = useGoalsStore((s) => s.executions);
+  const profile = useProfile();
 
   return (
     <div className="px-5 pt-12">
@@ -111,7 +115,7 @@ function PlanScreen() {
             .map((t) => (
               <div key={t.id} className="card-surface flex items-center gap-3 p-3.5">
                 <span className="font-mono text-xs font-bold text-muted-foreground">
-                  {t.startTime}
+                  {formatTime(t.startTime, profile.timeFormat)}
                 </span>
                 <span className="text-lg">
                   {(categoryMeta[t.category] ?? categoryMeta.generico).emoji}
@@ -136,7 +140,15 @@ function PlanScreen() {
         </div>
       )}
 
-      {layer === "semana" && <WeekLayer steps={steps} goals={goals} executions={executions} />}
+      {layer === "semana" && (
+        <WeekLayer
+          steps={steps}
+          goals={goals}
+          executions={executions}
+          weekStart={profile.weekStart}
+          timeFormat={profile.timeFormat}
+        />
+      )}
       {layer === "mes" && (
         <PlanningHorizonView
           title="Planejamentos deste mês"
@@ -223,16 +235,16 @@ function WeekLayer({
   steps,
   goals,
   executions,
+  weekStart,
+  timeFormat,
 }: {
   steps: Step[];
   goals: Goal[];
   executions: Execution[];
+  weekStart: WeekStart;
+  timeFormat: TimeFormat;
 }) {
-  const start = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - d.getDay());
-    return d;
-  }, []);
+  const start = useMemo(() => startOfWeekLocal(new Date(), weekStart), [weekStart]);
   const week = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(start, i)), [start]);
   const byDate = useMemo(() => agendaByDate(executions), [executions]);
 
@@ -283,7 +295,7 @@ function WeekLayer({
                     >
                       <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                         <GripVertical className="h-3 w-3" />
-                        <span>{t.startTime}</span>
+                        <span>{formatTime(t.startTime, timeFormat)}</span>
                       </div>
                       <p className="mt-1 text-xs font-medium leading-tight">
                         {(categoryMeta[t.category] ?? categoryMeta.generico).emoji} {t.title}

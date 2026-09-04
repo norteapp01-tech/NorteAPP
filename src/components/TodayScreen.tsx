@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { categoryMeta, statusDot, statusLabel, type TaskStatus } from "@/lib/mock-data";
 import { useProfile, greeting } from "@/lib/profile-store";
+import { formatTime } from "@/lib/format-utils";
 import { HydrationCard } from "@/components/hydration/HydrationCard";
 import { SubagendasGrid } from "@/components/SubagendasGrid";
 import {
@@ -43,6 +44,7 @@ import {
   toISODate,
   addDays,
   todayISO,
+  formatDateBR,
   DAILY_CAPACITY_HOURS,
   type Execution,
 } from "@/lib/goals-store";
@@ -320,8 +322,8 @@ export function TodayScreen() {
                   )}
                   <div className="mt-2.5 flex items-center gap-3 text-[11px] text-muted-foreground">
                     <span className="font-mono font-semibold text-foreground">
-                      {t.startTime}
-                      {t.endTime ? `–${t.endTime}` : ""}
+                      {formatTime(t.startTime, profile.timeFormat)}
+                      {t.endTime ? `–${formatTime(t.endTime, profile.timeFormat)}` : ""}
                     </span>
                     <span className="flex gap-0.5">
                       {[1, 2, 3].map((i) => (
@@ -600,6 +602,7 @@ function ConfrontModal({ task, onClose }: { task: Execution; onClose: () => void
   const [busy, setBusy] = useState(false);
   const linkedGoal = useGoalsStore((s) => s.goals.find((g) => g.id === task.goalId));
   const executions = useGoalsStore((s) => s.executions);
+  const profile = useProfile();
   const timesValid = !!startTime && !!endTime && endTime > startTime;
 
   const chooseReason = async (reason: string) => {
@@ -626,7 +629,9 @@ function ConfrontModal({ task, onClose }: { task: Execution; onClose: () => void
     setBusy(true);
     try {
       await rescheduleExecution(task.id, date, startTime, endTime, "reagendado manualmente");
-      setApplied(`Reagendado para ${date.split("-").reverse().join("/")} às ${startTime}.`);
+      setApplied(
+        `Reagendado para ${formatDateBR(date)} às ${formatTime(startTime, profile.timeFormat)}.`,
+      );
       setReagendarOpen(false);
     } finally {
       setBusy(false);
@@ -813,6 +818,7 @@ function EndOfDayModal({
   const [decisions, setDecisions] = useState<Record<string, string>>({});
   const goals = useGoalsStore((s) => s.goals);
   const executions = useGoalsStore((s) => s.executions);
+  const profile = useProfile();
   const decide = async (t: Execution, action: string) => {
     setDecisions((p) => ({ ...p, [t.id]: action }));
     const tomorrow = toISODate(addDays(new Date(), 1));
@@ -896,8 +902,9 @@ function EndOfDayModal({
               <li key={t.id} className="rounded-xl border border-border bg-surface-2 p-3">
                 <p className="text-sm font-semibold">{t.title}</p>
                 <p className="text-[11px] text-muted-foreground">
-                  {categoryMeta[t.category]?.label ?? t.category} · {t.startTime}
-                  {t.endTime ? `–${t.endTime}` : ""}
+                  {categoryMeta[t.category]?.label ?? t.category} ·{" "}
+                  {formatTime(t.startTime, profile.timeFormat)}
+                  {t.endTime ? `–${formatTime(t.endTime, profile.timeFormat)}` : ""}
                 </p>
                 {t.goalId && (
                   <p className="mt-0.5 text-[11px] text-primary">

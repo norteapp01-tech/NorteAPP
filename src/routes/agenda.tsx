@@ -20,6 +20,14 @@ import {
   effectiveStatus,
   type Execution,
 } from "@/lib/goals-store";
+import { useProfile } from "@/lib/profile-store";
+import {
+  formatTime,
+  startOfWeekLocal,
+  weekdayLabelsFor,
+  weekStartsOnFor,
+} from "@/lib/format-utils";
+import type { TimeFormat, WeekStart } from "@/lib/profile-store";
 
 export const Route = createFileRoute("/agenda")({
   head: () => ({ meta: [{ title: "Agenda — Norte" }] }),
@@ -55,6 +63,7 @@ function AgendaScreen() {
 
   const executions = useGoalsStore((s) => s.executions);
   const eventsByDate = useMemo(() => agendaByDate(executions), [executions]);
+  const profile = useProfile();
 
   const selectedEvents = eventsByDate[selectedDate] ?? [];
 
@@ -87,6 +96,7 @@ function AgendaScreen() {
           eventsByDate={eventsByDate}
           selectedDate={selectedDate}
           onSelect={setSelectedDate}
+          weekStart={profile.weekStart}
         />
       )}
       {view === "semana" && (
@@ -96,6 +106,7 @@ function AgendaScreen() {
           eventsByDate={eventsByDate}
           selectedDate={selectedDate}
           onSelect={setSelectedDate}
+          weekStart={profile.weekStart}
         />
       )}
       {view === "dia" && (
@@ -103,6 +114,7 @@ function AgendaScreen() {
           date={selectedDate}
           onNav={(d) => setSelectedDate(d)}
           eventsByDate={eventsByDate}
+          timeFormat={profile.timeFormat}
         />
       )}
       {view === "ano" && (
@@ -138,7 +150,9 @@ function AgendaScreen() {
                 <p className="text-sm text-muted-foreground">Nada agendado nesse dia.</p>
               </div>
             ) : (
-              selectedEvents.map((e) => <EventCard key={e.id} e={e} />)
+              selectedEvents.map((e) => (
+                <EventCard key={e.id} e={e} timeFormat={profile.timeFormat} />
+              ))
             )}
           </div>
         </div>
@@ -156,7 +170,7 @@ function AgendaScreen() {
   );
 }
 
-function EventCard({ e }: { e: Execution }) {
+function EventCard({ e, timeFormat }: { e: Execution; timeFormat: TimeFormat }) {
   const cat = categoryMeta[e.category] ?? categoryMeta.generico;
   const goals = useGoalsStore((s) => s.goals);
   const linkedGoal = goals.find((g) => g.id === e.goalId);
@@ -169,8 +183,8 @@ function EventCard({ e }: { e: Execution }) {
       <div className="flex items-start gap-3">
         <div className="flex flex-col items-center rounded-lg bg-surface-2 px-2.5 py-2">
           <span className="font-mono text-sm font-bold">
-            {e.startTime}
-            {e.endTime ? `–${e.endTime}` : ""}
+            {formatTime(e.startTime, timeFormat)}
+            {e.endTime ? `–${formatTime(e.endTime, timeFormat)}` : ""}
           </span>
         </div>
         <div className="min-w-0 flex-1">
@@ -313,21 +327,25 @@ function MonthGrid({
   eventsByDate,
   selectedDate,
   onSelect,
+  weekStart,
 }: {
   cursor: Date;
   setCursor: (d: Date) => void;
   eventsByDate: Record<string, Execution[]>;
   selectedDate: string;
   onSelect: (d: string) => void;
+  weekStart: WeekStart;
 }) {
   const y = cursor.getFullYear();
   const m = cursor.getMonth();
   const first = new Date(y, m, 1).getDay();
+  const leadingBlanks = (first - weekStartsOnFor(weekStart) + 7) % 7;
   const days = new Date(y, m + 1, 0).getDate();
   const cells: (Date | null)[] = [];
-  for (let i = 0; i < first; i++) cells.push(null);
+  for (let i = 0; i < leadingBlanks; i++) cells.push(null);
   for (let d = 1; d <= days; d++) cells.push(new Date(y, m, d));
   const todayIso = localISO(new Date());
+  const orderedLabels = weekdayLabelsFor(weekStart, weekLabels);
 
   return (
     <div className="card-surface mt-4 p-4">
@@ -349,7 +367,7 @@ function MonthGrid({
         </button>
       </div>
       <div className="mt-3 grid grid-cols-7 gap-1 text-center text-[10px] uppercase text-muted-foreground">
-        {weekLabels.map((d, i) => (
+        {orderedLabels.map((d, i) => (
           <div key={i}>{d}</div>
         ))}
       </div>
@@ -393,15 +411,16 @@ function WeekStrip({
   eventsByDate,
   selectedDate,
   onSelect,
+  weekStart,
 }: {
   cursor: Date;
   setCursor: (d: Date) => void;
   eventsByDate: Record<string, Execution[]>;
   selectedDate: string;
   onSelect: (d: string) => void;
+  weekStart: WeekStart;
 }) {
-  const start = new Date(cursor);
-  start.setDate(cursor.getDate() - cursor.getDay());
+  const start = startOfWeekLocal(cursor, weekStart);
   const week = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
@@ -462,10 +481,12 @@ function DayView({
   date,
   onNav,
   eventsByDate,
+  timeFormat,
 }: {
   date: string;
   onNav: (d: string) => void;
   eventsByDate: Record<string, Execution[]>;
+  timeFormat: TimeFormat;
 }) {
   const d = new Date(date + "T00:00:00");
   const shift = (n: number) => {
@@ -492,14 +513,17 @@ function DayView({
           const ev = evts.find((e) => e.startTime?.startsWith(hh));
           return (
             <div key={h} className="flex items-start gap-3">
-              <span className="w-10 pt-1 font-mono text-[10px] text-muted-foreground">{hh}:00</span>
+              <span className="w-12 pt-1 font-mono text-[10px] text-muted-foreground">
+                {formatTime(`${hh}:00`, timeFormat)}
+              </span>
               <div className="flex-1 border-t border-border/50 py-2">
                 {ev && (
                   <div className="rounded-lg border border-primary/30 bg-primary/10 p-2">
                     <p className="text-xs font-semibold">{ev.title}</p>
                     <p className="text-[10px] text-muted-foreground">
-                      {ev.startTime}
-                      {ev.endTime ? `–${ev.endTime}` : ""} {ev.location ? `· ${ev.location}` : ""}
+                      {formatTime(ev.startTime, timeFormat)}
+                      {ev.endTime ? `–${formatTime(ev.endTime, timeFormat)}` : ""}{" "}
+                      {ev.location ? `· ${ev.location}` : ""}
                     </p>
                   </div>
                 )}

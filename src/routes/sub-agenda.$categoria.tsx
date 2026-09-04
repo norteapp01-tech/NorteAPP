@@ -14,6 +14,8 @@ import {
   X,
 } from "lucide-react";
 import { categoryMeta } from "@/lib/mock-data";
+import { useProfile } from "@/lib/profile-store";
+import { formatTime } from "@/lib/format-utils";
 import {
   useGoalsStore,
   createRoutine,
@@ -21,6 +23,7 @@ import {
   removeRoutine,
   todayISO,
   relevantDate,
+  formatDateBR,
 } from "@/lib/goals-store";
 import {
   useWorkoutStore,
@@ -108,6 +111,7 @@ function SubAgenda() {
 /** Configuro a rotina -> defino dias/horários -> ela vira agenda de verdade. */
 function RoutineConfigCard({ categoria }: { categoria: string }) {
   const routines = useGoalsStore((s) => s.routines.filter((r) => r.category === categoria));
+  const profile = useProfile();
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
   const [weekday, setWeekday] = useState(1);
@@ -138,7 +142,9 @@ function RoutineConfigCard({ categoria }: { categoria: string }) {
                 <span className="text-[10px] uppercase text-muted-foreground">
                   {weekdayLabels[r.weekday]}
                 </span>
-                <span className="font-mono text-xs font-bold">{r.time}</span>
+                <span className="font-mono text-xs font-bold">
+                  {formatTime(r.time, profile.timeFormat)}
+                </span>
               </div>
               <p className="flex-1 truncate text-sm font-medium">{r.title}</p>
               <button
@@ -1090,6 +1096,7 @@ function RestTimerPill({
 
 function GenericoModule({ categoria }: { categoria: string }) {
   const executions = useGoalsStore((s) => s.executions);
+  const profile = useProfile();
   const next = executions
     .filter((e) => e.category === categoria && e.status === "planejada")
     .sort((a, b) =>
@@ -1104,8 +1111,8 @@ function GenericoModule({ categoria }: { categoria: string }) {
             <p className="text-xs text-muted-foreground">{next.agendaDate ? "Quando" : "Prazo"}</p>
             <p className="text-sm font-semibold">
               {next.agendaDate
-                ? `${next.agendaDate.split("-").reverse().join("/")} · ${next.startTime}`
-                : next.dueDate.split("-").reverse().join("/")}
+                ? `${formatDateBR(next.agendaDate)} · ${formatTime(next.startTime, profile.timeFormat)}`
+                : formatDateBR(next.dueDate)}
             </p>
             {next.how && (
               <>
