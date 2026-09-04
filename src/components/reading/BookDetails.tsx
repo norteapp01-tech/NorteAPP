@@ -212,7 +212,7 @@ export function BookDetails({
                     </button>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => pauseBook(book.id)}
+                        onClick={() => void pauseBook(book.id)}
                         className="flex-1 rounded-xl bg-surface-2 py-2 text-xs font-semibold"
                       >
                         Pausar
@@ -231,13 +231,13 @@ export function BookDetails({
                   <>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => resumeBook(book.id, { recalcPlan: false })}
+                        onClick={() => void resumeBook(book.id, { recalcPlan: false })}
                         className="flex-1 rounded-xl bg-primary py-2.5 text-xs font-semibold text-primary-foreground"
                       >
                         Manter plano
                       </button>
                       <button
-                        onClick={() => resumeBook(book.id, { recalcPlan: true })}
+                        onClick={() => void resumeBook(book.id, { recalcPlan: true })}
                         className="flex-1 rounded-xl border border-primary/40 py-2.5 text-xs font-semibold text-primary"
                       >
                         Recalcular plano
@@ -255,7 +255,7 @@ export function BookDetails({
                 {book.status === "want_to_read" && (
                   <>
                     <button
-                      onClick={() => startReading(book.id)}
+                      onClick={() => void startReading(book.id)}
                       className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground"
                     >
                       Começar leitura
@@ -276,8 +276,8 @@ export function BookDetails({
                         </button>
                       ) : (
                         <button
-                          onClick={() => {
-                            removeBook(book.id);
+                          onClick={async () => {
+                            await removeBook(book.id);
                             onClose();
                           }}
                           className="flex-1 rounded-xl bg-danger py-2 text-xs font-semibold text-white"
@@ -334,20 +334,28 @@ function EditBookForm({ book, onDone }: { book: Book; onDone: () => void }) {
     String(Math.round((book.totalSeconds ?? 0) / 60)),
   );
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const save = () => {
-    const res = updateBook(book.id, {
-      title: title.trim(),
-      authors: author ? author.split(",").map((a) => a.trim()) : [],
-      totalPages: book.progressMode === "pages" ? parseInt(totalPages, 10) || undefined : undefined,
-      totalSeconds:
-        book.progressMode === "time" ? (parseInt(totalMinutes, 10) || 0) * 60 : undefined,
-    });
-    if (!res.ok) {
-      setError(res.error ?? "não foi possível salvar");
-      return;
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const res = await updateBook(book.id, {
+        title: title.trim(),
+        authors: author ? author.split(",").map((a) => a.trim()) : [],
+        totalPages:
+          book.progressMode === "pages" ? parseInt(totalPages, 10) || undefined : undefined,
+        totalSeconds:
+          book.progressMode === "time" ? (parseInt(totalMinutes, 10) || 0) * 60 : undefined,
+      });
+      if (!res.ok) {
+        setError(res.error ?? "não foi possível salvar");
+        return;
+      }
+      onDone();
+    } finally {
+      setSaving(false);
     }
-    onDone();
   };
 
   return (
@@ -397,9 +405,10 @@ function EditBookForm({ book, onDone }: { book: Book; onDone: () => void }) {
       {error && <p className="text-xs text-danger">{error}</p>}
       <button
         onClick={save}
-        className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground"
+        disabled={saving}
+        className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-40"
       >
-        Salvar
+        {saving ? "Salvando…" : "Salvar"}
       </button>
     </div>
   );

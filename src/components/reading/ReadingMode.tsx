@@ -50,6 +50,8 @@ export function ReadingMode({
   const [rating, setRating] = useState(0);
   const [takeaway, setTakeaway] = useState("");
   const [reflection, setReflection] = useState("");
+  const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState("");
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
@@ -67,16 +69,26 @@ export function ReadingMode({
     setStep("finishInput");
   };
 
-  const confirmFinish = () => {
-    const stored = toStoredValue(book, parseFloat(endValue) || 0);
-    const res = finishSession(sessionId, stored);
-    if (!res.ok) return;
-    setSummary({
-      read: res.pagesOrUnitsRead ?? 0,
-      durationSeconds: res.durationSeconds ?? 0,
-      completed: !!res.completed,
-    });
-    setStep("summary");
+  const confirmFinish = async () => {
+    if (finishing) return;
+    setFinishing(true);
+    setFinishError("");
+    try {
+      const stored = toStoredValue(book, parseFloat(endValue) || 0);
+      const res = await finishSession(sessionId, stored);
+      if (!res.ok) {
+        setFinishError("Não foi possível finalizar a sessão. Tente de novo.");
+        return;
+      }
+      setSummary({
+        read: res.pagesOrUnitsRead ?? 0,
+        durationSeconds: res.durationSeconds ?? 0,
+        completed: !!res.completed,
+      });
+      setStep("summary");
+    } finally {
+      setFinishing(false);
+    }
   };
 
   return (
@@ -97,7 +109,7 @@ export function ReadingMode({
         <div className="flex flex-1 flex-col items-center justify-center px-5">
           <p className="font-mono text-5xl font-bold text-primary">{formatDuration(elapsed)}</p>
           <button
-            onClick={() => (paused ? resumeSession(sessionId) : pauseSession(sessionId))}
+            onClick={() => void (paused ? resumeSession(sessionId) : pauseSession(sessionId))}
             className="mt-6 flex items-center gap-2 rounded-full bg-surface-2 px-5 py-2.5 text-sm font-semibold"
           >
             {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
@@ -134,11 +146,13 @@ export function ReadingMode({
               className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
             />
           </label>
+          {finishError && <p className="mt-3 text-xs text-danger">{finishError}</p>}
           <button
             onClick={confirmFinish}
-            className="mt-6 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
+            disabled={finishing}
+            className="mt-6 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
           >
-            Confirmar
+            {finishing ? "Salvando…" : "Confirmar"}
           </button>
         </div>
       )}
@@ -178,8 +192,8 @@ export function ReadingMode({
           <h3 className="text-lg font-bold">Você terminou este livro.</h3>
           <div className="mt-6 flex flex-col gap-2">
             <button
-              onClick={() => {
-                completeBook(book.id);
+              onClick={async () => {
+                await completeBook(book.id);
                 setStep("rating");
               }}
               className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
@@ -227,8 +241,8 @@ export function ReadingMode({
           </label>
           <div className="mt-4 flex items-center gap-3">
             <button
-              onClick={() => {
-                completeBook(book.id, {
+              onClick={async () => {
+                await completeBook(book.id, {
                   rating: rating || undefined,
                   mainTakeaway: takeaway.trim() || undefined,
                   personalReflection: reflection.trim() || undefined,

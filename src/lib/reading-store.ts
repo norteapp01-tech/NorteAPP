@@ -1,11 +1,20 @@
-import { useSyncExternalStore } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toISODate, todayISO, addDays, createRoutine, removeRoutine } from "./goals-store";
+import { supabase, ensureSession, useSupabaseUserId } from "./supabase/client";
+import { queryClient } from "./query-client";
 import type { SearchBookResult } from "./book-search-service";
 
 // ---------------------------------------------------------------------------
-// Central de leitura — domínio auto-contido, mesmo padrão reativo dos outros
-// stores (goals-store.ts, workout-store.ts). A integração com Agenda/Rotina
-// reaproveita createRoutine/removeRoutine do goals-store, sem tocar nele.
+// Central de leitura — domínio auto-contido, mesmo padrão dos outros stores
+// (goals-store.ts). A integração com Agenda/Rotina reaproveita
+// createRoutine/removeRoutine do goals-store, sem tocar nele.
+//
+// Persistida no Supabase. Ações que antes liam `state` síncrono pra validar
+// (ex.: "não pode passar do total", "já existe sessão ativa em outro livro")
+// agora leem o snapshot mais recente já buscado via
+// `queryClient.getQueryData(QUERY_KEY)` — mesmo dado que a tela já está
+// vendo, sem round-trip extra — e escrevem no Supabase o resultado. A lógica
+// de validação/cálculo em si não mudou uma linha.
 // ---------------------------------------------------------------------------
 
 export type BookStatus = "reading" | "want_to_read" | "completed" | "paused";
@@ -122,20 +131,24 @@ type State = {
   routines: ReadingRoutine[];
   dailyTargets: ReadingDailyTarget[];
   activityDates: string[];
-  selectedReadingBookId: string | null;
 };
 
-let seq = 0;
-function genId(prefix: string) {
-  seq += 1;
-  return `${prefix}${Date.now().toString(36)}${seq}`;
-}
+const EMPTY_STATE: State = {
+  books: [],
+  sessions: [],
+  notes: [],
+  plans: [],
+  routines: [],
+  dailyTargets: [],
+  activityDates: [],
+};
+
 function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
 // ---------------------------------------------------------------------------
-// Helpers puros de formatação/cálculo
+// Helpers puros de formatação/cálculo — nada mudou aqui.
 // ---------------------------------------------------------------------------
 export function formatDuration(totalSeconds: number): string {
   const s = Math.max(0, Math.round(totalSeconds));
@@ -299,7 +312,7 @@ function normalizeText(s: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Seletores
+// Seletores — nada mudou aqui.
 // ---------------------------------------------------------------------------
 export function booksByStatus(books: Book[], status: BookStatus): Book[] {
   return books
@@ -443,199 +456,233 @@ export function getResurfacingCandidate(state: State): ReadingNote | null {
 }
 
 // ---------------------------------------------------------------------------
-// Seed — ecoa o que já existia como ilustração (Sapiens em andamento), agora
-// como dado real de verdade. Não é "migração": não havia dado real antes.
+// Mapeamento snake_case (Supabase) -> camelCase
 // ---------------------------------------------------------------------------
-function buildSeedState(): State {
-  const now = new Date();
-  const bookId = "bk-sapiens";
-  const books: Book[] = [
-    {
-      id: bookId,
-      title: "Sapiens: Uma Breve História da Humanidade",
-      authors: ["Yuval Noah Harari"],
-      coverUrl: undefined,
-      format: "physical",
-      progressMode: "pages",
-      status: "reading",
-      totalPages: 512,
-      currentPage: 164,
-      metadataProvider: "manual",
-      startedAt: toISODate(addDays(now, -21)),
-      createdAt: toISODate(addDays(now, -21)),
-      updatedAt: toISODate(addDays(now, -1)),
-    },
-  ];
+type Row = Record<string, unknown>;
 
-  const plans: ReadingPlan[] = [
-    {
-      id: genId("rpl"),
-      bookId,
-      type: "deadline",
-      deadline: toISODate(addDays(now, 40)),
-      active: true,
-      createdAt: toISODate(addDays(now, -21)),
-      updatedAt: toISODate(addDays(now, -21)),
-    },
-  ];
+function unwrap<T>(res: { data: T | null; error: { message: string } | null }): T {
+  if (res.error) throw new Error(res.error.message);
+  return res.data as T;
+}
 
-  const routines: ReadingRoutine[] = [
-    {
-      id: genId("rr"),
-      bookId,
-      weekdays: [1, 2, 3, 4, 5],
-      time: "21:00",
-      desiredDurationMinutes: 20,
-      active: true,
-      goalsRoutineIds: [],
-    },
-  ];
-
-  const sessions: ReadingSession[] = [];
-  const notes: ReadingNote[] = [];
-  const dailyTargets: ReadingDailyTarget[] = [];
-  const activityDates: string[] = [];
-
-  // Cobre todo dia de semana (rotina é seg-sex) dentro da janela de 14 dias que
-  // checkForMissedTargets olha pra trás — sem isso, dias "não registrados" no seed
-  // apareceriam como meta não cumprida em massa assim que o app abre.
-  const seedDays: number[] = [];
-  for (let offset = 13; offset >= 1; offset--) {
-    const d = addDays(now, -offset);
-    if (d.getDay() >= 1 && d.getDay() <= 5) seedDays.push(offset);
+function groupBy<T extends Row>(rows: T[], key: string): Record<string, T[]> {
+  const out: Record<string, T[]> = {};
+  for (const r of rows) {
+    const k = r[key] as string;
+    (out[k] ??= []).push(r);
   }
-  let page = 40;
-  for (const offset of [...seedDays].reverse()) {
-    const date = toISODate(addDays(now, -offset));
-    // Um único dia fica deliberadamente abaixo da meta, pra demonstrar o ajuste sem
-    // encher o seed de dias "perdidos" — os demais cumprem a meta de 12 páginas.
-    const pagesRead = offset === 4 ? 7 : 12;
-    const startPage = page;
-    page += pagesRead;
-    const startedAt = new Date(addDays(now, -offset));
-    startedAt.setHours(21, 0, 0, 0);
-    const endedAt = new Date(startedAt.getTime() + 22 * 60 * 1000);
-    sessions.push({
-      id: genId("rs"),
-      bookId,
-      startedAt: startedAt.toISOString(),
-      endedAt: endedAt.toISOString(),
-      pausedDurationSeconds: 0,
-      durationSeconds: 22 * 60,
-      startPage,
-      endPage: page,
-      pagesRead,
-      status: "completed",
-    });
-    dailyTargets.push({
-      id: genId("drt"),
-      bookId,
-      date,
-      plannedAmount: 12,
-      completedAmount: pagesRead,
-      unit: "pages",
-      adjustmentStatus: "none",
-    });
-    activityDates.push(date);
-  }
+  return out;
+}
 
-  notes.push(
-    {
-      id: genId("rn"),
-      bookId,
-      type: "insight",
-      content:
-        "Dinheiro é a maior ficção compartilhada — só funciona porque todo mundo acredita nela ao mesmo tempo.",
-      tags: ["economia", "cooperação"],
-      pageNumber: 132,
-      createdAt: new Date(addDays(now, -16)).toISOString(),
-      updatedAt: new Date(addDays(now, -16)).toISOString(),
-      resurfaceCount: 0,
-    },
-    {
-      id: genId("rn"),
-      bookId,
-      type: "quote",
-      content:
-        "Capítulos sobre a revolução cognitiva mostram como a linguagem permitiu fofoca — e a fofoca permitiu cooperação em massa.",
-      tags: ["linguagem"],
-      pageNumber: 58,
-      createdAt: new Date(addDays(now, -18)).toISOString(),
-      updatedAt: new Date(addDays(now, -18)).toISOString(),
-      resurfaceCount: 0,
-    },
-  );
-
+function mapBook(r: Row): Book {
   return {
-    books,
-    sessions,
-    notes,
-    plans,
-    routines,
-    dailyTargets,
-    activityDates,
-    selectedReadingBookId: bookId,
+    id: r.id as string,
+    title: r.title as string,
+    authors: (r.authors as string[]) ?? [],
+    coverUrl: (r.cover_url as string) ?? undefined,
+    coverImage: (r.cover_path as string) ?? undefined,
+    isbn: (r.isbn as string) ?? undefined,
+    externalId: (r.external_id as string) ?? undefined,
+    metadataProvider: (r.metadata_provider as Book["metadataProvider"]) ?? undefined,
+    format: r.format as BookFormat,
+    progressMode: r.progress_mode as ProgressMode,
+    status: r.status as BookStatus,
+    totalPages: (r.total_pages as number) ?? undefined,
+    currentPage: (r.current_page as number) ?? undefined,
+    currentPercentage: (r.current_percentage as number) ?? undefined,
+    totalSeconds: (r.total_seconds as number) ?? undefined,
+    currentSeconds: (r.current_seconds as number) ?? undefined,
+    rating: (r.rating as number) ?? undefined,
+    mainTakeaway: (r.main_takeaway as string) ?? undefined,
+    personalReflection: (r.personal_reflection as string) ?? undefined,
+    startedAt: (r.started_at as string) ?? undefined,
+    completedAt: (r.completed_at as string) ?? undefined,
+    pausedAt: (r.paused_at as string) ?? undefined,
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string,
   };
 }
 
-// ---------------------------------------------------------------------------
-// Store reativo
-// ---------------------------------------------------------------------------
-let state: State = buildSeedState();
-const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((l) => l());
-const subscribe = (l: () => void) => {
-  listeners.add(l);
-  return () => {
-    listeners.delete(l);
+function mapSession(r: Row): ReadingSession {
+  return {
+    id: r.id as string,
+    bookId: r.book_id as string,
+    startedAt: r.started_at as string,
+    endedAt: (r.ended_at as string) ?? undefined,
+    pausedDurationSeconds: (r.paused_duration_seconds as number) ?? 0,
+    durationSeconds: (r.duration_seconds as number) ?? undefined,
+    startPage: (r.start_page as number) ?? undefined,
+    endPage: (r.end_page as number) ?? undefined,
+    pagesRead: (r.pages_read as number) ?? undefined,
+    startPercentage: (r.start_percentage as number) ?? undefined,
+    endPercentage: (r.end_percentage as number) ?? undefined,
+    percentageRead: (r.percentage_read as number) ?? undefined,
+    startProgressSeconds: (r.start_progress_seconds as number) ?? undefined,
+    endProgressSeconds: (r.end_progress_seconds as number) ?? undefined,
+    progressSeconds: (r.progress_seconds as number) ?? undefined,
+    status: r.status as "active" | "completed",
+    pausedSince: (r.paused_since as string) ?? undefined,
   };
-};
-const getSnapshot = () => state;
+}
 
-function set(updater: (s: State) => State) {
-  state = updater(state);
-  emit();
+function mapNote(r: Row): ReadingNote {
+  return {
+    id: r.id as string,
+    bookId: r.book_id as string,
+    sessionId: (r.session_id as string) ?? undefined,
+    type: r.type as ReadingNoteType,
+    content: (r.content as string) ?? "",
+    tags: (r.tags as string[]) ?? [],
+    pageNumber: (r.page_number as number) ?? undefined,
+    percentage: (r.percentage as number) ?? undefined,
+    timestampSeconds: (r.timestamp_seconds as number) ?? undefined,
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string,
+    lastResurfacedAt: (r.last_resurfaced_at as string) ?? undefined,
+    resurfaceCount: (r.resurface_count as number) ?? 0,
+  };
+}
+
+function mapPlan(r: Row): ReadingPlan {
+  return {
+    id: r.id as string,
+    bookId: r.book_id as string,
+    type: r.type as ReadingPlanType,
+    deadline: (r.deadline as string) ?? undefined,
+    targetPages: (r.target_pages as number) ?? undefined,
+    targetPercentage: (r.target_percentage as number) ?? undefined,
+    targetSeconds: (r.target_seconds as number) ?? undefined,
+    active: r.active as boolean,
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string,
+  };
+}
+
+function mapRoutine(r: Row, links: Row[]): ReadingRoutine {
+  const sorted = [...links].sort((a, b) => (a.weekday as number) - (b.weekday as number));
+  return {
+    id: r.id as string,
+    bookId: (r.book_id as string) ?? undefined,
+    weekdays: sorted.map((l) => l.weekday as number),
+    time: r.time as string,
+    desiredDurationMinutes: (r.desired_duration_minutes as number) ?? undefined,
+    active: r.active as boolean,
+    goalsRoutineIds: sorted.map((l) => l.core_routine_id as string),
+  };
+}
+
+function mapDailyTarget(r: Row): ReadingDailyTarget {
+  return {
+    id: r.id as string,
+    bookId: r.book_id as string,
+    date: r.date as string,
+    plannedAmount: (r.planned_amount as number) ?? 0,
+    completedAmount: (r.completed_amount as number) ?? 0,
+    unit: r.unit as TargetUnit,
+    adjustmentStatus: r.adjustment_status as AdjustmentStatus,
+  };
+}
+
+async function fetchState(): Promise<State> {
+  const [
+    booksRes,
+    sessionsRes,
+    notesRes,
+    plansRes,
+    routinesRes,
+    linksRes,
+    targetsRes,
+    activityRes,
+  ] = await Promise.all([
+    supabase.from("reading_books").select("*").order("created_at", { ascending: false }),
+    supabase.from("reading_sessions").select("*").order("started_at", { ascending: false }),
+    supabase.from("reading_notes").select("*").order("created_at", { ascending: false }),
+    supabase.from("reading_plans").select("*").order("created_at", { ascending: false }),
+    supabase.from("reading_routines").select("*"),
+    supabase.from("routine_links").select("*").eq("source_type", "reading_routine"),
+    supabase.from("reading_daily_targets").select("*"),
+    supabase.from("reading_activity_log").select("date"),
+  ]);
+  const bookRows = unwrap(booksRes);
+  const sessionRows = unwrap(sessionsRes);
+  const noteRows = unwrap(notesRes);
+  const planRows = unwrap(plansRes);
+  const routineRows = unwrap(routinesRes);
+  const linkRows = unwrap(linksRes) as Row[];
+  const targetRows = unwrap(targetsRes);
+  const activityRows = unwrap(activityRes);
+
+  const linksByRoutine = groupBy(linkRows, "source_id");
+
+  return {
+    books: (bookRows as Row[]).map(mapBook),
+    sessions: (sessionRows as Row[]).map(mapSession),
+    notes: (noteRows as Row[]).map(mapNote),
+    plans: (planRows as Row[]).map(mapPlan),
+    routines: (routineRows as Row[]).map((r) =>
+      mapRoutine(r, linksByRoutine[r.id as string] ?? []),
+    ),
+    dailyTargets: (targetRows as Row[]).map(mapDailyTarget),
+    activityDates: (activityRows as Row[]).map((r) => r.date as string),
+  };
+}
+
+const QUERY_KEY = ["reading-domain"] as const;
+function invalidate() {
+  return queryClient.invalidateQueries({ queryKey: QUERY_KEY, refetchType: "all" });
+}
+/** Snapshot mais recente já buscado — usado dentro das ações pra validar/calcular
+ * exatamente como o `state` síncrono fazia antes, sem round-trip extra. */
+function snapshot(): State {
+  return queryClient.getQueryData<State>(QUERY_KEY) ?? EMPTY_STATE;
 }
 
 export function useReadingStore<T>(selector: (s: State) => T): T {
-  const snap = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  return selector(snap);
+  const userId = useSupabaseUserId();
+  const { data } = useQuery({ queryKey: QUERY_KEY, queryFn: fetchState, enabled: !!userId });
+  return selector(data ?? EMPTY_STATE);
 }
 
-function recordActivity(s: State, date = todayISO()): State {
-  if (s.activityDates.includes(date)) return s;
-  return { ...s, activityDates: [...s.activityDates, date] };
+function recordActivity(date = todayISO()) {
+  return ensureSession().then((userId) =>
+    supabase
+      .from("reading_activity_log")
+      .upsert({ user_id: userId, date }, { onConflict: "user_id,date" }),
+  );
 }
 
-function bumpDailyTargetCompleted(
-  s: State,
+/** Soma `delta` na meta diária do livro (cria a linha se ainda não existir). */
+async function bumpDailyTargetCompleted(
+  userId: string,
   bookId: string,
   date: string,
   delta: number,
   book: Book,
   plan: ReadingPlan | undefined,
   routine: ReadingRoutine | undefined,
-): ReadingDailyTarget[] {
-  const idx = s.dailyTargets.findIndex((t) => t.bookId === bookId && t.date === date);
-  if (idx >= 0) {
-    return s.dailyTargets.map((t, i) =>
-      i === idx ? { ...t, completedAmount: t.completedAmount + delta } : t,
-    );
+) {
+  const existing = snapshot().dailyTargets.find((t) => t.bookId === bookId && t.date === date);
+  if (existing) {
+    await supabase
+      .from("reading_daily_targets")
+      .update({ completed_amount: existing.completedAmount + delta })
+      .eq("id", existing.id);
+    return;
   }
-  if (!plan || !routine) return s.dailyTargets;
+  if (!plan || !routine) return;
   const computed = computePlanDailyAmount(book, plan, routine);
-  return [
-    ...s.dailyTargets,
+  await supabase.from("reading_daily_targets").upsert(
     {
-      id: genId("drt"),
-      bookId,
+      user_id: userId,
+      book_id: bookId,
       date,
-      plannedAmount: computed.value,
-      completedAmount: delta,
+      planned_amount: computed.value,
+      completed_amount: delta,
       unit: computed.unit,
-      adjustmentStatus: "none",
+      adjustment_status: "none",
     },
-  ];
+    { onConflict: "book_id,date" },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -646,7 +693,7 @@ function defaultProgressMode(format: BookFormat): ProgressMode {
   return "pages";
 }
 
-export function addBookFromSearch(
+export async function addBookFromSearch(
   result: SearchBookResult,
   opts: {
     format: BookFormat;
@@ -655,39 +702,38 @@ export function addBookFromSearch(
     totalPages?: number;
     totalSeconds?: number;
   },
-): string {
-  const id = genId("bk");
-  const now = new Date().toISOString();
+): Promise<string> {
+  const userId = await ensureSession();
   const mode = opts.progressMode ?? defaultProgressMode(opts.format);
-  const book: Book = {
-    id,
-    title: result.title,
-    authors: result.authors,
-    coverUrl: result.coverUrl,
-    isbn: result.isbn,
-    externalId: result.externalId,
-    metadataProvider: result.provider,
-    format: opts.format,
-    progressMode: mode,
-    status: opts.status,
-    totalPages: mode === "pages" ? (opts.totalPages ?? result.pageCount) : undefined,
-    totalSeconds: mode === "time" ? opts.totalSeconds : undefined,
-    currentPage: mode === "pages" ? 0 : undefined,
-    currentPercentage: mode === "percentage" ? 0 : undefined,
-    currentSeconds: mode === "time" ? 0 : undefined,
-    startedAt: opts.status === "reading" ? todayISO() : undefined,
-    createdAt: now,
-    updatedAt: now,
-  };
-  set((s) => ({
-    ...s,
-    books: [book, ...s.books],
-    selectedReadingBookId: opts.status === "reading" ? id : s.selectedReadingBookId,
-  }));
-  return id;
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("reading_books")
+      .insert({
+        user_id: userId,
+        title: result.title,
+        authors: result.authors,
+        cover_url: result.coverUrl,
+        isbn: result.isbn,
+        external_id: result.externalId,
+        metadata_provider: result.provider,
+        format: opts.format,
+        progress_mode: mode,
+        status: opts.status,
+        total_pages: mode === "pages" ? (opts.totalPages ?? result.pageCount) : undefined,
+        total_seconds: mode === "time" ? opts.totalSeconds : undefined,
+        current_page: mode === "pages" ? 0 : undefined,
+        current_percentage: mode === "percentage" ? 0 : undefined,
+        current_seconds: mode === "time" ? 0 : undefined,
+        started_at: opts.status === "reading" ? todayISO() : undefined,
+      })
+      .select()
+      .single(),
+  );
+  await invalidate();
+  return row.id;
 }
 
-export function addBookManual(input: {
+export async function addBookManual(input: {
   title: string;
   authors?: string[];
   format: BookFormat;
@@ -696,58 +742,60 @@ export function addBookManual(input: {
   coverImage?: string;
   totalPages?: number;
   totalSeconds?: number;
-}): string {
-  const id = genId("bk");
-  const now = new Date().toISOString();
+}): Promise<string> {
+  const userId = await ensureSession();
   const mode = input.progressMode ?? defaultProgressMode(input.format);
-  const book: Book = {
-    id,
-    title: input.title.trim(),
-    authors: input.authors ?? [],
-    coverImage: input.coverImage,
-    metadataProvider: "manual",
-    format: input.format,
-    progressMode: mode,
-    status: input.status,
-    totalPages: mode === "pages" ? input.totalPages : undefined,
-    totalSeconds: mode === "time" ? input.totalSeconds : undefined,
-    currentPage: mode === "pages" ? 0 : undefined,
-    currentPercentage: mode === "percentage" ? 0 : undefined,
-    currentSeconds: mode === "time" ? 0 : undefined,
-    startedAt: input.status === "reading" ? todayISO() : undefined,
-    createdAt: now,
-    updatedAt: now,
-  };
-  set((s) => ({
-    ...s,
-    books: [book, ...s.books],
-    selectedReadingBookId: input.status === "reading" ? id : s.selectedReadingBookId,
-  }));
-  return id;
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("reading_books")
+      .insert({
+        user_id: userId,
+        title: input.title.trim(),
+        authors: input.authors ?? [],
+        cover_path: input.coverImage,
+        metadata_provider: "manual",
+        format: input.format,
+        progress_mode: mode,
+        status: input.status,
+        total_pages: mode === "pages" ? input.totalPages : undefined,
+        total_seconds: mode === "time" ? input.totalSeconds : undefined,
+        current_page: mode === "pages" ? 0 : undefined,
+        current_percentage: mode === "percentage" ? 0 : undefined,
+        current_seconds: mode === "time" ? 0 : undefined,
+        started_at: input.status === "reading" ? todayISO() : undefined,
+      })
+      .select()
+      .single(),
+  );
+  await invalidate();
+  return row.id;
 }
 
 /** "+ Quero ler" — só o nome, extremamente rápido. */
-export function quickAddWantToRead(title: string): string {
-  const id = genId("bk");
-  const now = new Date().toISOString();
-  const book: Book = {
-    id,
-    title: title.trim(),
-    authors: [],
-    format: "physical",
-    progressMode: "pages",
-    status: "want_to_read",
-    metadataProvider: "manual",
-    createdAt: now,
-    updatedAt: now,
-  };
-  set((s) => ({ ...s, books: [book, ...s.books] }));
-  return id;
+export async function quickAddWantToRead(title: string): Promise<string> {
+  const userId = await ensureSession();
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("reading_books")
+      .insert({
+        user_id: userId,
+        title: title.trim(),
+        authors: [],
+        format: "physical",
+        progress_mode: "pages",
+        status: "want_to_read",
+        metadata_provider: "manual",
+      })
+      .select()
+      .single(),
+  );
+  await invalidate();
+  return row.id;
 }
 
 export type UpdateBookResult = { ok: boolean; error?: string };
 
-export function updateBook(
+export async function updateBook(
   id: string,
   patch: Partial<
     Pick<
@@ -765,8 +813,8 @@ export function updateBook(
       | "personalReflection"
     >
   >,
-): UpdateBookResult {
-  const book = state.books.find((b) => b.id === id);
+): Promise<UpdateBookResult> {
+  const book = snapshot().books.find((b) => b.id === id);
   if (!book) return { ok: false, error: "livro não encontrado" };
   if (patch.totalPages !== undefined && (book.currentPage ?? 0) > patch.totalPages) {
     return { ok: false, error: "o total não pode ser menor que o progresso atual" };
@@ -774,110 +822,94 @@ export function updateBook(
   if (patch.totalSeconds !== undefined && (book.currentSeconds ?? 0) > patch.totalSeconds) {
     return { ok: false, error: "o total não pode ser menor que o progresso atual" };
   }
-  set((s) => ({
-    ...s,
-    books: s.books.map((b) =>
-      b.id === id ? { ...b, ...patch, updatedAt: new Date().toISOString() } : b,
-    ),
-  }));
+  const dbPatch: Row = {};
+  if (patch.title !== undefined) dbPatch.title = patch.title;
+  if (patch.authors !== undefined) dbPatch.authors = patch.authors;
+  if (patch.coverUrl !== undefined) dbPatch.cover_url = patch.coverUrl;
+  if (patch.coverImage !== undefined) dbPatch.cover_path = patch.coverImage;
+  if (patch.format !== undefined) dbPatch.format = patch.format;
+  if (patch.progressMode !== undefined) dbPatch.progress_mode = patch.progressMode;
+  if (patch.totalPages !== undefined) dbPatch.total_pages = patch.totalPages;
+  if (patch.totalSeconds !== undefined) dbPatch.total_seconds = patch.totalSeconds;
+  if (patch.rating !== undefined) dbPatch.rating = patch.rating;
+  if (patch.mainTakeaway !== undefined) dbPatch.main_takeaway = patch.mainTakeaway;
+  if (patch.personalReflection !== undefined)
+    dbPatch.personal_reflection = patch.personalReflection;
+  unwrap(await supabase.from("reading_books").update(dbPatch).eq("id", id).select().single());
+  await invalidate();
   return { ok: true };
 }
 
-export function startReading(bookId: string) {
-  set((s) => ({
-    ...s,
-    books: s.books.map((b) =>
-      b.id === bookId
-        ? {
-            ...b,
-            status: "reading",
-            startedAt: b.startedAt ?? todayISO(),
-            updatedAt: new Date().toISOString(),
-          }
-        : b,
-    ),
-    selectedReadingBookId: bookId,
-  }));
+export async function startReading(bookId: string) {
+  const book = snapshot().books.find((b) => b.id === bookId);
+  unwrap(
+    await supabase
+      .from("reading_books")
+      .update({ status: "reading", started_at: book?.startedAt ?? todayISO() })
+      .eq("id", bookId)
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
-export function pauseBook(bookId: string) {
-  set((s) => ({
-    ...s,
-    books: s.books.map((b) =>
-      b.id === bookId
-        ? {
-            ...b,
-            status: "paused",
-            pausedAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }
-        : b,
-    ),
-    selectedReadingBookId:
-      s.selectedReadingBookId === bookId
-        ? (s.books.find((b) => b.status === "reading" && b.id !== bookId)?.id ?? null)
-        : s.selectedReadingBookId,
-  }));
+export async function pauseBook(bookId: string) {
+  unwrap(
+    await supabase
+      .from("reading_books")
+      .update({ status: "paused", paused_at: new Date().toISOString() })
+      .eq("id", bookId)
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
-export function resumeBook(bookId: string, opts: { recalcPlan: boolean }) {
-  set((s) => {
-    let plans = s.plans;
-    if (opts.recalcPlan) {
-      plans = s.plans.map((p) => (p.bookId === bookId && p.active ? { ...p, active: false } : p));
-    }
-    return {
-      ...s,
-      plans,
-      books: s.books.map((b) =>
-        b.id === bookId
-          ? { ...b, status: "reading", pausedAt: undefined, updatedAt: new Date().toISOString() }
-          : b,
-      ),
-      selectedReadingBookId: bookId,
-    };
-  });
+export async function resumeBook(bookId: string, opts: { recalcPlan: boolean }) {
+  if (opts.recalcPlan) {
+    const activePlan = snapshot().plans.find((p) => p.bookId === bookId && p.active);
+    if (activePlan)
+      await supabase.from("reading_plans").update({ active: false }).eq("id", activePlan.id);
+  }
+  unwrap(
+    await supabase
+      .from("reading_books")
+      .update({ status: "reading", paused_at: null })
+      .eq("id", bookId)
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
-export function completeBook(
+export async function completeBook(
   bookId: string,
   extra?: { rating?: number; mainTakeaway?: string; personalReflection?: string },
 ) {
-  set((s) => ({
-    ...s,
-    books: s.books.map((b) =>
-      b.id === bookId
-        ? {
-            ...b,
-            status: "completed",
-            completedAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            ...extra,
-          }
-        : b,
-    ),
-    selectedReadingBookId:
-      s.selectedReadingBookId === bookId
-        ? (s.books.find((b) => b.status === "reading" && b.id !== bookId)?.id ?? null)
-        : s.selectedReadingBookId,
-  }));
+  unwrap(
+    await supabase
+      .from("reading_books")
+      .update({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        rating: extra?.rating,
+        main_takeaway: extra?.mainTakeaway,
+        personal_reflection: extra?.personalReflection,
+      })
+      .eq("id", bookId)
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
-/** Só remove livros que nunca viraram leitura de fato (quero ler) — sem histórico pra perder. */
+/** Só remove livros que nunca viraram leitura de fato (quero ler) — sem histórico pra perder.
+ * Planos/rotinas do livro cascateiam no banco; as Routine do núcleo são removidas explicitamente. */
 export async function removeBook(bookId: string) {
-  const routine = routineFor(state.routines, bookId);
+  const routine = routineFor(snapshot().routines, bookId);
   if (routine) await Promise.all(routine.goalsRoutineIds.map((gid) => removeRoutine(gid)));
-  set((s) => ({
-    ...s,
-    books: s.books.filter((b) => b.id !== bookId),
-    plans: s.plans.filter((p) => p.bookId !== bookId),
-    routines: s.routines.filter((r) => r.bookId !== bookId),
-    selectedReadingBookId: s.selectedReadingBookId === bookId ? null : s.selectedReadingBookId,
-  }));
-}
-
-export function setSelectedReadingBookId(id: string | null) {
-  set((s) => ({ ...s, selectedReadingBookId: id }));
+  await supabase.from("reading_books").delete().eq("id", bookId);
+  await invalidate();
 }
 
 export type UpdateProgressResult = {
@@ -887,11 +919,12 @@ export type UpdateProgressResult = {
   completed?: boolean;
 };
 
-export function updateProgress(
+export async function updateProgress(
   bookId: string,
   newValue: number,
   opts?: { confirm?: boolean },
-): UpdateProgressResult {
+): Promise<UpdateProgressResult> {
+  const state = snapshot();
   const book = state.books.find((b) => b.id === bookId);
   if (!book) return { ok: false, error: "livro não encontrado" };
   const current =
@@ -911,29 +944,30 @@ export function updateProgress(
     return { ok: false, error: "não pode passar do total" };
   if (newValue < current && !opts?.confirm) return { ok: false, needsConfirmation: true };
 
+  const userId = await ensureSession();
   const delta = newValue - current;
   const iso = todayISO();
-  set((s) => {
-    const b = s.books.find((x) => x.id === bookId)!;
-    const updatedBook: Book =
-      b.progressMode === "pages"
-        ? { ...b, currentPage: newValue, updatedAt: new Date().toISOString() }
-        : b.progressMode === "percentage"
-          ? { ...b, currentPercentage: newValue, updatedAt: new Date().toISOString() }
-          : { ...b, currentSeconds: newValue, updatedAt: new Date().toISOString() };
-    const plan = planFor(s.plans, bookId);
-    const routine = routineFor(s.routines, bookId);
-    const dailyTargets =
-      delta > 0
-        ? bumpDailyTargetCompleted(s, bookId, iso, delta, updatedBook, plan, routine)
-        : s.dailyTargets;
-    const next = {
-      ...s,
-      books: s.books.map((x) => (x.id === bookId ? updatedBook : x)),
-      dailyTargets,
-    };
-    return delta > 0 ? recordActivity(next, iso) : next;
-  });
+  const field =
+    book.progressMode === "pages"
+      ? "current_page"
+      : book.progressMode === "percentage"
+        ? "current_percentage"
+        : "current_seconds";
+  await supabase
+    .from("reading_books")
+    .update({ [field]: newValue })
+    .eq("id", bookId);
+  if (delta > 0) {
+    const plan = planFor(state.plans, bookId);
+    const routine = routineFor(state.routines, bookId);
+    const updatedBook = {
+      ...book,
+      [field.replace(/_([a-z])/g, (_, c) => c.toUpperCase())]: newValue,
+    } as Book;
+    await bumpDailyTargetCompleted(userId, bookId, iso, delta, updatedBook, plan, routine);
+    await recordActivity(iso);
+  }
+  await invalidate();
   return {
     ok: true,
     completed: isBookComplete({
@@ -950,51 +984,66 @@ export function updateProgress(
 // ---------------------------------------------------------------------------
 export type StartSessionResult = { ok: boolean; conflictSessionId?: string; sessionId?: string };
 
-export function startSession(bookId: string): StartSessionResult {
+export async function startSession(bookId: string): Promise<StartSessionResult> {
+  const state = snapshot();
   const existing = activeSession(state.sessions);
   if (existing && existing.bookId !== bookId) return { ok: false, conflictSessionId: existing.id };
   if (existing && existing.bookId === bookId) return { ok: true, sessionId: existing.id };
+
+  const userId = await ensureSession();
   const book = state.books.find((b) => b.id === bookId);
-  const id = genId("rs");
-  const session: ReadingSession = {
-    id,
-    bookId,
-    startedAt: new Date().toISOString(),
-    pausedDurationSeconds: 0,
-    startPage: book?.progressMode === "pages" ? (book.currentPage ?? 0) : undefined,
-    startPercentage:
-      book?.progressMode === "percentage" ? (book.currentPercentage ?? 0) : undefined,
-    startProgressSeconds: book?.progressMode === "time" ? (book.currentSeconds ?? 0) : undefined,
-    status: "active",
-  };
-  set((s) => ({ ...s, sessions: [session, ...s.sessions] }));
-  return { ok: true, sessionId: id };
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("reading_sessions")
+      .insert({
+        user_id: userId,
+        book_id: bookId,
+        started_at: new Date().toISOString(),
+        paused_duration_seconds: 0,
+        start_page: book?.progressMode === "pages" ? (book.currentPage ?? 0) : undefined,
+        start_percentage:
+          book?.progressMode === "percentage" ? (book.currentPercentage ?? 0) : undefined,
+        start_progress_seconds:
+          book?.progressMode === "time" ? (book.currentSeconds ?? 0) : undefined,
+        status: "active",
+      })
+      .select()
+      .single(),
+  );
+  await invalidate();
+  return { ok: true, sessionId: row.id };
 }
 
-export function pauseSession(sessionId: string) {
-  set((s) => ({
-    ...s,
-    sessions: s.sessions.map((sess) =>
-      sess.id === sessionId && !sess.pausedSince
-        ? { ...sess, pausedSince: new Date().toISOString() }
-        : sess,
-    ),
-  }));
+export async function pauseSession(sessionId: string) {
+  const session = snapshot().sessions.find((s) => s.id === sessionId);
+  if (!session || session.pausedSince) return;
+  unwrap(
+    await supabase
+      .from("reading_sessions")
+      .update({ paused_since: new Date().toISOString() })
+      .eq("id", sessionId)
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
-export function resumeSession(sessionId: string) {
-  set((s) => ({
-    ...s,
-    sessions: s.sessions.map((sess) => {
-      if (sess.id !== sessionId || !sess.pausedSince) return sess;
-      const extra = Math.max(0, (Date.now() - new Date(sess.pausedSince).getTime()) / 1000);
-      return {
-        ...sess,
-        pausedDurationSeconds: sess.pausedDurationSeconds + extra,
-        pausedSince: undefined,
-      };
-    }),
-  }));
+export async function resumeSession(sessionId: string) {
+  const session = snapshot().sessions.find((s) => s.id === sessionId);
+  if (!session || !session.pausedSince) return;
+  const extra = Math.max(0, (Date.now() - new Date(session.pausedSince).getTime()) / 1000);
+  unwrap(
+    await supabase
+      .from("reading_sessions")
+      .update({
+        paused_duration_seconds: session.pausedDurationSeconds + extra,
+        paused_since: null,
+      })
+      .eq("id", sessionId)
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
 export type FinishSessionResult = {
@@ -1005,12 +1054,17 @@ export type FinishSessionResult = {
   metTarget?: boolean;
 };
 
-export function finishSession(sessionId: string, endingValue: number): FinishSessionResult {
+export async function finishSession(
+  sessionId: string,
+  endingValue: number,
+): Promise<FinishSessionResult> {
+  const state = snapshot();
   const session = state.sessions.find((s) => s.id === sessionId);
   if (!session) return { ok: false };
   const book = state.books.find((b) => b.id === session.bookId);
   if (!book) return { ok: false };
 
+  const userId = await ensureSession();
   const startValue =
     book.progressMode === "pages"
       ? (session.startPage ?? 0)
@@ -1021,43 +1075,54 @@ export function finishSession(sessionId: string, endingValue: number): FinishSes
   const progress = calculateSessionProgress(book, startValue, safeEndingValue);
   const durationSeconds = sessionElapsedSeconds(session);
   const iso = todayISO();
+  const endedAt = new Date().toISOString();
 
-  let metTarget = false;
-  set((s) => {
-    const endedAt = new Date().toISOString();
-    const updatedSession: ReadingSession = {
-      ...session,
-      endedAt,
-      durationSeconds,
+  await supabase
+    .from("reading_sessions")
+    .update({
+      ended_at: endedAt,
+      duration_seconds: durationSeconds,
       status: "completed",
-      endPage: book.progressMode === "pages" ? safeEndingValue : undefined,
-      endPercentage: book.progressMode === "percentage" ? safeEndingValue : undefined,
-      endProgressSeconds: book.progressMode === "time" ? safeEndingValue : undefined,
-      ...progress,
-    };
-    const updatedBook: Book =
-      book.progressMode === "pages"
-        ? { ...book, currentPage: safeEndingValue, updatedAt: endedAt }
-        : book.progressMode === "percentage"
-          ? { ...book, currentPercentage: safeEndingValue, updatedAt: endedAt }
-          : { ...book, currentSeconds: safeEndingValue, updatedAt: endedAt };
-    const delta = safeEndingValue - startValue;
-    const plan = planFor(s.plans, book.id);
-    const routine = routineFor(s.routines, book.id);
-    const dailyTargets =
-      delta > 0
-        ? bumpDailyTargetCompleted(s, book.id, iso, delta, updatedBook, plan, routine)
-        : s.dailyTargets;
-    const targetRow = dailyTargets.find((t) => t.bookId === book.id && t.date === iso);
-    metTarget = !!targetRow && targetRow.completedAmount >= targetRow.plannedAmount;
-    const next: State = {
-      ...s,
-      sessions: s.sessions.map((x) => (x.id === sessionId ? updatedSession : x)),
-      books: s.books.map((x) => (x.id === book.id ? updatedBook : x)),
-      dailyTargets,
-    };
-    return recordActivity(next, iso);
-  });
+      end_page: book.progressMode === "pages" ? safeEndingValue : undefined,
+      end_percentage: book.progressMode === "percentage" ? safeEndingValue : undefined,
+      end_progress_seconds: book.progressMode === "time" ? safeEndingValue : undefined,
+      pages_read: progress.pagesRead,
+      percentage_read: progress.percentageRead,
+      progress_seconds: progress.progressSeconds,
+    })
+    .eq("id", sessionId);
+
+  const field =
+    book.progressMode === "pages"
+      ? "current_page"
+      : book.progressMode === "percentage"
+        ? "current_percentage"
+        : "current_seconds";
+  await supabase
+    .from("reading_books")
+    .update({ [field]: safeEndingValue })
+    .eq("id", book.id);
+
+  const delta = safeEndingValue - startValue;
+  let metTarget = false;
+  if (delta > 0) {
+    const plan = planFor(state.plans, book.id);
+    const routine = routineFor(state.routines, book.id);
+    const updatedBook = {
+      ...book,
+      [field.replace(/_([a-z])/g, (_, c) => c.toUpperCase())]: safeEndingValue,
+    } as Book;
+    await bumpDailyTargetCompleted(userId, book.id, iso, delta, updatedBook, plan, routine);
+    await recordActivity(iso);
+    const targetRow =
+      (snapshot().dailyTargets.find((t) => t.bookId === book.id && t.date === iso)
+        ?.completedAmount ?? 0) + delta;
+    const plannedRow = snapshot().dailyTargets.find(
+      (t) => t.bookId === book.id && t.date === iso,
+    )?.plannedAmount;
+    metTarget = plannedRow !== undefined && targetRow >= plannedRow;
+  }
+  await invalidate();
 
   return {
     ok: true,
@@ -1077,7 +1142,7 @@ export function finishSession(sessionId: string, endingValue: number): FinishSes
 // ---------------------------------------------------------------------------
 // Ações — notas (frase/insight/nota)
 // ---------------------------------------------------------------------------
-export function addNote(input: {
+export async function addNote(input: {
   bookId: string;
   sessionId?: string;
   type: ReadingNoteType;
@@ -1086,69 +1151,79 @@ export function addNote(input: {
   pageNumber?: number;
   percentage?: number;
   timestampSeconds?: number;
-}): string {
-  const id = genId("rn");
-  const now = new Date().toISOString();
-  const note: ReadingNote = {
-    id,
-    bookId: input.bookId,
-    sessionId: input.sessionId,
-    type: input.type,
-    content: input.content.trim(),
-    tags: input.tags ?? [],
-    pageNumber: input.pageNumber,
-    percentage: input.percentage,
-    timestampSeconds: input.timestampSeconds,
-    createdAt: now,
-    updatedAt: now,
-    resurfaceCount: 0,
-  };
-  set((s) => ({ ...s, notes: [note, ...s.notes] }));
-  return id;
+}): Promise<string> {
+  const userId = await ensureSession();
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("reading_notes")
+      .insert({
+        user_id: userId,
+        book_id: input.bookId,
+        session_id: input.sessionId,
+        type: input.type,
+        content: input.content.trim(),
+        tags: input.tags ?? [],
+        page_number: input.pageNumber,
+        percentage: input.percentage,
+        timestamp_seconds: input.timestampSeconds,
+      })
+      .select()
+      .single(),
+  );
+  await invalidate();
+  return row.id;
 }
 
-export function markResurfaced(noteId: string) {
-  set((s) => ({
-    ...s,
-    notes: s.notes.map((n) =>
-      n.id === noteId
-        ? { ...n, lastResurfacedAt: new Date().toISOString(), resurfaceCount: n.resurfaceCount + 1 }
-        : n,
-    ),
-  }));
+export async function markResurfaced(noteId: string) {
+  const note = snapshot().notes.find((n) => n.id === noteId);
+  unwrap(
+    await supabase
+      .from("reading_notes")
+      .update({
+        last_resurfaced_at: new Date().toISOString(),
+        resurface_count: (note?.resurfaceCount ?? 0) + 1,
+      })
+      .eq("id", noteId)
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
 // ---------------------------------------------------------------------------
 // Ações — plano e rotina
 // ---------------------------------------------------------------------------
-export function setReadingPlan(
+export async function setReadingPlan(
   bookId: string,
   input: { type: ReadingPlanType; deadline?: string; targetAmount?: number },
 ) {
+  const state = snapshot();
+  const userId = await ensureSession();
   const book = state.books.find((b) => b.id === bookId);
   const unit = book ? targetUnitForBook(book) : "pages";
-  set((s) => {
-    const plans = s.plans.map((p) =>
-      p.bookId === bookId && p.active ? { ...p, active: false } : p,
-    );
-    const now = new Date().toISOString();
-    const plan: ReadingPlan = {
-      id: genId("rpl"),
-      bookId,
-      type: input.type,
-      deadline: input.type === "deadline" ? input.deadline : undefined,
-      targetPages:
-        input.type === "daily_target" && unit === "pages" ? input.targetAmount : undefined,
-      targetPercentage:
-        input.type === "daily_target" && unit === "percentage" ? input.targetAmount : undefined,
-      targetSeconds:
-        input.type === "daily_target" && unit === "seconds" ? input.targetAmount : undefined,
-      active: true,
-      createdAt: now,
-      updatedAt: now,
-    };
-    return { ...s, plans: [...plans, plan] };
-  });
+  const activePlan = state.plans.find((p) => p.bookId === bookId && p.active);
+  if (activePlan)
+    await supabase.from("reading_plans").update({ active: false }).eq("id", activePlan.id);
+  unwrap(
+    await supabase
+      .from("reading_plans")
+      .insert({
+        user_id: userId,
+        book_id: bookId,
+        type: input.type,
+        deadline: input.type === "deadline" ? input.deadline : undefined,
+        target_pages:
+          input.type === "daily_target" && unit === "pages" ? input.targetAmount : undefined,
+        target_percentage:
+          input.type === "daily_target" && unit === "percentage" ? input.targetAmount : undefined,
+        target_seconds:
+          input.type === "daily_target" && unit === "seconds" ? input.targetAmount : undefined,
+        active: true,
+      })
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
 /** Cria/edita a rotina de leitura do livro — recria as Routine do goals-store sem duplicar. */
@@ -1156,10 +1231,13 @@ export async function setReadingRoutine(
   bookId: string,
   input: { weekdays: number[]; time: string; desiredDurationMinutes?: number },
 ) {
+  const state = snapshot();
+  const userId = await ensureSession();
   const book = state.books.find((b) => b.id === bookId);
   const existing = routineFor(state.routines, bookId);
   if (existing) {
     await Promise.all(existing.goalsRoutineIds.map((gid) => removeRoutine(gid)));
+    await supabase.from("reading_routines").update({ active: false }).eq("id", existing.id);
   }
   const goalsRoutineIds = await Promise.all(
     input.weekdays.map((weekday) =>
@@ -1171,146 +1249,182 @@ export async function setReadingRoutine(
       }),
     ),
   );
-  set((s) => {
-    const routines = s.routines.map((r) =>
-      r.bookId === bookId && r.active ? { ...r, active: false } : r,
-    );
-    const routine: ReadingRoutine = {
-      id: genId("rr"),
-      bookId,
-      weekdays: input.weekdays,
-      time: input.time,
-      desiredDurationMinutes: input.desiredDurationMinutes,
-      active: true,
-      goalsRoutineIds,
-    };
-    return { ...s, routines: [...routines, routine] };
-  });
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("reading_routines")
+      .insert({
+        user_id: userId,
+        book_id: bookId,
+        time: input.time,
+        desired_duration_minutes: input.desiredDurationMinutes,
+        active: true,
+      })
+      .select()
+      .single(),
+  );
+  await Promise.all(
+    goalsRoutineIds.map((rid, i) =>
+      supabase.from("routine_links").insert({
+        user_id: userId,
+        source_type: "reading_routine",
+        source_id: row.id,
+        weekday: input.weekdays[i],
+        core_routine_id: rid,
+      }),
+    ),
+  );
+  await invalidate();
 }
 
 // ---------------------------------------------------------------------------
 // Ações — ajuste de meta não cumprida
 // ---------------------------------------------------------------------------
 /** Materializa (sem duplicar) as linhas dos últimos dias planejados sem registro, pra detectar déficits ao abrir o módulo. */
-export function checkForMissedTargets() {
-  set((s) => {
-    const dailyTargets = [...s.dailyTargets];
-    const iso = todayISO();
-    for (const book of s.books.filter((b) => b.status === "reading")) {
-      const plan = planFor(s.plans, book.id);
-      const routine = routineFor(s.routines, book.id);
-      if (!plan || !routine) continue;
-      const lookbackStart = toISODate(addDays(new Date(), -14));
-      const days = plannedDaysBetween(
-        routine,
-        lookbackStart,
-        toISODate(addDays(new Date(), -1)),
-      ).filter((d) => d < iso);
-      for (const date of days) {
-        const has = dailyTargets.some((t) => t.bookId === book.id && t.date === date);
-        if (has) continue;
-        const computed = computePlanDailyAmount(book, plan, routine);
-        dailyTargets.push({
-          id: genId("drt"),
-          bookId: book.id,
-          date,
-          plannedAmount: computed.value,
-          completedAmount: 0,
-          unit: computed.unit,
-          adjustmentStatus: "none",
-        });
-      }
+export async function checkForMissedTargets() {
+  const state = snapshot();
+  const userId = await ensureSession();
+  const iso = todayISO();
+  const toInsert: Row[] = [];
+  for (const book of state.books.filter((b) => b.status === "reading")) {
+    const plan = planFor(state.plans, book.id);
+    const routine = routineFor(state.routines, book.id);
+    if (!plan || !routine) continue;
+    const lookbackStart = toISODate(addDays(new Date(), -14));
+    const days = plannedDaysBetween(
+      routine,
+      lookbackStart,
+      toISODate(addDays(new Date(), -1)),
+    ).filter((d) => d < iso);
+    for (const date of days) {
+      const has = state.dailyTargets.some((t) => t.bookId === book.id && t.date === date);
+      if (has) continue;
+      const computed = computePlanDailyAmount(book, plan, routine);
+      toInsert.push({
+        user_id: userId,
+        book_id: book.id,
+        date,
+        planned_amount: computed.value,
+        completed_amount: 0,
+        unit: computed.unit,
+        adjustment_status: "none",
+      });
     }
-    return { ...s, dailyTargets };
-  });
+  }
+  if (toInsert.length > 0) {
+    await supabase.from("reading_daily_targets").upsert(toInsert, { onConflict: "book_id,date" });
+    await invalidate();
+  }
 }
 
-export function redistributeMissedTarget(dailyTargetId: string) {
-  set((s) => {
-    const target = s.dailyTargets.find((t) => t.id === dailyTargetId);
-    if (!target) return s;
-    const missed = target.plannedAmount - target.completedAmount;
-    const markResolved = (list: ReadingDailyTarget[]) =>
-      list.map((t) =>
-        t.id === dailyTargetId ? { ...t, adjustmentStatus: "redistributed" as const } : t,
-      );
-    if (missed <= 0) return { ...s, dailyTargets: markResolved(s.dailyTargets) };
-    const book = s.books.find((b) => b.id === target.bookId);
-    const plan = planFor(s.plans, target.bookId);
-    const routine = routineFor(s.routines, target.bookId);
-    if (!book || !plan || !routine) return { ...s, dailyTargets: markResolved(s.dailyTargets) };
-    const horizonEnd = plan.deadline ?? toISODate(addDays(new Date(), 30));
-    const days = plannedDaysBetween(routine, toISODate(addDays(new Date(), 1)), horizonEnd);
-    if (days.length === 0) return { ...s, dailyTargets: markResolved(s.dailyTargets) };
+export async function redistributeMissedTarget(dailyTargetId: string) {
+  const state = snapshot();
+  const target = state.dailyTargets.find((t) => t.id === dailyTargetId);
+  if (!target) return;
+  const userId = await ensureSession();
+  const missed = target.plannedAmount - target.completedAmount;
+  if (missed <= 0) {
+    await supabase
+      .from("reading_daily_targets")
+      .update({ adjustment_status: "redistributed" })
+      .eq("id", dailyTargetId);
+    await invalidate();
+    return;
+  }
+  const book = state.books.find((b) => b.id === target.bookId);
+  const plan = planFor(state.plans, target.bookId);
+  const routine = routineFor(state.routines, target.bookId);
+  if (!book || !plan || !routine) {
+    await supabase
+      .from("reading_daily_targets")
+      .update({ adjustment_status: "redistributed" })
+      .eq("id", dailyTargetId);
+    await invalidate();
+    return;
+  }
+  const horizonEnd = plan.deadline ?? toISODate(addDays(new Date(), 30));
+  const days = plannedDaysBetween(routine, toISODate(addDays(new Date(), 1)), horizonEnd);
+  if (days.length > 0) {
     const share = Math.floor(missed / days.length);
     let remainder = missed - share * days.length;
-    const dailyTargets = [...s.dailyTargets];
     for (const date of days) {
       const add = share + (remainder > 0 ? 1 : 0);
       if (remainder > 0) remainder -= 1;
       if (add <= 0) continue;
-      const idx = dailyTargets.findIndex((t) => t.bookId === book.id && t.date === date);
-      if (idx >= 0) {
-        dailyTargets[idx] = {
-          ...dailyTargets[idx],
-          plannedAmount: dailyTargets[idx].plannedAmount + add,
-        };
+      const existing = snapshot().dailyTargets.find((t) => t.bookId === book.id && t.date === date);
+      if (existing) {
+        await supabase
+          .from("reading_daily_targets")
+          .update({ planned_amount: existing.plannedAmount + add })
+          .eq("id", existing.id);
       } else {
         const base = computePlanDailyAmount(book, plan, routine);
-        dailyTargets.push({
-          id: genId("drt"),
-          bookId: book.id,
-          date,
-          plannedAmount: base.value + add,
-          completedAmount: 0,
-          unit: base.unit,
-          adjustmentStatus: "none",
-        });
+        await supabase.from("reading_daily_targets").upsert(
+          {
+            user_id: userId,
+            book_id: book.id,
+            date,
+            planned_amount: base.value + add,
+            completed_amount: 0,
+            unit: base.unit,
+            adjustment_status: "none",
+          },
+          { onConflict: "book_id,date" },
+        );
       }
     }
-    return { ...s, dailyTargets: markResolved(dailyTargets) };
-  });
+  }
+  await supabase
+    .from("reading_daily_targets")
+    .update({ adjustment_status: "redistributed" })
+    .eq("id", dailyTargetId);
+  await invalidate();
 }
 
-export function moveMissedTarget(dailyTargetId: string, targetDate: string) {
-  set((s) => {
-    const target = s.dailyTargets.find((t) => t.id === dailyTargetId);
-    if (!target) return s;
-    const missed = Math.max(0, target.plannedAmount - target.completedAmount);
-    const markResolved = (list: ReadingDailyTarget[]) =>
-      list.map((t) => (t.id === dailyTargetId ? { ...t, adjustmentStatus: "moved" as const } : t));
-    if (missed <= 0) return { ...s, dailyTargets: markResolved(s.dailyTargets) };
-    const book = s.books.find((b) => b.id === target.bookId);
-    const plan = planFor(s.plans, target.bookId);
-    const routine = routineFor(s.routines, target.bookId);
-    const dailyTargets = [...s.dailyTargets];
-    const idx = dailyTargets.findIndex((t) => t.bookId === target.bookId && t.date === targetDate);
-    if (idx >= 0) {
-      dailyTargets[idx] = {
-        ...dailyTargets[idx],
-        plannedAmount: dailyTargets[idx].plannedAmount + missed,
-      };
+export async function moveMissedTarget(dailyTargetId: string, targetDate: string) {
+  const state = snapshot();
+  const target = state.dailyTargets.find((t) => t.id === dailyTargetId);
+  if (!target) return;
+  const userId = await ensureSession();
+  const missed = Math.max(0, target.plannedAmount - target.completedAmount);
+  if (missed > 0) {
+    const book = state.books.find((b) => b.id === target.bookId);
+    const plan = planFor(state.plans, target.bookId);
+    const routine = routineFor(state.routines, target.bookId);
+    const existing = state.dailyTargets.find(
+      (t) => t.bookId === target.bookId && t.date === targetDate,
+    );
+    if (existing) {
+      await supabase
+        .from("reading_daily_targets")
+        .update({ planned_amount: existing.plannedAmount + missed })
+        .eq("id", existing.id);
     } else if (book && plan && routine) {
       const base = computePlanDailyAmount(book, plan, routine);
-      dailyTargets.push({
-        id: genId("drt"),
-        bookId: book.id,
-        date: targetDate,
-        plannedAmount: base.value + missed,
-        completedAmount: 0,
-        unit: base.unit,
-        adjustmentStatus: "none",
-      });
+      await supabase.from("reading_daily_targets").upsert(
+        {
+          user_id: userId,
+          book_id: book.id,
+          date: targetDate,
+          planned_amount: base.value + missed,
+          completed_amount: 0,
+          unit: base.unit,
+          adjustment_status: "none",
+        },
+        { onConflict: "book_id,date" },
+      );
     }
-    return { ...s, dailyTargets: markResolved(dailyTargets) };
-  });
+  }
+  await supabase
+    .from("reading_daily_targets")
+    .update({ adjustment_status: "moved" })
+    .eq("id", dailyTargetId);
+  await invalidate();
 }
 
-export function keepMissedTarget(dailyTargetId: string) {
-  set((s) => ({
-    ...s,
-    dailyTargets: s.dailyTargets.map((t) =>
-      t.id === dailyTargetId ? { ...t, adjustmentStatus: "kept" as const } : t,
-    ),
-  }));
+export async function keepMissedTarget(dailyTargetId: string) {
+  await supabase
+    .from("reading_daily_targets")
+    .update({ adjustment_status: "kept" })
+    .eq("id", dailyTargetId);
+  await invalidate();
 }

@@ -31,6 +31,8 @@ export function AddBookFlow({ onClose }: { onClose: () => void }) {
   const [coverDataUrl, setCoverDataUrl] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState<QuickStatus>("reading");
   const [createdBookId, setCreatedBookId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const gen = useRef(0);
 
@@ -82,8 +84,10 @@ export function AddBookFlow({ onClose }: { onClose: () => void }) {
     reader.readAsDataURL(file);
   };
 
-  const confirmDetails = () => {
-    if (!title.trim()) return;
+  const confirmDetails = async () => {
+    if (!title.trim() || saving) return;
+    setSaving(true);
+    setError("");
     const opts = {
       format,
       status,
@@ -91,28 +95,34 @@ export function AddBookFlow({ onClose }: { onClose: () => void }) {
       totalPages: effectiveMode === "pages" ? parseInt(totalPages, 10) || undefined : undefined,
       totalSeconds: effectiveMode === "time" ? (parseInt(totalMinutes, 10) || 0) * 60 : undefined,
     };
-    let id: string;
-    if (selected) {
-      id = addBookFromSearch(
-        {
-          ...selected,
+    try {
+      let id: string;
+      if (selected) {
+        id = await addBookFromSearch(
+          {
+            ...selected,
+            title: title.trim(),
+            authors: author ? author.split(",").map((a) => a.trim()) : [],
+          },
+          opts,
+        );
+        if (coverDataUrl) await updateBook(id, { coverImage: coverDataUrl });
+      } else {
+        id = await addBookManual({
           title: title.trim(),
           authors: author ? author.split(",").map((a) => a.trim()) : [],
-        },
-        opts,
-      );
-      if (coverDataUrl) updateBook(id, { coverImage: coverDataUrl });
-    } else {
-      id = addBookManual({
-        title: title.trim(),
-        authors: author ? author.split(",").map((a) => a.trim()) : [],
-        coverImage: coverDataUrl,
-        ...opts,
-      });
+          coverImage: coverDataUrl,
+          ...opts,
+        });
+      }
+      setCreatedBookId(id);
+      if (status === "reading") setStep("plan");
+      else onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar o livro.");
+    } finally {
+      setSaving(false);
     }
-    setCreatedBookId(id);
-    if (status === "reading") setStep("plan");
-    else onClose();
   };
 
   const book = useReadingStore((s) => s.books.find((b) => b.id === createdBookId));
@@ -312,12 +322,13 @@ export function AddBookFlow({ onClose }: { onClose: () => void }) {
               </div>
             </div>
 
+            {error && <p className="text-[11px] text-danger">{error}</p>}
             <button
               onClick={confirmDetails}
-              disabled={!title.trim()}
+              disabled={!title.trim() || saving}
               className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
             >
-              Continuar
+              {saving ? "Salvando…" : "Continuar"}
             </button>
           </div>
         )}

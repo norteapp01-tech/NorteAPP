@@ -46,8 +46,8 @@ export function MissedTargetAdjustment({
         {!pickingDate ? (
           <div className="mt-4 flex flex-col gap-2">
             <button
-              onClick={() => {
-                redistributeMissedTarget(target.id);
+              onClick={async () => {
+                await redistributeMissedTarget(target.id);
                 onClose();
               }}
               className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
@@ -61,8 +61,8 @@ export function MissedTargetAdjustment({
               Mover para outro dia
             </button>
             <button
-              onClick={() => {
-                keepMissedTarget(target.id);
+              onClick={async () => {
+                await keepMissedTarget(target.id);
                 onClose();
               }}
               className="w-full py-2 text-xs text-muted-foreground"
@@ -80,8 +80,8 @@ export function MissedTargetAdjustment({
               className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
             />
             <button
-              onClick={() => {
-                moveMissedTarget(target.id, date);
+              onClick={async () => {
+                await moveMissedTarget(target.id, date);
                 onClose();
               }}
               className="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"

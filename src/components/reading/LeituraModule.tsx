@@ -5,7 +5,6 @@ import {
   useReadingStore,
   booksByStatus,
   startSession,
-  setSelectedReadingBookId,
   checkForMissedTargets,
   getMissedReadingTarget,
   getResurfacingCandidate,
@@ -41,13 +40,15 @@ type Modal =
 
 export function LeituraModule() {
   useEffect(() => {
-    checkForMissedTargets();
+    void checkForMissedTargets();
   }, []);
 
   const state = useReadingStore((s) => s);
   const executions = useGoalsStore((s) => s.executions);
   void executions;
   const [modal, setModal] = useState<Modal>(null);
+  const [selectedReadingBookId, setSelectedReadingBookId] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
 
   const readingBooks = booksByStatus(state.books, "reading");
   const wantBooks = booksByStatus(state.books, "want_to_read");
@@ -55,8 +56,8 @@ export function LeituraModule() {
   const pausedBooks = booksByStatus(state.books, "paused");
 
   const selectedId =
-    state.selectedReadingBookId && readingBooks.some((b) => b.id === state.selectedReadingBookId)
-      ? state.selectedReadingBookId
+    selectedReadingBookId && readingBooks.some((b) => b.id === selectedReadingBookId)
+      ? selectedReadingBookId
       : (readingBooks[0]?.id ?? null);
   const selectedBook = readingBooks.find((b) => b.id === selectedId) ?? null;
 
@@ -72,18 +73,24 @@ export function LeituraModule() {
     }
   }, [resurfaceCandidate]);
 
-  const beginReading = (book: Book) => {
-    const res = startSession(book.id);
-    if (!res.ok && res.conflictSessionId) {
-      const conflictSession = state.sessions.find((s) => s.id === res.conflictSessionId);
-      setModal({
-        type: "sessionConflict",
-        requested: book,
-        conflictBookId: conflictSession?.bookId ?? "",
-      });
-      return;
+  const beginReading = async (book: Book) => {
+    if (starting) return;
+    setStarting(true);
+    try {
+      const res = await startSession(book.id);
+      if (!res.ok && res.conflictSessionId) {
+        const conflictSession = state.sessions.find((s) => s.id === res.conflictSessionId);
+        setModal({
+          type: "sessionConflict",
+          requested: book,
+          conflictBookId: conflictSession?.bookId ?? "",
+        });
+        return;
+      }
+      if (res.sessionId) setModal({ type: "readingMode", book, sessionId: res.sessionId });
+    } finally {
+      setStarting(false);
     }
-    if (res.sessionId) setModal({ type: "readingMode", book, sessionId: res.sessionId });
   };
 
   return (
@@ -135,8 +142,8 @@ export function LeituraModule() {
                   <BookCover book={b} className="h-10 w-7" />
                   <p className="min-w-0 flex-1 truncate text-xs font-semibold">{b.title}</p>
                   <button
-                    onClick={() => {
-                      startReading(b.id);
+                    onClick={async () => {
+                      await startReading(b.id);
                       setModal({ type: "bookDetails", bookId: b.id });
                     }}
                     className="shrink-0 text-[11px] font-semibold text-primary"

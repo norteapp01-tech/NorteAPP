@@ -25,22 +25,29 @@ export function ReadingProgressUpdater({ book, onClose }: { book: Book; onClose:
   const [rating, setRating] = useState(0);
   const [takeaway, setTakeaway] = useState("");
   const [reflection, setReflection] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const submit = (confirm = false) => {
-    const stored = toStoredValue(book, parseFloat(value) || 0);
-    const res = updateProgress(book.id, stored, { confirm });
-    if (!res.ok) {
-      if (res.needsConfirmation) {
-        setNeedsConfirm(true);
+  const submit = async (confirm = false) => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const stored = toStoredValue(book, parseFloat(value) || 0);
+      const res = await updateProgress(book.id, stored, { confirm });
+      if (!res.ok) {
+        if (res.needsConfirmation) {
+          setNeedsConfirm(true);
+          return;
+        }
+        setError(res.error ?? "valor inválido");
         return;
       }
-      setError(res.error ?? "valor inválido");
-      return;
+      setError(null);
+      setNeedsConfirm(false);
+      if (res.completed) setStep("confirmComplete");
+      else onClose();
+    } finally {
+      setSaving(false);
     }
-    setError(null);
-    setNeedsConfirm(false);
-    if (res.completed) setStep("confirmComplete");
-    else onClose();
   };
 
   if (step === "confirmComplete") {
@@ -49,8 +56,8 @@ export function ReadingProgressUpdater({ book, onClose }: { book: Book; onClose:
         <p className="text-sm">Você terminou este livro.</p>
         <div className="mt-4 flex flex-col gap-2">
           <button
-            onClick={() => {
-              completeBook(book.id);
+            onClick={async () => {
+              await completeBook(book.id);
               setStep("rating");
             }}
             className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
@@ -99,8 +106,8 @@ export function ReadingProgressUpdater({ book, onClose }: { book: Book; onClose:
         </label>
         <div className="mt-4 flex items-center gap-3">
           <button
-            onClick={() => {
-              completeBook(book.id, {
+            onClick={async () => {
+              await completeBook(book.id, {
                 rating: rating || undefined,
                 mainTakeaway: takeaway.trim() || undefined,
                 personalReflection: reflection.trim() || undefined,
@@ -144,7 +151,8 @@ export function ReadingProgressUpdater({ book, onClose }: { book: Book; onClose:
           <div className="mt-2 flex gap-2">
             <button
               onClick={() => submit(true)}
-              className="rounded-lg bg-warning px-3 py-1.5 font-semibold text-background"
+              disabled={saving}
+              className="rounded-lg bg-warning px-3 py-1.5 font-semibold text-background disabled:opacity-40"
             >
               Confirmar
             </button>
@@ -156,9 +164,10 @@ export function ReadingProgressUpdater({ book, onClose }: { book: Book; onClose:
       )}
       <button
         onClick={() => submit(false)}
-        className="mt-4 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
+        disabled={saving}
+        className="mt-4 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
       >
-        Salvar progresso
+        {saving ? "Salvando…" : "Salvar progresso"}
       </button>
     </Sheet>
   );

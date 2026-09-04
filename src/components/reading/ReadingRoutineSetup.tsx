@@ -8,19 +8,25 @@ export function ReadingRoutineSetup({ book, onClose }: { book: Book; onClose: ()
   const [weekdays, setWeekdays] = useState<number[]>(existing?.weekdays ?? [1, 2, 3, 4, 5]);
   const [time, setTime] = useState(existing?.time ?? "21:00");
   const [duration, setDuration] = useState(String(existing?.desiredDurationMinutes ?? 20));
+  const [saving, setSaving] = useState(false);
 
   const toggleDay = (d: number) => {
     setWeekdays((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d].sort()));
   };
 
-  const save = () => {
-    if (weekdays.length === 0) return;
-    setReadingRoutine(book.id, {
-      weekdays,
-      time,
-      desiredDurationMinutes: parseInt(duration, 10) || undefined,
-    });
-    onClose();
+  const save = async () => {
+    if (weekdays.length === 0 || saving) return;
+    setSaving(true);
+    try {
+      await setReadingRoutine(book.id, {
+        weekdays,
+        time,
+        desiredDurationMinutes: parseInt(duration, 10) || undefined,
+      });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -79,10 +85,10 @@ export function ReadingRoutineSetup({ book, onClose }: { book: Book; onClose: ()
 
         <button
           onClick={save}
-          disabled={weekdays.length === 0}
+          disabled={weekdays.length === 0 || saving}
           className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
         >
-          Salvar rotina
+          {saving ? "Salvando…" : "Salvar rotina"}
         </button>
       </div>
     </div>

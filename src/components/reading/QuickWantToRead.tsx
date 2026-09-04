@@ -5,11 +5,20 @@ import { quickAddWantToRead } from "@/lib/reading-store";
 /** "+ Quero ler" — um campo só, sem fricção nenhuma. */
 export function QuickWantToRead() {
   const [title, setTitle] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const add = () => {
-    if (!title.trim()) return;
-    quickAddWantToRead(title);
+  const add = async () => {
+    if (!title.trim() || saving) return;
+    setSaving(true);
+    const value = title;
     setTitle("");
+    try {
+      await quickAddWantToRead(value);
+    } catch {
+      setTitle(value);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -23,7 +32,7 @@ export function QuickWantToRead() {
       />
       <button
         onClick={add}
-        disabled={!title.trim()}
+        disabled={!title.trim() || saving}
         className="shrink-0 text-primary disabled:opacity-30"
       >
         <Plus className="h-4 w-4" />

@@ -25,24 +25,30 @@ export function ReadingPlanSetup({
   const [type, setType] = useState<ReadingPlanType>("deadline");
   const [deadline, setDeadline] = useState("");
   const [amount, setAmount] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const canSave = type === "deadline" ? deadline.trim().length > 0 : parseFloat(amount) > 0;
 
-  const save = () => {
-    if (!canSave) return;
-    const unit = targetUnitForBook(book);
-    const targetAmount =
-      type === "daily_target"
-        ? unit === "seconds"
-          ? (parseFloat(amount) || 0) * 60
-          : parseFloat(amount) || 0
-        : undefined;
-    setReadingPlan(book.id, {
-      type,
-      deadline: type === "deadline" ? deadline : undefined,
-      targetAmount,
-    });
-    onSave();
+  const save = async () => {
+    if (!canSave || saving) return;
+    setSaving(true);
+    try {
+      const unit = targetUnitForBook(book);
+      const targetAmount =
+        type === "daily_target"
+          ? unit === "seconds"
+            ? (parseFloat(amount) || 0) * 60
+            : parseFloat(amount) || 0
+          : undefined;
+      await setReadingPlan(book.id, {
+        type,
+        deadline: type === "deadline" ? deadline : undefined,
+        targetAmount,
+      });
+      onSave();
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -91,10 +97,10 @@ export function ReadingPlanSetup({
       <div className="mt-4 flex items-center gap-3">
         <button
           onClick={save}
-          disabled={!canSave}
+          disabled={!canSave || saving}
           className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-40"
         >
-          Salvar plano
+          {saving ? "Salvando…" : "Salvar plano"}
         </button>
         {onSkip && (
           <button onClick={onSkip} className="text-xs text-muted-foreground">

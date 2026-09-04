@@ -34,24 +34,30 @@ export function ReadingNoteEditor({
   const [content, setContent] = useState("");
   const [tags, setTags] = useState("");
   const [position, setPosition] = useState(String(defaultPosition));
+  const [saving, setSaving] = useState(false);
 
-  const save = () => {
-    if (!content.trim()) return;
-    const pos = parseFloat(position) || 0;
-    addNote({
-      bookId: book.id,
-      sessionId,
-      type,
-      content,
-      tags: tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
-      pageNumber: book.progressMode === "pages" ? pos : undefined,
-      percentage: book.progressMode === "percentage" ? pos : undefined,
-      timestampSeconds: book.progressMode === "time" ? pos * 60 : undefined,
-    });
-    onSaved();
+  const save = async () => {
+    if (!content.trim() || saving) return;
+    setSaving(true);
+    try {
+      const pos = parseFloat(position) || 0;
+      await addNote({
+        bookId: book.id,
+        sessionId,
+        type,
+        content,
+        tags: tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+        pageNumber: book.progressMode === "pages" ? pos : undefined,
+        percentage: book.progressMode === "percentage" ? pos : undefined,
+        timestampSeconds: book.progressMode === "time" ? pos * 60 : undefined,
+      });
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -103,10 +109,10 @@ export function ReadingNoteEditor({
         </div>
         <button
           onClick={save}
-          disabled={!content.trim()}
+          disabled={!content.trim() || saving}
           className="mt-4 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
         >
-          Salvar e continuar lendo
+          {saving ? "Salvando…" : "Salvar e continuar lendo"}
         </button>
       </div>
     </div>
