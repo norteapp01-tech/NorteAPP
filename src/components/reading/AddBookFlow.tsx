@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { X, Search, Camera } from "lucide-react";
+import { Search, Camera } from "lucide-react";
 import { searchBooks, type SearchBookResult } from "@/lib/book-search-service";
 import {
   addBookFromSearch,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/reading-store";
 import { BookCover } from "./BookCover";
 import { ReadingPlanSetup } from "./ReadingPlanSetup";
+import { Modal } from "@/components/ui/modal";
 
 type Step = "search" | "details" | "plan";
 type QuickStatus = "reading" | "want_to_read";
@@ -128,24 +129,10 @@ export function AddBookFlow({ onClose }: { onClose: () => void }) {
   const book = useReadingStore((s) => s.books.find((b) => b.id === createdBookId));
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end bg-background/85 backdrop-blur-sm sm:items-center sm:justify-center"
-      onClick={step === "search" ? onClose : undefined}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card-surface flex w-full max-w-md flex-col rounded-b-none rounded-t-3xl border-x-0 border-b-0 p-5 sm:rounded-3xl sm:border"
-        style={{ maxHeight: "88vh" }}
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold">Adicionar livro</h3>
-          <button onClick={onClose}>
-            <X className="h-5 w-5 text-muted-foreground" />
-          </button>
-        </div>
-
+    <Modal onClose={onClose} title="Adicionar livro">
+      <div className="flex h-full flex-col">
         {step === "search" && (
-          <div className="mt-3 flex flex-1 flex-col overflow-hidden">
+          <div className="flex flex-1 flex-col">
             <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2">
               <Search className="h-4 w-4 text-muted-foreground" />
               <input
@@ -156,7 +143,7 @@ export function AddBookFlow({ onClose }: { onClose: () => void }) {
                 className="w-full bg-transparent text-sm outline-none"
               />
             </div>
-            <div className="mt-3 flex-1 space-y-2 overflow-y-auto">
+            <div className="mt-3 flex-1 space-y-2">
               {loading && <p className="text-xs text-muted-foreground">Buscando...</p>}
               {!loading &&
                 results.map((r) => (
@@ -188,7 +175,7 @@ export function AddBookFlow({ onClose }: { onClose: () => void }) {
         )}
 
         {step === "details" && (
-          <div className="mt-3 flex-1 space-y-3 overflow-y-auto">
+          <div className="flex-1 space-y-3">
             <div className="flex items-center gap-3">
               <BookCover
                 book={{ title, coverUrl: selected?.coverUrl, coverImage: coverDataUrl }}
@@ -334,7 +321,7 @@ export function AddBookFlow({ onClose }: { onClose: () => void }) {
         )}
 
         {step === "plan" && book && (
-          <div className="mt-3">
+          <div>
             <p className="text-sm text-muted-foreground">
               Quer definir um plano de leitura pra{" "}
               <strong className="text-foreground">{book.title}</strong>?
@@ -345,6 +332,6 @@ export function AddBookFlow({ onClose }: { onClose: () => void }) {
           </div>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

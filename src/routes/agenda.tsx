@@ -29,6 +29,7 @@ import {
 } from "@/lib/format-utils";
 import type { TimeFormat, WeekStart } from "@/lib/profile-store";
 import { nowDate } from "@/lib/test-clock";
+import { Modal } from "@/components/ui/modal";
 
 export const Route = createFileRoute("/agenda")({
   head: () => ({ meta: [{ title: "Agenda — Norte" }] }),
@@ -279,46 +280,31 @@ function EventCard({ e, timeFormat }: { e: Execution; timeFormat: TimeFormat }) 
 function GoalPicker({ onPick, onClose }: { onPick: (id: string) => void; onClose: () => void }) {
   const goals = useGoalsStore((s) => s.goals);
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end bg-background/85 backdrop-blur-sm sm:items-center sm:justify-center"
-      onClick={onClose}
-    >
-      <div
-        onClick={(ev) => ev.stopPropagation()}
-        className="card-surface w-full max-w-md rounded-b-none rounded-t-3xl border-x-0 border-b-0 p-5 sm:rounded-3xl sm:border"
-        style={{ maxHeight: "80vh" }}
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold">Vincular a um planejamento</h3>
-          <button onClick={onClose}>
-            <X className="h-5 w-5 text-muted-foreground" />
-          </button>
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Toque num planejamento. Este compromisso vai contar como avanço.
-        </p>
-        <div className="mt-4 max-h-[60vh] space-y-2 overflow-y-auto pr-1">
-          {goals.map((g) => {
-            const c = categoryMeta[g.category] ?? categoryMeta.generico;
-            return (
-              <button
-                key={g.id}
-                onClick={() => onPick(g.id)}
-                className="card-surface flex w-full items-center gap-3 p-3 text-left hover:border-primary/40"
-              >
-                <span className="text-lg">{c.emoji}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{g.title}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {g.lifeArea} · prazo {g.deadlineLabel}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+    <Modal onClose={onClose} title="Vincular a um planejamento">
+      <p className="text-xs text-muted-foreground">
+        Toque num planejamento. Este compromisso vai contar como avanço.
+      </p>
+      <div className="mt-4 space-y-2">
+        {goals.map((g) => {
+          const c = categoryMeta[g.category] ?? categoryMeta.generico;
+          return (
+            <button
+              key={g.id}
+              onClick={() => onPick(g.id)}
+              className="card-surface flex w-full items-center gap-3 p-3 text-left hover:border-primary/40"
+            >
+              <span className="text-lg">{c.emoji}</span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">{g.title}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {g.lifeArea} · prazo {g.deadlineLabel}
+                </p>
+              </div>
+            </button>
+          );
+        })}
       </div>
-    </div>
+    </Modal>
   );
 }
 

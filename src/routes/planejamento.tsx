@@ -1,23 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { categoryMeta, lifeAreas, lifeAreaColor } from "@/lib/mock-data";
 import {
   useGoalsStore,
   goalProgress,
   goalPace,
   todayExecutions,
-  agendaByDate,
-  toISODate,
-  addDays,
   type Goal,
   type Step,
   type Execution,
 } from "@/lib/goals-store";
-import { GripVertical, Plus, GitBranch, Target } from "lucide-react";
-import { PlanGantt } from "@/components/PlanGantt";
+import { Plus, GitBranch, Target } from "lucide-react";
+import { PlanProgressChart } from "@/components/PlanProgressChart";
 import { useProfile } from "@/lib/profile-store";
-import type { TimeFormat, WeekStart } from "@/lib/profile-store";
-import { formatTime, startOfWeekLocal } from "@/lib/format-utils";
+import { formatTime } from "@/lib/format-utils";
 import { nowDate } from "@/lib/test-clock";
 
 export const Route = createFileRoute("/planejamento")({
@@ -27,7 +23,6 @@ export const Route = createFileRoute("/planejamento")({
 
 type Layer = "hoje" | "semana" | "mes" | "quarter" | "semestre" | "ano";
 
-const dayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const sundayMode = nowDate().getDay() === 0;
 
 const layerLabel: Record<Layer, string> = {
@@ -103,8 +98,7 @@ function PlanScreen() {
           {layer === "semestre" && "Planejamentos com prazo dentro dos próximos 6 meses."}
           {layer === "quarter" && "Planejamentos com prazo dentro dos próximos 90 dias."}
           {layer === "mes" && "Planejamentos com prazo dentro deste mês."}
-          {layer === "semana" &&
-            "Planejamentos com prazo nos próximos 7 dias + suas execuções, dia a dia."}
+          {layer === "semana" && "Planejamentos com prazo nos próximos 7 dias."}
           {layer === "hoje" && "O que aparece hoje veio direto das execuções planejadas."}
         </p>
       </div>
@@ -141,15 +135,7 @@ function PlanScreen() {
         </div>
       )}
 
-      {layer === "semana" && (
-        <WeekLayer
-          steps={steps}
-          goals={goals}
-          executions={executions}
-          weekStart={profile.weekStart}
-          timeFormat={profile.timeFormat}
-        />
-      )}
+      {layer === "semana" && <WeekLayer steps={steps} goals={goals} executions={executions} />}
       {layer === "mes" && (
         <PlanningHorizonView
           title="Planejamentos deste mês"
@@ -201,7 +187,7 @@ function PlanScreen() {
       </div>
 
       <div className="mt-6">
-        <PlanGantt />
+        <PlanProgressChart />
       </div>
     </div>
   );
@@ -236,19 +222,11 @@ function WeekLayer({
   steps,
   goals,
   executions,
-  weekStart,
-  timeFormat,
 }: {
   steps: Step[];
   goals: Goal[];
   executions: Execution[];
-  weekStart: WeekStart;
-  timeFormat: TimeFormat;
 }) {
-  const start = useMemo(() => startOfWeekLocal(nowDate(), weekStart), [weekStart]);
-  const week = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(start, i)), [start]);
-  const byDate = useMemo(() => agendaByDate(executions), [executions]);
-
   return (
     <>
       {sundayMode && (
@@ -257,7 +235,8 @@ function WeekLayer({
             🛋️ Ritual de Domingo ativo
           </p>
           <p className="mt-1.5 text-sm text-balance-tight">
-            Revise as execuções da semana e ajuste o que precisar antes de segunda.
+            Revise as execuções da semana e ajuste o que precisar antes de segunda. A agenda dia a
+            dia fica na aba Agenda.
           </p>
         </div>
       )}
@@ -268,50 +247,6 @@ function WeekLayer({
         steps={steps}
         executions={executions}
       />
-      <div className="mt-6">
-        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          Sua semana, dia a dia
-        </p>
-      </div>
-      <div className="mt-2 -mx-5 overflow-x-auto px-5">
-        <div className="flex gap-2.5" style={{ width: "max-content" }}>
-          {week.map((d) => {
-            const iso = toISODate(d);
-            const evts = byDate[iso] ?? [];
-            return (
-              <div key={iso} className="w-44 shrink-0">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs font-bold uppercase tracking-wider">
-                    {dayLabels[d.getDay()]}
-                  </p>
-                  <span className="text-[10px] text-muted-foreground">
-                    {d.getDate()}/{d.getMonth() + 1}
-                  </span>
-                </div>
-                <div className="card-surface min-h-72 space-y-2 p-2.5">
-                  {evts.map((t) => (
-                    <div
-                      key={t.id}
-                      className={`rounded-lg border border-border bg-surface-2 p-2.5 ${t.status === "concluida" ? "opacity-50" : ""}`}
-                    >
-                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                        <GripVertical className="h-3 w-3" />
-                        <span>{formatTime(t.startTime, timeFormat)}</span>
-                      </div>
-                      <p className="mt-1 text-xs font-medium leading-tight">
-                        {(categoryMeta[t.category] ?? categoryMeta.generico).emoji} {t.title}
-                      </p>
-                    </div>
-                  ))}
-                  {evts.length === 0 && (
-                    <p className="py-4 text-center text-[10px] text-muted-foreground">vazio</p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </>
   );
 }
@@ -330,53 +265,79 @@ function PlanningHorizonView({
   executions: Execution[];
 }) {
   const filtered = planningsWithinDeadline(goals, maxDays);
+  const overdue = filtered.filter((g) => (daysUntil(g.deadlineISO) ?? 0) < 0);
+  const upcoming = filtered.filter((g) => (daysUntil(g.deadlineISO) ?? 0) >= 0);
+
   return (
-    <div className="mt-5">
-      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</p>
-      <div className="mt-3 space-y-2.5">
-        {filtered.map((g) => {
-          const cat = categoryMeta[g.category] ?? categoryMeta.generico;
-          const pct = goalProgress(g, steps, executions);
-          const gSteps = steps.filter((s) => s.goalId === g.id).sort((a, b) => a.order - b.order);
-          const nextAction = gSteps.find((s) => !s.done);
-          return (
-            <Link
-              key={g.id}
-              to="/objetivo/$id"
-              params={{ id: g.id }}
-              className="card-surface block p-4 hover:border-primary/40"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-[10px] uppercase tracking-wider text-muted-foreground">
-                    {cat.emoji} {g.lifeArea}
-                  </p>
-                  <p className="mt-1 font-semibold leading-snug">{g.title}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    prazo {g.deadlineLabel}
-                    {gSteps.length > 0
-                      ? ` · ${gSteps.filter((s) => s.done).length}/${gSteps.length} etapas`
-                      : ""}
-                  </p>
-                </div>
-                <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 font-mono text-xs font-bold text-primary">
-                  {pct}%
-                </span>
-              </div>
-              {nextAction && (
-                <p className="mt-2 truncate text-[11px] text-primary">
-                  Próxima ação: {nextAction.title}
-                </p>
-              )}
-              <PlanningProgressBar goal={g} steps={steps} executions={executions} />
-            </Link>
-          );
-        })}
-        {filtered.length === 0 && (
-          <EmptyLayer text="Sem planejamentos com prazo nesse horizonte." />
-        )}
+    <div className="mt-5 space-y-5">
+      {overdue.length > 0 && (
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-danger">
+            Atrasados ({overdue.length})
+          </p>
+          <div className="mt-3 space-y-2.5">
+            {overdue.map((g) => (
+              <PlanCard key={g.id} goal={g} steps={steps} executions={executions} />
+            ))}
+          </div>
+        </div>
+      )}
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</p>
+        <div className="mt-3 space-y-2.5">
+          {upcoming.map((g) => (
+            <PlanCard key={g.id} goal={g} steps={steps} executions={executions} />
+          ))}
+          {filtered.length === 0 && (
+            <EmptyLayer text="Sem planejamentos com prazo nesse horizonte." />
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+function PlanCard({
+  goal: g,
+  steps,
+  executions,
+}: {
+  goal: Goal;
+  steps: Step[];
+  executions: Execution[];
+}) {
+  const cat = categoryMeta[g.category] ?? categoryMeta.generico;
+  const pct = goalProgress(g, steps, executions);
+  const gSteps = steps.filter((s) => s.goalId === g.id).sort((a, b) => a.order - b.order);
+  const nextAction = gSteps.find((s) => !s.done);
+  return (
+    <Link
+      to="/objetivo/$id"
+      params={{ id: g.id }}
+      className="card-surface block p-4 hover:border-primary/40"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-[10px] uppercase tracking-wider text-muted-foreground">
+            {cat.emoji} {g.lifeArea}
+          </p>
+          <p className="mt-1 font-semibold leading-snug">{g.title}</p>
+          <p className="text-[11px] text-muted-foreground">
+            prazo {g.deadlineLabel}
+            {gSteps.length > 0
+              ? ` · ${gSteps.filter((s) => s.done).length}/${gSteps.length} etapas`
+              : ""}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 font-mono text-xs font-bold text-primary">
+          {pct}%
+        </span>
+      </div>
+      {nextAction && (
+        <p className="mt-2 truncate text-[11px] text-primary">Próxima ação: {nextAction.title}</p>
+      )}
+      <PlanningProgressBar goal={g} steps={steps} executions={executions} />
+    </Link>
   );
 }
 

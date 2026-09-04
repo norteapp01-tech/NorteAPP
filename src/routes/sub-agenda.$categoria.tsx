@@ -56,9 +56,10 @@ import { LeituraModule } from "@/components/reading/LeituraModule";
 import { AlimentacaoModule } from "@/components/nutrition/AlimentacaoModule";
 import { FinancasModule } from "@/components/finance/FinancasModule";
 import { FeModule } from "@/components/fe/FeModule";
+import { Modal } from "@/components/ui/modal";
+import { ExerciseEvolutionChart } from "@/components/academia/ExerciseEvolutionChart";
 import {
   Card,
-  Sparkline,
   weekdayLabels,
   weekVisualLabels,
   weekVisualOrder,
@@ -488,45 +489,31 @@ function WeekdayPlanPicker({
   onClose: () => void;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end bg-background/85 backdrop-blur-sm sm:items-center sm:justify-center"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card-surface w-full max-w-md rounded-b-none rounded-t-3xl border-x-0 border-b-0 p-5 sm:rounded-3xl sm:border"
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold">{weekdayLabels[weekday]}</h3>
-          <button onClick={onClose}>
-            <X className="h-5 w-5 text-muted-foreground" />
-          </button>
-        </div>
-        <div className="mt-4 space-y-2">
+    <Modal onClose={onClose} title={weekdayLabels[weekday]}>
+      <div className="space-y-2">
+        <button
+          onClick={() => onPick(null)}
+          className="card-surface w-full p-3 text-left text-sm font-semibold hover:border-primary/40"
+        >
+          Descanso
+        </button>
+        {plans.map((p) => (
           <button
-            onClick={() => onPick(null)}
-            className="card-surface w-full p-3 text-left text-sm font-semibold hover:border-primary/40"
+            key={p.id}
+            onClick={() => onPick(p.id)}
+            className="card-surface flex w-full items-center gap-3 p-3 text-left hover:border-primary/40"
           >
-            Descanso
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-sm font-bold text-primary">
+              {p.letter}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{p.name}</p>
+              <p className="text-[11px] text-muted-foreground">{p.muscleGroups}</p>
+            </div>
           </button>
-          {plans.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => onPick(p.id)}
-              className="card-surface flex w-full items-center gap-3 p-3 text-left hover:border-primary/40"
-            >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-sm font-bold text-primary">
-                {p.letter}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{p.name}</p>
-                <p className="text-[11px] text-muted-foreground">{p.muscleGroups}</p>
-              </div>
-            </button>
-          ))}
-        </div>
+        ))}
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -820,134 +807,123 @@ function ExerciseModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end bg-background/85 backdrop-blur-sm sm:items-center sm:justify-center"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card-surface w-full overflow-y-auto rounded-b-none rounded-t-3xl border-x-0 border-b-0 p-5 sm:w-[min(92vw,28rem)] sm:rounded-3xl sm:border"
-        style={{ maxHeight: "85vh" }}
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold">{exercise.name}</h3>
-          <button onClick={onClose}>
-            <X className="h-5 w-5 text-muted-foreground" />
-          </button>
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground/70">
-          Meta: {exercise.setsTarget} séries × {exercise.repsTarget} reps — {exercise.loadTarget} kg
-        </p>
+    <Modal onClose={onClose} title={exercise.name}>
+      <p className="text-xs text-muted-foreground/70">
+        Meta: {exercise.setsTarget} séries × {exercise.repsTarget} reps — {exercise.loadTarget} kg
+      </p>
 
-        <div className="mt-4 space-y-1.5">
-          {(log?.sets ?? []).map((s) => (
-            <div
-              key={s.setIndex}
-              className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 p-2"
-            >
-              <span className="w-14 shrink-0 text-[11px] text-muted-foreground">
-                Série {s.setIndex + 1}
-              </span>
-              <input
-                type="number"
-                value={s.weight}
-                onChange={(e) =>
-                  void updateSet(liveSession.id, exercise.id, s.setIndex, {
-                    weight: parseFloat(e.target.value) || 0,
-                  })
-                }
-                className="w-16 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
-              />
-              <span className="text-[10px] text-muted-foreground">kg</span>
-              <input
-                type="number"
-                value={s.reps}
-                onChange={(e) =>
-                  void updateSet(liveSession.id, exercise.id, s.setIndex, {
-                    reps: parseInt(e.target.value, 10) || 0,
-                  })
-                }
-                className="w-14 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
-              />
-              <span className="text-[10px] text-muted-foreground">reps</span>
-            </div>
-          ))}
-        </div>
-
-        {plannedRemaining > 0 && (
-          <div className="mt-1.5 space-y-1.5">
-            {Array.from({ length: plannedRemaining }, (_, i) => registeredCount + i).map((idx) => {
-              const d = draftFor(idx);
-              return (
-                <div
-                  key={idx}
-                  className="flex items-center gap-2 rounded-lg border border-dashed border-primary/40 bg-primary/5 p-2"
-                >
-                  <span className="w-14 shrink-0 text-[11px] text-muted-foreground">
-                    Série {idx + 1}
-                  </span>
-                  <input
-                    type="number"
-                    value={d.weight}
-                    onChange={(e) => setDraftFor(idx, { weight: e.target.value })}
-                    className="w-16 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
-                  />
-                  <span className="text-[10px] text-muted-foreground">kg</span>
-                  <input
-                    type="number"
-                    value={d.reps}
-                    onChange={(e) => setDraftFor(idx, { reps: e.target.value })}
-                    className="w-14 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
-                  />
-                  <span className="text-[10px] text-muted-foreground">reps</span>
-                  <button
-                    onClick={() => registerPlanned(idx)}
-                    className="ml-auto rounded-lg bg-primary p-1.5 text-primary-foreground"
-                    title="Registrar série"
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {plannedRemaining === 0 && (
-          <div className="mt-3 flex items-center gap-2 rounded-lg border border-dashed border-border p-2">
+      <div className="mt-4 space-y-1.5">
+        {(log?.sets ?? []).map((s) => (
+          <div
+            key={s.setIndex}
+            className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 p-2"
+          >
             <span className="w-14 shrink-0 text-[11px] text-muted-foreground">
-              Série {registeredCount + 1}
+              Série {s.setIndex + 1}
             </span>
             <input
               type="number"
-              value={extraWeight}
-              onChange={(e) => setExtraWeight(e.target.value)}
+              value={s.weight}
+              onChange={(e) =>
+                void updateSet(liveSession.id, exercise.id, s.setIndex, {
+                  weight: parseFloat(e.target.value) || 0,
+                })
+              }
               className="w-16 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
             />
             <span className="text-[10px] text-muted-foreground">kg</span>
             <input
               type="number"
-              value={extraReps}
-              onChange={(e) => setExtraReps(e.target.value)}
+              value={s.reps}
+              onChange={(e) =>
+                void updateSet(liveSession.id, exercise.id, s.setIndex, {
+                  reps: parseInt(e.target.value, 10) || 0,
+                })
+              }
               className="w-14 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
             />
             <span className="text-[10px] text-muted-foreground">reps</span>
-            <button
-              onClick={addExtraSet}
-              className="ml-auto rounded-lg bg-primary p-1.5 text-primary-foreground"
-              title="Adicionar série extra"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
           </div>
-        )}
+        ))}
+      </div>
 
+      {plannedRemaining > 0 && (
+        <div className="mt-1.5 space-y-1.5">
+          {Array.from({ length: plannedRemaining }, (_, i) => registeredCount + i).map((idx) => {
+            const d = draftFor(idx);
+            return (
+              <div
+                key={idx}
+                className="flex items-center gap-2 rounded-lg border border-dashed border-primary/40 bg-primary/5 p-2"
+              >
+                <span className="w-14 shrink-0 text-[11px] text-muted-foreground">
+                  Série {idx + 1}
+                </span>
+                <input
+                  type="number"
+                  value={d.weight}
+                  onChange={(e) => setDraftFor(idx, { weight: e.target.value })}
+                  className="w-16 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
+                />
+                <span className="text-[10px] text-muted-foreground">kg</span>
+                <input
+                  type="number"
+                  value={d.reps}
+                  onChange={(e) => setDraftFor(idx, { reps: e.target.value })}
+                  className="w-14 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
+                />
+                <span className="text-[10px] text-muted-foreground">reps</span>
+                <button
+                  onClick={() => registerPlanned(idx)}
+                  className="ml-auto rounded-lg bg-primary p-1.5 text-primary-foreground"
+                  title="Registrar série"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {plannedRemaining === 0 && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-dashed border-border p-2">
+          <span className="w-14 shrink-0 text-[11px] text-muted-foreground">
+            Série {registeredCount + 1}
+          </span>
+          <input
+            type="number"
+            value={extraWeight}
+            onChange={(e) => setExtraWeight(e.target.value)}
+            className="w-16 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
+          />
+          <span className="text-[10px] text-muted-foreground">kg</span>
+          <input
+            type="number"
+            value={extraReps}
+            onChange={(e) => setExtraReps(e.target.value)}
+            className="w-14 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
+          />
+          <span className="text-[10px] text-muted-foreground">reps</span>
+          <button
+            onClick={addExtraSet}
+            className="ml-auto rounded-lg bg-primary p-1.5 text-primary-foreground"
+            title="Adicionar série extra"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      <div className="mt-5">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          Evolução de carga
+        </p>
+        <div className="mt-2">
+          <ExerciseEvolutionChart series={series} />
+        </div>
         {series.length > 0 && (
-          <div className="mt-5">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Evolução de carga
-            </p>
-            <Sparkline values={series.map((p) => p.maxWeight)} />
+          <>
             <button
               onClick={() => setShowHistory((v) => !v)}
               className="mt-1 text-[11px] text-primary"
@@ -967,21 +943,21 @@ function ExerciseModal({
                 ))}
               </ul>
             )}
-          </div>
+          </>
         )}
-
-        <button
-          onClick={async () => {
-            await completeExerciseLog(liveSession.id, exercise.id);
-            onClose();
-          }}
-          disabled={!log || log.sets.length === 0}
-          className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
-        >
-          <Check className="h-4 w-4" /> Concluir exercício
-        </button>
       </div>
-    </div>
+
+      <button
+        onClick={async () => {
+          await completeExerciseLog(liveSession.id, exercise.id);
+          onClose();
+        }}
+        disabled={!log || log.sets.length === 0}
+        className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+      >
+        <Check className="h-4 w-4" /> Concluir exercício
+      </button>
+    </Modal>
   );
 }
 
@@ -996,64 +972,54 @@ function FinishSummaryModal({ sessionId, onClose }: { sessionId: string; onClose
   const summary = sessionSummary(session, previous, exercises);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end bg-background/85 backdrop-blur-sm sm:items-center sm:justify-center"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card-surface w-full max-w-md overflow-y-auto rounded-b-none rounded-t-3xl border-x-0 border-b-0 p-5 sm:rounded-3xl sm:border"
-        style={{ maxHeight: "85vh" }}
-      >
-        <p className="text-xs uppercase tracking-wider text-muted-foreground">Treino concluído</p>
-        <h3 className="mt-1 text-xl font-bold">
-          {plan ? `Treino ${plan.letter} — ${plan.name}` : "Treino"}
-        </h3>
-        <div className="mt-4 grid grid-cols-2 gap-2 text-center">
-          <div className="rounded-xl bg-success/10 p-3">
-            <p className="text-xl font-bold text-success">{summary.completedExercises}</p>
-            <p className="text-[10px] uppercase text-muted-foreground">exercícios concluídos</p>
-          </div>
-          <div className="rounded-xl bg-primary/10 p-3">
-            <p className="text-xl font-bold text-primary">{summary.totalSets}</p>
-            <p className="text-[10px] uppercase text-muted-foreground">séries realizadas</p>
-          </div>
+    <Modal onClose={onClose} title="Treino concluído">
+      <h3 className="text-xl font-bold">
+        {plan ? `Treino ${plan.letter} — ${plan.name}` : "Treino"}
+      </h3>
+      <div className="mt-4 grid grid-cols-2 gap-2 text-center">
+        <div className="rounded-xl bg-success/10 p-3">
+          <p className="text-xl font-bold text-success">{summary.completedExercises}</p>
+          <p className="text-[10px] uppercase text-muted-foreground">exercícios concluídos</p>
         </div>
-        <ul className="mt-4 space-y-2">
-          {summary.exercises.map((e) => (
-            <li
-              key={e.exerciseId}
-              className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface-2 p-3"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{e.name}</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {e.maxWeight}kg × {e.repsAtMaxWeight} reps · meta {e.targetWeight}kg ×{" "}
-                  {e.targetReps}
-                </p>
-              </div>
-              {e.deltaWeightVsPrevious !== undefined && e.deltaWeightVsPrevious !== 0 && (
-                <span
-                  className={`shrink-0 text-xs font-bold ${e.deltaWeightVsPrevious > 0 ? "text-success" : "text-danger"}`}
-                >
-                  {e.deltaWeightVsPrevious > 0 ? "+" : ""}
-                  {e.deltaWeightVsPrevious}kg
-                </span>
-              )}
-            </li>
-          ))}
-          {summary.exercises.length === 0 && (
-            <p className="text-sm text-muted-foreground">Nenhuma série registrada nesse treino.</p>
-          )}
-        </ul>
-        <button
-          onClick={onClose}
-          className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
-        >
-          Fechar
-        </button>
+        <div className="rounded-xl bg-primary/10 p-3">
+          <p className="text-xl font-bold text-primary">{summary.totalSets}</p>
+          <p className="text-[10px] uppercase text-muted-foreground">séries realizadas</p>
+        </div>
       </div>
-    </div>
+      <ul className="mt-4 space-y-2">
+        {summary.exercises.map((e) => (
+          <li
+            key={e.exerciseId}
+            className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface-2 p-3"
+          >
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{e.name}</p>
+              <p className="text-[11px] text-muted-foreground">
+                {e.maxWeight}kg × {e.repsAtMaxWeight} reps · meta {e.targetWeight}kg ×{" "}
+                {e.targetReps}
+              </p>
+            </div>
+            {e.deltaWeightVsPrevious !== undefined && e.deltaWeightVsPrevious !== 0 && (
+              <span
+                className={`shrink-0 text-xs font-bold ${e.deltaWeightVsPrevious > 0 ? "text-success" : "text-danger"}`}
+              >
+                {e.deltaWeightVsPrevious > 0 ? "+" : ""}
+                {e.deltaWeightVsPrevious}kg
+              </span>
+            )}
+          </li>
+        ))}
+        {summary.exercises.length === 0 && (
+          <p className="text-sm text-muted-foreground">Nenhuma série registrada nesse treino.</p>
+        )}
+      </ul>
+      <button
+        onClick={onClose}
+        className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
+      >
+        Fechar
+      </button>
+    </Modal>
   );
 }
 
@@ -1085,6 +1051,7 @@ function RestTimerPill({
           <span className="text-xs font-semibold text-success">Descanso concluído</span>
           <button
             onClick={() => setRest(null)}
+            aria-label="Fechar aviso de descanso"
             className="text-muted-foreground hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />

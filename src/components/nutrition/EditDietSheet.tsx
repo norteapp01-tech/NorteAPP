@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { X, Plus, Trash2, ChevronRight, ChevronLeft } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronLeft } from "lucide-react";
+import { Modal } from "@/components/ui/modal";
 import {
   useNutritionStore,
   mealsSorted,
@@ -24,49 +25,38 @@ export function EditDietSheet({ onClose }: { onClose: () => void }) {
   const meals = mealsSorted(state.meals);
   const activeMeal = view.screen === "meal" ? state.meals.find((m) => m.id === view.mealId) : null;
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end bg-background/85 backdrop-blur-sm sm:items-center sm:justify-center"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card-surface flex w-full max-w-md flex-col rounded-b-none rounded-t-3xl border-x-0 border-b-0 p-5 sm:rounded-3xl sm:border"
-        style={{ maxHeight: "88vh" }}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {view.screen === "meal" && (
-              <button onClick={() => setView({ screen: "root" })}>
-                <ChevronLeft className="h-5 w-5 text-muted-foreground" />
-              </button>
-            )}
-            <h3 className="text-lg font-bold">
-              {view.screen === "root" ? "Editar dieta" : activeMeal?.name}
-            </h3>
-          </div>
-          <button onClick={onClose}>
-            <X className="h-5 w-5 text-muted-foreground" />
-          </button>
-        </div>
+  const title =
+    view.screen === "meal" ? (
+      <span className="flex items-center gap-2">
+        <button
+          onClick={() => setView({ screen: "root" })}
+          aria-label="Voltar"
+          className="-ml-1 rounded-full p-1 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        {activeMeal?.name}
+      </span>
+    ) : (
+      "Editar dieta"
+    );
 
-        <div className="mt-3 flex-1 overflow-y-auto">
-          {view.screen === "root" && (
-            <DietRoot
-              meals={meals}
-              goals={state.goals}
-              onOpenMeal={(mealId) => setView({ screen: "meal", mealId })}
-            />
-          )}
-          {view.screen === "meal" && activeMeal && (
-            <MealOptionsEditor
-              meal={activeMeal}
-              options={optionsForMeal(state.options, activeMeal.id)}
-            />
-          )}
-        </div>
-      </div>
-    </div>
+  return (
+    <Modal onClose={onClose} title={title}>
+      {view.screen === "root" && (
+        <DietRoot
+          meals={meals}
+          goals={state.goals}
+          onOpenMeal={(mealId) => setView({ screen: "meal", mealId })}
+        />
+      )}
+      {view.screen === "meal" && activeMeal && (
+        <MealOptionsEditor
+          meal={activeMeal}
+          options={optionsForMeal(state.options, activeMeal.id)}
+        />
+      )}
+    </Modal>
   );
 }
 

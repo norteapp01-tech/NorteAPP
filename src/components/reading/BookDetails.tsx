@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { X, Star, Trash2 } from "lucide-react";
+import { Star, Trash2 } from "lucide-react";
+import { Modal } from "@/components/ui/modal";
 import {
   useReadingStore,
   getBookProgress,
@@ -50,267 +51,247 @@ export function BookDetails({
     .sort((a, b) => (b.endedAt ?? "").localeCompare(a.endedAt ?? ""));
   const notesCount = state.notes.filter((n) => n.bookId === bookId).length;
 
+  const title =
+    view === "edit"
+      ? "Editar livro"
+      : view === "planEdit"
+        ? "Editar plano"
+        : view === "reflection"
+          ? "Reflexão"
+          : "Detalhes";
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end bg-background/85 backdrop-blur-sm sm:items-center sm:justify-center"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card-surface flex w-full max-w-md flex-col rounded-b-none rounded-t-3xl border-x-0 border-b-0 p-5 sm:rounded-3xl sm:border"
-        style={{ maxHeight: "88vh" }}
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold">
-            {view === "edit"
-              ? "Editar livro"
-              : view === "planEdit"
-                ? "Editar plano"
-                : view === "reflection"
-                  ? "Reflexão"
-                  : "Detalhes"}
-          </h3>
-          <button onClick={onClose}>
-            <X className="h-5 w-5 text-muted-foreground" />
-          </button>
-        </div>
-
-        <div className="mt-3 flex-1 space-y-4 overflow-y-auto">
-          {view === "details" && (
-            <>
-              <div className="flex gap-4">
-                <BookCover book={book} className="h-28 w-20" />
-                <div className="min-w-0 flex-1">
-                  <p className="font-bold">{book.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {book.authors.join(", ") || "autor desconhecido"}
-                  </p>
-                  <p className="mt-1 text-[11px] uppercase text-muted-foreground">
-                    {statusLabel(book.status)} · {formatLabel(book.format)}
-                  </p>
-                  {book.status !== "want_to_read" && (
-                    <>
-                      <p className="mt-2 text-sm font-semibold">{progress.label}</p>
-                      {progress.total !== undefined && (
-                        <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface-2">
-                          <div
-                            className="h-full bg-primary"
-                            style={{ width: `${progress.pct}%` }}
-                          />
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {book.status === "completed" && (
-                <div className="rounded-lg bg-surface-2 p-3">
-                  {book.rating && (
-                    <div className="flex gap-0.5">
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <Star
-                          key={n}
-                          className={`h-4 w-4 ${n <= (book.rating ?? 0) ? "fill-primary text-primary" : "text-muted-foreground"}`}
-                        />
-                      ))}
-                    </div>
-                  )}
-                  {book.mainTakeaway && (
-                    <p className="mt-2 text-xs">
-                      <span className="text-muted-foreground">vale lembrar: </span>
-                      {book.mainTakeaway}
-                    </p>
-                  )}
-                  {book.personalReflection && (
-                    <p className="mt-1 text-xs">
-                      <span className="text-muted-foreground">mudou: </span>
-                      {book.personalReflection}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {(book.status === "reading" || book.status === "paused") && (
-                <div className="rounded-lg border border-border bg-surface-2 p-3 text-xs">
-                  <p className="font-semibold uppercase text-muted-foreground">Plano</p>
-                  {plan ? (
-                    <p className="mt-1">
-                      {plan.type === "deadline"
-                        ? `Terminar até ${plan.deadline?.split("-").reverse().join("/")}`
-                        : `Meta diária: ${plan.targetPages ?? plan.targetPercentage ?? Math.round((plan.targetSeconds ?? 0) / 60)}`}
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-muted-foreground">Nenhum plano configurado.</p>
-                  )}
-                  <button onClick={() => setView("planEdit")} className="mt-1 text-primary">
-                    {plan ? "editar plano" : "configurar plano"}
-                  </button>
-
-                  <p className="mt-3 font-semibold uppercase text-muted-foreground">Rotina</p>
-                  {routine ? (
-                    <p className="mt-1">
-                      {routine.weekdays
-                        .map((d) => weekVisualLabels[weekVisualOrder.indexOf(d)])
-                        .join(", ")}{" "}
-                      às {routine.time}
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-muted-foreground">Nenhuma rotina configurada.</p>
-                  )}
-                  <button onClick={() => onOpenRoutineSetup(book)} className="mt-1 text-primary">
-                    {routine ? "editar rotina" : "configurar rotina"}
-                  </button>
-                </div>
-              )}
-
-              {sessions.length > 0 && (
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Sessões
-                  </p>
-                  <ul className="mt-1.5 space-y-1">
-                    {sessions.slice(0, 8).map((s) => (
-                      <li
-                        key={s.id}
-                        className="flex justify-between text-[11px] text-muted-foreground"
-                      >
-                        <span>{(s.endedAt ?? "").slice(0, 10).split("-").reverse().join("/")}</span>
-                        <span>{formatDuration(s.durationSeconds ?? 0)}</span>
-                        <span>
-                          +{s.pagesRead ?? s.percentageRead ?? s.progressSeconds ?? 0}
-                          {book.progressMode === "pages"
-                            ? " pág"
-                            : book.progressMode === "percentage"
-                              ? "%"
-                              : "s"}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <button onClick={() => onOpenNotebook(bookId)} className="text-xs text-primary">
-                Ver caderno do livro ({notesCount})
-              </button>
-
-              <div className="flex flex-col gap-2 pt-2">
-                {book.status === "reading" && (
+    <Modal onClose={onClose} title={title}>
+      <div className="space-y-4">
+        {view === "details" && (
+          <>
+            <div className="flex gap-4">
+              <BookCover book={book} className="h-28 w-20" />
+              <div className="min-w-0 flex-1">
+                <p className="font-bold">{book.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  {book.authors.join(", ") || "autor desconhecido"}
+                </p>
+                <p className="mt-1 text-[11px] uppercase text-muted-foreground">
+                  {statusLabel(book.status)} · {formatLabel(book.format)}
+                </p>
+                {book.status !== "want_to_read" && (
                   <>
-                    <button
-                      onClick={() => onOpenReadingMode(book)}
-                      className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground"
-                    >
-                      Continuar leitura
-                    </button>
-                    <button
-                      onClick={() => onOpenProgressUpdater(book)}
-                      className="w-full rounded-xl border border-border py-2.5 text-sm font-semibold"
-                    >
-                      Atualizar progresso
-                    </button>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => void pauseBook(book.id)}
-                        className="flex-1 rounded-xl bg-surface-2 py-2 text-xs font-semibold"
-                      >
-                        Pausar
-                      </button>
-                      <button
-                        onClick={() => setView("edit")}
-                        className="flex-1 rounded-xl bg-surface-2 py-2 text-xs font-semibold"
-                      >
-                        Editar
-                      </button>
-                    </div>
+                    <p className="mt-2 text-sm font-semibold">{progress.label}</p>
+                    {progress.total !== undefined && (
+                      <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface-2">
+                        <div className="h-full bg-primary" style={{ width: `${progress.pct}%` }} />
+                      </div>
+                    )}
                   </>
                 )}
+              </div>
+            </div>
 
-                {book.status === "paused" && (
-                  <>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => void resumeBook(book.id, { recalcPlan: false })}
-                        className="flex-1 rounded-xl bg-primary py-2.5 text-xs font-semibold text-primary-foreground"
-                      >
-                        Manter plano
-                      </button>
-                      <button
-                        onClick={() => void resumeBook(book.id, { recalcPlan: true })}
-                        className="flex-1 rounded-xl border border-primary/40 py-2.5 text-xs font-semibold text-primary"
-                      >
-                        Recalcular plano
-                      </button>
-                    </div>
+            {book.status === "completed" && (
+              <div className="rounded-lg bg-surface-2 p-3">
+                {book.rating && (
+                  <div className="flex gap-0.5">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <Star
+                        key={n}
+                        className={`h-4 w-4 ${n <= (book.rating ?? 0) ? "fill-primary text-primary" : "text-muted-foreground"}`}
+                      />
+                    ))}
+                  </div>
+                )}
+                {book.mainTakeaway && (
+                  <p className="mt-2 text-xs">
+                    <span className="text-muted-foreground">vale lembrar: </span>
+                    {book.mainTakeaway}
+                  </p>
+                )}
+                {book.personalReflection && (
+                  <p className="mt-1 text-xs">
+                    <span className="text-muted-foreground">mudou: </span>
+                    {book.personalReflection}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {(book.status === "reading" || book.status === "paused") && (
+              <div className="rounded-lg border border-border bg-surface-2 p-3 text-xs">
+                <p className="font-semibold uppercase text-muted-foreground">Plano</p>
+                {plan ? (
+                  <p className="mt-1">
+                    {plan.type === "deadline"
+                      ? `Terminar até ${plan.deadline?.split("-").reverse().join("/")}`
+                      : `Meta diária: ${plan.targetPages ?? plan.targetPercentage ?? Math.round((plan.targetSeconds ?? 0) / 60)}`}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-muted-foreground">Nenhum plano configurado.</p>
+                )}
+                <button onClick={() => setView("planEdit")} className="mt-1 text-primary">
+                  {plan ? "editar plano" : "configurar plano"}
+                </button>
+
+                <p className="mt-3 font-semibold uppercase text-muted-foreground">Rotina</p>
+                {routine ? (
+                  <p className="mt-1">
+                    {routine.weekdays
+                      .map((d) => weekVisualLabels[weekVisualOrder.indexOf(d)])
+                      .join(", ")}{" "}
+                    às {routine.time}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-muted-foreground">Nenhuma rotina configurada.</p>
+                )}
+                <button onClick={() => onOpenRoutineSetup(book)} className="mt-1 text-primary">
+                  {routine ? "editar rotina" : "configurar rotina"}
+                </button>
+              </div>
+            )}
+
+            {sessions.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Sessões
+                </p>
+                <ul className="mt-1.5 space-y-1">
+                  {sessions.slice(0, 8).map((s) => (
+                    <li
+                      key={s.id}
+                      className="flex justify-between text-[11px] text-muted-foreground"
+                    >
+                      <span>{(s.endedAt ?? "").slice(0, 10).split("-").reverse().join("/")}</span>
+                      <span>{formatDuration(s.durationSeconds ?? 0)}</span>
+                      <span>
+                        +{s.pagesRead ?? s.percentageRead ?? s.progressSeconds ?? 0}
+                        {book.progressMode === "pages"
+                          ? " pág"
+                          : book.progressMode === "percentage"
+                            ? "%"
+                            : "s"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <button onClick={() => onOpenNotebook(bookId)} className="text-xs text-primary">
+              Ver caderno do livro ({notesCount})
+            </button>
+
+            <div className="flex flex-col gap-2 pt-2">
+              {book.status === "reading" && (
+                <>
+                  <button
+                    onClick={() => onOpenReadingMode(book)}
+                    className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground"
+                  >
+                    Continuar leitura
+                  </button>
+                  <button
+                    onClick={() => onOpenProgressUpdater(book)}
+                    className="w-full rounded-xl border border-border py-2.5 text-sm font-semibold"
+                  >
+                    Atualizar progresso
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => void pauseBook(book.id)}
+                      className="flex-1 rounded-xl bg-surface-2 py-2 text-xs font-semibold"
+                    >
+                      Pausar
+                    </button>
                     <button
                       onClick={() => setView("edit")}
-                      className="w-full rounded-xl bg-surface-2 py-2 text-xs font-semibold"
+                      className="flex-1 rounded-xl bg-surface-2 py-2 text-xs font-semibold"
                     >
                       Editar
                     </button>
-                  </>
-                )}
+                  </div>
+                </>
+              )}
 
-                {book.status === "want_to_read" && (
-                  <>
+              {book.status === "paused" && (
+                <>
+                  <div className="flex gap-2">
                     <button
-                      onClick={() => void startReading(book.id)}
-                      className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground"
+                      onClick={() => void resumeBook(book.id, { recalcPlan: false })}
+                      className="flex-1 rounded-xl bg-primary py-2.5 text-xs font-semibold text-primary-foreground"
                     >
-                      Começar leitura
+                      Manter plano
                     </button>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setView("edit")}
-                        className="flex-1 rounded-xl bg-surface-2 py-2 text-xs font-semibold"
-                      >
-                        Editar
-                      </button>
-                      {!confirmRemove ? (
-                        <button
-                          onClick={() => setConfirmRemove(true)}
-                          className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-surface-2 py-2 text-xs font-semibold text-danger"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" /> Remover
-                        </button>
-                      ) : (
-                        <button
-                          onClick={async () => {
-                            await removeBook(book.id);
-                            onClose();
-                          }}
-                          className="flex-1 rounded-xl bg-danger py-2 text-xs font-semibold text-white"
-                        >
-                          Confirmar remoção
-                        </button>
-                      )}
-                    </div>
-                  </>
-                )}
-
-                {book.status === "completed" && (
+                    <button
+                      onClick={() => void resumeBook(book.id, { recalcPlan: true })}
+                      className="flex-1 rounded-xl border border-primary/40 py-2.5 text-xs font-semibold text-primary"
+                    >
+                      Recalcular plano
+                    </button>
+                  </div>
                   <button
-                    onClick={() => setView("reflection")}
-                    className="w-full rounded-xl bg-surface-2 py-2.5 text-sm font-semibold"
+                    onClick={() => setView("edit")}
+                    className="w-full rounded-xl bg-surface-2 py-2 text-xs font-semibold"
                   >
-                    Editar reflexão
+                    Editar
                   </button>
-                )}
-              </div>
-            </>
-          )}
+                </>
+              )}
 
-          {view === "edit" && <EditBookForm book={book} onDone={() => setView("details")} />}
-          {view === "planEdit" && (
-            <ReadingPlanSetup book={book} onSave={() => setView("details")} />
-          )}
-          {view === "reflection" && (
-            <ReflectionEditor book={book} onDone={() => setView("details")} />
-          )}
-        </div>
+              {book.status === "want_to_read" && (
+                <>
+                  <button
+                    onClick={() => void startReading(book.id)}
+                    className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground"
+                  >
+                    Começar leitura
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setView("edit")}
+                      className="flex-1 rounded-xl bg-surface-2 py-2 text-xs font-semibold"
+                    >
+                      Editar
+                    </button>
+                    {!confirmRemove ? (
+                      <button
+                        onClick={() => setConfirmRemove(true)}
+                        className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-surface-2 py-2 text-xs font-semibold text-danger"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Remover
+                      </button>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          await removeBook(book.id);
+                          onClose();
+                        }}
+                        className="flex-1 rounded-xl bg-danger py-2 text-xs font-semibold text-white"
+                      >
+                        Confirmar remoção
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {book.status === "completed" && (
+                <button
+                  onClick={() => setView("reflection")}
+                  className="w-full rounded-xl bg-surface-2 py-2.5 text-sm font-semibold"
+                >
+                  Editar reflexão
+                </button>
+              )}
+            </div>
+          </>
+        )}
+
+        {view === "edit" && <EditBookForm book={book} onDone={() => setView("details")} />}
+        {view === "planEdit" && <ReadingPlanSetup book={book} onSave={() => setView("details")} />}
+        {view === "reflection" && (
+          <ReflectionEditor book={book} onDone={() => setView("details")} />
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }
 

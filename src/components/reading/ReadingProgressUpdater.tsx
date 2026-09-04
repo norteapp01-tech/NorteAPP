@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
-import { X, Star } from "lucide-react";
+import { Star } from "lucide-react";
 import { updateProgress, completeBook, getBookProgress, type Book } from "@/lib/reading-store";
+import { Modal } from "@/components/ui/modal";
 
 function modeLabel(book: Book): string {
   if (book.progressMode === "pages") return "Página atual";
@@ -183,22 +184,8 @@ function Sheet({
   children: ReactNode;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end bg-background/85 backdrop-blur-sm sm:items-center sm:justify-center"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card-surface w-full max-w-md rounded-b-none rounded-t-3xl border-x-0 border-b-0 p-5 sm:rounded-3xl sm:border"
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold">{title}</h3>
-          <button onClick={onClose}>
-            <X className="h-5 w-5 text-muted-foreground" />
-          </button>
-        </div>
-        <div className="mt-3">{children}</div>
-      </div>
-    </div>
+    <Modal onClose={onClose} title={title}>
+      {children}
+    </Modal>
   );
 }

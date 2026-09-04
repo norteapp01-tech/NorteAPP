@@ -19,6 +19,7 @@ import { categoryMeta } from "@/lib/mock-data";
 import { useProfile } from "@/lib/profile-store";
 import { formatTime } from "@/lib/format-utils";
 import { nowDate, nowMs } from "@/lib/test-clock";
+import { Modal } from "@/components/ui/modal";
 import {
   useGoalsStore,
   useGoalsLoading,
@@ -828,6 +829,7 @@ function ExecutionRow({
           disabled={busy}
           className="text-muted-foreground hover:text-danger disabled:opacity-50"
           title="Desvincular"
+          aria-label="Desvincular"
         >
           <X className="h-4 w-4" />
         </button>
@@ -1021,59 +1023,44 @@ function ExecutionPicker({ goalId, onClose }: { goalId: string; onClose: () => v
   const profile = useProfile();
   const available = executions.filter((e) => e.goalId !== goalId && e.status === "planejada");
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end bg-background/85 backdrop-blur-sm sm:items-center sm:justify-center"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card-surface w-full max-w-md rounded-b-none rounded-t-3xl border-x-0 border-b-0 p-5 sm:rounded-3xl sm:border"
-        style={{ maxHeight: "80vh" }}
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold">Vincular execução</h3>
-          <button onClick={onClose}>
-            <X className="h-5 w-5 text-muted-foreground" />
-          </button>
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Toque para vincular. Ela passa a contar como execução deste planejamento.
-        </p>
-        <div className="mt-4 max-h-[60vh] space-y-2 overflow-y-auto pr-1">
-          {available.length === 0 && (
-            <p className="p-4 text-center text-sm text-muted-foreground">
-              Nenhuma execução disponível.
-            </p>
-          )}
-          {available.map((e) => {
-            const c = categoryMeta[e.category] ?? categoryMeta.generico;
-            return (
-              <button
-                key={e.id}
-                onClick={async () => {
-                  await linkExecutionToGoal(e.id, goalId);
-                  onClose();
-                }}
-                className="card-surface flex w-full items-center gap-3 p-3 text-left hover:border-primary/40"
-              >
-                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">
-                    {c.emoji} {e.title}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Prazo {formatDateBR(e.dueDate)}
-                    {isScheduled(e)
-                      ? ` · agendada ${formatDateBR(e.agendaDate!)} ${formatTime(e.startTime, profile.timeFormat)}`
-                      : " · sem agenda"}
-                    {e.goalId ? " · já vinculada a outro planejamento" : ""}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+    <Modal onClose={onClose} title="Vincular execução">
+      <p className="text-xs text-muted-foreground">
+        Toque para vincular. Ela passa a contar como execução deste planejamento.
+      </p>
+      <div className="mt-4 space-y-2">
+        {available.length === 0 && (
+          <p className="p-4 text-center text-sm text-muted-foreground">
+            Nenhuma execução disponível.
+          </p>
+        )}
+        {available.map((e) => {
+          const c = categoryMeta[e.category] ?? categoryMeta.generico;
+          return (
+            <button
+              key={e.id}
+              onClick={async () => {
+                await linkExecutionToGoal(e.id, goalId);
+                onClose();
+              }}
+              className="card-surface flex w-full items-center gap-3 p-3 text-left hover:border-primary/40"
+            >
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">
+                  {c.emoji} {e.title}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Prazo {formatDateBR(e.dueDate)}
+                  {isScheduled(e)
+                    ? ` · agendada ${formatDateBR(e.agendaDate!)} ${formatTime(e.startTime, profile.timeFormat)}`
+                    : " · sem agenda"}
+                  {e.goalId ? " · já vinculada a outro planejamento" : ""}
+                </p>
+              </div>
+            </button>
+          );
+        })}
       </div>
-    </div>
+    </Modal>
   );
 }

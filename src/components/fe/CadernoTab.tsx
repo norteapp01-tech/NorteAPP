@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Plus, Search, Sparkles, X } from "lucide-react";
+import { Plus, Search, Sparkles } from "lucide-react";
 import {
   useFeStore,
   notebookTimeline,
@@ -9,6 +9,7 @@ import {
 } from "@/lib/fe-store";
 import { Card } from "@/components/sub-agenda-shared";
 import { NotebookEntryEditor } from "./NotebookEntryEditor";
+import { Modal } from "@/components/ui/modal";
 import { nowMs } from "@/lib/test-clock";
 
 const typeMeta: Record<NotebookEntryType, string> = {
@@ -141,36 +142,22 @@ export function CadernoTab() {
       ))}
 
       {pickingType && (
-        <div
-          className="fixed inset-0 z-50 flex items-end bg-background/85 backdrop-blur-sm sm:items-center sm:justify-center"
-          onClick={() => setPickingType(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="card-surface w-full max-w-md rounded-b-none rounded-t-3xl border-x-0 border-b-0 p-5 sm:rounded-3xl sm:border"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold">Novo registro</h3>
-              <button onClick={() => setPickingType(false)}>
-                <X className="h-5 w-5 text-muted-foreground" />
+        <Modal onClose={() => setPickingType(false)} title="Novo registro">
+          <div className="space-y-2">
+            {typeOptions.map((t) => (
+              <button
+                key={t}
+                onClick={() => {
+                  setPickingType(false);
+                  setEditingType(t);
+                }}
+                className="w-full rounded-lg bg-surface-2 p-3 text-left text-sm font-semibold hover:border-primary/40"
+              >
+                {typeMeta[t]}
               </button>
-            </div>
-            <div className="mt-4 space-y-2">
-              {typeOptions.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => {
-                    setPickingType(false);
-                    setEditingType(t);
-                  }}
-                  className="w-full rounded-lg bg-surface-2 p-3 text-left text-sm font-semibold hover:border-primary/40"
-                >
-                  {typeMeta[t]}
-                </button>
-              ))}
-            </div>
+            ))}
           </div>
-        </div>
+        </Modal>
       )}
 
       {editingType && (

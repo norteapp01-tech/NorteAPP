@@ -13,6 +13,7 @@ import {
   type Book,
 } from "@/lib/reading-store";
 import { Card } from "@/components/sub-agenda-shared";
+import { Modal as ModalDialog } from "@/components/ui/modal";
 import { ActiveBookSelector } from "./ActiveBookSelector";
 import { ContinueReadingCard } from "./ContinueReadingCard";
 import { ReadingMode } from "./ReadingMode";
@@ -257,31 +258,22 @@ function SessionConflictDialog({
   onCancel: () => void;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end bg-background/85 backdrop-blur-sm sm:items-center sm:justify-center"
-      onClick={onCancel}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card-surface w-full max-w-md rounded-b-none rounded-t-3xl border-x-0 border-b-0 p-5 sm:rounded-3xl sm:border"
-      >
-        <h3 className="text-lg font-bold">Uma leitura já está em andamento</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Você já tem uma sessão em andamento com {conflictBook?.title ?? "outro livro"}. Termine
-          essa sessão antes de começar {requested.title}.
-        </p>
-        <div className="mt-4 flex flex-col gap-2">
-          <button
-            onClick={onContinueConflict}
-            className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
-          >
-            Continuar sessão em andamento
-          </button>
-          <button onClick={onCancel} className="w-full py-2 text-xs text-muted-foreground">
-            Cancelar
-          </button>
-        </div>
+    <ModalDialog onClose={onCancel} title="Uma leitura já está em andamento">
+      <p className="text-sm text-muted-foreground">
+        Você já tem uma sessão em andamento com {conflictBook?.title ?? "outro livro"}. Termine essa
+        sessão antes de começar {requested.title}.
+      </p>
+      <div className="mt-4 flex flex-col gap-2">
+        <button
+          onClick={onContinueConflict}
+          className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
+        >
+          Continuar sessão em andamento
+        </button>
+        <button onClick={onCancel} className="w-full py-2 text-xs text-muted-foreground">
+          Cancelar
+        </button>
       </div>
-    </div>
+    </ModalDialog>
   );
 }

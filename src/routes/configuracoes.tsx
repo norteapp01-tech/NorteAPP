@@ -52,6 +52,21 @@ function SectionHeader({ icon: Icon, title }: { icon: typeof User; title: string
   );
 }
 
+/** Metadados compartilhados com o painel de Configurações (aberto pelos três pontos na Hoje)
+ * — cada seção abaixo também é usada isolada lá, numa tela dedicada por categoria. */
+export const settingsSections = [
+  { key: "perfil", label: "Perfil", icon: User, Component: ProfileSection },
+  { key: "conta", label: "Conta e segurança", icon: ShieldCheck, Component: AccountSection },
+  {
+    key: "preferencias",
+    label: "Preferências",
+    icon: SlidersHorizontal,
+    Component: PreferencesSection,
+  },
+  { key: "notificacoes", label: "Notificações", icon: Bell, Component: NotificationsSection },
+  { key: "privacidade", label: "Dados e privacidade", icon: Lock, Component: DataPrivacySection },
+] as const;
+
 function Row({ label, value, onClick }: { label: string; value?: string; onClick?: () => void }) {
   const content = (
     <div className="flex items-center justify-between p-3.5">

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X } from "lucide-react";
+import { Modal } from "@/components/ui/modal";
 import { addNotebookEntry, type NotebookEntryType } from "@/lib/fe-store";
 
 const typeTitles: Record<NotebookEntryType, string> = {
@@ -62,68 +62,51 @@ export function NotebookEntryEditor({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end bg-background/85 backdrop-blur-sm sm:items-center sm:justify-center"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card-surface w-full max-w-md rounded-b-none rounded-t-3xl border-x-0 border-b-0 p-5 sm:rounded-3xl sm:border"
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold">{typeTitles[type]}</h3>
-          <button onClick={onClose}>
-            <X className="h-5 w-5 text-muted-foreground" />
-          </button>
-        </div>
+    <Modal onClose={onClose} title={typeTitles[type]}>
+      {prompts[type] && <p className="text-sm font-medium">{prompts[type]}</p>}
 
-        {prompts[type] && <p className="mt-3 text-sm font-medium">{prompts[type]}</p>}
+      <textarea
+        autoFocus
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        placeholder={type === "versiculo" ? "Uma nota, se quiser (opcional)..." : "Escreva aqui..."}
+        className="mt-2 min-h-24 w-full resize-none rounded-lg border border-border bg-surface-2 p-3 text-sm outline-none focus:border-primary"
+      />
 
-        <textarea
-          autoFocus
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder={
-            type === "versiculo" ? "Uma nota, se quiser (opcional)..." : "Escreva aqui..."
-          }
-          className="mt-2 min-h-24 w-full resize-none rounded-lg border border-border bg-surface-2 p-3 text-sm outline-none focus:border-primary"
-        />
-
-        {showVerseFields && (
-          <div className="mt-3 space-y-2">
-            <input
-              value={verseReference}
-              onChange={(e) => setVerseReference(e.target.value)}
-              placeholder="Referência (ex: Provérbios 3:5)"
-              className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
-            />
-            <textarea
-              value={verseText}
-              onChange={(e) => setVerseText(e.target.value)}
-              placeholder="Texto do versículo (opcional)"
-              className="min-h-14 w-full resize-none rounded-lg border border-border bg-surface-2 p-3 text-sm outline-none focus:border-primary"
-            />
-          </div>
-        )}
-
-        {type === "deus_falou" && (
+      {showVerseFields && (
+        <div className="mt-3 space-y-2">
           <input
-            value={context}
-            onChange={(e) => setContext(e.target.value)}
-            placeholder="Contexto (opcional)"
-            className="mt-3 w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
+            value={verseReference}
+            onChange={(e) => setVerseReference(e.target.value)}
+            placeholder="Referência (ex: Provérbios 3:5)"
+            className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
           />
-        )}
+          <textarea
+            value={verseText}
+            onChange={(e) => setVerseText(e.target.value)}
+            placeholder="Texto do versículo (opcional)"
+            className="min-h-14 w-full resize-none rounded-lg border border-border bg-surface-2 p-3 text-sm outline-none focus:border-primary"
+          />
+        </div>
+      )}
 
-        {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
-        <button
-          onClick={save}
-          disabled={!canSave || saving}
-          className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
-        >
-          {saving ? "Salvando…" : "Salvar"}
-        </button>
-      </div>
-    </div>
+      {type === "deus_falou" && (
+        <input
+          value={context}
+          onChange={(e) => setContext(e.target.value)}
+          placeholder="Contexto (opcional)"
+          className="mt-3 w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
+        />
+      )}
+
+      {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
+      <button
+        onClick={save}
+        disabled={!canSave || saving}
+        className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+      >
+        {saving ? "Salvando…" : "Salvar"}
+      </button>
+    </Modal>
   );
 }
