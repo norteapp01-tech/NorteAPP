@@ -15,6 +15,7 @@ import {
   createExecution,
   scheduleExecution,
   isScheduled,
+  formatDateBR,
   useGoalsStore,
   type Execution,
 } from "@/lib/goals-store";
@@ -244,7 +245,7 @@ function AgendaFlow({ onDone }: { onDone: () => void }) {
           </p>
           <p className="mt-1 font-semibold">{selectedExecution.title}</p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Prazo: {selectedExecution.dueDate.split("-").reverse().join("/")}
+            Prazo: {formatDateBR(selectedExecution.dueDate)}
           </p>
         </div>
       ) : (
@@ -335,7 +336,7 @@ function ExecutionPickButton({
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold">{execution.title}</p>
         <p className="text-[11px] text-muted-foreground">
-          Prazo: {execution.dueDate.split("-").reverse().join("/")}
+          Prazo: {formatDateBR(execution.dueDate)}
         </p>
       </div>
       {active && <Check className="h-4 w-4 shrink-0 text-primary" />}
@@ -558,7 +559,7 @@ function PlanejamentoFlow({ onDone }: { onDone: (id: string) => void }) {
                   <p className="truncate text-sm">{s.title}</p>
                   {s.targetDate && (
                     <p className="text-[10px] text-muted-foreground">
-                      {s.targetDate.split("-").reverse().join("/")}
+                      {formatDateBR(s.targetDate)}
                     </p>
                   )}
                 </div>

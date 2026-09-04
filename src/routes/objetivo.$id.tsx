@@ -25,7 +25,6 @@ import {
   addSubtask,
   toggleSubtask,
   removeSubtask,
-  logExecution,
   createExecution,
   scheduleExecution,
   isScheduled,
@@ -41,6 +40,7 @@ import {
   executionsForGoal,
   effectiveStatus,
   relevantDate,
+  formatDateBR,
   toISODate,
   addDays,
   todayISO,
@@ -88,7 +88,7 @@ export const Route = createFileRoute("/objetivo/$id")({
   ),
 });
 
-function GoalDetail() {
+export function GoalDetail() {
   const { id } = Route.useParams();
   const nav = useNavigate();
   const goal = useGoalsStore((s) => s.goals.find((g) => g.id === id));
@@ -96,11 +96,11 @@ function GoalDetail() {
   const allExecutions = useGoalsStore((s) => s.executions);
   const loading = useGoalsLoading();
 
-  const [tab, setTab] = useState<"vista" | "etapas" | "vinculos" | "evolucao">("vista");
+  const [tab, setTab] = useState<"vista" | "vinculos" | "evolucao">("vista");
   const [newStep, setNewStep] = useState("");
   const [newStepDate, setNewStepDate] = useState("");
+  const [stepDateError, setStepDateError] = useState("");
   const [showPicker, setShowPicker] = useState(false);
-  const [logging, setLogging] = useState(false);
   const [completingNext, setCompletingNext] = useState(false);
   const [addingStep, setAddingStep] = useState(false);
 
@@ -180,25 +180,11 @@ function GoalDetail() {
             </div>
           </div>
         </div>
-        <button
-          disabled={logging}
-          onClick={async () => {
-            setLogging(true);
-            try {
-              await logExecution(goal.id);
-            } finally {
-              setLogging(false);
-            }
-          }}
-          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground active:scale-[0.98] disabled:opacity-60"
-        >
-          <Check className="h-4 w-4" /> {logging ? "Registrando…" : "Registrar avanço"}
-        </button>
       </section>
 
       {/* Tabs */}
       <div className="mt-5 flex gap-1 rounded-2xl border border-border bg-surface p-1">
-        {(["vista", "etapas", "vinculos", "evolucao"] as const).map((t) => (
+        {(["vista", "vinculos", "evolucao"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -206,11 +192,9 @@ function GoalDetail() {
           >
             {t === "vista"
               ? "Visão"
-              : t === "etapas"
-                ? `Etapas (${steps.length})`
-                : t === "vinculos"
-                  ? `Execuções (${executions.length})`
-                  : "Evolução"}
+              : t === "vinculos"
+                ? `Execuções (${executions.length})`
+                : "Evolução"}
           </button>
         ))}
       </div>
@@ -244,7 +228,7 @@ function GoalDetail() {
               if (!next)
                 return (
                   <p className="text-sm text-muted-foreground">
-                    Sem etapas abertas — adicione uma em Etapas.
+                    Sem etapas abertas — adicione uma abaixo.
                   </p>
                 );
               return (
@@ -273,11 +257,10 @@ function GoalDetail() {
               );
             })()}
           </Card>
-        </div>
-      )}
 
-      {tab === "etapas" && (
-        <div className="mt-5 space-y-2.5">
+          <h2 className="pt-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+            Etapas
+          </h2>
           {steps.length === 0 && (
             <p className="text-sm text-muted-foreground">
               Nenhuma etapa ainda. Divida o planejamento em passos concretos.
@@ -296,37 +279,58 @@ function GoalDetail() {
           <form
             onSubmit={async (e) => {
               e.preventDefault();
-              if (newStep.trim() && !addingStep) {
-                setAddingStep(true);
-                try {
-                  await addStep(goal.id, newStep.trim(), newStepDate || undefined);
-                  setNewStep("");
-                  setNewStepDate("");
-                } finally {
-                  setAddingStep(false);
-                }
+              if (!newStep.trim() || addingStep) return;
+              if (goal.deadlineISO && newStepDate && newStepDate > goal.deadlineISO) {
+                setStepDateError(
+                  `Essa etapa não pode ter prazo depois do prazo do plano (${formatDateBR(goal.deadlineISO)}).`,
+                );
+                return;
+              }
+              setStepDateError("");
+              setAddingStep(true);
+              try {
+                await addStep(goal.id, newStep.trim(), newStepDate || undefined);
+                setNewStep("");
+                setNewStepDate("");
+              } catch (err) {
+                setStepDateError(
+                  err instanceof Error ? err.message : "Não foi possível criar. Tente de novo.",
+                );
+              } finally {
+                setAddingStep(false);
               }
             }}
-            className="flex gap-2"
+            className="card-surface space-y-2 p-3"
           >
             <input
               value={newStep}
               onChange={(e) => setNewStep(e.target.value)}
               placeholder="Ex: Terminar capítulo 3"
-              className="flex-1 rounded-xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-primary"
+              className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-primary"
             />
-            <input
-              type="date"
-              value={newStepDate}
-              onChange={(e) => setNewStepDate(e.target.value)}
-              className="w-32 rounded-xl border border-border bg-surface px-2 py-3 text-xs outline-none focus:border-primary"
-            />
-            <button
-              disabled={addingStep}
-              className="rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
+            <label className="block">
+              <span className="mb-1 block text-[11px] uppercase tracking-wider text-muted-foreground">
+                Realizar esta etapa até:
+              </span>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={newStepDate}
+                  onChange={(e) => {
+                    setNewStepDate(e.target.value);
+                    setStepDateError("");
+                  }}
+                  className="flex-1 rounded-xl border border-border bg-surface px-3 py-3 text-xs outline-none focus:border-primary"
+                />
+                <button
+                  disabled={addingStep || !newStep.trim()}
+                  className="rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+            </label>
+            {stepDateError && <p className="text-[11px] text-danger">{stepDateError}</p>}
           </form>
         </div>
       )}
@@ -394,16 +398,32 @@ function StepRow({ step, goal, executions }: { step: Step; goal: Goal; execution
   const [showSubtasks, setShowSubtasks] = useState(false);
   const [subtaskDraft, setSubtaskDraft] = useState("");
   const [form, setForm] = useState({ title: "", dueDate: "" });
+  const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [schedule, setSchedule] = useState({ date: todayISO(), startTime: "", endTime: "" });
+  const [scheduleError, setScheduleError] = useState("");
   const [scheduling, setScheduling] = useState(false);
   const subtasks = step.subtasks ?? [];
   const justCreated = executions.find((e) => e.id === justCreatedId);
+  const justCreatedScheduled = justCreated ? isScheduled(justCreated) : false;
+
+  const dueLimit = step.targetDate ?? goal.deadlineISO;
+  const dueLimitLabel = step.targetDate
+    ? `a etapa (${formatDateBR(step.targetDate)})`
+    : goal.deadlineISO
+      ? `o plano (${formatDateBR(goal.deadlineISO)})`
+      : "";
 
   const save = async () => {
     if (!form.title || !form.dueDate || saving) return;
+    if (dueLimit && form.dueDate > dueLimit) {
+      setFormError(`O prazo da execução não pode ser depois do prazo d${dueLimitLabel}.`);
+      return;
+    }
+    setFormError("");
     setSaving(true);
     try {
       const id = await createExecution({
@@ -417,6 +437,9 @@ function StepRow({ step, goal, executions }: { step: Step; goal: Goal; execution
       setForm({ title: "", dueDate: "" });
       setAdding(false);
       setJustCreatedId(id);
+      setShowScheduleForm(false);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Não foi possível criar. Tente de novo.");
     } finally {
       setSaving(false);
     }
@@ -427,10 +450,14 @@ function StepRow({ step, goal, executions }: { step: Step; goal: Goal; execution
 
   const confirmSchedule = async () => {
     if (!justCreatedId || !timesValid || scheduling) return;
+    setScheduleError("");
     setScheduling(true);
     try {
       await scheduleExecution(justCreatedId, schedule.date, schedule.startTime, schedule.endTime);
-      setJustCreatedId(null);
+    } catch (err) {
+      setScheduleError(
+        err instanceof Error ? err.message : "Não foi possível agendar. Tente de novo.",
+      );
     } finally {
       setScheduling(false);
     }
@@ -459,9 +486,7 @@ function StepRow({ step, goal, executions }: { step: Step; goal: Goal; execution
           </p>
           {(step.dueLabel || step.targetDate) && (
             <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">
-              {step.targetDate
-                ? `Prazo: ${step.targetDate.split("-").reverse().join("/")}`
-                : step.dueLabel}
+              {step.targetDate ? `Realizar até: ${formatDateBR(step.targetDate)}` : step.dueLabel}
             </p>
           )}
           {executions.length > 0 && (
@@ -483,45 +508,99 @@ function StepRow({ step, goal, executions }: { step: Step; goal: Goal; execution
 
       {justCreated && (
         <div className="mt-2.5 rounded-lg border border-primary/25 bg-primary/5 p-2.5">
-          <p className="text-[11px] text-foreground">
-            "{justCreated.title}" criada — prazo{" "}
-            {justCreated.dueDate.split("-").reverse().join("/")}.
-          </p>
-          <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-            <input
-              type="date"
-              value={schedule.date}
-              onChange={(e) => setSchedule({ ...schedule, date: e.target.value })}
-              className="rounded-lg border border-border bg-surface px-2 py-1.5 text-[11px] outline-none focus:border-primary"
-            />
-            <input
-              type="time"
-              value={schedule.startTime}
-              onChange={(e) => setSchedule({ ...schedule, startTime: e.target.value })}
-              className="rounded-lg border border-border bg-surface px-2 py-1.5 text-[11px] outline-none focus:border-primary"
-            />
-            <input
-              type="time"
-              value={schedule.endTime}
-              onChange={(e) => setSchedule({ ...schedule, endTime: e.target.value })}
-              className="rounded-lg border border-border bg-surface px-2 py-1.5 text-[11px] outline-none focus:border-primary"
-            />
-          </div>
-          <div className="mt-1.5 flex gap-1.5">
-            <button
-              disabled={!timesValid || scheduling}
-              onClick={confirmSchedule}
-              className="flex-1 rounded-lg bg-primary py-1.5 text-[11px] font-semibold text-primary-foreground disabled:opacity-50"
-            >
-              {scheduling ? "Agendando…" : "Agendar agora"}
-            </button>
-            <button
-              onClick={() => setJustCreatedId(null)}
-              className="rounded-lg border border-dashed border-border px-3 py-1.5 text-[11px] text-muted-foreground"
-            >
-              deixar pra depois
-            </button>
-          </div>
+          {justCreatedScheduled ? (
+            <>
+              <p className="text-[11px] text-foreground">
+                Execução "{justCreated.title}" agendada para {formatDateBR(justCreated.agendaDate!)}{" "}
+                às {justCreated.startTime} ✓
+              </p>
+              <button
+                onClick={() => setJustCreatedId(null)}
+                className="mt-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-[11px] font-semibold"
+              >
+                ok
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-[11px] text-foreground">
+                Execução "{justCreated.title}" criada. Prazo: {formatDateBR(justCreated.dueDate)}.
+              </p>
+              {!showScheduleForm ? (
+                <div className="mt-1.5 flex gap-1.5">
+                  <button
+                    onClick={() => setShowScheduleForm(true)}
+                    className="flex-1 rounded-lg bg-primary py-1.5 text-[11px] font-semibold text-primary-foreground"
+                  >
+                    Colocar na agenda
+                  </button>
+                  <button
+                    onClick={() => setJustCreatedId(null)}
+                    className="rounded-lg border border-dashed border-border px-3 py-1.5 text-[11px] text-muted-foreground"
+                  >
+                    Agora não
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-1.5 space-y-1.5">
+                  <label className="block">
+                    <span className="mb-0.5 block text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Dia na agenda
+                    </span>
+                    <input
+                      type="date"
+                      value={schedule.date}
+                      onChange={(e) => setSchedule({ ...schedule, date: e.target.value })}
+                      className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-[11px] outline-none focus:border-primary"
+                    />
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <label className="block">
+                      <span className="mb-0.5 block text-[10px] uppercase tracking-wider text-muted-foreground">
+                        Início
+                      </span>
+                      <input
+                        type="time"
+                        value={schedule.startTime}
+                        onChange={(e) => setSchedule({ ...schedule, startTime: e.target.value })}
+                        className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-[11px] outline-none focus:border-primary"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-0.5 block text-[10px] uppercase tracking-wider text-muted-foreground">
+                        Término
+                      </span>
+                      <input
+                        type="time"
+                        value={schedule.endTime}
+                        onChange={(e) => setSchedule({ ...schedule, endTime: e.target.value })}
+                        className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-[11px] outline-none focus:border-primary"
+                      />
+                    </label>
+                  </div>
+                  {scheduleError && <p className="text-[11px] text-danger">{scheduleError}</p>}
+                  <div className="flex gap-1.5">
+                    <button
+                      disabled={!timesValid || scheduling}
+                      onClick={confirmSchedule}
+                      className="flex-1 rounded-lg bg-primary py-1.5 text-[11px] font-semibold text-primary-foreground disabled:opacity-50"
+                    >
+                      {scheduling ? "Agendando…" : "Confirmar na agenda"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowScheduleForm(false);
+                        setScheduleError("");
+                      }}
+                      className="rounded-lg border border-dashed border-border px-3 py-1.5 text-[11px] text-muted-foreground"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 
@@ -540,13 +619,21 @@ function StepRow({ step, goal, executions }: { step: Step; goal: Goal; execution
             placeholder="O que precisa ser feito?"
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs outline-none focus:border-primary"
           />
-          <input
-            type="date"
-            value={form.dueDate}
-            onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-            placeholder="Até quando?"
-            className="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs outline-none focus:border-primary"
-          />
+          <label className="mt-1.5 block">
+            <span className="mb-0.5 block text-[10px] uppercase tracking-wider text-muted-foreground">
+              Realizar esta execução até:
+            </span>
+            <input
+              type="date"
+              value={form.dueDate}
+              onChange={(e) => {
+                setForm({ ...form, dueDate: e.target.value });
+                setFormError("");
+              }}
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs outline-none focus:border-primary"
+            />
+          </label>
+          {formError && <p className="mt-1 text-[11px] text-danger">{formError}</p>}
           <button
             disabled={!form.title || !form.dueDate || saving}
             onClick={save}
@@ -704,7 +791,7 @@ function ExecutionRow({
             </p>
           )}
           <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Prazo: {e.dueDate.split("-").reverse().join("/")}
+            Prazo: {formatDateBR(e.dueDate)}
           </p>
           {e.location && (
             <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
@@ -758,25 +845,40 @@ function ExecutionRow({
               {scheduled ? "reagendar" : "Adicionar à agenda"}
             </button>
           ) : (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <input
-                type="date"
-                value={schedule.date}
-                onChange={(ev) => setSchedule({ ...schedule, date: ev.target.value })}
-                className="rounded-lg border border-border bg-surface px-2 py-1.5 text-[11px] outline-none focus:border-primary"
-              />
-              <input
-                type="time"
-                value={schedule.startTime}
-                onChange={(ev) => setSchedule({ ...schedule, startTime: ev.target.value })}
-                className="rounded-lg border border-border bg-surface px-2 py-1.5 text-[11px] outline-none focus:border-primary"
-              />
-              <input
-                type="time"
-                value={schedule.endTime}
-                onChange={(ev) => setSchedule({ ...schedule, endTime: ev.target.value })}
-                className="rounded-lg border border-border bg-surface px-2 py-1.5 text-[11px] outline-none focus:border-primary"
-              />
+            <div className="flex flex-wrap items-end gap-1.5">
+              <label className="block">
+                <span className="mb-0.5 block text-[9px] uppercase tracking-wider text-muted-foreground">
+                  Dia na agenda
+                </span>
+                <input
+                  type="date"
+                  value={schedule.date}
+                  onChange={(ev) => setSchedule({ ...schedule, date: ev.target.value })}
+                  className="rounded-lg border border-border bg-surface px-2 py-1.5 text-[11px] outline-none focus:border-primary"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-0.5 block text-[9px] uppercase tracking-wider text-muted-foreground">
+                  Início
+                </span>
+                <input
+                  type="time"
+                  value={schedule.startTime}
+                  onChange={(ev) => setSchedule({ ...schedule, startTime: ev.target.value })}
+                  className="rounded-lg border border-border bg-surface px-2 py-1.5 text-[11px] outline-none focus:border-primary"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-0.5 block text-[9px] uppercase tracking-wider text-muted-foreground">
+                  Término
+                </span>
+                <input
+                  type="time"
+                  value={schedule.endTime}
+                  onChange={(ev) => setSchedule({ ...schedule, endTime: ev.target.value })}
+                  className="rounded-lg border border-border bg-surface px-2 py-1.5 text-[11px] outline-none focus:border-primary"
+                />
+              </label>
               <button
                 onClick={confirmSchedule}
                 disabled={busy || !timesValid}
@@ -954,9 +1056,9 @@ function ExecutionPicker({ goalId, onClose }: { goalId: string; onClose: () => v
                     {c.emoji} {e.title}
                   </p>
                   <p className="text-[11px] text-muted-foreground">
-                    Prazo {e.dueDate.split("-").reverse().join("/")}
+                    Prazo {formatDateBR(e.dueDate)}
                     {isScheduled(e)
-                      ? ` · agendada ${e.agendaDate!.split("-").reverse().join("/")} ${e.startTime}`
+                      ? ` · agendada ${formatDateBR(e.agendaDate!)} ${e.startTime}`
                       : " · sem agenda"}
                     {e.goalId ? " · já vinculada a outro planejamento" : ""}
                   </p>

@@ -126,6 +126,12 @@ export function nowHM() {
   const d = new Date();
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+/** "YYYY-MM-DD" -> "DD/MM/YYYY" por split de string — nunca passa por `Date`,
+ * então nunca sofre o deslocamento de fuso que `new Date(iso)` (UTC) causaria. */
+export function formatDateBR(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
 
 const weightHours: Record<TaskWeight, number> = { leve: 0.5, medio: 1.5, pesado: 2.5 };
 export const DAILY_CAPACITY_HOURS = 8;
@@ -612,7 +618,9 @@ function unwrap<T>(res: { data: T | null; error: { message: string } | null }): 
   return res.data as T;
 }
 
-async function fetchState(): Promise<State> {
+/** Exportado só pra teste poder registrar a mesma queryFn real via prefetchQuery
+ * — sem isso, um refetch pós-invalidate reusaria uma queryFn de teste incompleta. */
+export async function fetchState(): Promise<State> {
   const [goalsRes, stepsRes, subtasksRes, execRes, histRes, routinesRes] = await Promise.all([
     supabase.from("goals").select("*").order("created_at", { ascending: false }),
     supabase.from("steps").select("*").order("order_index"),
@@ -643,11 +651,17 @@ async function fetchState(): Promise<State> {
   };
 }
 
-const QUERY_KEY = ["goals-domain"] as const;
+export const QUERY_KEY = ["goals-domain"] as const;
 /** Espera o refetch terminar antes de resolver — evita navegar pra uma tela que lê
- * o cache antes do dado novo chegar (ex.: ir pro detalhe do objetivo recém-criado). */
+ * o cache antes do dado novo chegar (ex.: ir pro detalhe do objetivo recém-criado).
+ * `refetchType: "all"` é essencial: o default do TanStack Query só re-busca queries
+ * com observador ATIVO no momento da chamada. Ações disparadas de telas que não leem
+ * `useGoalsStore` (ex.: PlanejamentoFlow em criar.tsx) não têm observador ativo — sem
+ * isso, o invalidate só marcava a query como stale e a navegação seguinte lia cache
+ * antigo enquanto o refetch acontecia em segundo plano (causa raiz do "Planejamento
+ * não encontrado" transitório). */
 function invalidate() {
-  return queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+  return queryClient.invalidateQueries({ queryKey: QUERY_KEY, refetchType: "all" });
 }
 
 export function useGoalsStore<T>(selector: (s: State) => T): T {
@@ -660,16 +674,19 @@ export function useGoalsStore<T>(selector: (s: State) => T): T {
   return selector(data ?? EMPTY_STATE);
 }
 
-/** true enquanto o primeiro carregamento ainda não chegou — evita telas tratarem
- * "ainda buscando" como "não existe" (ex.: notFound() num objetivo recém-criado). */
+/** true enquanto o primeiro carregamento OU um refetch em segundo plano ainda não
+ * terminou — evita telas tratarem "ainda buscando/atualizando" como "não existe"
+ * (ex.: notFound() num objetivo recém-criado, cujo refetch pós-invalidate ainda não
+ * chegou). Checar só `isLoading` não bastava: com dado antigo em cache, o TanStack
+ * Query considera a query "success" mesmo enquanto refaz o fetch em segundo plano. */
 export function useGoalsLoading(): boolean {
   const userId = useSupabaseUserId();
-  const { isLoading } = useQuery({
+  const { isLoading, isFetching } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: fetchState,
     enabled: !!userId,
   });
-  return !userId || isLoading;
+  return !userId || isLoading || isFetching;
 }
 
 // ---------------------------------------------------------------------------
