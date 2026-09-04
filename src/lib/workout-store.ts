@@ -1,9 +1,12 @@
-import { useSyncExternalStore } from "react";
-import { toISODate, todayISO, addDays } from "./goals-store";
+import { useQuery } from "@tanstack/react-query";
+import { todayISO } from "./goals-store";
+import { supabase, ensureSession, useSupabaseUserId } from "./supabase/client";
+import { queryClient } from "./query-client";
 
 // ---------------------------------------------------------------------------
-// Diário de treino da Academia — domínio auto-contido, mesmo padrão reativo
-// do goals-store.ts. Treino (A/B/C...) -> Exercícios -> Sessões (série a série).
+// Diário de treino da Academia — Treino (A/B/C...) -> Exercícios -> Sessões
+// (série a série). Persistido no Supabase (mesmo padrão de goals-store.ts) —
+// seletores puros abaixo continuam 100% inalterados.
 // ---------------------------------------------------------------------------
 
 export type WorkoutPlan = {
@@ -59,11 +62,22 @@ type State = {
   bodyWeights: BodyWeightEntry[];
 };
 
-let seq = 0;
-function genId(prefix: string) {
-  seq += 1;
-  return `${prefix}${Date.now().toString(36)}${seq}`;
-}
+const EMPTY_WEEKLY: Record<number, string | null> = {
+  0: null,
+  1: null,
+  2: null,
+  3: null,
+  4: null,
+  5: null,
+  6: null,
+};
+const EMPTY_STATE: State = {
+  plans: [],
+  exercises: [],
+  sessions: [],
+  weeklyAssignment: EMPTY_WEEKLY,
+  bodyWeights: [],
+};
 
 // ---------------------------------------------------------------------------
 // Seletores puros
@@ -164,261 +178,162 @@ export function sessionSummary(
 }
 
 // ---------------------------------------------------------------------------
-// Seed
+// Mapeamento snake_case (Supabase) -> camelCase
 // ---------------------------------------------------------------------------
-function buildSeedState(): State {
-  const now = new Date();
-  let order = 0;
-  const plans: WorkoutPlan[] = [
-    {
-      id: "wpA",
-      letter: "A",
-      name: "Peito + Tríceps",
-      muscleGroups: "Peito, tríceps, ombro",
-      order: order++,
-    },
-    {
-      id: "wpB",
-      letter: "B",
-      name: "Costas + Bíceps",
-      muscleGroups: "Costas, bíceps",
-      order: order++,
-    },
-    {
-      id: "wpC",
-      letter: "C",
-      name: "Pernas",
-      muscleGroups: "Quadríceps, posterior, glúteo",
-      order: order++,
-    },
-  ];
+type Row = Record<string, unknown>;
 
-  const exOrder: Record<string, number> = {};
-  const nextOrder = (planId: string) => (exOrder[planId] = (exOrder[planId] ?? -1) + 1);
-  const exercise = (
-    planId: string,
-    name: string,
-    setsTarget: number,
-    repsTarget: number,
-    loadTarget: number,
-    restSeconds = 90,
-  ): Exercise => ({
-    id: genId("wex"),
-    planId,
-    name,
-    setsTarget,
-    repsTarget,
-    loadTarget,
-    restSeconds,
-    order: nextOrder(planId),
-  });
-
-  const exercises: Exercise[] = [
-    exercise("wpA", "Supino reto", 4, 10, 70, 90),
-    exercise("wpA", "Supino inclinado", 4, 10, 60, 90),
-    exercise("wpA", "Tríceps corda", 3, 15, 25, 60),
-    exercise("wpB", "Puxada alta", 4, 10, 55, 90),
-    exercise("wpB", "Remada baixa", 4, 10, 50, 90),
-    exercise("wpB", "Rosca direta", 3, 12, 16, 60),
-    exercise("wpB", "Rosca martelo", 3, 12, 14, 60),
-    exercise("wpC", "Agachamento", 4, 10, 80, 120),
-    exercise("wpC", "Leg press", 4, 12, 120, 90),
-    exercise("wpC", "Cadeira extensora", 3, 15, 40, 60),
-  ];
-
-  const weeklyAssignment: Record<number, string | null> = {
-    0: null, // domingo
-    1: "wpA",
-    2: "wpB",
-    3: null,
-    4: "wpA",
-    5: "wpB",
-    6: "wpC",
-  };
-
-  // Histórico das últimas semanas, com progressão real de carga (pra Sparkline/resumo não nascerem vazios).
-  const sessions: WorkoutSession[] = [];
-  const seedSession = (
-    planId: string,
-    dayOffset: number,
-    weights: Record<string, { weight: number; reps: number }[]>,
-  ) => {
-    const date = toISODate(addDays(now, -dayOffset));
-    const exerciseLogs: ExerciseLog[] = Object.entries(weights).map(([exerciseId, sets]) => ({
-      exerciseId,
-      sets: sets.map((s, i) => ({ setIndex: i, weight: s.weight, reps: s.reps })),
-      done: true,
-    }));
-    sessions.push({
-      id: genId("wsess"),
-      planId,
-      date,
-      startedAt: new Date(addDays(now, -dayOffset)).toISOString(),
-      finishedAt: new Date(addDays(now, -dayOffset)).toISOString(),
-      exerciseLogs,
-      status: "concluido",
-    });
-  };
-  const [supinoReto, supinoInclinado, tricepsCorda] = exercises
-    .filter((e) => e.planId === "wpA")
-    .map((e) => e.id);
-  const [puxadaAlta, remadaBaixa, roscaDireta, roscaMartelo] = exercises
-    .filter((e) => e.planId === "wpB")
-    .map((e) => e.id);
-
-  seedSession("wpA", 24, {
-    [supinoReto]: [
-      { weight: 60, reps: 10 },
-      { weight: 60, reps: 10 },
-      { weight: 60, reps: 9 },
-      { weight: 55, reps: 10 },
-    ],
-    [supinoInclinado]: [
-      { weight: 50, reps: 10 },
-      { weight: 50, reps: 10 },
-      { weight: 50, reps: 9 },
-      { weight: 45, reps: 10 },
-    ],
-    [tricepsCorda]: [
-      { weight: 20, reps: 15 },
-      { weight: 20, reps: 14 },
-      { weight: 20, reps: 13 },
-    ],
-  });
-  seedSession("wpA", 10, {
-    [supinoReto]: [
-      { weight: 65, reps: 10 },
-      { weight: 65, reps: 10 },
-      { weight: 65, reps: 9 },
-      { weight: 60, reps: 10 },
-    ],
-    [supinoInclinado]: [
-      { weight: 55, reps: 10 },
-      { weight: 55, reps: 9 },
-      { weight: 55, reps: 9 },
-      { weight: 50, reps: 10 },
-    ],
-    [tricepsCorda]: [
-      { weight: 22, reps: 15 },
-      { weight: 22, reps: 14 },
-      { weight: 22, reps: 13 },
-    ],
-  });
-  seedSession("wpB", 21, {
-    [puxadaAlta]: [
-      { weight: 50, reps: 10 },
-      { weight: 50, reps: 10 },
-      { weight: 50, reps: 9 },
-      { weight: 45, reps: 10 },
-    ],
-    [remadaBaixa]: [
-      { weight: 45, reps: 10 },
-      { weight: 45, reps: 10 },
-      { weight: 45, reps: 9 },
-      { weight: 40, reps: 10 },
-    ],
-    [roscaDireta]: [
-      { weight: 14, reps: 12 },
-      { weight: 14, reps: 12 },
-      { weight: 14, reps: 10 },
-    ],
-    [roscaMartelo]: [
-      { weight: 12, reps: 12 },
-      { weight: 12, reps: 12 },
-      { weight: 12, reps: 11 },
-    ],
-  });
-  seedSession("wpB", 7, {
-    [puxadaAlta]: [
-      { weight: 55, reps: 10 },
-      { weight: 55, reps: 10 },
-      { weight: 55, reps: 9 },
-      { weight: 50, reps: 10 },
-    ],
-    [remadaBaixa]: [
-      { weight: 50, reps: 10 },
-      { weight: 50, reps: 10 },
-      { weight: 50, reps: 9 },
-      { weight: 45, reps: 10 },
-    ],
-    [roscaDireta]: [
-      { weight: 16, reps: 12 },
-      { weight: 16, reps: 12 },
-      { weight: 16, reps: 10 },
-    ],
-    [roscaMartelo]: [
-      { weight: 14, reps: 12 },
-      { weight: 14, reps: 12 },
-      { weight: 14, reps: 11 },
-    ],
-  });
-
-  const bodyWeights: BodyWeightEntry[] = [
-    { id: genId("bw"), date: toISODate(addDays(now, -28)), weight: 80.0 },
-    { id: genId("bw"), date: toISODate(addDays(now, -14)), weight: 79.1 },
-    { id: genId("bw"), date: toISODate(addDays(now, -3)), weight: 78.4 },
-  ];
-
-  return { plans, exercises, sessions, weeklyAssignment, bodyWeights };
+function unwrap<T>(res: { data: T | null; error: { message: string } | null }): T {
+  if (res.error) throw new Error(res.error.message);
+  return res.data as T;
 }
 
-// ---------------------------------------------------------------------------
-// Store reativo
-// ---------------------------------------------------------------------------
-let state: State = buildSeedState();
-const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((l) => l());
-const subscribe = (l: () => void) => {
-  listeners.add(l);
-  return () => {
-    listeners.delete(l);
-  };
-};
-const getSnapshot = () => state;
+function groupBy<T extends Row>(rows: T[], key: string): Record<string, T[]> {
+  const out: Record<string, T[]> = {};
+  for (const r of rows) {
+    const k = r[key] as string;
+    (out[k] ??= []).push(r);
+  }
+  return out;
+}
 
-function set(updater: (s: State) => State) {
-  state = updater(state);
-  emit();
+function mapPlan(r: Row): WorkoutPlan {
+  return {
+    id: r.id as string,
+    letter: r.letter as string,
+    name: r.name as string,
+    muscleGroups: (r.muscle_groups as string) ?? "",
+    order: (r.order_index as number) ?? 0,
+  };
+}
+
+function mapExercise(r: Row): Exercise {
+  return {
+    id: r.id as string,
+    planId: r.plan_id as string,
+    name: r.name as string,
+    setsTarget: (r.sets_target as number) ?? 0,
+    repsTarget: (r.reps_target as number) ?? 0,
+    loadTarget: (r.load_target as number) ?? 0,
+    restSeconds: (r.rest_seconds as number) ?? 60,
+    order: (r.order_index as number) ?? 0,
+  };
+}
+
+function mapSession(r: Row, exerciseLogs: ExerciseLog[]): WorkoutSession {
+  return {
+    id: r.id as string,
+    planId: r.plan_id as string,
+    date: r.date as string,
+    startedAt: r.started_at as string,
+    finishedAt: (r.finished_at as string) ?? undefined,
+    exerciseLogs,
+    status: r.status as WorkoutSessionStatus,
+  };
+}
+
+function mapBodyWeight(r: Row): BodyWeightEntry {
+  return { id: r.id as string, date: r.date as string, weight: r.weight as number };
+}
+
+async function fetchState(): Promise<State> {
+  const [plansRes, exercisesRes, weeklyRes, sessionsRes, exLogsRes, setLogsRes, weightsRes] =
+    await Promise.all([
+      supabase.from("workout_plans").select("*").order("order_index"),
+      supabase.from("workout_exercises").select("*").order("order_index"),
+      supabase.from("workout_weekly_assignment").select("*"),
+      supabase.from("workout_sessions").select("*").order("date", { ascending: false }),
+      supabase.from("workout_exercise_logs").select("*"),
+      supabase.from("workout_set_logs").select("*").order("set_index"),
+      supabase.from("workout_body_weights").select("*").order("date", { ascending: false }),
+    ]);
+  const planRows = unwrap(plansRes);
+  const exerciseRows = unwrap(exercisesRes);
+  const weeklyRows = unwrap(weeklyRes);
+  const sessionRows = unwrap(sessionsRes);
+  const exLogRows = unwrap(exLogsRes) as Row[];
+  const setLogRows = unwrap(setLogsRes) as Row[];
+  const weightRows = unwrap(weightsRes);
+
+  const setLogsByExLog = groupBy(setLogRows, "exercise_log_id");
+  const exLogsBySession = groupBy(exLogRows, "session_id");
+
+  const sessions = (sessionRows as Row[]).map((r) => {
+    const exLogs = exLogsBySession[r.id as string] ?? [];
+    const exerciseLogs: ExerciseLog[] = exLogs.map((el) => ({
+      exerciseId: el.exercise_id as string,
+      sets: (setLogsByExLog[el.id as string] ?? []).map((s) => ({
+        setIndex: s.set_index as number,
+        weight: s.weight as number,
+        reps: s.reps as number,
+      })),
+      done: el.done as boolean,
+    }));
+    return mapSession(r, exerciseLogs);
+  });
+
+  const weeklyAssignment: Record<number, string | null> = { ...EMPTY_WEEKLY };
+  for (const r of weeklyRows as Row[]) {
+    weeklyAssignment[r.weekday as number] = (r.plan_id as string) ?? null;
+  }
+
+  return {
+    plans: (planRows as Row[]).map(mapPlan),
+    exercises: (exerciseRows as Row[]).map(mapExercise),
+    sessions,
+    weeklyAssignment,
+    bodyWeights: (weightRows as Row[]).map(mapBodyWeight),
+  };
+}
+
+const QUERY_KEY = ["workout-domain"] as const;
+function invalidate() {
+  return queryClient.invalidateQueries({ queryKey: QUERY_KEY, refetchType: "all" });
 }
 
 export function useWorkoutStore<T>(selector: (s: State) => T): T {
-  const snap = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  return selector(snap);
+  const userId = useSupabaseUserId();
+  const { data } = useQuery({ queryKey: QUERY_KEY, queryFn: fetchState, enabled: !!userId });
+  return selector(data ?? EMPTY_STATE);
 }
 
 // ---------------------------------------------------------------------------
 // Ações
 // ---------------------------------------------------------------------------
-export function createPlan(input: { letter: string; name: string; muscleGroups: string }): string {
-  const id = genId("wp");
-  set((s) => ({
-    ...s,
-    plans: [
-      ...s.plans,
-      {
-        id,
+export async function createPlan(input: {
+  letter: string;
+  name: string;
+  muscleGroups: string;
+}): Promise<string> {
+  const userId = await ensureSession();
+  const { count } = await supabase
+    .from("workout_plans")
+    .select("id", { count: "exact", head: true });
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("workout_plans")
+      .insert({
+        user_id: userId,
         letter: input.letter,
         name: input.name,
-        muscleGroups: input.muscleGroups,
-        order: s.plans.length,
-      },
-    ],
-  }));
-  return id;
+        muscle_groups: input.muscleGroups,
+        order_index: count ?? 0,
+      })
+      .select()
+      .single(),
+  );
+  await invalidate();
+  return row.id;
 }
 
-export function removePlan(planId: string) {
-  set((s) => ({
-    ...s,
-    plans: s.plans.filter((p) => p.id !== planId),
-    exercises: s.exercises.filter((e) => e.planId !== planId),
-    weeklyAssignment: Object.fromEntries(
-      Object.entries(s.weeklyAssignment).map(([day, pid]) => [day, pid === planId ? null : pid]),
-    ),
-  }));
+/** Exercícios e a atribuição semanal são apagados em cascata pelo banco. Sessões
+ * já registradas são preservadas (não apagadas) — ficam "órfãs" de plano, mas o
+ * histórico de treino real não some quando você reorganiza seus treinos. */
+export async function removePlan(planId: string) {
+  await supabase.from("workout_plans").delete().eq("id", planId);
+  await invalidate();
 }
 
-export function addExercise(
+export async function addExercise(
   planId: string,
   input: {
     name: string;
@@ -427,172 +342,247 @@ export function addExercise(
     loadTarget: number;
     restSeconds: number;
   },
-): string {
-  const id = genId("wex");
-  set((s) => {
-    const order = s.exercises.filter((e) => e.planId === planId).length;
-    return { ...s, exercises: [...s.exercises, { id, planId, order, ...input }] };
-  });
-  return id;
+): Promise<string> {
+  const userId = await ensureSession();
+  const { count } = await supabase
+    .from("workout_exercises")
+    .select("id", { count: "exact", head: true })
+    .eq("plan_id", planId);
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("workout_exercises")
+      .insert({
+        user_id: userId,
+        plan_id: planId,
+        name: input.name,
+        sets_target: input.setsTarget,
+        reps_target: input.repsTarget,
+        load_target: input.loadTarget,
+        rest_seconds: input.restSeconds,
+        order_index: count ?? 0,
+      })
+      .select()
+      .single(),
+  );
+  await invalidate();
+  return row.id;
 }
 
-export function updateExercise(
+export async function updateExercise(
   id: string,
   patch: Partial<
     Pick<Exercise, "name" | "setsTarget" | "repsTarget" | "loadTarget" | "restSeconds">
   >,
 ) {
-  set((s) => ({ ...s, exercises: s.exercises.map((e) => (e.id === id ? { ...e, ...patch } : e)) }));
+  const dbPatch: Row = {};
+  if (patch.name !== undefined) dbPatch.name = patch.name;
+  if (patch.setsTarget !== undefined) dbPatch.sets_target = patch.setsTarget;
+  if (patch.repsTarget !== undefined) dbPatch.reps_target = patch.repsTarget;
+  if (patch.loadTarget !== undefined) dbPatch.load_target = patch.loadTarget;
+  if (patch.restSeconds !== undefined) dbPatch.rest_seconds = patch.restSeconds;
+  unwrap(await supabase.from("workout_exercises").update(dbPatch).eq("id", id).select().single());
+  await invalidate();
 }
 
-export function removeExercise(id: string) {
-  set((s) => ({ ...s, exercises: s.exercises.filter((e) => e.id !== id) }));
+export async function removeExercise(id: string) {
+  await supabase.from("workout_exercises").delete().eq("id", id);
+  await invalidate();
 }
 
-export function reorderExercise(id: string, direction: "up" | "down") {
-  set((s) => {
-    const ex = s.exercises.find((e) => e.id === id);
-    if (!ex) return s;
-    const siblings = exercisesForPlan(s.exercises, ex.planId);
-    const idx = siblings.findIndex((e) => e.id === id);
-    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= siblings.length) return s;
-    const other = siblings[swapIdx];
-    return {
-      ...s,
-      exercises: s.exercises.map((e) => {
-        if (e.id === ex.id) return { ...e, order: other.order };
-        if (e.id === other.id) return { ...e, order: ex.order };
-        return e;
-      }),
-    };
-  });
+/** Recebe os exercícios do plano (já ordenados) porque não há mais leitura síncrona
+ * de estado — mesmo padrão de `redistributeExecution(id, allExecutions)` no core. */
+export async function reorderExercise(id: string, direction: "up" | "down", siblings: Exercise[]) {
+  const idx = siblings.findIndex((e) => e.id === id);
+  if (idx < 0) return;
+  const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= siblings.length) return;
+  const a = siblings[idx];
+  const b = siblings[swapIdx];
+  await Promise.all([
+    supabase.from("workout_exercises").update({ order_index: b.order }).eq("id", a.id),
+    supabase.from("workout_exercises").update({ order_index: a.order }).eq("id", b.id),
+  ]);
+  await invalidate();
 }
 
-export function setWeeklyAssignment(weekday: number, planId: string | null) {
-  set((s) => ({ ...s, weeklyAssignment: { ...s.weeklyAssignment, [weekday]: planId } }));
+export async function setWeeklyAssignment(weekday: number, planId: string | null) {
+  const userId = await ensureSession();
+  unwrap(
+    await supabase
+      .from("workout_weekly_assignment")
+      .upsert({ user_id: userId, weekday, plan_id: planId }, { onConflict: "user_id,weekday" })
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
-/** Começa a sessão de hoje pro treino — se já existir uma sessão hoje pra esse treino, reaproveita (idempotente). */
-export function startSession(planId: string): string {
-  const existing = sessionForToday(state.sessions, planId);
-  if (existing) return existing.id;
-  const id = genId("wsess");
-  set((s) => {
-    const exerciseLogs: ExerciseLog[] = exercisesForPlan(s.exercises, planId).map((e) => ({
-      exerciseId: e.id,
-      sets: [],
-      done: false,
-    }));
-    const session: WorkoutSession = {
-      id,
-      planId,
-      date: todayISO(),
-      startedAt: new Date().toISOString(),
-      exerciseLogs,
-      status: "em_andamento",
-    };
-    return { ...s, sessions: [session, ...s.sessions] };
-  });
-  return id;
+/** Começa a sessão de hoje pro treino — se já existir uma sessão hoje pra esse treino,
+ * reaproveita (idempotente), mesmo comportamento de antes. */
+export async function startSession(planId: string): Promise<string> {
+  const userId = await ensureSession();
+  const today = todayISO();
+  const { data: existing } = await supabase
+    .from("workout_sessions")
+    .select("id")
+    .eq("plan_id", planId)
+    .eq("date", today)
+    .maybeSingle();
+  if (existing) return existing.id as string;
+
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("workout_sessions")
+      .insert({ user_id: userId, plan_id: planId, date: today, status: "em_andamento" })
+      .select()
+      .single(),
+  );
+  const { data: planExercises } = await supabase
+    .from("workout_exercises")
+    .select("id")
+    .eq("plan_id", planId);
+  if (planExercises && planExercises.length > 0) {
+    unwrap(
+      await supabase.from("workout_exercise_logs").insert(
+        planExercises.map((e) => ({
+          user_id: userId,
+          session_id: row.id,
+          exercise_id: e.id as string,
+          done: false,
+        })),
+      ),
+    );
+  }
+  await invalidate();
+  return row.id;
 }
 
-export function logSet(sessionId: string, exerciseId: string, weight: number, reps: number) {
-  set((s) => ({
-    ...s,
-    sessions: s.sessions.map((sess) => {
-      if (sess.id !== sessionId) return sess;
-      return {
-        ...sess,
-        exerciseLogs: sess.exerciseLogs.map((log) =>
-          log.exerciseId === exerciseId
-            ? { ...log, sets: [...log.sets, { setIndex: log.sets.length, weight, reps }] }
-            : log,
-        ),
-      };
-    }),
-  }));
+async function findExerciseLogId(sessionId: string, exerciseId: string): Promise<string> {
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("workout_exercise_logs")
+      .select("id")
+      .eq("session_id", sessionId)
+      .eq("exercise_id", exerciseId)
+      .single(),
+  );
+  return row.id;
 }
 
-export function updateSet(
+export async function logSet(sessionId: string, exerciseId: string, weight: number, reps: number) {
+  const userId = await ensureSession();
+  const exerciseLogId = await findExerciseLogId(sessionId, exerciseId);
+  const { count } = await supabase
+    .from("workout_set_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("exercise_log_id", exerciseLogId);
+  unwrap(
+    await supabase
+      .from("workout_set_logs")
+      .insert({
+        user_id: userId,
+        exercise_log_id: exerciseLogId,
+        set_index: count ?? 0,
+        weight,
+        reps,
+      })
+      .select()
+      .single(),
+  );
+  await invalidate();
+}
+
+export async function updateSet(
   sessionId: string,
   exerciseId: string,
   setIndex: number,
   patch: { weight?: number; reps?: number },
 ) {
-  set((s) => ({
-    ...s,
-    sessions: s.sessions.map((sess) => {
-      if (sess.id !== sessionId) return sess;
-      return {
-        ...sess,
-        exerciseLogs: sess.exerciseLogs.map((log) =>
-          log.exerciseId === exerciseId
-            ? {
-                ...log,
-                sets: log.sets.map((set) =>
-                  set.setIndex === setIndex ? { ...set, ...patch } : set,
-                ),
-              }
-            : log,
-        ),
-      };
-    }),
-  }));
+  const exerciseLogId = await findExerciseLogId(sessionId, exerciseId);
+  const dbPatch: Row = {};
+  if (patch.weight !== undefined) dbPatch.weight = patch.weight;
+  if (patch.reps !== undefined) dbPatch.reps = patch.reps;
+  unwrap(
+    await supabase
+      .from("workout_set_logs")
+      .update(dbPatch)
+      .eq("exercise_log_id", exerciseLogId)
+      .eq("set_index", setIndex)
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
-export function removeLastSet(sessionId: string, exerciseId: string) {
-  set((s) => ({
-    ...s,
-    sessions: s.sessions.map((sess) => {
-      if (sess.id !== sessionId) return sess;
-      return {
-        ...sess,
-        exerciseLogs: sess.exerciseLogs.map((log) =>
-          log.exerciseId === exerciseId ? { ...log, sets: log.sets.slice(0, -1) } : log,
-        ),
-      };
-    }),
-  }));
+export async function removeLastSet(sessionId: string, exerciseId: string) {
+  const exerciseLogId = await findExerciseLogId(sessionId, exerciseId);
+  const { data: sets } = await supabase
+    .from("workout_set_logs")
+    .select("id, set_index")
+    .eq("exercise_log_id", exerciseLogId)
+    .order("set_index", { ascending: false })
+    .limit(1);
+  if (sets && sets.length > 0) {
+    await supabase
+      .from("workout_set_logs")
+      .delete()
+      .eq("id", sets[0].id as string);
+    await invalidate();
+  }
 }
 
-export function completeExerciseLog(sessionId: string, exerciseId: string) {
-  set((s) => ({
-    ...s,
-    sessions: s.sessions.map((sess) =>
-      sess.id === sessionId
-        ? {
-            ...sess,
-            exerciseLogs: sess.exerciseLogs.map((log) =>
-              log.exerciseId === exerciseId ? { ...log, done: true } : log,
-            ),
-          }
-        : sess,
-    ),
-  }));
+export async function completeExerciseLog(sessionId: string, exerciseId: string) {
+  const exerciseLogId = await findExerciseLogId(sessionId, exerciseId);
+  unwrap(
+    await supabase
+      .from("workout_exercise_logs")
+      .update({ done: true })
+      .eq("id", exerciseLogId)
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
-export function finishSession(sessionId: string) {
-  set((s) => ({
-    ...s,
-    sessions: s.sessions.map((sess) =>
-      sess.id === sessionId
-        ? { ...sess, status: "concluido", finishedAt: new Date().toISOString() }
-        : sess,
-    ),
-  }));
+export async function finishSession(sessionId: string) {
+  unwrap(
+    await supabase
+      .from("workout_sessions")
+      .update({ status: "concluido", finished_at: new Date().toISOString() })
+      .eq("id", sessionId)
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
-export function addBodyWeight(weight: number) {
-  set((s) => {
-    const iso = todayISO();
-    const existing = s.bodyWeights.find((b) => b.date === iso);
-    if (existing) {
-      return {
-        ...s,
-        bodyWeights: s.bodyWeights.map((b) => (b.date === iso ? { ...b, weight } : b)),
-      };
-    }
-    return { ...s, bodyWeights: [{ id: genId("bw"), date: iso, weight }, ...s.bodyWeights] };
-  });
+/** Um registro por dia — se já existir um pra hoje, atualiza em vez de duplicar
+ * (tabela não tem unique constraint em (user_id,date), então o dedup é feito aqui). */
+export async function addBodyWeight(weight: number) {
+  const userId = await ensureSession();
+  const iso = todayISO();
+  const { data: existing } = await supabase
+    .from("workout_body_weights")
+    .select("id")
+    .eq("date", iso)
+    .maybeSingle();
+  if (existing) {
+    unwrap(
+      await supabase
+        .from("workout_body_weights")
+        .update({ weight })
+        .eq("id", existing.id as string)
+        .select()
+        .single(),
+    );
+  } else {
+    unwrap(
+      await supabase
+        .from("workout_body_weights")
+        .insert({ user_id: userId, date: iso, weight })
+        .select()
+        .single(),
+    );
+  }
+  await invalidate();
 }

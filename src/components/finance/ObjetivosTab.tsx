@@ -137,11 +137,11 @@ function GoalDetailSheet({ goalId, onClose }: { goalId: string; onClose: () => v
               className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
             />
             <button
-              onClick={() => {
+              onClick={async () => {
                 const value = parseFloat(amount);
                 if (!value || value <= 0) return;
-                contributeToGoal(goalId, value);
                 setAmount("");
+                await contributeToGoal(goalId, value);
               }}
               className="shrink-0 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
             >
@@ -184,8 +184,8 @@ function GoalDetailSheet({ goalId, onClose }: { goalId: string; onClose: () => v
                 </button>
               ) : (
                 <button
-                  onClick={() => {
-                    removeFinancialGoal(goalId);
+                  onClick={async () => {
+                    await removeFinancialGoal(goalId);
                     onClose();
                   }}
                   className="flex-1 rounded-lg bg-danger py-2 text-xs font-semibold text-white"
@@ -206,8 +206,8 @@ function EditGoalForm({ goal, onDone }: { goal: FinancialGoal; onDone: () => voi
   const [target, setTarget] = useState(String(goal.targetAmount));
   const [deadline, setDeadline] = useState(goal.deadline ?? "");
 
-  const save = () => {
-    updateFinancialGoal(goal.id, {
+  const save = async () => {
+    await updateFinancialGoal(goal.id, {
       name: name.trim() || goal.name,
       targetAmount: parseFloat(target) || goal.targetAmount,
       deadline: deadline || undefined,
@@ -259,9 +259,9 @@ function NewGoalSheet({ onClose }: { onClose: () => void }) {
     reader.readAsDataURL(file);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!name.trim() || !parseFloat(target)) return;
-    addFinancialGoal({
+    await addFinancialGoal({
       name,
       targetAmount: parseFloat(target),
       savedAmount: saved ? parseFloat(saved) : undefined,

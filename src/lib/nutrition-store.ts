@@ -1,5 +1,7 @@
-import { useSyncExternalStore } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { todayISO } from "./goals-store";
+import { supabase, ensureSession, useSupabaseUserId } from "./supabase/client";
+import { queryClient } from "./query-client";
 
 // ---------------------------------------------------------------------------
 // Alimentação — a dieta virou rotina de execução, não um contador de
@@ -8,6 +10,9 @@ import { todayISO } from "./goals-store";
 // 4 campos de macro em MealOption são o ponto de extensão futuro: quando
 // houver IA que interpreta a descrição, ela só precisa preencher esses
 // campos — nenhuma mudança de forma será necessária.
+//
+// Persistida no Supabase (mesmo padrão de goals-store.ts) — seletores puros
+// abaixo continuam 100% inalterados, só a camada de leitura/escrita mudou.
 // ---------------------------------------------------------------------------
 
 export type Meal = {
@@ -58,11 +63,8 @@ type State = {
   logs: MealLog[];
 };
 
-let seq = 0;
-function genId(prefix: string) {
-  seq += 1;
-  return `${prefix}${Date.now().toString(36)}${seq}`;
-}
+const DEFAULT_GOALS: DailyGoals = { protein: 160, carbs: 280, fat: 70, calories: 2500 };
+const EMPTY_STATE: State = { meals: [], options: [], goals: DEFAULT_GOALS, logs: [] };
 
 // ---------------------------------------------------------------------------
 // Seletores puros
@@ -110,222 +112,168 @@ export function macroProgress(current: number, goal: number): { pct: number; lab
 }
 
 // ---------------------------------------------------------------------------
-// Seed — ecoa o exemplo do próprio pedido: Café e Almoço já confirmados hoje,
-// Lanche e Jantar pendentes.
+// Mapeamento snake_case (Supabase) -> camelCase (tipos acima)
 // ---------------------------------------------------------------------------
-function buildSeedState(): State {
-  const meals: Meal[] = [
-    { id: "meal-cafe", time: "07:30", name: "Café da manhã", order: 0 },
-    { id: "meal-almoco", time: "12:30", name: "Almoço", order: 1 },
-    { id: "meal-lanche", time: "16:00", name: "Lanche", order: 2 },
-    { id: "meal-jantar", time: "20:00", name: "Jantar", order: 3 },
-  ];
+type Row = Record<string, unknown>;
 
-  const options: MealOption[] = [
-    {
-      id: "opt-cafe-a",
-      mealId: "meal-cafe",
-      description: "2 ovos + banana + café",
-      protein: 17,
-      carbs: 25,
-      fat: 12,
-      calories: 280,
-    },
-    {
-      id: "opt-cafe-b",
-      mealId: "meal-cafe",
-      description: "Iogurte + granola + morango",
-      protein: 14,
-      carbs: 32,
-      fat: 8,
-      calories: 260,
-    },
-    {
-      id: "opt-cafe-c",
-      mealId: "meal-cafe",
-      description: "Pão + ovos + queijo",
-      protein: 19,
-      carbs: 30,
-      fat: 14,
-      calories: 320,
-    },
-    {
-      id: "opt-almoco-a",
-      mealId: "meal-almoco",
-      description: "Frango + arroz + feijão + salada",
-      protein: 48,
-      carbs: 72,
-      fat: 14,
-      calories: 610,
-    },
-    {
-      id: "opt-almoco-b",
-      mealId: "meal-almoco",
-      description: "Carne moída + batata doce + legumes",
-      protein: 44,
-      carbs: 58,
-      fat: 18,
-      calories: 590,
-    },
-    {
-      id: "opt-lanche-a",
-      mealId: "meal-lanche",
-      description: "Whey + banana",
-      protein: 24,
-      carbs: 28,
-      fat: 3,
-      calories: 250,
-    },
-    {
-      id: "opt-lanche-b",
-      mealId: "meal-lanche",
-      description: "Pasta de amendoim + torrada",
-      protein: 12,
-      carbs: 26,
-      fat: 16,
-      calories: 290,
-    },
-    {
-      id: "opt-jantar-a",
-      mealId: "meal-jantar",
-      description: "Salmão + arroz + legumes",
-      protein: 35,
-      carbs: 58,
-      fat: 16,
-      calories: 540,
-    },
-    {
-      id: "opt-jantar-b",
-      mealId: "meal-jantar",
-      description: "Omelete + salada + torrada",
-      protein: 28,
-      carbs: 30,
-      fat: 18,
-      calories: 420,
-    },
-  ];
-
-  const goals: DailyGoals = { protein: 160, carbs: 280, fat: 70, calories: 2500 };
-
-  const today = todayISO();
-  const now = new Date().toISOString();
-  const logs: MealLog[] = [
-    {
-      id: genId("mlog"),
-      mealId: "meal-cafe",
-      date: today,
-      source: "option",
-      optionId: "opt-cafe-a",
-      description: "2 ovos + banana + café",
-      protein: 17,
-      carbs: 25,
-      fat: 12,
-      calories: 280,
-      confirmedAt: now,
-    },
-    {
-      id: genId("mlog"),
-      mealId: "meal-almoco",
-      date: today,
-      source: "option",
-      optionId: "opt-almoco-a",
-      description: "Frango + arroz + feijão + salada",
-      protein: 48,
-      carbs: 72,
-      fat: 14,
-      calories: 610,
-      confirmedAt: now,
-    },
-  ];
-
-  return { meals, options, goals, logs };
+function unwrap<T>(res: { data: T | null; error: { message: string } | null }): T {
+  if (res.error) throw new Error(res.error.message);
+  return res.data as T;
 }
 
-// ---------------------------------------------------------------------------
-// Store reativo
-// ---------------------------------------------------------------------------
-let state: State = buildSeedState();
-const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((l) => l());
-const subscribe = (l: () => void) => {
-  listeners.add(l);
-  return () => {
-    listeners.delete(l);
+function mapMeal(r: Row): Meal {
+  return {
+    id: r.id as string,
+    time: r.time as string,
+    name: r.name as string,
+    order: (r.order_index as number) ?? 0,
   };
-};
-const getSnapshot = () => state;
+}
 
-function set(updater: (s: State) => State) {
-  state = updater(state);
-  emit();
+function mapOption(r: Row): MealOption {
+  return {
+    id: r.id as string,
+    mealId: r.meal_id as string,
+    description: r.description as string,
+    protein: (r.protein as number) ?? undefined,
+    carbs: (r.carbs as number) ?? undefined,
+    fat: (r.fat as number) ?? undefined,
+    calories: (r.calories as number) ?? undefined,
+  };
+}
+
+function mapLog(r: Row): MealLog {
+  return {
+    id: r.id as string,
+    mealId: r.meal_id as string,
+    date: r.date as string,
+    source: r.source as MealLogSource,
+    optionId: (r.option_id as string) ?? undefined,
+    description: r.description as string,
+    protein: (r.protein as number) ?? 0,
+    carbs: (r.carbs as number) ?? 0,
+    fat: (r.fat as number) ?? 0,
+    calories: (r.calories as number) ?? 0,
+    confirmedAt: r.confirmed_at as string,
+  };
+}
+
+function mapGoals(r: Row): DailyGoals {
+  return {
+    protein: (r.protein as number) ?? 0,
+    carbs: (r.carbs as number) ?? 0,
+    fat: (r.fat as number) ?? 0,
+    calories: (r.calories as number) ?? 0,
+  };
+}
+
+async function fetchState(): Promise<State> {
+  const [mealsRes, optionsRes, logsRes, goalsRes] = await Promise.all([
+    supabase.from("meals").select("*").order("order_index"),
+    supabase.from("meal_options").select("*"),
+    supabase.from("meal_logs").select("*").order("date", { ascending: false }),
+    supabase.from("nutrition_goals").select("*").maybeSingle(),
+  ]);
+  const mealRows = unwrap(mealsRes);
+  const optionRows = unwrap(optionsRes);
+  const logRows = unwrap(logsRes);
+  if (goalsRes.error) throw new Error(goalsRes.error.message);
+
+  return {
+    meals: (mealRows as Row[]).map(mapMeal),
+    options: (optionRows as Row[]).map(mapOption),
+    logs: (logRows as Row[]).map(mapLog),
+    goals: goalsRes.data ? mapGoals(goalsRes.data as Row) : DEFAULT_GOALS,
+  };
+}
+
+const QUERY_KEY = ["nutrition-domain"] as const;
+function invalidate() {
+  return queryClient.invalidateQueries({ queryKey: QUERY_KEY, refetchType: "all" });
 }
 
 export function useNutritionStore<T>(selector: (s: State) => T): T {
-  const snap = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  return selector(snap);
+  const userId = useSupabaseUserId();
+  const { data } = useQuery({ queryKey: QUERY_KEY, queryFn: fetchState, enabled: !!userId });
+  return selector(data ?? EMPTY_STATE);
 }
 
 // ---------------------------------------------------------------------------
 // Ações — metas
 // ---------------------------------------------------------------------------
-export function setDailyGoals(goals: DailyGoals) {
-  set((s) => ({ ...s, goals }));
+export async function setDailyGoals(goals: DailyGoals) {
+  const userId = await ensureSession();
+  unwrap(
+    await supabase
+      .from("nutrition_goals")
+      .upsert({ user_id: userId, ...goals }, { onConflict: "user_id" })
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
 // ---------------------------------------------------------------------------
 // Ações — refeições e opções (a dieta / o plano)
 // ---------------------------------------------------------------------------
-export function addMeal(input: { time: string; name: string }): string {
-  const id = genId("meal");
-  set((s) => ({
-    ...s,
-    meals: [...s.meals, { id, time: input.time, name: input.name.trim(), order: s.meals.length }],
-  }));
-  return id;
+export async function addMeal(input: { time: string; name: string }): Promise<string> {
+  const userId = await ensureSession();
+  const { count } = await supabase.from("meals").select("id", { count: "exact", head: true });
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("meals")
+      .insert({
+        user_id: userId,
+        time: input.time,
+        name: input.name.trim(),
+        order_index: count ?? 0,
+      })
+      .select()
+      .single(),
+  );
+  await invalidate();
+  return row.id;
 }
 
-export function updateMeal(id: string, patch: { time?: string; name?: string }) {
-  set((s) => ({
-    ...s,
-    meals: s.meals.map((m) =>
-      m.id === id ? { ...m, ...patch, name: patch.name?.trim() ?? m.name } : m,
-    ),
-  }));
+export async function updateMeal(id: string, patch: { time?: string; name?: string }) {
+  const dbPatch: Row = {};
+  if (patch.time !== undefined) dbPatch.time = patch.time;
+  if (patch.name !== undefined) dbPatch.name = patch.name.trim();
+  unwrap(await supabase.from("meals").update(dbPatch).eq("id", id).select().single());
+  await invalidate();
 }
 
-export function removeMeal(id: string) {
-  set((s) => ({
-    ...s,
-    meals: s.meals.filter((m) => m.id !== id),
-    options: s.options.filter((o) => o.mealId !== id),
-    logs: s.logs.filter((l) => l.mealId !== id),
-  }));
+/** Deleta em cascata (options + logs) direto no banco — mesma FK já garantia isso em memória. */
+export async function removeMeal(id: string) {
+  await supabase.from("meals").delete().eq("id", id);
+  await invalidate();
 }
 
-export function addMealOption(
+export async function addMealOption(
   mealId: string,
   input: { description: string; protein?: number; carbs?: number; fat?: number; calories?: number },
-): string {
-  const id = genId("mopt");
-  set((s) => ({
-    ...s,
-    options: [
-      ...s.options,
-      {
-        id,
-        mealId,
+): Promise<string> {
+  const userId = await ensureSession();
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("meal_options")
+      .insert({
+        user_id: userId,
+        meal_id: mealId,
         description: input.description.trim(),
         protein: input.protein,
         carbs: input.carbs,
         fat: input.fat,
         calories: input.calories,
-      },
-    ],
-  }));
-  return id;
+      })
+      .select()
+      .single(),
+  );
+  await invalidate();
+  return row.id;
 }
 
-export function updateMealOption(
+export async function updateMealOption(
   id: string,
   patch: {
     description?: string;
@@ -335,71 +283,87 @@ export function updateMealOption(
     calories?: number;
   },
 ) {
-  set((s) => ({
-    ...s,
-    options: s.options.map((o) =>
-      o.id === id ? { ...o, ...patch, description: patch.description?.trim() ?? o.description } : o,
-    ),
-  }));
+  const dbPatch: Row = {};
+  if (patch.description !== undefined) dbPatch.description = patch.description.trim();
+  if (patch.protein !== undefined) dbPatch.protein = patch.protein;
+  if (patch.carbs !== undefined) dbPatch.carbs = patch.carbs;
+  if (patch.fat !== undefined) dbPatch.fat = patch.fat;
+  if (patch.calories !== undefined) dbPatch.calories = patch.calories;
+  unwrap(await supabase.from("meal_options").update(dbPatch).eq("id", id).select().single());
+  await invalidate();
 }
 
-export function removeMealOption(id: string) {
-  set((s) => ({
-    ...s,
-    options: s.options.filter((o) => o.id !== id),
-    logs: s.logs.map((l) => (l.optionId === id ? { ...l, optionId: undefined } : l)),
-  }));
+/** `option_id` nos logs vira null automaticamente (FK on delete set null) — não precisa passo manual. */
+export async function removeMealOption(id: string) {
+  await supabase.from("meal_options").delete().eq("id", id);
+  await invalidate();
 }
 
 // ---------------------------------------------------------------------------
 // Ações — execução do dia (confirmar refeição)
 // ---------------------------------------------------------------------------
-function upsertLog(s: State, log: MealLog): State {
-  const idx = s.logs.findIndex((l) => l.mealId === log.mealId && l.date === log.date);
-  if (idx >= 0) {
-    const logs = [...s.logs];
-    logs[idx] = log;
-    return { ...s, logs };
-  }
-  return { ...s, logs: [...s.logs, log] };
+export async function confirmMealOption(
+  mealId: string,
+  optionId: string,
+  date: string = todayISO(),
+): Promise<void> {
+  const userId = await ensureSession();
+  const optRow = unwrap<Row>(
+    await supabase.from("meal_options").select("*").eq("id", optionId).single(),
+  );
+  unwrap(
+    await supabase
+      .from("meal_logs")
+      .upsert(
+        {
+          user_id: userId,
+          meal_id: mealId,
+          date,
+          source: "option",
+          option_id: optionId,
+          description: optRow.description,
+          protein: (optRow.protein as number) ?? 0,
+          carbs: (optRow.carbs as number) ?? 0,
+          fat: (optRow.fat as number) ?? 0,
+          calories: (optRow.calories as number) ?? 0,
+          confirmed_at: new Date().toISOString(),
+        },
+        { onConflict: "meal_id,date" },
+      )
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
-export function confirmMealOption(mealId: string, optionId: string, date: string = todayISO()) {
-  const option = state.options.find((o) => o.id === optionId);
-  if (!option) return;
-  const log: MealLog = {
-    id: genId("mlog"),
-    mealId,
-    date,
-    source: "option",
-    optionId,
-    description: option.description,
-    protein: option.protein ?? 0,
-    carbs: option.carbs ?? 0,
-    fat: option.fat ?? 0,
-    calories: option.calories ?? 0,
-    confirmedAt: new Date().toISOString(),
-  };
-  set((s) => upsertLog(s, log));
-}
-
-export function confirmMealCustom(
+export async function confirmMealCustom(
   mealId: string,
   description: string,
   macros: { protein?: number; carbs?: number; fat?: number; calories?: number } = {},
   date: string = todayISO(),
-) {
-  const log: MealLog = {
-    id: genId("mlog"),
-    mealId,
-    date,
-    source: "custom",
-    description: description.trim(),
-    protein: macros.protein ?? 0,
-    carbs: macros.carbs ?? 0,
-    fat: macros.fat ?? 0,
-    calories: macros.calories ?? 0,
-    confirmedAt: new Date().toISOString(),
-  };
-  set((s) => upsertLog(s, log));
+): Promise<void> {
+  const userId = await ensureSession();
+  unwrap(
+    await supabase
+      .from("meal_logs")
+      .upsert(
+        {
+          user_id: userId,
+          meal_id: mealId,
+          date,
+          source: "custom",
+          option_id: null,
+          description: description.trim(),
+          protein: macros.protein ?? 0,
+          carbs: macros.carbs ?? 0,
+          fat: macros.fat ?? 0,
+          calories: macros.calories ?? 0,
+          confirmed_at: new Date().toISOString(),
+        },
+        { onConflict: "meal_id,date" },
+      )
+      .select()
+      .single(),
+  );
+  await invalidate();
 }

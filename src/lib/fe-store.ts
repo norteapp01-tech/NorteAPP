@@ -1,7 +1,9 @@
-import { useSyncExternalStore } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toISODate, addDays, todayISO, createRoutine, removeRoutine } from "./goals-store";
 import { startOfWeekLocal } from "./format-utils";
 import type { WeekStart } from "./profile-store";
+import { supabase, ensureSession, useSupabaseUserId } from "./supabase/client";
+import { queryClient } from "./query-client";
 
 /** Data que rege o momento espiritual — agenda se existir, senão o prazo (mesma regra do core). */
 function relevantDate(e: { dueDate: string; agendaDate?: string }): string {
@@ -13,6 +15,10 @@ function relevantDate(e: { dueDate: string; agendaDate?: string }): string {
 // espaço para buscá-Lo." Nada aqui é streak, XP ou ranking — a única
 // visualização de constância é o "Ritmo" (seção mais abaixo), sempre
 // derivado dos registros reais, nunca um contador administrado à parte.
+//
+// Persistida no Supabase (mesmo padrão de goals-store.ts). Atividades
+// agendáveis usam `routine_links` pra apontar pra `routines` do núcleo (uma
+// Routine por dia da semana escolhido) — nunca duplicam a Agenda.
 // ---------------------------------------------------------------------------
 
 export type PrayerSubjectStatus = "em_oracao" | "quero_agradecer" | "encerrada";
@@ -76,7 +82,6 @@ export type SpiritualActivity = {
   time: string;
   durationMinutes?: number;
   goalsRoutineIds: string[];
-  purposeId?: string;
 };
 
 export const kindLabel: Record<SpiritualActivityKind, string> = {
@@ -174,14 +179,19 @@ type State = {
   prayerActivityDates: string[];
 };
 
-let seq = 0;
-function genId(prefix: string) {
-  seq += 1;
-  return `${prefix}${Date.now().toString(36)}${seq}`;
-}
+const EMPTY_STATE: State = {
+  prayerSubjects: [],
+  prayerNotes: [],
+  purposes: [],
+  bibleReadingLogs: [],
+  readingFrequency: "none",
+  notebookEntries: [],
+  spiritualActivities: [],
+  prayerActivityDates: [],
+};
 
 // ---------------------------------------------------------------------------
-// Seletores puros
+// Seletores puros — nada muda aqui, seguem operando sobre arrays simples.
 // ---------------------------------------------------------------------------
 export function currentBook(logs: BibleReadingLog[]): string | undefined {
   return [...logs].sort(
@@ -327,195 +337,201 @@ export function getResurfacingCandidate(entries: NotebookEntry[]): NotebookEntry
 }
 
 // ---------------------------------------------------------------------------
-// Seed
+// Mapeamento snake_case (Supabase) -> camelCase
 // ---------------------------------------------------------------------------
-function buildSeedState(): State {
-  const now = new Date();
+type Row = Record<string, unknown>;
 
-  const prayerSubjects: PrayerSubject[] = [
-    {
-      id: "ps-familia",
-      title: "Família",
-      description: "Saúde e proteção da minha família.",
-      status: "em_oracao",
-      createdAt: toISODate(addDays(now, -20)),
-      updatedAt: toISODate(addDays(now, -2)),
-    },
-    {
-      id: "ps-trabalho",
-      title: "Trabalho",
-      description: "Sabedoria para uma decisão profissional.",
-      status: "em_oracao",
-      createdAt: toISODate(addDays(now, -14)),
-      updatedAt: toISODate(addDays(now, -5)),
-    },
-    {
-      id: "ps-eu",
-      title: "Eu",
-      description: "Quero ter mais sabedoria nessa fase.",
-      status: "quero_agradecer",
-      createdAt: toISODate(addDays(now, -30)),
-      updatedAt: toISODate(addDays(now, -1)),
-    },
-  ];
+function unwrap<T>(res: { data: T | null; error: { message: string } | null }): T {
+  if (res.error) throw new Error(res.error.message);
+  return res.data as T;
+}
 
-  const purposes: Purpose[] = [
-    {
-      id: "purp-constancia",
-      title: "Constância com Deus",
-      intention: "Separar espaço mesmo nos dias corridos.",
-      why: "Tenho sentido falta de presença nos dias mais corridos.",
-      archived: false,
-      createdAt: toISODate(addDays(now, -21)),
-    },
-  ];
+function groupBy<T extends Row>(rows: T[], key: string): Record<string, T[]> {
+  const out: Record<string, T[]> = {};
+  for (const r of rows) {
+    const k = r[key] as string;
+    (out[k] ??= []).push(r);
+  }
+  return out;
+}
 
-  const bibleReadingLogs: BibleReadingLog[] = [
-    {
-      id: "brl1",
-      book: "João",
-      chapter: 3,
-      date: toISODate(addDays(now, -12)),
-      createdAt: new Date(addDays(now, -12)).toISOString(),
-    },
-    {
-      id: "brl2",
-      book: "João",
-      chapter: 5,
-      date: toISODate(addDays(now, -8)),
-      createdAt: new Date(addDays(now, -8)).toISOString(),
-    },
-    {
-      id: "brl3",
-      book: "João",
-      chapter: 6,
-      date: toISODate(addDays(now, -5)),
-      reflection:
-        "A multiplicação dos pães me lembrou que o pouco que ofereço já é suficiente nas mãos de Deus.",
-      createdAt: new Date(addDays(now, -5)).toISOString(),
-    },
-    {
-      id: "brl4",
-      book: "João",
-      chapter: 8,
-      date: toISODate(addDays(now, -1)),
-      createdAt: new Date(addDays(now, -1)).toISOString(),
-    },
-  ];
-
-  const notebookEntries: NotebookEntry[] = [
-    {
-      id: "ne1",
-      type: "deus_falou",
-      content: "Tenho tentado controlar coisas que não estão nas minhas mãos.",
-      verseReference: "Provérbios 3:5",
-      createdAt: new Date(addDays(now, -3)).toISOString(),
-      resurfaceCount: 0,
-    },
-    {
-      id: "ne2",
-      type: "gratidao",
-      content: "Sou grato pela minha família.",
-      createdAt: new Date(addDays(now, -10)).toISOString(),
-      resurfaceCount: 0,
-    },
-    {
-      id: "ne3",
-      type: "versiculo",
-      content: "",
-      verseReference: "Isaías 41:10",
-      verseText: "Não temas, porque eu sou contigo; não te assombres, porque eu sou o teu Deus.",
-      createdAt: new Date(addDays(now, -18)).toISOString(),
-      resurfaceCount: 0,
-    },
-  ];
-
+function mapPrayerSubject(r: Row): PrayerSubject {
   return {
-    prayerSubjects,
-    prayerNotes: [],
-    purposes,
-    bibleReadingLogs,
-    readingFrequency: "3x",
-    notebookEntries,
-    spiritualActivities: [],
-    prayerActivityDates: [toISODate(addDays(now, -2)), toISODate(addDays(now, -1))],
+    id: r.id as string,
+    title: r.title as string,
+    description: (r.description as string) ?? "",
+    status: r.status as PrayerSubjectStatus,
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string,
   };
 }
 
-// ---------------------------------------------------------------------------
-// Store reativo
-// ---------------------------------------------------------------------------
-let state: State = buildSeedState();
-const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((l) => l());
-const subscribe = (l: () => void) => {
-  listeners.add(l);
-  return () => {
-    listeners.delete(l);
+function mapPrayerNote(r: Row): PrayerNote {
+  return {
+    id: r.id as string,
+    subjectId: r.subject_id as string,
+    text: r.text as string,
+    createdAt: r.created_at as string,
   };
-};
-const getSnapshot = () => state;
+}
 
-function set(updater: (s: State) => State) {
-  state = updater(state);
-  emit();
+function mapPurpose(r: Row): Purpose {
+  return {
+    id: r.id as string,
+    title: r.title as string,
+    intention: r.intention as string,
+    why: (r.why as string) ?? undefined,
+    startDate: (r.start_date as string) ?? undefined,
+    endDate: (r.end_date as string) ?? undefined,
+    spiritualActivityId: (r.spiritual_activity_id as string) ?? undefined,
+    archived: r.archived as boolean,
+    createdAt: r.created_at as string,
+  };
+}
+
+function mapBibleReadingLog(r: Row): BibleReadingLog {
+  return {
+    id: r.id as string,
+    book: r.book as string,
+    chapter: r.chapter as number,
+    verseRange: (r.verse_range as string) ?? undefined,
+    date: r.date as string,
+    reflection: (r.reflection as string) ?? undefined,
+    createdAt: r.created_at as string,
+  };
+}
+
+function mapNotebookEntry(r: Row): NotebookEntry {
+  return {
+    id: r.id as string,
+    type: r.type as NotebookEntryType,
+    content: (r.content as string) ?? "",
+    verseReference: (r.verse_reference as string) ?? undefined,
+    verseText: (r.verse_text as string) ?? undefined,
+    context: (r.context as string) ?? undefined,
+    createdAt: r.created_at as string,
+    lastResurfacedAt: (r.last_resurfaced_at as string) ?? undefined,
+    resurfaceCount: (r.resurface_count as number) ?? 0,
+  };
+}
+
+function mapSpiritualActivity(r: Row, links: Row[]): SpiritualActivity {
+  const sorted = [...links].sort((a, b) => (a.weekday as number) - (b.weekday as number));
+  return {
+    id: r.id as string,
+    kind: r.kind as SpiritualActivityKind,
+    title: r.title as string,
+    weekdays: sorted.map((l) => l.weekday as number),
+    time: r.time as string,
+    durationMinutes: (r.duration_minutes as number) ?? undefined,
+    goalsRoutineIds: sorted.map((l) => l.core_routine_id as string),
+  };
+}
+
+async function fetchState(): Promise<State> {
+  const [
+    subjectsRes,
+    notesRes,
+    purposesRes,
+    bibleRes,
+    freqRes,
+    entriesRes,
+    activitiesRes,
+    linksRes,
+    prayerLogRes,
+  ] = await Promise.all([
+    supabase.from("prayer_subjects").select("*").order("created_at", { ascending: false }),
+    supabase.from("prayer_notes").select("*").order("created_at", { ascending: false }),
+    supabase.from("purposes").select("*").order("created_at", { ascending: false }),
+    supabase.from("bible_reading_logs").select("*").order("date", { ascending: false }),
+    supabase.from("reading_frequency_pref").select("*").maybeSingle(),
+    supabase.from("notebook_entries").select("*").order("created_at", { ascending: false }),
+    supabase.from("spiritual_activities").select("*"),
+    supabase.from("routine_links").select("*").eq("source_type", "spiritual_activity"),
+    supabase.from("prayer_activity_log").select("date"),
+  ]);
+  const subjectRows = unwrap(subjectsRes);
+  const noteRows = unwrap(notesRes);
+  const purposeRows = unwrap(purposesRes);
+  const bibleRows = unwrap(bibleRes);
+  if (freqRes.error) throw new Error(freqRes.error.message);
+  const entryRows = unwrap(entriesRes);
+  const activityRows = unwrap(activitiesRes);
+  const linkRows = unwrap(linksRes);
+  const prayerLogRows = unwrap(prayerLogRes);
+
+  const linksByActivity = groupBy(linkRows as Row[], "source_id");
+
+  return {
+    prayerSubjects: (subjectRows as Row[]).map(mapPrayerSubject),
+    prayerNotes: (noteRows as Row[]).map(mapPrayerNote),
+    purposes: (purposeRows as Row[]).map(mapPurpose),
+    bibleReadingLogs: (bibleRows as Row[]).map(mapBibleReadingLog),
+    readingFrequency: freqRes.data ? ((freqRes.data as Row).frequency as ReadingFrequency) : "none",
+    notebookEntries: (entryRows as Row[]).map(mapNotebookEntry),
+    spiritualActivities: (activityRows as Row[]).map((r) =>
+      mapSpiritualActivity(r, linksByActivity[r.id as string] ?? []),
+    ),
+    prayerActivityDates: (prayerLogRows as Row[]).map((r) => r.date as string),
+  };
+}
+
+const QUERY_KEY = ["fe-domain"] as const;
+function invalidate() {
+  return queryClient.invalidateQueries({ queryKey: QUERY_KEY, refetchType: "all" });
 }
 
 export function useFeStore<T>(selector: (s: State) => T): T {
-  const snap = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  return selector(snap);
+  const userId = useSupabaseUserId();
+  const { data } = useQuery({ queryKey: QUERY_KEY, queryFn: fetchState, enabled: !!userId });
+  return selector(data ?? EMPTY_STATE);
 }
 
 // ---------------------------------------------------------------------------
 // Ações — orações
 // ---------------------------------------------------------------------------
-export function addPrayerSubject(input: { title: string; description: string }): string {
-  const id = genId("ps");
-  const now = new Date().toISOString();
-  set((s) => ({
-    ...s,
-    prayerSubjects: [
-      ...s.prayerSubjects,
-      {
-        id,
-        title: input.title.trim(),
-        description: input.description.trim(),
-        status: "em_oracao",
-        createdAt: now,
-        updatedAt: now,
-      },
-    ],
-  }));
-  return id;
+export async function addPrayerSubject(input: {
+  title: string;
+  description: string;
+}): Promise<string> {
+  const userId = await ensureSession();
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("prayer_subjects")
+      .insert({ user_id: userId, title: input.title.trim(), description: input.description.trim() })
+      .select()
+      .single(),
+  );
+  await invalidate();
+  return row.id;
 }
 
-export function updatePrayerSubject(id: string, patch: { title?: string; description?: string }) {
-  set((s) => ({
-    ...s,
-    prayerSubjects: s.prayerSubjects.map((p) =>
-      p.id === id ? { ...p, ...patch, updatedAt: new Date().toISOString() } : p,
-    ),
-  }));
+export async function updatePrayerSubject(
+  id: string,
+  patch: { title?: string; description?: string },
+) {
+  const dbPatch: Row = {};
+  if (patch.title !== undefined) dbPatch.title = patch.title.trim();
+  if (patch.description !== undefined) dbPatch.description = patch.description.trim();
+  unwrap(await supabase.from("prayer_subjects").update(dbPatch).eq("id", id).select().single());
+  await invalidate();
 }
 
-export function setPrayerSubjectStatus(id: string, status: PrayerSubjectStatus) {
-  set((s) => ({
-    ...s,
-    prayerSubjects: s.prayerSubjects.map((p) =>
-      p.id === id ? { ...p, status, updatedAt: new Date().toISOString() } : p,
-    ),
-  }));
+export async function setPrayerSubjectStatus(id: string, status: PrayerSubjectStatus) {
+  unwrap(await supabase.from("prayer_subjects").update({ status }).eq("id", id).select().single());
+  await invalidate();
 }
 
-export function addPrayerNote(subjectId: string, text: string) {
-  const id = genId("pn");
-  set((s) => ({
-    ...s,
-    prayerNotes: [
-      { id, subjectId, text: text.trim(), createdAt: new Date().toISOString() },
-      ...s.prayerNotes,
-    ],
-  }));
+export async function addPrayerNote(subjectId: string, text: string) {
+  const userId = await ensureSession();
+  unwrap(
+    await supabase
+      .from("prayer_notes")
+      .insert({ user_id: userId, subject_id: subjectId, text: text.trim() })
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
 export function notesForSubject(notes: PrayerNote[], subjectId: string): PrayerNote[] {
@@ -525,83 +541,99 @@ export function notesForSubject(notes: PrayerNote[], subjectId: string): PrayerN
 }
 
 /** Marca que houve um momento de oração hoje — só a data, sem conteúdo, alimenta o Ritmo. */
-export function recordPrayerActivity(date: string = todayISO()) {
-  set((s) =>
-    s.prayerActivityDates.includes(date)
-      ? s
-      : { ...s, prayerActivityDates: [...s.prayerActivityDates, date] },
+export async function recordPrayerActivity(date: string = todayISO()) {
+  const userId = await ensureSession();
+  unwrap(
+    await supabase
+      .from("prayer_activity_log")
+      .upsert({ user_id: userId, date }, { onConflict: "user_id,date" })
+      .select()
+      .single(),
   );
+  await invalidate();
 }
 
 // ---------------------------------------------------------------------------
 // Ações — jornada bíblica
 // ---------------------------------------------------------------------------
-export function logBibleReading(input: {
+export async function logBibleReading(input: {
   book: string;
   chapter: number;
   verseRange?: string;
   date?: string;
   reflection?: string;
-}): string {
-  const id = genId("brl");
-  set((s) => ({
-    ...s,
-    bibleReadingLogs: [
-      {
-        id,
+}): Promise<string> {
+  const userId = await ensureSession();
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("bible_reading_logs")
+      .insert({
+        user_id: userId,
         book: input.book,
         chapter: input.chapter,
-        verseRange: input.verseRange,
+        verse_range: input.verseRange,
         date: input.date ?? todayISO(),
-        reflection: input.reflection?.trim() || undefined,
-        createdAt: new Date().toISOString(),
-      },
-      ...s.bibleReadingLogs,
-    ],
-  }));
-  return id;
+        reflection: input.reflection?.trim() || null,
+      })
+      .select()
+      .single(),
+  );
+  await invalidate();
+  return row.id;
 }
 
-export function setReadingFrequency(freq: ReadingFrequency) {
-  set((s) => ({ ...s, readingFrequency: freq }));
+export async function setReadingFrequency(freq: ReadingFrequency) {
+  const userId = await ensureSession();
+  unwrap(
+    await supabase
+      .from("reading_frequency_pref")
+      .upsert({ user_id: userId, frequency: freq }, { onConflict: "user_id" })
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
 // ---------------------------------------------------------------------------
 // Ações — caderno
 // ---------------------------------------------------------------------------
-export function addNotebookEntry(input: {
+export async function addNotebookEntry(input: {
   type: NotebookEntryType;
   content: string;
   verseReference?: string;
   verseText?: string;
   context?: string;
-}): string {
-  const id = genId("ne");
-  set((s) => ({
-    ...s,
-    notebookEntries: [
-      {
-        id,
+}): Promise<string> {
+  const userId = await ensureSession();
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("notebook_entries")
+      .insert({
+        user_id: userId,
         type: input.type,
         content: input.content.trim(),
-        verseReference: input.verseReference,
-        verseText: input.verseText,
-        context: input.context?.trim() || undefined,
-        createdAt: new Date().toISOString(),
-        resurfaceCount: 0,
-      },
-      ...s.notebookEntries,
-    ],
-  }));
-  return id;
+        verse_reference: input.verseReference,
+        verse_text: input.verseText,
+        context: input.context?.trim() || null,
+      })
+      .select()
+      .single(),
+  );
+  await invalidate();
+  return row.id;
 }
 
-export function saveVerseOfDay(reference: string, text: string) {
-  addNotebookEntry({ type: "versiculo", content: "", verseReference: reference, verseText: text });
+export async function saveVerseOfDay(reference: string, text: string) {
+  await addNotebookEntry({
+    type: "versiculo",
+    content: "",
+    verseReference: reference,
+    verseText: text,
+  });
 }
 
-export function reflectOnVerse(reference: string, text: string, reflection: string) {
-  addNotebookEntry({
+export async function reflectOnVerse(reference: string, text: string, reflection: string) {
+  await addNotebookEntry({
     type: "versiculo",
     content: reflection,
     verseReference: reference,
@@ -609,59 +641,68 @@ export function reflectOnVerse(reference: string, text: string, reflection: stri
   });
 }
 
-export function markResurfaced(id: string) {
-  set((s) => ({
-    ...s,
-    notebookEntries: s.notebookEntries.map((e) =>
-      e.id === id
-        ? { ...e, lastResurfacedAt: new Date().toISOString(), resurfaceCount: e.resurfaceCount + 1 }
-        : e,
-    ),
-  }));
+export async function markResurfaced(id: string) {
+  const row = unwrap<Row>(
+    await supabase.from("notebook_entries").select("resurface_count").eq("id", id).single(),
+  );
+  unwrap(
+    await supabase
+      .from("notebook_entries")
+      .update({
+        last_resurfaced_at: new Date().toISOString(),
+        resurface_count: ((row.resurface_count as number) ?? 0) + 1,
+      })
+      .eq("id", id)
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
 // ---------------------------------------------------------------------------
 // Ações — propósitos
 // ---------------------------------------------------------------------------
-export function createPurpose(input: {
+export async function createPurpose(input: {
   title: string;
   intention: string;
   why?: string;
   startDate?: string;
   endDate?: string;
-}): string {
-  const id = genId("purp");
-  set((s) => ({
-    ...s,
-    purposes: [
-      ...s.purposes,
-      {
-        id,
+}): Promise<string> {
+  const userId = await ensureSession();
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("purposes")
+      .insert({
+        user_id: userId,
         title: input.title.trim(),
         intention: input.intention.trim(),
-        why: input.why?.trim() || undefined,
-        startDate: input.startDate,
-        endDate: input.endDate,
-        archived: false,
-        createdAt: new Date().toISOString(),
-      },
-    ],
-  }));
-  return id;
+        why: input.why?.trim() || null,
+        start_date: input.startDate,
+        end_date: input.endDate,
+      })
+      .select()
+      .single(),
+  );
+  await invalidate();
+  return row.id;
 }
 
-export function linkPurposeToActivity(purposeId: string, spiritualActivityId: string) {
-  set((s) => ({
-    ...s,
-    purposes: s.purposes.map((p) => (p.id === purposeId ? { ...p, spiritualActivityId } : p)),
-  }));
+export async function linkPurposeToActivity(purposeId: string, spiritualActivityId: string) {
+  unwrap(
+    await supabase
+      .from("purposes")
+      .update({ spiritual_activity_id: spiritualActivityId })
+      .eq("id", purposeId)
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
-export function archivePurpose(id: string) {
-  set((s) => ({
-    ...s,
-    purposes: s.purposes.map((p) => (p.id === id ? { ...p, archived: true } : p)),
-  }));
+export async function archivePurpose(id: string) {
+  unwrap(await supabase.from("purposes").update({ archived: true }).eq("id", id).select().single());
+  await invalidate();
 }
 
 // ---------------------------------------------------------------------------
@@ -673,65 +714,92 @@ export async function createSpiritualActivity(input: {
   weekdays: number[];
   time: string;
   durationMinutes?: number;
-  purposeId?: string;
 }): Promise<string> {
+  const userId = await ensureSession();
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("spiritual_activities")
+      .insert({
+        user_id: userId,
+        kind: input.kind,
+        title: input.title.trim(),
+        time: input.time,
+        duration_minutes: input.durationMinutes,
+      })
+      .select()
+      .single(),
+  );
   const goalsRoutineIds = await Promise.all(
     input.weekdays.map((weekday) =>
       createRoutine({ category: "fe", title: input.title, weekday, time: input.time }),
     ),
   );
-  const id = genId("sa");
-  set((s) => ({
-    ...s,
-    spiritualActivities: [
-      ...s.spiritualActivities,
-      {
-        id,
-        kind: input.kind,
-        title: input.title.trim(),
-        weekdays: input.weekdays,
-        time: input.time,
-        durationMinutes: input.durationMinutes,
-        goalsRoutineIds,
-        purposeId: input.purposeId,
-      },
-    ],
-  }));
-  return id;
+  await Promise.all(
+    goalsRoutineIds.map((rid, i) =>
+      supabase.from("routine_links").insert({
+        user_id: userId,
+        source_type: "spiritual_activity",
+        source_id: row.id,
+        weekday: input.weekdays[i],
+        core_routine_id: rid,
+      }),
+    ),
+  );
+  await invalidate();
+  return row.id;
 }
 
-/** Recria as Routine do goals-store sem duplicar (mesmo padrão de setReadingRoutine). */
+/** Recria as Routine do goals-store sem duplicar — apagar a Routine já apaga o
+ * routine_link em cascata (FK), não precisa de um passo manual pra isso. */
 export async function updateSpiritualActivity(
   id: string,
   input: { title: string; weekdays: number[]; time: string; durationMinutes?: number },
 ) {
-  const existing = state.spiritualActivities.find((a) => a.id === id);
-  if (!existing) return;
-  await Promise.all(existing.goalsRoutineIds.map((rid) => removeRoutine(rid)));
+  const userId = await ensureSession();
+  const { data: existingLinks } = await supabase
+    .from("routine_links")
+    .select("core_routine_id")
+    .eq("source_type", "spiritual_activity")
+    .eq("source_id", id);
+  await Promise.all((existingLinks ?? []).map((l) => removeRoutine(l.core_routine_id as string)));
   const goalsRoutineIds = await Promise.all(
     input.weekdays.map((weekday) =>
       createRoutine({ category: "fe", title: input.title, weekday, time: input.time }),
     ),
   );
-  set((s) => ({
-    ...s,
-    spiritualActivities: s.spiritualActivities.map((a) =>
-      a.id === id
-        ? {
-            ...a,
-            title: input.title.trim(),
-            weekdays: input.weekdays,
-            time: input.time,
-            durationMinutes: input.durationMinutes,
-            goalsRoutineIds,
-          }
-        : a,
+  await Promise.all(
+    goalsRoutineIds.map((rid, i) =>
+      supabase.from("routine_links").insert({
+        user_id: userId,
+        source_type: "spiritual_activity",
+        source_id: id,
+        weekday: input.weekdays[i],
+        core_routine_id: rid,
+      }),
     ),
-  }));
+  );
+  unwrap(
+    await supabase
+      .from("spiritual_activities")
+      .update({
+        title: input.title.trim(),
+        time: input.time,
+        duration_minutes: input.durationMinutes,
+      })
+      .eq("id", id)
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
 export async function removeSpiritualActivity(id: string) {
-  const existing = state.spiritualActivities.find((a) => a.id === id);
-  if (existing) await Promise.all(existing.goalsRoutineIds.map((rid) => removeRoutine(rid)));
-  set((s) => ({ ...s, spiritualActivities: s.spiritualActivities.filter((a) => a.id !== id) }));
+  const { data: existingLinks } = await supabase
+    .from("routine_links")
+    .select("core_routine_id")
+    .eq("source_type", "spiritual_activity")
+    .eq("source_id", id);
+  await Promise.all((existingLinks ?? []).map((l) => removeRoutine(l.core_routine_id as string)));
+  await supabase.from("spiritual_activities").delete().eq("id", id);
+  await invalidate();
 }

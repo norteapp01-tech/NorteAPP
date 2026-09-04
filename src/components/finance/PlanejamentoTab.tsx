@@ -30,15 +30,15 @@ export function PlanejamentoTab({ month }: { month: string }) {
   const [intentionText, setIntentionText] = useState("");
   const [showIntentionForm, setShowIntentionForm] = useState(false);
 
-  const saveGoal = () => {
-    setSavingsGoal(month, parseFloat(goalValue) || 0);
+  const saveGoal = async () => {
+    await setSavingsGoal(month, parseFloat(goalValue) || 0);
     setEditingGoal(false);
   };
 
-  const saveNewLimit = () => {
+  const saveNewLimit = async () => {
     const value = parseFloat(limitValue);
     if (!value || value <= 0) return;
-    addCategoryLimit(limitCategory, value);
+    await addCategoryLimit(limitCategory, value);
     setLimitValue("");
     setAddingLimit(false);
   };
@@ -101,8 +101,11 @@ export function PlanejamentoTab({ month }: { month: string }) {
                           className="w-20 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
                         />
                         <button
-                          onClick={() => {
-                            updateCategoryLimit(l.id, parseFloat(editingLimitValue) || l.limit);
+                          onClick={async () => {
+                            await updateCategoryLimit(
+                              l.id,
+                              parseFloat(editingLimitValue) || l.limit,
+                            );
                             setEditingLimitId(null);
                           }}
                           className="text-primary"
@@ -125,7 +128,9 @@ export function PlanejamentoTab({ month }: { month: string }) {
                           editar
                         </button>
                         <button
-                          onClick={() => removeCategoryLimit(l.id)}
+                          onClick={async () => {
+                            await removeCategoryLimit(l.id);
+                          }}
                           className="text-muted-foreground hover:text-danger"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -198,11 +203,12 @@ export function PlanejamentoTab({ month }: { month: string }) {
               className="min-h-16 w-full resize-none rounded-lg border border-border bg-surface-2 p-2.5 text-sm outline-none focus:border-primary"
             />
             <button
-              onClick={() => {
+              onClick={async () => {
                 if (!intentionText.trim()) return;
-                setIntention(intentionText);
+                const text = intentionText;
                 setIntentionText("");
                 setShowIntentionForm(false);
+                await setIntention(text);
               }}
               disabled={!intentionText.trim()}
               className="mt-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-40"

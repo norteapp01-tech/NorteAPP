@@ -227,6 +227,8 @@ function AcademiaModule() {
   const [rest, setRest] = useState<RestState | null>(null);
   const [showWeightInput, setShowWeightInput] = useState(false);
   const [weightDraft, setWeightDraft] = useState("");
+  const [startingSession, setStartingSession] = useState(false);
+  const [finishingSession, setFinishingSession] = useState(false);
 
   useEffect(() => {
     if (!rest || !rest.running || rest.secondsLeft <= 0) return;
@@ -289,11 +291,18 @@ function AcademiaModule() {
               {todayExercises.map((ex) => (
                 <li key={ex.id}>
                   <button
-                    onClick={() => {
-                      startSession(todayPlan.id);
-                      setOpenExerciseId(ex.id);
+                    disabled={startingSession}
+                    onClick={async () => {
+                      if (startingSession) return;
+                      setStartingSession(true);
+                      try {
+                        await startSession(todayPlan.id);
+                        setOpenExerciseId(ex.id);
+                      } finally {
+                        setStartingSession(false);
+                      }
                     }}
-                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-surface-2 p-3 text-left transition-colors hover:border-primary/40"
+                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-surface-2 p-3 text-left transition-colors hover:border-primary/40 disabled:opacity-60"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{ex.name}</p>
@@ -346,14 +355,22 @@ function AcademiaModule() {
               })}
             </ul>
             <button
-              onClick={() => {
-                finishSession(todaySession.id);
-                setSummarySessionId(todaySession.id);
+              onClick={async () => {
+                if (finishingSession) return;
+                setFinishingSession(true);
+                try {
+                  await finishSession(todaySession.id);
+                  setSummarySessionId(todaySession.id);
+                } finally {
+                  setFinishingSession(false);
+                }
               }}
-              disabled={todaySession.exerciseLogs.every((l) => l.sets.length === 0)}
+              disabled={
+                finishingSession || todaySession.exerciseLogs.every((l) => l.sets.length === 0)
+              }
               className="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
             >
-              Finalizar treino
+              {finishingSession ? "Finalizando…" : "Finalizar treino"}
             </button>
           </>
         )}
@@ -412,10 +429,10 @@ function AcademiaModule() {
                 className="w-20 rounded-lg border border-border bg-surface px-2 py-2 text-sm outline-none focus:border-primary"
               />
               <button
-                onClick={() => {
+                onClick={async () => {
                   const w = parseFloat(weightDraft);
-                  if (w > 0) addBodyWeight(w);
                   setShowWeightInput(false);
+                  if (w > 0) await addBodyWeight(w);
                 }}
                 className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
               >
@@ -430,8 +447,8 @@ function AcademiaModule() {
         <WeekdayPlanPicker
           weekday={pickerDay}
           plans={plans}
-          onPick={(planId) => {
-            setWeeklyAssignment(pickerDay, planId);
+          onPick={async (planId) => {
+            await setWeeklyAssignment(pickerDay, planId);
             setPickerDay(null);
           }}
           onClose={() => setPickerDay(null)}
@@ -545,7 +562,9 @@ function PlanManagerCard() {
                 )}
               </button>
               <button
-                onClick={() => removePlan(p.id)}
+                onClick={async () => {
+                  await removePlan(p.id);
+                }}
                 className="shrink-0 text-muted-foreground hover:text-danger"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -591,9 +610,9 @@ function PlanManagerCard() {
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
           />
           <button
-            onClick={() => {
+            onClick={async () => {
               if (!newPlan.letter.trim() || !newPlan.name.trim()) return;
-              createPlan({
+              await createPlan({
                 letter: newPlan.letter.trim(),
                 name: newPlan.name.trim(),
                 muscleGroups: newPlan.muscleGroups.trim(),
@@ -634,20 +653,26 @@ function PlanExerciseEditor({ planId }: { planId: string }) {
           </div>
           <button
             disabled={i === 0}
-            onClick={() => reorderExercise(ex.id, "up")}
+            onClick={async () => {
+              await reorderExercise(ex.id, "up", exercises);
+            }}
             className="text-muted-foreground hover:text-primary disabled:opacity-30"
           >
             <ChevronUp className="h-3.5 w-3.5" />
           </button>
           <button
             disabled={i === exercises.length - 1}
-            onClick={() => reorderExercise(ex.id, "down")}
+            onClick={async () => {
+              await reorderExercise(ex.id, "down", exercises);
+            }}
             className="text-muted-foreground hover:text-primary disabled:opacity-30"
           >
             <ChevronDown className="h-3.5 w-3.5" />
           </button>
           <button
-            onClick={() => removeExercise(ex.id)}
+            onClick={async () => {
+              await removeExercise(ex.id);
+            }}
             className="text-muted-foreground hover:text-danger"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -700,9 +725,9 @@ function PlanExerciseEditor({ planId }: { planId: string }) {
             ))}
           </div>
           <button
-            onClick={() => {
+            onClick={async () => {
               if (!form.name.trim()) return;
-              addExercise(planId, {
+              await addExercise(planId, {
                 name: form.name.trim(),
                 setsTarget: parseInt(form.setsTarget, 10) || 1,
                 repsTarget: parseInt(form.repsTarget, 10) || 1,
@@ -945,8 +970,8 @@ function ExerciseModal({
         )}
 
         <button
-          onClick={() => {
-            completeExerciseLog(liveSession.id, exercise.id);
+          onClick={async () => {
+            await completeExerciseLog(liveSession.id, exercise.id);
             onClose();
           }}
           disabled={!log || log.sets.length === 0}

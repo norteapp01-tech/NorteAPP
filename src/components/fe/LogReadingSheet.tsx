@@ -12,18 +12,28 @@ export function LogReadingSheet({ onClose }: { onClose: () => void }) {
   const [verseRange, setVerseRange] = useState("");
   const [date, setDate] = useState(todayISO());
   const [reflection, setReflection] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const save = () => {
+  const save = async () => {
     const chapterNum = parseInt(chapter, 10);
-    if (!book.trim() || !chapterNum || chapterNum <= 0) return;
-    logBibleReading({
-      book: book.trim(),
-      chapter: chapterNum,
-      verseRange: verseRange.trim() || undefined,
-      date,
-      reflection,
-    });
-    onClose();
+    if (!book.trim() || !chapterNum || chapterNum <= 0 || saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      await logBibleReading({
+        book: book.trim(),
+        chapter: chapterNum,
+        verseRange: verseRange.trim() || undefined,
+        date,
+        reflection,
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar. Tente de novo.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -103,11 +113,13 @@ export function LogReadingSheet({ onClose }: { onClose: () => void }) {
           />
         </label>
 
+        {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
         <button
           onClick={save}
-          className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
+          disabled={saving}
+          className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
         >
-          Salvar
+          {saving ? "Salvando…" : "Salvar"}
         </button>
       </div>
     </div>

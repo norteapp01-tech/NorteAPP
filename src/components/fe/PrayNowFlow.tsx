@@ -20,8 +20,8 @@ export function PrayNowFlow({ onClose }: { onClose: () => void }) {
     return () => clearInterval(id);
   }, [showTimer]);
 
-  const finish = () => {
-    recordPrayerActivity();
+  const finish = async () => {
+    await recordPrayerActivity();
     onClose();
   };
 

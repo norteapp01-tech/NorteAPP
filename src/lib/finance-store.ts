@@ -1,5 +1,7 @@
-import { useSyncExternalStore } from "react";
-import { toISODate, addDays, todayISO } from "./goals-store";
+import { useQuery } from "@tanstack/react-query";
+import { todayISO } from "./goals-store";
+import { supabase, ensureSession, useSupabaseUserId } from "./supabase/client";
+import { queryClient } from "./query-client";
 
 // ---------------------------------------------------------------------------
 // Finanças — diário financeiro, não extrato bancário. Tudo aqui é o que o
@@ -7,6 +9,8 @@ import { toISODate, addDays, todayISO } from "./goals-store";
 // seletores abaixo recebem os arrays e devolvem valores puros — é a
 // "arquitetura pronta pra perguntas futuras" (ex.: uma IA perguntando
 // "quanto gastei com Uber esse mês?" só precisa chamar essas funções).
+//
+// Persistida no Supabase (mesmo padrão de goals-store.ts).
 // ---------------------------------------------------------------------------
 
 export type TransactionType = "expense" | "income";
@@ -82,11 +86,15 @@ type State = {
   checkIns: CheckIn[];
 };
 
-let seq = 0;
-function genId(prefix: string) {
-  seq += 1;
-  return `${prefix}${Date.now().toString(36)}${seq}`;
-}
+const EMPTY_STATE: State = {
+  transactions: [],
+  savingsGoals: [],
+  categoryLimits: [],
+  goals: [],
+  contributions: [],
+  intentions: [],
+  checkIns: [],
+};
 
 export function formatBRL(value: number): string {
   return new Intl.NumberFormat("pt-BR", {
@@ -120,7 +128,7 @@ function daysInMonth(month: string): number {
 }
 
 // ---------------------------------------------------------------------------
-// Seletores puros
+// Seletores puros — nada muda aqui.
 // ---------------------------------------------------------------------------
 export function transactionsForMonth(transactions: Transaction[], month: string): Transaction[] {
   return transactions.filter((t) => monthOf(t.date) === month);
@@ -222,7 +230,6 @@ export function computeInsights(state: State, month: string): Insight[] {
   const current = categoryBreakdown(state.transactions, month);
   const previous = categoryBreakdown(state.transactions, prevMonth);
 
-  // 1) sugestão de redução se a meta de guardar está em risco
   const totals = totalsForMonth(state.transactions, state.contributions, state.savingsGoals, month);
   const goalTarget = state.savingsGoals.find((g) => g.month === month)?.targetAmount ?? 0;
   const gap = goalTarget - totals.saved;
@@ -239,7 +246,6 @@ export function computeInsights(state: State, month: string): Insight[] {
     }
   }
 
-  // 2) maior alta percentual mês a mês por categoria
   let biggestIncrease: { category: string; pct: number } | null = null;
   for (const c of current) {
     const prev = previous.find((p) => p.category === c.category);
@@ -256,7 +262,6 @@ export function computeInsights(state: State, month: string): Insight[] {
     });
   }
 
-  // 3) maior gasto único por descrição (ex.: "Você gastou R$340 com Uber este mês.")
   const byDescription = new Map<string, number>();
   for (const t of transactionsForMonth(state.transactions, month)) {
     if (t.type !== "expense") continue;
@@ -270,7 +275,6 @@ export function computeInsights(state: State, month: string): Insight[] {
     });
   }
 
-  // 4) ritmo atual vs. limite configurado
   const dayOfMonth = month === currentMonth() ? new Date().getDate() : daysInMonth(month);
   const monthDays = daysInMonth(month);
   const expectedPace = dayOfMonth / monthDays;
@@ -300,279 +304,6 @@ export function projectedMonthlyPace(goal: FinancialGoal): number | null {
   return remaining / months;
 }
 
-// ---------------------------------------------------------------------------
-// Seed
-// ---------------------------------------------------------------------------
-function buildSeedState(): State {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth(); // 0-indexed
-  const todayDay = now.getDate();
-  const tx: Transaction[] = [];
-  let counter = 0;
-
-  // Ancorado no dia do calendário (nunca em "N dias atrás de hoje") — evita que um
-  // lançamento "deste mês" acabe caindo no mês anterior quando hoje é cedo no mês.
-  // Dias pedidos além do que já passou neste mês colapsam no dia mais recente possível.
-  const push = (
-    monthOffset: number,
-    day: number,
-    type: TransactionType,
-    amount: number,
-    description: string,
-    category: string,
-    isFixed = false,
-  ) => {
-    // Proporcional aos dias já decorridos do mês corrente, nunca colapsando tudo no mesmo dia.
-    const safeDay =
-      monthOffset === 0 ? Math.max(1, Math.min(todayDay, Math.round((day / 30) * todayDay))) : day;
-    const d = new Date(year, month + monthOffset, safeDay);
-    counter += 1;
-    tx.push({
-      id: `seed-tx-${counter}`,
-      type,
-      amount,
-      description,
-      category,
-      date: toISODate(d),
-      isFixed,
-      createdAt: d.toISOString(),
-    });
-  };
-
-  // mês corrente
-  push(0, 3, "income", 6200, "Salário", "Trabalho/Receita");
-  push(0, 10, "income", 500, "Freelance", "Trabalho/Receita");
-  push(0, 2, "expense", 1800, "Aluguel", "Aluguel", true);
-  push(0, 4, "expense", 120, "Academia", "Academia", true);
-  push(0, 5, "expense", 55.9, "Netflix + Spotify", "Assinaturas", true);
-  push(0, 12, "expense", 340, "Uber", "Transporte");
-  push(0, 14, "expense", 210, "Restaurante", "Alimentação");
-  push(0, 16, "expense", 180, "Mercado", "Alimentação");
-  push(0, 18, "expense", 280, "Cinema + bar", "Lazer");
-  push(0, 21, "expense", 150, "Tênis novo", "Compras");
-  push(0, 24, "expense", 96, "Ifood", "Alimentação");
-  push(0, 27, "expense", 65, "Uber", "Transporte");
-  push(0, 29, "expense", 8, "Barrinha de proteína", "Alimentação");
-  push(0, 30, "expense", 32, "Uber", "Transporte");
-
-  // mês anterior (pra comparação mês-a-mês)
-  push(-1, 3, "income", 6200, "Salário", "Trabalho/Receita");
-  push(-1, 2, "expense", 1800, "Aluguel", "Aluguel", true);
-  push(-1, 5, "expense", 55.9, "Netflix + Spotify", "Assinaturas", true);
-  push(-1, 10, "expense", 640, "Restaurante", "Alimentação");
-  push(-1, 14, "expense", 210, "Uber", "Transporte");
-  push(-1, 18, "expense", 220, "Lazer", "Lazer");
-  push(-1, 22, "expense", 100, "Compras", "Compras");
-
-  const goals: FinancialGoal[] = [
-    {
-      id: "goal-emergencia",
-      name: "Reserva de emergência",
-      targetAmount: 30000,
-      savedAmount: 18000,
-      createdAt: toISODate(addDays(now, -180)),
-    },
-    {
-      id: "goal-japao",
-      name: "Viagem Japão",
-      targetAmount: 20000,
-      savedAmount: 8500,
-      deadline: toISODate(addDays(now, 300)),
-      createdAt: toISODate(addDays(now, -90)),
-    },
-  ];
-
-  const contributions: GoalContribution[] = [
-    { id: "gc1", goalId: "goal-emergencia", amount: 1000, date: toISODate(addDays(now, -10)) },
-    { id: "gc2", goalId: "goal-japao", amount: 500, date: toISODate(addDays(now, -5)) },
-  ];
-
-  const intentions: FinancialIntention[] = [
-    {
-      id: "int1",
-      text: "Quero gastar menos com Uber essa semana para guardar mais.",
-      createdAt: toISODate(addDays(now, -3)),
-    },
-  ];
-
-  const checkIns: CheckIn[] = [
-    {
-      id: "ci1",
-      weekStart: toISODate(addDays(now, -now.getDay())),
-      question: "Você queria reduzir Uber esta semana. Como foi?",
-    },
-  ];
-
-  return {
-    transactions: tx,
-    savingsGoals: [{ month: currentMonth(), targetAmount: 2000 }],
-    categoryLimits: [
-      { id: "lim1", category: "Alimentação", limitAmount: 800 },
-      { id: "lim2", category: "Lazer", limitAmount: 600 },
-      { id: "lim3", category: "Compras", limitAmount: 1000 },
-    ],
-    goals,
-    contributions,
-    intentions,
-    checkIns,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Store reativo
-// ---------------------------------------------------------------------------
-let state: State = buildSeedState();
-const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((l) => l());
-const subscribe = (l: () => void) => {
-  listeners.add(l);
-  return () => {
-    listeners.delete(l);
-  };
-};
-const getSnapshot = () => state;
-
-function set(updater: (s: State) => State) {
-  state = updater(state);
-  emit();
-}
-
-export function useFinanceStore<T>(selector: (s: State) => T): T {
-  const snap = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  return selector(snap);
-}
-
-// ---------------------------------------------------------------------------
-// Ações — transações
-// ---------------------------------------------------------------------------
-export function addTransaction(input: {
-  type: TransactionType;
-  amount: number;
-  description: string;
-  category: string;
-  date?: string;
-  isFixed?: boolean;
-  recurrence?: "none" | "monthly";
-  paymentMethod?: string;
-  note?: string;
-}): string {
-  const id = genId("tx");
-  set((s) => ({
-    ...s,
-    transactions: [
-      {
-        id,
-        type: input.type,
-        amount: input.amount,
-        description: input.description.trim(),
-        category: input.category,
-        date: input.date ?? todayISO(),
-        isFixed: input.isFixed,
-        recurrence: input.recurrence ?? "none",
-        paymentMethod: input.paymentMethod,
-        note: input.note,
-        createdAt: new Date().toISOString(),
-      },
-      ...s.transactions,
-    ],
-  }));
-  return id;
-}
-
-export function removeTransaction(id: string) {
-  set((s) => ({ ...s, transactions: s.transactions.filter((t) => t.id !== id) }));
-}
-
-// ---------------------------------------------------------------------------
-// Ações — planejamento
-// ---------------------------------------------------------------------------
-export function setSavingsGoal(month: string, targetAmount: number) {
-  set((s) => {
-    const rest = s.savingsGoals.filter((g) => g.month !== month);
-    return { ...s, savingsGoals: [...rest, { month, targetAmount }] };
-  });
-}
-
-export function addCategoryLimit(category: string, limitAmount: number): string {
-  const id = genId("lim");
-  set((s) => ({ ...s, categoryLimits: [...s.categoryLimits, { id, category, limitAmount }] }));
-  return id;
-}
-export function updateCategoryLimit(id: string, limitAmount: number) {
-  set((s) => ({
-    ...s,
-    categoryLimits: s.categoryLimits.map((l) => (l.id === id ? { ...l, limitAmount } : l)),
-  }));
-}
-export function removeCategoryLimit(id: string) {
-  set((s) => ({ ...s, categoryLimits: s.categoryLimits.filter((l) => l.id !== id) }));
-}
-
-export function setIntention(text: string) {
-  const id = genId("int");
-  set((s) => ({
-    ...s,
-    intentions: [{ id, text: text.trim(), createdAt: todayISO() }, ...s.intentions],
-  }));
-}
-
-// ---------------------------------------------------------------------------
-// Ações — objetivos financeiros
-// ---------------------------------------------------------------------------
-export function addFinancialGoal(input: {
-  name: string;
-  targetAmount: number;
-  savedAmount?: number;
-  deadline?: string;
-  imageUrl?: string;
-}): string {
-  const id = genId("fgoal");
-  set((s) => ({
-    ...s,
-    goals: [
-      ...s.goals,
-      {
-        id,
-        name: input.name.trim(),
-        targetAmount: input.targetAmount,
-        savedAmount: input.savedAmount ?? 0,
-        deadline: input.deadline,
-        imageUrl: input.imageUrl,
-        createdAt: new Date().toISOString(),
-      },
-    ],
-  }));
-  return id;
-}
-
-export function updateFinancialGoal(
-  id: string,
-  patch: Partial<Pick<FinancialGoal, "name" | "targetAmount" | "deadline" | "imageUrl">>,
-) {
-  set((s) => ({ ...s, goals: s.goals.map((g) => (g.id === id ? { ...g, ...patch } : g)) }));
-}
-
-export function removeFinancialGoal(id: string) {
-  set((s) => ({
-    ...s,
-    goals: s.goals.filter((g) => g.id !== id),
-    contributions: s.contributions.filter((c) => c.goalId !== id),
-  }));
-}
-
-/** Aportar dinheiro a um objetivo é uma ALOCAÇÃO, nunca uma despesa — não cria Transaction. */
-export function contributeToGoal(goalId: string, amount: number, note?: string) {
-  const id = genId("gc");
-  set((s) => ({
-    ...s,
-    goals: s.goals.map((g) =>
-      g.id === goalId ? { ...g, savedAmount: g.savedAmount + amount } : g,
-    ),
-    contributions: [{ id, goalId, amount, date: todayISO(), note }, ...s.contributions],
-  }));
-}
-
 export function contributionsForGoal(
   contributions: GoalContribution[],
   goalId: string,
@@ -582,18 +313,305 @@ export function contributionsForGoal(
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
+export function pendingCheckIn(checkIns: CheckIn[]): CheckIn | undefined {
+  return checkIns.find((c) => !c.answer);
+}
+
+// ---------------------------------------------------------------------------
+// Mapeamento snake_case (Supabase) -> camelCase
+// ---------------------------------------------------------------------------
+type Row = Record<string, unknown>;
+
+function unwrap<T>(res: { data: T | null; error: { message: string } | null }): T {
+  if (res.error) throw new Error(res.error.message);
+  return res.data as T;
+}
+
+function mapTransaction(r: Row): Transaction {
+  return {
+    id: r.id as string,
+    type: r.type as TransactionType,
+    amount: r.amount as number,
+    description: r.description as string,
+    category: r.category as string,
+    date: r.date as string,
+    isFixed: (r.is_fixed as boolean) ?? undefined,
+    recurrence: (r.recurrence as "none" | "monthly") ?? "none",
+    paymentMethod: (r.payment_method as string) ?? undefined,
+    note: (r.note as string) ?? undefined,
+    createdAt: r.created_at as string,
+  };
+}
+
+function mapSavingsGoal(r: Row): SavingsGoalMonthly {
+  return { month: r.month as string, targetAmount: r.target_amount as number };
+}
+
+function mapCategoryLimit(r: Row): CategoryLimit {
+  return {
+    id: r.id as string,
+    category: r.category as string,
+    limitAmount: r.limit_amount as number,
+  };
+}
+
+function mapFinancialGoal(r: Row): FinancialGoal {
+  return {
+    id: r.id as string,
+    name: r.name as string,
+    targetAmount: r.target_amount as number,
+    savedAmount: (r.saved_amount as number) ?? 0,
+    deadline: (r.deadline as string) ?? undefined,
+    imageUrl: (r.image_url as string) ?? undefined,
+    createdAt: r.created_at as string,
+  };
+}
+
+function mapContribution(r: Row): GoalContribution {
+  return {
+    id: r.id as string,
+    goalId: r.goal_id as string,
+    amount: r.amount as number,
+    date: r.date as string,
+    note: (r.note as string) ?? undefined,
+  };
+}
+
+function mapIntention(r: Row): FinancialIntention {
+  return { id: r.id as string, text: r.text as string, createdAt: r.created_at as string };
+}
+
+function mapCheckIn(r: Row): CheckIn {
+  return {
+    id: r.id as string,
+    weekStart: r.week_start as string,
+    question: r.question as string,
+    answer: (r.answer as CheckInAnswer) ?? undefined,
+    note: (r.note as string) ?? undefined,
+    respondedAt: (r.responded_at as string) ?? undefined,
+  };
+}
+
+async function fetchState(): Promise<State> {
+  const [txRes, savingsRes, limitsRes, goalsRes, contribRes, intentionsRes, checkInsRes] =
+    await Promise.all([
+      supabase.from("transactions").select("*").order("date", { ascending: false }),
+      supabase.from("savings_goals_monthly").select("*"),
+      supabase.from("category_limits").select("*"),
+      supabase.from("financial_goals").select("*").order("created_at", { ascending: false }),
+      supabase.from("goal_contributions").select("*").order("date", { ascending: false }),
+      supabase.from("financial_intentions").select("*").order("created_at", { ascending: false }),
+      supabase.from("check_ins").select("*"),
+    ]);
+  const txRows = unwrap(txRes);
+  const savingsRows = unwrap(savingsRes);
+  const limitRows = unwrap(limitsRes);
+  const goalRows = unwrap(goalsRes);
+  const contribRows = unwrap(contribRes);
+  const intentionRows = unwrap(intentionsRes);
+  const checkInRows = unwrap(checkInsRes);
+
+  return {
+    transactions: (txRows as Row[]).map(mapTransaction),
+    savingsGoals: (savingsRows as Row[]).map(mapSavingsGoal),
+    categoryLimits: (limitRows as Row[]).map(mapCategoryLimit),
+    goals: (goalRows as Row[]).map(mapFinancialGoal),
+    contributions: (contribRows as Row[]).map(mapContribution),
+    intentions: (intentionRows as Row[]).map(mapIntention),
+    checkIns: (checkInRows as Row[]).map(mapCheckIn),
+  };
+}
+
+const QUERY_KEY = ["finance-domain"] as const;
+function invalidate() {
+  return queryClient.invalidateQueries({ queryKey: QUERY_KEY, refetchType: "all" });
+}
+
+export function useFinanceStore<T>(selector: (s: State) => T): T {
+  const userId = useSupabaseUserId();
+  const { data } = useQuery({ queryKey: QUERY_KEY, queryFn: fetchState, enabled: !!userId });
+  return selector(data ?? EMPTY_STATE);
+}
+
+// ---------------------------------------------------------------------------
+// Ações — transações
+// ---------------------------------------------------------------------------
+export async function addTransaction(input: {
+  type: TransactionType;
+  amount: number;
+  description: string;
+  category: string;
+  date?: string;
+  isFixed?: boolean;
+  recurrence?: "none" | "monthly";
+  paymentMethod?: string;
+  note?: string;
+}): Promise<string> {
+  const userId = await ensureSession();
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("transactions")
+      .insert({
+        user_id: userId,
+        type: input.type,
+        amount: input.amount,
+        description: input.description.trim(),
+        category: input.category,
+        date: input.date ?? todayISO(),
+        is_fixed: input.isFixed ?? false,
+        recurrence: input.recurrence ?? "none",
+        payment_method: input.paymentMethod,
+        note: input.note,
+      })
+      .select()
+      .single(),
+  );
+  await invalidate();
+  return row.id;
+}
+
+export async function removeTransaction(id: string) {
+  await supabase.from("transactions").delete().eq("id", id);
+  await invalidate();
+}
+
+// ---------------------------------------------------------------------------
+// Ações — planejamento
+// ---------------------------------------------------------------------------
+export async function setSavingsGoal(month: string, targetAmount: number) {
+  const userId = await ensureSession();
+  unwrap(
+    await supabase
+      .from("savings_goals_monthly")
+      .upsert(
+        { user_id: userId, month, target_amount: targetAmount },
+        { onConflict: "user_id,month" },
+      )
+      .select()
+      .single(),
+  );
+  await invalidate();
+}
+
+export async function addCategoryLimit(category: string, limitAmount: number): Promise<string> {
+  const userId = await ensureSession();
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("category_limits")
+      .insert({ user_id: userId, category, limit_amount: limitAmount })
+      .select()
+      .single(),
+  );
+  await invalidate();
+  return row.id;
+}
+
+export async function updateCategoryLimit(id: string, limitAmount: number) {
+  unwrap(
+    await supabase
+      .from("category_limits")
+      .update({ limit_amount: limitAmount })
+      .eq("id", id)
+      .select()
+      .single(),
+  );
+  await invalidate();
+}
+
+export async function removeCategoryLimit(id: string) {
+  await supabase.from("category_limits").delete().eq("id", id);
+  await invalidate();
+}
+
+export async function setIntention(text: string) {
+  const userId = await ensureSession();
+  unwrap(
+    await supabase
+      .from("financial_intentions")
+      .insert({ user_id: userId, text: text.trim() })
+      .select()
+      .single(),
+  );
+  await invalidate();
+}
+
+// ---------------------------------------------------------------------------
+// Ações — objetivos financeiros
+// ---------------------------------------------------------------------------
+export async function addFinancialGoal(input: {
+  name: string;
+  targetAmount: number;
+  savedAmount?: number;
+  deadline?: string;
+  imageUrl?: string;
+}): Promise<string> {
+  const userId = await ensureSession();
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("financial_goals")
+      .insert({
+        user_id: userId,
+        name: input.name.trim(),
+        target_amount: input.targetAmount,
+        saved_amount: input.savedAmount ?? 0,
+        deadline: input.deadline,
+        image_url: input.imageUrl,
+      })
+      .select()
+      .single(),
+  );
+  await invalidate();
+  return row.id;
+}
+
+export async function updateFinancialGoal(
+  id: string,
+  patch: Partial<Pick<FinancialGoal, "name" | "targetAmount" | "deadline" | "imageUrl">>,
+) {
+  const dbPatch: Row = {};
+  if (patch.name !== undefined) dbPatch.name = patch.name;
+  if (patch.targetAmount !== undefined) dbPatch.target_amount = patch.targetAmount;
+  if (patch.deadline !== undefined) dbPatch.deadline = patch.deadline;
+  if (patch.imageUrl !== undefined) dbPatch.image_url = patch.imageUrl;
+  unwrap(await supabase.from("financial_goals").update(dbPatch).eq("id", id).select().single());
+  await invalidate();
+}
+
+/** Contribuições ficam preservadas (FK cascade só apaga elas junto do objetivo, nunca sozinhas). */
+export async function removeFinancialGoal(id: string) {
+  await supabase.from("financial_goals").delete().eq("id", id);
+  await invalidate();
+}
+
+/** Aportar dinheiro a um objetivo é uma ALOCAÇÃO, nunca uma despesa — não cria Transaction. */
+export async function contributeToGoal(goalId: string, amount: number, note?: string) {
+  const userId = await ensureSession();
+  const goalRow = unwrap<{ saved_amount: number }>(
+    await supabase.from("financial_goals").select("saved_amount").eq("id", goalId).single(),
+  );
+  await Promise.all([
+    supabase
+      .from("financial_goals")
+      .update({ saved_amount: (goalRow.saved_amount ?? 0) + amount })
+      .eq("id", goalId),
+    supabase
+      .from("goal_contributions")
+      .insert({ user_id: userId, goal_id: goalId, amount, date: todayISO(), note }),
+  ]);
+  await invalidate();
+}
+
 // ---------------------------------------------------------------------------
 // Ações — check-in
 // ---------------------------------------------------------------------------
-export function answerCheckIn(id: string, answer: CheckInAnswer, note?: string) {
-  set((s) => ({
-    ...s,
-    checkIns: s.checkIns.map((c) =>
-      c.id === id ? { ...c, answer, note, respondedAt: new Date().toISOString() } : c,
-    ),
-  }));
-}
-
-export function pendingCheckIn(checkIns: CheckIn[]): CheckIn | undefined {
-  return checkIns.find((c) => !c.answer);
+export async function answerCheckIn(id: string, answer: CheckInAnswer, note?: string) {
+  unwrap(
+    await supabase
+      .from("check_ins")
+      .update({ answer, note, responded_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single(),
+  );
+  await invalidate();
 }

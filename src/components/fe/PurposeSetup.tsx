@@ -12,22 +12,32 @@ export function PurposeSetup({ onClose }: { onClose: () => void }) {
   const [endDate, setEndDate] = useState("");
   const [wantsRoutine, setWantsRoutine] = useState(false);
   const [createdPurposeId, setCreatedPurposeId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const canSave = title.trim().length > 0 && intention.trim().length > 0;
 
-  const save = () => {
-    if (!canSave) return;
-    const id = createPurpose({
-      title,
-      intention,
-      why: why || undefined,
-      startDate: definePeriod ? startDate || undefined : undefined,
-      endDate: definePeriod ? endDate || undefined : undefined,
-    });
-    if (wantsRoutine) {
-      setCreatedPurposeId(id);
-    } else {
-      onClose();
+  const save = async () => {
+    if (!canSave || saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      const id = await createPurpose({
+        title,
+        intention,
+        why: why || undefined,
+        startDate: definePeriod ? startDate || undefined : undefined,
+        endDate: definePeriod ? endDate || undefined : undefined,
+      });
+      if (wantsRoutine) {
+        setCreatedPurposeId(id);
+      } else {
+        onClose();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar. Tente de novo.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -37,7 +47,9 @@ export function PurposeSetup({ onClose }: { onClose: () => void }) {
         kind="proposito"
         initialTitle={title}
         onClose={onClose}
-        onSaved={(activityId) => linkPurposeToActivity(createdPurposeId, activityId)}
+        onSaved={async (activityId) => {
+          await linkPurposeToActivity(createdPurposeId, activityId);
+        }}
       />
     );
   }
@@ -130,12 +142,13 @@ export function PurposeSetup({ onClose }: { onClose: () => void }) {
           </label>
         </div>
 
+        {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
         <button
           onClick={save}
-          disabled={!canSave}
+          disabled={!canSave || saving}
           className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
         >
-          {wantsRoutine ? "Continuar" : "Criar propósito"}
+          {saving ? "Salvando…" : wantsRoutine ? "Continuar" : "Criar propósito"}
         </button>
       </div>
     </div>

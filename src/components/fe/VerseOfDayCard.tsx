@@ -11,14 +11,14 @@ export function VerseOfDayCard() {
   const [reflection, setReflection] = useState("");
   const [reflected, setReflected] = useState(false);
 
-  const guardar = () => {
-    saveVerseOfDay(verse.reference, verse.text);
+  const guardar = async () => {
+    await saveVerseOfDay(verse.reference, verse.text);
     setSaved(true);
   };
 
-  const salvarReflexao = () => {
+  const salvarReflexao = async () => {
     if (!reflection.trim()) return;
-    reflectOnVerse(verse.reference, verse.text, reflection);
+    await reflectOnVerse(verse.reference, verse.text, reflection);
     setReflecting(false);
     setReflected(true);
   };

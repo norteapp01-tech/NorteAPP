@@ -88,8 +88,8 @@ function DietRoot({
   const [newTime, setNewTime] = useState("12:00");
   const [newName, setNewName] = useState("");
 
-  const saveGoals = () => {
-    setDailyGoals({
+  const saveGoals = async () => {
+    await setDailyGoals({
       protein: parseFloat(protein) || 0,
       carbs: parseFloat(carbs) || 0,
       fat: parseFloat(fat) || 0,
@@ -98,9 +98,9 @@ function DietRoot({
     setEditingGoals(false);
   };
 
-  const saveNewMeal = () => {
+  const saveNewMeal = async () => {
     if (!newName.trim()) return;
-    addMeal({ time: newTime, name: newName.trim() });
+    await addMeal({ time: newTime, name: newName.trim() });
     setNewName("");
     setAddingMeal(false);
   };
@@ -170,7 +170,9 @@ function DietRoot({
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </button>
               <button
-                onClick={() => removeMeal(m.id)}
+                onClick={async () => {
+                  await removeMeal(m.id);
+                }}
                 className="text-muted-foreground hover:text-danger"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -238,8 +240,8 @@ function MealOptionsEditor({ meal, options }: { meal: Meal; options: MealOption[
   const [addingOption, setAddingOption] = useState(false);
   const [editingOptionId, setEditingOptionId] = useState<string | null>(null);
 
-  const saveMealFields = () => {
-    updateMeal(meal.id, { time, name });
+  const saveMealFields = async () => {
+    await updateMeal(meal.id, { time, name });
   };
 
   return (
@@ -276,8 +278,8 @@ function MealOptionsEditor({ meal, options }: { meal: Meal; options: MealOption[
               <OptionForm
                 key={o.id}
                 initial={o}
-                onSave={(patch) => {
-                  updateMealOption(o.id, patch);
+                onSave={async (patch) => {
+                  await updateMealOption(o.id, patch);
                   setEditingOptionId(null);
                 }}
                 onCancel={() => setEditingOptionId(null)}
@@ -290,7 +292,9 @@ function MealOptionsEditor({ meal, options }: { meal: Meal; options: MealOption[
                     editar
                   </button>
                   <button
-                    onClick={() => removeMealOption(o.id)}
+                    onClick={async () => {
+                      await removeMealOption(o.id);
+                    }}
                     className="text-muted-foreground hover:text-danger"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -317,9 +321,9 @@ function MealOptionsEditor({ meal, options }: { meal: Meal; options: MealOption[
         ) : (
           <div className="mt-2">
             <OptionForm
-              onSave={(patch) => {
+              onSave={async (patch) => {
                 if (!patch.description) return;
-                addMealOption(meal.id, patch);
+                await addMealOption(meal.id, patch);
                 setAddingOption(false);
               }}
               onCancel={() => setAddingOption(false)}

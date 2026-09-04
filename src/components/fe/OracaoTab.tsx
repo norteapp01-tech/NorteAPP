@@ -30,18 +30,19 @@ export function OracaoTab() {
   const active = state.prayerSubjects.filter((p) => p.status !== "encerrada");
   const purposes = state.purposes.filter((p) => !p.archived);
 
-  const saveSubject = () => {
+  const saveSubject = async () => {
     if (!newTitle.trim()) return;
-    addPrayerSubject({ title: newTitle, description: newDescription });
+    await addPrayerSubject({ title: newTitle, description: newDescription });
     setNewTitle("");
     setNewDescription("");
     setAddingSubject(false);
   };
 
-  const saveGratitude = () => {
+  const saveGratitude = async () => {
     if (!gratitude.trim()) return;
-    addNotebookEntry({ type: "gratidao", content: gratitude });
+    const content = gratitude;
     setGratitude("");
+    await addNotebookEntry({ type: "gratidao", content });
   };
 
   return (

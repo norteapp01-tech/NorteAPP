@@ -27,26 +27,37 @@ export function MealDetailSheet({ meal, onClose }: { meal: Meal; onClose: () => 
   const [carbs, setCarbs] = useState("");
   const [fat, setFat] = useState("");
   const [calories, setCalories] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const confirm = () => {
-    if (customMode) {
-      if (!customText.trim()) return;
-      confirmMealCustom(
-        meal.id,
-        customText,
-        {
-          protein: protein ? parseFloat(protein) : undefined,
-          carbs: carbs ? parseFloat(carbs) : undefined,
-          fat: fat ? parseFloat(fat) : undefined,
-          calories: calories ? parseFloat(calories) : undefined,
-        },
-        date,
-      );
-    } else {
-      if (!selectedOptionId) return;
-      confirmMealOption(meal.id, selectedOptionId, date);
+  const confirm = async () => {
+    if (saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      if (customMode) {
+        if (!customText.trim()) return;
+        await confirmMealCustom(
+          meal.id,
+          customText,
+          {
+            protein: protein ? parseFloat(protein) : undefined,
+            carbs: carbs ? parseFloat(carbs) : undefined,
+            fat: fat ? parseFloat(fat) : undefined,
+            calories: calories ? parseFloat(calories) : undefined,
+          },
+          date,
+        );
+      } else {
+        if (!selectedOptionId) return;
+        await confirmMealOption(meal.id, selectedOptionId, date);
+      }
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar. Tente de novo.");
+    } finally {
+      setSaving(false);
     }
-    onClose();
   };
 
   const canConfirm = customMode ? customText.trim().length > 0 : !!selectedOptionId;
@@ -138,12 +149,13 @@ export function MealDetailSheet({ meal, onClose }: { meal: Meal; onClose: () => 
           )}
         </div>
 
+        {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
         <button
           onClick={confirm}
-          disabled={!canConfirm}
+          disabled={!canConfirm || saving}
           className="mt-4 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
         >
-          Confirmar refeição
+          {saving ? "Salvando…" : "Confirmar refeição"}
         </button>
       </div>
     </div>

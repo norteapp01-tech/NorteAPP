@@ -21,6 +21,8 @@ export function QuickAddSheet({ onClose }: { onClose: () => void }) {
   const [recurrence, setRecurrence] = useState<"none" | "monthly">("none");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const submitText = () => {
     const parsed = parseFinanceEntry(text);
@@ -46,20 +48,28 @@ export function QuickAddSheet({ onClose }: { onClose: () => void }) {
     setStep("confirm");
   };
 
-  const save = () => {
+  const save = async () => {
     const value = parseFloat(amount.replace(",", "."));
-    if (!value || value <= 0 || !description.trim()) return;
-    addTransaction({
-      type,
-      amount: value,
-      description,
-      category,
-      date,
-      recurrence,
-      paymentMethod: paymentMethod || undefined,
-      note: note || undefined,
-    });
-    onClose();
+    if (!value || value <= 0 || !description.trim() || saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      await addTransaction({
+        type,
+        amount: value,
+        description,
+        category,
+        date,
+        recurrence,
+        paymentMethod: paymentMethod || undefined,
+        note: note || undefined,
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar. Tente de novo.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -255,13 +265,16 @@ export function QuickAddSheet({ onClose }: { onClose: () => void }) {
         )}
 
         {step === "confirm" && (
-          <button
-            onClick={save}
-            disabled={!amount || !description.trim()}
-            className="mt-4 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
-          >
-            Salvar
-          </button>
+          <>
+            {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
+            <button
+              onClick={save}
+              disabled={!amount || !description.trim() || saving}
+              className="mt-4 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+            >
+              {saving ? "Salvando…" : "Salvar"}
+            </button>
+          </>
         )}
       </div>
     </div>

@@ -33,8 +33,8 @@ export function PrayerSubjectDetail({
 
   if (!subject) return null;
 
-  const saveEdit = () => {
-    updatePrayerSubject(subject.id, { title, description });
+  const saveEdit = async () => {
+    await updatePrayerSubject(subject.id, { title, description });
     setEditing(false);
   };
 
@@ -113,10 +113,11 @@ export function PrayerSubjectDetail({
                 className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
               />
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (!noteText.trim()) return;
-                  addPrayerNote(subject.id, noteText);
+                  const text = noteText;
                   setNoteText("");
+                  await addPrayerNote(subject.id, text);
                 }}
                 className="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
               >

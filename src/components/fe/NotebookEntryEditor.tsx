@@ -33,22 +33,32 @@ export function NotebookEntryEditor({
   const [verseReference, setVerseReference] = useState("");
   const [verseText, setVerseText] = useState("");
   const [context, setContext] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const showVerseFields = type === "deus_falou" || type === "versiculo";
   const canSave =
     type === "versiculo" ? verseReference.trim().length > 0 : content.trim().length > 0;
 
-  const save = () => {
-    if (!canSave) return;
-    addNotebookEntry({
-      type,
-      content,
-      verseReference: verseReference.trim() || undefined,
-      verseText: verseText.trim() || undefined,
-      context: type === "deus_falou" ? context : undefined,
-    });
-    onSaved?.();
-    onClose();
+  const save = async () => {
+    if (!canSave || saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      await addNotebookEntry({
+        type,
+        content,
+        verseReference: verseReference.trim() || undefined,
+        verseText: verseText.trim() || undefined,
+        context: type === "deus_falou" ? context : undefined,
+      });
+      onSaved?.();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar. Tente de novo.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -105,12 +115,13 @@ export function NotebookEntryEditor({
           />
         )}
 
+        {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
         <button
           onClick={save}
-          disabled={!canSave}
+          disabled={!canSave || saving}
           className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
         >
-          Salvar
+          {saving ? "Salvando…" : "Salvar"}
         </button>
       </div>
     </div>
