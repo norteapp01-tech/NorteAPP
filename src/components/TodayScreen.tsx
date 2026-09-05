@@ -21,6 +21,7 @@ import { formatTime } from "@/lib/format-utils";
 import { HydrationCard } from "@/components/hydration/HydrationCard";
 import { SubagendasGrid } from "@/components/SubagendasGrid";
 import { Modal } from "@/components/ui/modal";
+import { DateField } from "@/components/ui/date-wheel-picker";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import {
   useGoalsStore,
@@ -711,11 +712,10 @@ function ConfrontModal({ task, onClose }: { task: Execution; onClose: () => void
                 </button>
               ) : (
                 <div className="rounded-xl border border-border bg-surface-2 p-3">
-                  <input
-                    type="date"
+                  <DateField
                     value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+                    onChange={setDate}
+                    className="flex w-full items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-left text-sm outline-none focus:border-primary"
                   />
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <input

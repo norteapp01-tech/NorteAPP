@@ -1,17 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { categoryMeta, lifeAreas, lifeAreaColor } from "@/lib/mock-data";
 import {
   useGoalsStore,
   goalProgress,
   goalPace,
   todayExecutions,
+  isGoalComplete,
   type Goal,
   type Step,
   type Execution,
 } from "@/lib/goals-store";
 import { Plus, GitBranch, Target } from "lucide-react";
 import { PlanProgressChart } from "@/components/PlanProgressChart";
+import { CompletedPlansSection } from "@/components/plan/CompletedPlansSection";
 import { useProfile } from "@/lib/profile-store";
 import { formatTime } from "@/lib/format-utils";
 import { nowDate } from "@/lib/test-clock";
@@ -59,6 +61,13 @@ function PlanScreen() {
   const steps = useGoalsStore((s) => s.steps);
   const executions = useGoalsStore((s) => s.executions);
   const profile = useProfile();
+  // Planos 100% concluídos saem das visões ativas (Semana/Mês/90 dias/Semestre/Ano) —
+  // ficam só na seção "Planos concluídos", reativo (reabrir uma etapa/execução já basta
+  // pra voltar a aparecer aqui, sem reload).
+  const activeGoals = useMemo(
+    () => goals.filter((g) => !isGoalComplete(g, steps, executions)),
+    [goals, steps, executions],
+  );
 
   return (
     <div className="px-5 pt-12">
@@ -135,12 +144,14 @@ function PlanScreen() {
         </div>
       )}
 
-      {layer === "semana" && <WeekLayer steps={steps} goals={goals} executions={executions} />}
+      {layer === "semana" && (
+        <WeekLayer steps={steps} goals={activeGoals} executions={executions} />
+      )}
       {layer === "mes" && (
         <PlanningHorizonView
           title="Planejamentos deste mês"
           maxDays={31}
-          goals={goals}
+          goals={activeGoals}
           steps={steps}
           executions={executions}
         />
@@ -149,7 +160,7 @@ function PlanScreen() {
         <PlanningHorizonView
           title="Planejamentos dos próximos 90 dias"
           maxDays={90}
-          goals={goals}
+          goals={activeGoals}
           steps={steps}
           executions={executions}
         />
@@ -158,12 +169,14 @@ function PlanScreen() {
         <PlanningHorizonView
           title="Planejamentos deste semestre"
           maxDays={183}
-          goals={goals}
+          goals={activeGoals}
           steps={steps}
           executions={executions}
         />
       )}
-      {layer === "ano" && <YearGoals />}
+      {layer === "ano" && <YearGoals goals={activeGoals} steps={steps} executions={executions} />}
+
+      <CompletedPlansSection goals={goals} steps={steps} executions={executions} />
 
       <div className="mt-8 rounded-2xl border border-border bg-surface p-4">
         <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -341,10 +354,15 @@ function PlanCard({
   );
 }
 
-function YearGoals() {
-  const storedGoals = useGoalsStore((s) => s.goals);
-  const steps = useGoalsStore((s) => s.steps);
-  const executions = useGoalsStore((s) => s.executions);
+function YearGoals({
+  goals: storedGoals,
+  steps,
+  executions,
+}: {
+  goals: Goal[];
+  steps: Step[];
+  executions: Execution[];
+}) {
   return (
     <div className="mt-5 space-y-3">
       <div className="flex items-center justify-between">

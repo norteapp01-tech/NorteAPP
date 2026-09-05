@@ -91,3 +91,12 @@
 @utility text-balance-tight {
   text-wrap: balance;
 }
+
+/* Colunas do seletor de data (date-wheel-picker) — rolagem por gesto sem barra visível. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

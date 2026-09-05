@@ -10,6 +10,7 @@ import {
   streakForTitle,
   achievementsEarned,
   goalPace,
+  isGoalComplete,
   type Range,
 } from "@/lib/goals-store";
 import { TrendingUp, TrendingDown, Trophy, Sparkles, ChevronRight, Flame } from "lucide-react";
@@ -35,6 +36,10 @@ function Dashboard() {
   const confidence = confidenceIndexByCategory(executions);
   const procrastinated = procrastinationRanking(executions);
   const achievements = achievementsEarned(state);
+  // Ritmo (adiantado/no ritmo/atrasado) só faz sentido pra plano ainda em andamento —
+  // um plano concluído não "atrasa" mais nada. A conquista de conclusão continua
+  // aparecendo normalmente em achievementsEarned, que não é filtrado aqui.
+  const activeGoals = goals.filter((g) => !isGoalComplete(g, steps, executions));
 
   const kpiCards = [
     {
@@ -211,7 +216,7 @@ function Dashboard() {
         </p>
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
           {(["ahead", "ontrack", "behind"] as const).map((p) => {
-            const count = goals.filter((g) => goalPace(g, steps, executions) === p).length;
+            const count = activeGoals.filter((g) => goalPace(g, steps, executions) === p).length;
             const label = p === "ahead" ? "adiantados" : p === "ontrack" ? "no ritmo" : "atrasados";
             const tone =
               p === "ahead" ? "text-warning" : p === "ontrack" ? "text-success" : "text-danger";
@@ -224,7 +229,7 @@ function Dashboard() {
           })}
         </div>
         <div className="mt-3 space-y-2.5">
-          {goals.slice(0, 4).map((g) => {
+          {activeGoals.slice(0, 4).map((g) => {
             const pace = goalPace(g, steps, executions);
             const forecast =
               pace === "behind" ? "atrasa" : pace === "ahead" ? "adianta" : "no prazo";

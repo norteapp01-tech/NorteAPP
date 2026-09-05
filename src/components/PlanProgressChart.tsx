@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useGoalsStore, goalProgress, goalPace } from "@/lib/goals-store";
+import { useGoalsStore, goalProgress, goalPace, isGoalComplete } from "@/lib/goals-store";
 
 const paceColor: Record<string, string> = {
   ahead: "oklch(0.82 0.16 85)",
@@ -15,11 +15,15 @@ export function PlanProgressChart() {
   const steps = useGoalsStore((s) => s.steps);
   const executions = useGoalsStore((s) => s.executions);
 
-  const rows = goals.map((g) => ({
-    goal: g,
-    progress: goalProgress(g, steps, executions),
-    pace: goalPace(g, steps, executions),
-  }));
+  // Plano 100% concluído já tem seu próprio lugar em "Planos concluídos" — não
+  // precisa de barra de progresso aqui (progresso é sempre 100, não agrega nada).
+  const rows = goals
+    .filter((g) => !isGoalComplete(g, steps, executions))
+    .map((g) => ({
+      goal: g,
+      progress: goalProgress(g, steps, executions),
+      pace: goalPace(g, steps, executions),
+    }));
 
   return (
     <div>
@@ -35,7 +39,9 @@ export function PlanProgressChart() {
       <div className="card-surface mt-3 p-4">
         {rows.length === 0 ? (
           <p className="p-2 text-center text-sm text-muted-foreground">
-            Nenhum planejamento ainda.
+            {goals.length > 0
+              ? "Todos os seus planos ativos estão concluídos."
+              : "Nenhum planejamento ainda."}
           </p>
         ) : (
           <div className="relative">

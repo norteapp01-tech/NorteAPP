@@ -18,6 +18,7 @@ import {
   agendaByDate,
   linkExecutionToGoal,
   effectiveStatus,
+  isGoalComplete,
   type Execution,
 } from "@/lib/goals-store";
 import { useProfile } from "@/lib/profile-store";
@@ -279,13 +280,22 @@ function EventCard({ e, timeFormat }: { e: Execution; timeFormat: TimeFormat }) 
 
 function GoalPicker({ onPick, onClose }: { onPick: (id: string) => void; onClose: () => void }) {
   const goals = useGoalsStore((s) => s.goals);
+  const steps = useGoalsStore((s) => s.steps);
+  const executions = useGoalsStore((s) => s.executions);
+  // Plano concluído não recebe novos compromissos — só planos ativos aparecem aqui.
+  const activeGoals = goals.filter((g) => !isGoalComplete(g, steps, executions));
   return (
     <Modal onClose={onClose} title="Vincular a um planejamento">
       <p className="text-xs text-muted-foreground">
         Toque num planejamento. Este compromisso vai contar como avanço.
       </p>
       <div className="mt-4 space-y-2">
-        {goals.map((g) => {
+        {activeGoals.length === 0 && (
+          <p className="p-4 text-center text-sm text-muted-foreground">
+            Nenhum plano ativo pra vincular.
+          </p>
+        )}
+        {activeGoals.map((g) => {
           const c = categoryMeta[g.category] ?? categoryMeta.generico;
           return (
             <button

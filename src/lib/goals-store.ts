@@ -49,7 +49,14 @@ export type Step = {
   dueLabel?: string;
   /** Data-alvo real da etapa — usada pelas camadas Semana/Mês do Planejamento. */
   targetDate?: string;
-  /** Organização interna da etapa — não entra no cálculo de progresso do planejamento. */
+  /** Quando a etapa foi marcada concluída de verdade — null enquanto aberta ou reaberta.
+   * Alimenta a linha de evolução (progresso ao longo do tempo) de planejamentos "por etapas". */
+  completedAt?: string;
+  /** Só uma etapa por planejamento pode estar assim (garantido por índice único no banco)
+   * — usada pra destacar o foco atual do plano, independente de ordem/prazo. */
+  isCurrent: boolean;
+  /** Organização interna da etapa — não entra no cálculo de progresso do planejamento.
+   * Dado legado: a interface não cria subtarefas novas, só exibe/conclui/remove as existentes. */
   subtasks?: Subtask[];
   order: number;
 };
@@ -216,6 +223,152 @@ export function planningStatus(goal: Goal, steps: Step[], executions: Execution[
   const expected =
     end > start ? Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100)) : 0;
   return progress < expected - 20 ? "atrasado" : "em_risco";
+}
+
+export type ProgressPoint = { date: string; pct: number };
+
+/**
+ * Linha de evolução do percentual ao longo do tempo — só com dados reais, nunca
+ * interpolado/inventado. "Etapas": cada ponto é o momento em que uma etapa foi
+ * marcada concluída (completedAt), dividido pelo total de etapas atual. "Frequência/
+ * número": cada ponto é o momento em que uma execução foi concluída (última entrada
+ * "-> concluida" no histórico), dividido pelo alvo efetivo. Sempre começa em 0% na
+ * criação do plano e termina hoje com o percentual atual (mesmo cálculo de
+ * `goalProgress`), pra nunca destoar do número mostrado em outro lugar da tela.
+ */
+export function progressOverTime(
+  goal: Goal,
+  steps: Step[],
+  executions: Execution[],
+): ProgressPoint[] {
+  const todayIso = todayISO();
+  const startPoint: ProgressPoint = { date: toISODate(new Date(goal.createdAt)), pct: 0 };
+  const points: ProgressPoint[] = [startPoint];
+
+  if (goal.trackingType === "etapas") {
+    const gSteps = stepsForGoal(steps, goal.id);
+    const total = gSteps.length;
+    if (total === 0) return [];
+    const completions = gSteps
+      .filter((s) => s.completedAt)
+      .map((s) => s.completedAt as string)
+      .sort();
+    let doneCount = 0;
+    for (const at of completions) {
+      doneCount += 1;
+      points.push({ date: at.slice(0, 10), pct: Math.round((doneCount / total) * 100) });
+    }
+  } else {
+    const target = effectiveExecutionTarget(goal);
+    const completions = executionsForGoal(executions, goal.id)
+      .map((e) => {
+        const doneEntry = [...e.history].reverse().find((h) => h.to === "concluida");
+        return doneEntry?.at ?? (e.status === "concluida" ? e.createdAt : null);
+      })
+      .filter((x): x is string => !!x)
+      .sort();
+    let doneCount = 0;
+    for (const at of completions) {
+      doneCount += 1;
+      points.push({
+        date: at.slice(0, 10),
+        pct: Math.min(100, Math.round((doneCount / target) * 100)),
+      });
+    }
+  }
+
+  const last = points[points.length - 1];
+  const currentPct = goalProgress(goal, steps, executions);
+  if (last.date !== todayIso || last.pct !== currentPct) {
+    points.push({ date: todayIso, pct: currentPct });
+  }
+  return points;
+}
+
+/** Planejado vs. realizado: quantas execuções deste plano já deveriam ter acontecido até
+ * hoje (agenda vencida ou prazo vencido, excluindo canceladas/reagendadas) e quantas de
+ * fato foram concluídas. */
+export function plannedVsActual(
+  goal: Goal,
+  executions: Execution[],
+): { planned: number; actual: number } {
+  const gExecs = executionsForGoal(executions, goal.id).filter(
+    (e) => e.status !== "cancelada" && e.status !== "reagendada",
+  );
+  const iso = todayISO();
+  const hm = nowHM();
+  const dueByToday = gExecs.filter((e) => isDue(e, iso, hm));
+  return {
+    planned: dueByToday.length,
+    actual: dueByToday.filter((e) => e.status === "concluida").length,
+  };
+}
+
+/** Previsão de conclusão por extrapolação linear simples do ritmo até agora — não é
+ * uma promessa, é "se você continuar nesse ritmo". Retorna null sem dado suficiente
+ * (progresso zerado, plano recém-criado, ou já concluído). */
+export function estimatedCompletionDate(
+  goal: Goal,
+  steps: Step[],
+  executions: Execution[],
+): string | null {
+  const progress = goalProgress(goal, steps, executions);
+  if (progress >= 100 || progress <= 0) return null;
+  const elapsedDays = (nowMs() - new Date(goal.createdAt).getTime()) / 86400000;
+  if (elapsedDays <= 0) return null;
+  const ratePerDay = progress / elapsedDays;
+  if (ratePerDay <= 0) return null;
+  const daysNeeded = (100 - progress) / ratePerDay;
+  return toISODate(addDays(nowDate(), Math.ceil(daysNeeded)));
+}
+
+/** Plano ativo (não concluído) sem nenhuma próxima ação visível: nenhuma execução
+ * pendente, nenhuma etapa aberta (marcada como atual ou não — qualquer etapa aberta
+ * já é "a próxima ação" pro NextStepCard, então também zera o alerta aqui), e nada
+ * concluído nos últimos 14 dias. */
+export function isPlanStalled(goal: Goal, steps: Step[], executions: Execution[]): boolean {
+  if (goalProgress(goal, steps, executions) >= 100) return false;
+  const gSteps = stepsForGoal(steps, goal.id);
+  const gExecs = executionsForGoal(executions, goal.id);
+  if (gExecs.some((e) => e.status === "planejada")) return false;
+  if (gSteps.some((s) => !s.done)) return false;
+  const cutoff = toISODate(addDays(nowDate(), -14));
+  if (gSteps.some((s) => s.completedAt && s.completedAt.slice(0, 10) >= cutoff)) return false;
+  if (gExecs.some((e) => e.status === "concluida" && relevantDate(e) >= cutoff)) return false;
+  return true;
+}
+
+/** Plano 100% concluído — sai das listas de planos ativos (planejamento.tsx, gráfico
+ * de progresso, seletor de vínculo da Agenda, prévia do Espelho), mas nunca é apagado:
+ * volta pra "ativo" sozinho assim que qualquer etapa/execução for reaberta. */
+export function isGoalComplete(goal: Goal, steps: Step[], executions: Execution[]): boolean {
+  return goalProgress(goal, steps, executions) >= 100;
+}
+
+/** Data real da conclusão (não estimada) — mesma fonte de dados do progressOverTime:
+ * completedAt mais recente das etapas ("etapas") ou última transição "->concluida"
+ * do histórico de execuções (frequência/número). Null se o plano não está 100%. */
+export function goalCompletionDate(
+  goal: Goal,
+  steps: Step[],
+  executions: Execution[],
+): string | null {
+  if (!isGoalComplete(goal, steps, executions)) return null;
+  if (goal.trackingType === "etapas") {
+    const dates = stepsForGoal(steps, goal.id)
+      .map((s) => s.completedAt)
+      .filter((x): x is string => !!x)
+      .sort();
+    return dates.length > 0 ? dates[dates.length - 1].slice(0, 10) : null;
+  }
+  const dates = executionsForGoal(executions, goal.id)
+    .map((e) => {
+      const doneEntry = [...e.history].reverse().find((h) => h.to === "concluida");
+      return doneEntry?.at ?? (e.status === "concluida" ? e.createdAt : null);
+    })
+    .filter((x): x is string => !!x)
+    .sort();
+  return dates.length > 0 ? dates[dates.length - 1].slice(0, 10) : null;
 }
 
 /** Data que efetivamente rege "quando isso deveria ter acontecido" — agenda se existir, senão o prazo. */
@@ -550,6 +703,8 @@ function mapStep(r: Row, subtasks: Subtask[]): Step {
     done: r.done as boolean,
     dueLabel: (r.due_label as string) ?? undefined,
     targetDate: (r.target_date as string) ?? undefined,
+    completedAt: (r.completed_at as string) ?? undefined,
+    isCurrent: (r.is_current as boolean) ?? false,
     subtasks: subtasks.length > 0 ? subtasks : undefined,
     order: (r.order_index as number) ?? 0,
   };
@@ -707,7 +862,7 @@ export async function createGoal(input: {
   deadlineISO?: string;
   metric: { target: number; unit: string };
   steps?: { title: string; targetDate?: string }[];
-}): Promise<string> {
+}): Promise<{ id: string; firstStepId?: string }> {
   const userId = await ensureSession();
   const goal = unwrap<{ id: string }>(
     await supabase
@@ -731,21 +886,28 @@ export async function createGoal(input: {
       .select()
       .single(),
   );
+  let firstStepId: string | undefined;
   if (input.steps && input.steps.length > 0) {
-    unwrap(
-      await supabase.from("steps").insert(
-        input.steps.map((s, i) => ({
-          user_id: userId,
-          goal_id: goal.id,
-          title: s.title,
-          target_date: s.targetDate,
-          order_index: i,
-        })),
-      ),
+    // `.select()` de volta pra saber o id gerado da 1a etapa — a primeira execução
+    // criada junto com o plano (criar.tsx) precisa vincular a ela via stepId.
+    const rows = unwrap<{ id: string; order_index: number }[]>(
+      await supabase
+        .from("steps")
+        .insert(
+          input.steps.map((s, i) => ({
+            user_id: userId,
+            goal_id: goal.id,
+            title: s.title,
+            target_date: s.targetDate,
+            order_index: i,
+          })),
+        )
+        .select("id, order_index"),
     );
+    firstStepId = rows.find((r) => r.order_index === 0)?.id;
   }
   await invalidate();
-  return goal.id as string;
+  return { id: goal.id as string, firstStepId };
 }
 
 export async function addStep(
@@ -773,10 +935,11 @@ export async function addStep(
 }
 
 export async function toggleStep(stepId: string, currentlyDone: boolean) {
+  const nowDone = !currentlyDone;
   unwrap(
     await supabase
       .from("steps")
-      .update({ done: !currentlyDone })
+      .update({ done: nowDone, completed_at: nowDone ? nowDate().toISOString() : null })
       .eq("id", stepId)
       .select()
       .single(),
@@ -787,6 +950,19 @@ export async function toggleStep(stepId: string, currentlyDone: boolean) {
 export async function removeStep(stepId: string) {
   await supabase.from("executions").update({ step_id: null }).eq("step_id", stepId);
   await supabase.from("steps").delete().eq("id", stepId);
+  await invalidate();
+}
+
+/** Marca `stepId` como a etapa atual do plano, desmarcando qualquer outra que já estivesse
+ * (o índice único no banco também garante isso, mas fazemos explícito aqui pra não depender
+ * só do erro de constraint). Passar `null` só remove o destaque, sem marcar nenhuma outra. */
+export async function setCurrentStep(goalId: string, stepId: string | null) {
+  await supabase.from("steps").update({ is_current: false }).eq("goal_id", goalId);
+  if (stepId) {
+    unwrap(
+      await supabase.from("steps").update({ is_current: true }).eq("id", stepId).select().single(),
+    );
+  }
   await invalidate();
 }
 
@@ -867,6 +1043,31 @@ export async function createExecution(input: {
   return row.id as string;
 }
 
+/** Cria a execução "derivada" de uma etapa que ainda não tem nenhuma execução própria,
+ * já direto na agenda — usada tanto pelo atalho rápido no card da etapa quanto pelo
+ * fluxo completo de Adicionar à Agenda. Nunca duplica: só faz sentido oferecer enquanto
+ * a etapa não tiver nenhuma execução (o chamador é quem garante essa condição antes de
+ * chamar — assim que a execução existe, a UI que oferecia esse atalho some sozinha). */
+export async function scheduleStepAsExecution(
+  step: Step,
+  goal: Goal,
+  agendaDate: string,
+  startTime: string,
+  endTime?: string,
+): Promise<string> {
+  return createExecution({
+    title: step.title,
+    dueDate: step.targetDate ?? agendaDate,
+    agendaDate,
+    startTime,
+    endTime,
+    category: goal.category,
+    weight: "medio",
+    goalId: goal.id,
+    stepId: step.id,
+  });
+}
+
 /** Agenda uma execução que só tinha prazo — atualiza a MESMA linha, nunca duplica. */
 export async function scheduleExecution(
   id: string,
@@ -926,7 +1127,7 @@ export async function toggleExecutionDone(id: string) {
 
 export async function patchExecution(
   id: string,
-  patch: Partial<Pick<Execution, "how" | "why" | "weight" | "title" | "rigid">>,
+  patch: Partial<Pick<Execution, "how" | "why" | "weight" | "title" | "rigid" | "dueDate">>,
 ) {
   const dbPatch: Row = {};
   if (patch.how !== undefined) dbPatch.how = patch.how;
@@ -934,7 +1135,17 @@ export async function patchExecution(
   if (patch.weight !== undefined) dbPatch.weight = patch.weight;
   if (patch.title !== undefined) dbPatch.title = patch.title;
   if (patch.rigid !== undefined) dbPatch.rigid = patch.rigid;
+  if (patch.dueDate !== undefined) dbPatch.due_date = patch.dueDate;
   unwrap(await supabase.from("executions").update(dbPatch).eq("id", id).select().single());
+  await invalidate();
+}
+
+/** Exclusão real (não soft-delete) — diferente de `cancelExecution` (que preserva
+ * histórico como "cancelada"). Usada só quando o usuário confirma explicitamente
+ * que quer apagar o registro, não só descartá-lo. `execution_history` cai junto
+ * (FK on delete cascade), sem deixar rastro órfão. */
+export async function removeExecution(id: string) {
+  await supabase.from("executions").delete().eq("id", id);
   await invalidate();
 }
 

@@ -64,6 +64,7 @@ function fixtureStep(overrides: Partial<Step> = {}): Step {
     title: "Terminar front-end",
     done: false,
     targetDate: "2026-09-10",
+    isCurrent: false,
     order: 0,
     ...overrides,
   };
@@ -88,14 +89,18 @@ function fixtureExecution(overrides: Partial<Execution> = {}): Execution {
 
 let queryClient: QueryClient;
 
-beforeEach(() => {
-  queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 10_000 } } });
+function seed(overrides: { goals?: Goal[]; steps?: Step[]; executions?: Execution[] }) {
   queryClient.setQueryData(QUERY_KEY, {
-    goals: [fixtureGoal()],
-    steps: [fixtureStep()],
-    executions: [fixtureExecution()],
+    goals: overrides.goals ?? [fixtureGoal()],
+    steps: overrides.steps ?? [fixtureStep()],
+    executions: overrides.executions ?? [fixtureExecution()],
     routines: [],
   });
+}
+
+beforeEach(() => {
+  queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 10_000 } } });
+  seed({});
 });
 
 function renderGoalDetail() {
@@ -106,19 +111,18 @@ function renderGoalDetail() {
   );
 }
 
-describe("GoalDetail — Visão e Etapas unificadas", () => {
-  it("não existe mais uma aba separada 'Etapas'", () => {
+describe("GoalDetail — abas: só Planejamento e Evolução", () => {
+  it("a barra de abas tem exatamente Planejamento e Evolução, sem Execuções separada", () => {
     renderGoalDetail();
-    expect(screen.queryByRole("button", { name: /^Etapas/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Planejamento" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Evolução" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Execuções/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Visão" })).not.toBeInTheDocument();
   });
 
-  it("as etapas (lista + form de nova etapa) aparecem dentro de Visão, sem precisar trocar de aba", () => {
+  it("não existe mais o card 'Números' na aba principal — os números moraram pra Evolução", () => {
     renderGoalDetail();
-    // A aba "vista" é a default — não clico em nada. O título aparece 2x (card
-    // "Próxima etapa" + a linha da etapa em si), então uso getAllByText.
-    expect(screen.getAllByText("Terminar front-end").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Realizar até: 10\/09\/2026/)).toBeInTheDocument();
-    expect(screen.getByText("Realizar esta etapa até:")).toBeInTheDocument();
+    expect(screen.queryByText("Números")).not.toBeInTheDocument();
   });
 
   it("não existe mais o botão 'Registrar avanço'", () => {
@@ -126,10 +130,97 @@ describe("GoalDetail — Visão e Etapas unificadas", () => {
     expect(screen.queryByText("Registrar avanço")).not.toBeInTheDocument();
   });
 
-  it("a barra de abas tem exatamente Visão, Execuções e Evolução", () => {
+  it("as etapas (lista + form de nova etapa) aparecem dentro de Planejamento, sem precisar trocar de aba", () => {
     renderGoalDetail();
-    expect(screen.getByRole("button", { name: "Visão" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Execuções/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Evolução" })).toBeInTheDocument();
+    expect(screen.getAllByText("Terminar front-end").length).toBeGreaterThan(0);
+    expect(screen.getByPlaceholderText("Ex: Terminar capítulo 3")).toBeInTheDocument();
+  });
+
+  it("a execução aparece aninhada dentro do card da etapa, não numa lista separada", () => {
+    renderGoalDetail();
+    expect(screen.getByText("Decidir layout")).toBeInTheDocument();
+  });
+});
+
+describe("GoalDetail — plano sem etapas (cenário 1 da checklist)", () => {
+  it("mostra o alerta de plano parado e o fallback vazio, sem quebrar", () => {
+    seed({ steps: [], executions: [] });
+    renderGoalDetail();
+    expect(screen.getByText(/sem uma próxima ação/i)).toBeInTheDocument();
+    expect(screen.getByText(/adicione uma abaixo/i)).toBeInTheDocument();
+  });
+});
+
+describe("GoalDetail — subtarefas legadas: exibidas, nunca criáveis pela UI", () => {
+  it("não existe nenhum jeito de criar uma subtarefa nova, mesmo com dado legado presente", () => {
+    seed({
+      steps: [
+        fixtureStep({
+          subtasks: [{ id: "sub-1", title: "Rascunho antigo", done: false }],
+        }),
+      ],
+    });
+    renderGoalDetail();
+    // dado legado continua visível...
+    expect(screen.getByText("Rascunho antigo")).toBeInTheDocument();
+    // ...mas não há campo/botão de criar subtarefa nova em lugar nenhum da tela
+    expect(screen.queryByPlaceholderText(/subtarefa/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/nova subtarefa/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("GoalDetail — etapa atual", () => {
+  it("etapa marcada como isCurrent aparece destacada como 'etapa atual'", () => {
+    seed({ steps: [fixtureStep({ isCurrent: true })] });
+    renderGoalDetail();
+    expect(screen.getByText(/etapa atual/i)).toBeInTheDocument();
+  });
+});
+
+describe("GoalDetail — execução sem etapa (órfã)", () => {
+  it("aparece numa seção própria 'Execuções sem etapa', não se perde", () => {
+    seed({
+      steps: [fixtureStep()],
+      executions: [
+        fixtureExecution({ id: "exec-orfa", title: "Sem etapa nenhuma", stepId: undefined }),
+      ],
+    });
+    renderGoalDetail();
+    expect(screen.getByText("Execuções sem etapa")).toBeInTheDocument();
+    expect(screen.getByText("Sem etapa nenhuma")).toBeInTheDocument();
+  });
+});
+
+describe("GoalDetail — 'Colocar etapa na agenda' (item 3)", () => {
+  it("aparece só quando a etapa não tem nenhuma execução", () => {
+    seed({ steps: [fixtureStep()], executions: [] });
+    renderGoalDetail();
+    expect(screen.getByText("Colocar etapa na agenda")).toBeInTheDocument();
+  });
+
+  it("some assim que a etapa já tem uma execução própria", () => {
+    seed({ steps: [fixtureStep()], executions: [fixtureExecution()] });
+    renderGoalDetail();
+    expect(screen.queryByText("Colocar etapa na agenda")).not.toBeInTheDocument();
+  });
+
+  it("não aparece pra etapa já concluída", () => {
+    seed({ steps: [fixtureStep({ done: true })], executions: [] });
+    renderGoalDetail();
+    expect(screen.queryByText("Colocar etapa na agenda")).not.toBeInTheDocument();
+  });
+});
+
+describe("GoalDetail — alerta de plano parado desaparece com qualquer etapa aberta (item 2)", () => {
+  it("etapa recém-criada (aberta, não marcada como atual, sem execução) já basta pra tirar o alerta", () => {
+    seed({ steps: [fixtureStep({ isCurrent: false, done: false })], executions: [] });
+    renderGoalDetail();
+    expect(screen.queryByText(/sem uma próxima ação/i)).not.toBeInTheDocument();
+  });
+
+  it("plano sem nenhuma etapa continua mostrando o alerta", () => {
+    seed({ steps: [], executions: [] });
+    renderGoalDetail();
+    expect(screen.getByText(/sem uma próxima ação/i)).toBeInTheDocument();
   });
 });

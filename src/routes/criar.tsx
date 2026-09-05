@@ -14,19 +14,33 @@ import {
   createGoal,
   createExecution,
   scheduleExecution,
+  scheduleStepAsExecution,
   isScheduled,
   formatDateBR,
   useGoalsStore,
+  type Goal,
+  type Step,
   type Execution,
 } from "@/lib/goals-store";
 import { categoryMeta, catByArea, lifeAreas } from "@/lib/mock-data";
 import { nowDate } from "@/lib/test-clock";
+import { DateField } from "@/components/ui/date-wheel-picker";
+import { PlanItemPicker, type PlanItemSelection } from "@/components/plan/PlanItemPicker";
+import { useProfile } from "@/lib/profile-store";
+import { formatTime } from "@/lib/format-utils";
 
 type Mode = "escolha" | "agenda" | "planejamento";
 
 export const Route = createFileRoute("/criar")({
   head: () => ({ meta: [{ title: "Criar — Norte" }] }),
-  validateSearch: (s: Record<string, unknown>) => ({ modo: s.modo as Mode | undefined }),
+  validateSearch: (
+    s: Record<string, unknown>,
+  ): { modo?: Mode; goalId?: string; stepId?: string; executionId?: string } => ({
+    modo: s.modo as Mode | undefined,
+    goalId: s.goalId as string | undefined,
+    stepId: s.stepId as string | undefined,
+    executionId: s.executionId as string | undefined,
+  }),
   component: CreateScreen,
 });
 
@@ -108,7 +122,16 @@ function CreateScreen() {
         </div>
       )}
 
-      {mode === "agenda" && <AgendaFlow onDone={() => nav({ to: "/agenda" })} />}
+      {mode === "agenda" && (
+        <AgendaFlow
+          onDone={() => nav({ to: "/agenda" })}
+          deepLink={{
+            goalId: search.goalId,
+            stepId: search.stepId,
+            executionId: search.executionId,
+          }}
+        />
+      )}
       {mode === "planejamento" && (
         <PlanejamentoFlow onDone={(id) => nav({ to: "/objetivo/$id", params: { id } })} />
       )}
@@ -116,55 +139,97 @@ function CreateScreen() {
   );
 }
 
-// -------- Agenda: quick creation + optional plan link (nova ou execução já existente) --------
-function AgendaFlow({ onDone }: { onDone: () => void }) {
+// -------- Agenda: seleção estruturada Plano→Etapa→Execução, ou compromisso avulso --------
+type DeepLink = { goalId?: string; stepId?: string; executionId?: string };
+
+function resolveDeepLink(
+  deepLink: DeepLink | undefined,
+  goals: Goal[],
+  steps: Step[],
+  executions: Execution[],
+): PlanItemSelection | null {
+  if (!deepLink) return null;
+  if (deepLink.executionId) {
+    const execution = executions.find((e) => e.id === deepLink.executionId);
+    if (!execution) return null;
+    const goal = goals.find((g) => g.id === execution.goalId);
+    if (!goal) return null;
+    const step = execution.stepId ? steps.find((s) => s.id === execution.stepId) : undefined;
+    return { kind: "execution", goal, step, execution };
+  }
+  if (deepLink.stepId) {
+    const step = steps.find((s) => s.id === deepLink.stepId);
+    const goal = goals.find((g) => g.id === (deepLink.goalId ?? step?.goalId));
+    if (!goal || !step) return null;
+    return { kind: "step", goal, step };
+  }
+  if (deepLink.goalId) {
+    const goal = goals.find((g) => g.id === deepLink.goalId);
+    if (!goal) return null;
+    return { kind: "goal", goal };
+  }
+  return null;
+}
+
+function AgendaFlow({ onDone, deepLink }: { onDone: () => void; deepLink?: DeepLink }) {
   const goals = useGoalsStore((s) => s.goals);
+  const steps = useGoalsStore((s) => s.steps);
   const executions = useGoalsStore((s) => s.executions);
+  const profile = useProfile();
+
+  const [avulso, setAvulso] = useState(false);
+  const [selection, setSelection] = useState<PlanItemSelection | null>(() =>
+    resolveDeepLink(deepLink, goals, steps, executions),
+  );
+  const [showPicker, setShowPicker] = useState(false);
+  const [avulsoTitle, setAvulsoTitle] = useState("");
   const [form, setForm] = useState({
-    title: "",
     date: "",
     startTime: "",
     endTime: "",
     location: "",
     rigid: true,
-    goalId: "" as string,
   });
-  const [selectedExecutionId, setSelectedExecutionId] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const linked = goals.find((g) => g.id === form.goalId);
-  const pendingExecutions = form.goalId
-    ? executions.filter(
-        (e) => e.goalId === form.goalId && e.status === "planejada" && !isScheduled(e),
-      )
-    : [];
-  const selectedExecution = pendingExecutions.find((e) => e.id === selectedExecutionId);
-
+  const creatingNew = avulso || selection?.kind === "goal" || selection?.kind === "step";
   const timesValid = !!form.startTime && !!form.endTime && form.endTime > form.startTime;
-  const valid = selectedExecution
-    ? !!form.date && timesValid
-    : !!form.title && !!form.date && timesValid;
+  const title =
+    selection?.kind === "step"
+      ? selection.step.title
+      : selection?.kind === "execution"
+        ? selection.execution.title
+        : avulsoTitle;
+  const valid = !!title.trim() && !!form.date && timesValid && (avulso || selection !== null);
 
   const save = async () => {
     if (!valid || saving) return;
     setSaving(true);
     setError("");
     try {
-      if (selectedExecution) {
-        await scheduleExecution(selectedExecution.id, form.date, form.startTime, form.endTime);
+      if (selection?.kind === "execution") {
+        await scheduleExecution(selection.execution.id, form.date, form.startTime, form.endTime);
+      } else if (selection?.kind === "step") {
+        await scheduleStepAsExecution(
+          selection.step,
+          selection.goal,
+          form.date,
+          form.startTime,
+          form.endTime,
+        );
       } else {
         await createExecution({
-          title: form.title,
+          title: title.trim(),
           dueDate: form.date,
           agendaDate: form.date,
           startTime: form.startTime,
           endTime: form.endTime,
-          category: linked?.category ?? "generico",
+          category: selection?.kind === "goal" ? selection.goal.category : "generico",
           location: form.location || undefined,
           rigid: form.rigid,
           weight: "leve",
-          goalId: form.goalId || undefined,
+          goalId: selection?.kind === "goal" ? selection.goal.id : undefined,
         });
       }
       onDone();
@@ -174,6 +239,15 @@ function AgendaFlow({ onDone }: { onDone: () => void }) {
       setSaving(false);
     }
   };
+
+  const breadcrumb =
+    selection &&
+    [
+      selection.goal.title,
+      selection.kind !== "goal" && selection.kind === "step" ? selection.step.title : null,
+      selection.kind === "execution" ? (selection.step?.title ?? null) : null,
+      selection.kind === "execution" ? selection.execution.title : null,
+    ].filter(Boolean);
 
   return (
     <div className="mt-8 space-y-5">
@@ -186,84 +260,79 @@ function AgendaFlow({ onDone }: { onDone: () => void }) {
 
       <div>
         <span className="mb-1 block text-[11px] uppercase tracking-wider text-muted-foreground">
-          Vincular a um plano (opcional)
+          O quê
         </span>
-        <div className="rounded-xl border border-border bg-surface p-2">
-          <div className="flex flex-wrap gap-1.5">
-            <Chip
-              active={form.goalId === ""}
-              onClick={() => {
-                setForm({ ...form, goalId: "" });
-                setSelectedExecutionId("");
-              }}
+        {!avulso ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowPicker(true)}
+              className="flex w-full items-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-left text-sm outline-none focus:border-primary"
             >
-              nenhum
-            </Chip>
-            {goals.slice(0, 8).map((g) => (
-              <Chip
-                key={g.id}
-                active={form.goalId === g.id}
-                onClick={() => {
-                  setForm({ ...form, goalId: g.id });
-                  setSelectedExecutionId("");
-                }}
+              <Target className="h-4 w-4 shrink-0 text-muted-foreground" />
+              {selection ? (
+                <span className="min-w-0 flex-1 truncate">{breadcrumb!.join(" › ")}</span>
+              ) : (
+                <span className="flex-1 text-muted-foreground">
+                  Selecionar plano, etapa ou execução
+                </span>
+              )}
+            </button>
+            {selection && (
+              <button
+                type="button"
+                onClick={() => setShowPicker(true)}
+                className="mt-1.5 text-[11px] font-semibold text-primary"
               >
-                {categoryMeta[g.category]?.emoji ?? "✦"}{" "}
-                {g.title.length > 24 ? g.title.slice(0, 22) + "…" : g.title}
-              </Chip>
-            ))}
-          </div>
-        </div>
-        {linked && pendingExecutions.length > 0 && (
-          <div className="mt-2 space-y-1.5">
-            <p className="text-[11px] text-muted-foreground">
-              "{linked.title}" tem execuções sem agenda — selecione uma pra só marcar dia/hora, ou
-              deixe sem selecionar pra criar um compromisso novo.
-            </p>
-            <div className="space-y-1.5">
-              {pendingExecutions.map((e) => (
-                <ExecutionPickButton
-                  key={e.id}
-                  execution={e}
-                  active={selectedExecutionId === e.id}
-                  onClick={() => setSelectedExecutionId((cur) => (cur === e.id ? "" : e.id))}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-        {linked && pendingExecutions.length === 0 && (
-          <p className="mt-2 flex items-center gap-1.5 text-[11px] text-primary">
-            <Link2 className="h-3 w-3" /> essa execução vai contar como avanço em "{linked.title}".
-          </p>
+                trocar
+              </button>
+            )}
+            {selection?.kind === "execution" && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Prazo: {formatDateBR(selection.execution.dueDate)}
+                {isScheduled(selection.execution)
+                  ? ` — já agendada para ${formatDateBR(selection.execution.agendaDate!)} às ${formatTime(selection.execution.startTime, profile.timeFormat)}. Confirmar aqui só troca o horário, não duplica.`
+                  : " — agendar aqui não muda o prazo nem duplica a execução, só marca dia e horário."}
+              </p>
+            )}
+            {selection?.kind === "step" && (
+              <p className="mt-2 flex items-center gap-1.5 text-[11px] text-primary">
+                <Link2 className="h-3 w-3" /> essa etapa ainda não tem execução — vamos criar uma ao
+                agendar.
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setAvulso(true);
+                setSelection(null);
+              }}
+              className="mt-2.5 text-[11px] font-semibold text-muted-foreground underline decoration-dotted"
+            >
+              ou criar um compromisso avulso (sem plano)
+            </button>
+          </>
+        ) : (
+          <>
+            <input
+              value={avulsoTitle}
+              onChange={(e) => setAvulsoTitle(e.target.value)}
+              placeholder='Ex: "Dentista"'
+              autoFocus
+              className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-primary"
+            />
+            <button
+              type="button"
+              onClick={() => setAvulso(false)}
+              className="mt-1.5 text-[11px] font-semibold text-primary"
+            >
+              vincular a um plano em vez disso
+            </button>
+          </>
         )}
       </div>
 
-      {selectedExecution ? (
-        <div className="card-surface p-3.5">
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            Execução selecionada
-          </p>
-          <p className="mt-1 font-semibold">{selectedExecution.title}</p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Prazo: {formatDateBR(selectedExecution.dueDate)}
-          </p>
-        </div>
-      ) : (
-        <Field
-          label="O quê"
-          placeholder='Ex: "Dentista"'
-          value={form.title}
-          onChange={(v) => setForm({ ...form, title: v })}
-          autoFocus
-        />
-      )}
-      <Field
-        label="Dia"
-        value={form.date}
-        onChange={(v) => setForm({ ...form, date: v })}
-        type="date"
-      />
+      <DateField label="Dia" value={form.date} onChange={(v) => setForm({ ...form, date: v })} />
       <div className="grid grid-cols-2 gap-3">
         <Field
           label="Início"
@@ -283,7 +352,7 @@ function AgendaFlow({ onDone }: { onDone: () => void }) {
       {form.startTime && form.endTime && !timesValid && (
         <p className="text-[11px] text-danger">O horário de fim precisa ser depois do início.</p>
       )}
-      {!selectedExecution && (
+      {creatingNew && (
         <>
           <Field
             label="Onde (opcional)"
@@ -314,34 +383,23 @@ function AgendaFlow({ onDone }: { onDone: () => void }) {
         className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-semibold text-primary-foreground disabled:opacity-40"
       >
         <Check className="h-4 w-4" />
-        {saving ? "Salvando…" : selectedExecution ? "Agendar execução" : "Salvar na agenda"}
+        {saving
+          ? "Salvando…"
+          : selection?.kind === "execution"
+            ? "Agendar execução"
+            : "Salvar na agenda"}
       </button>
-    </div>
-  );
-}
 
-function ExecutionPickButton({
-  execution,
-  active,
-  onClick,
-}: {
-  execution: Execution;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex w-full items-center justify-between gap-2 rounded-xl border p-3 text-left transition-colors ${active ? "border-primary bg-primary/10" : "border-border bg-surface hover:border-primary/40"}`}
-    >
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold">{execution.title}</p>
-        <p className="text-[11px] text-muted-foreground">
-          Prazo: {formatDateBR(execution.dueDate)}
-        </p>
-      </div>
-      {active && <Check className="h-4 w-4 shrink-0 text-primary" />}
-    </button>
+      {showPicker && (
+        <PlanItemPicker
+          onClose={() => setShowPicker(false)}
+          onSelect={(sel) => {
+            setSelection(sel);
+            setShowPicker(false);
+          }}
+        />
+      )}
+    </div>
   );
 }
 
@@ -406,7 +464,7 @@ function PlanejamentoFlow({ onDone }: { onDone: (id: string) => void }) {
     setError("");
     try {
       const cat = catByArea[form.lifeArea] ?? "generico";
-      const id = await createGoal({
+      const { id, firstStepId } = await createGoal({
         title: form.title.trim(),
         why: form.why.trim(),
         trackingType: "etapas",
@@ -430,6 +488,7 @@ function PlanejamentoFlow({ onDone }: { onDone: (id: string) => void }) {
           category: cat,
           weight: "medio",
           goalId: id,
+          stepId: firstStepId,
         });
       }
       onDone(id);
@@ -521,12 +580,12 @@ function PlanejamentoFlow({ onDone }: { onDone: (id: string) => void }) {
               Data personalizada
             </button>
             {form.preset === "personalizado" && (
-              <input
-                type="date"
-                value={form.customISO}
-                onChange={(e) => setForm({ ...form, customISO: e.target.value })}
-                className="mt-2 w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-primary"
-              />
+              <div className="mt-2">
+                <DateField
+                  value={form.customISO}
+                  onChange={(v) => setForm({ ...form, customISO: v })}
+                />
+              </div>
             )}
           </div>
           {deadlineDate && (
@@ -582,11 +641,10 @@ function PlanejamentoFlow({ onDone }: { onDone: (id: string) => void }) {
                 className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
               />
               <div className="flex gap-2">
-                <input
-                  type="date"
+                <DateField
                   value={stepDraftDate}
-                  onChange={(e) => setStepDraftDate(e.target.value)}
-                  className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+                  onChange={setStepDraftDate}
+                  className="flex flex-1 items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-left text-sm outline-none focus:border-primary"
                 />
                 <button
                   onClick={() => {
@@ -719,6 +777,9 @@ function Field({
   autoFocus?: boolean;
   type?: string;
 }) {
+  if (type === "date") {
+    return <DateField label={label} value={p.value} onChange={p.onChange} />;
+  }
   return (
     <label className="block">
       <span className="mb-1 block text-[11px] uppercase tracking-wider text-muted-foreground">
