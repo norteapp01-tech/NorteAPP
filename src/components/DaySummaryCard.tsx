@@ -26,11 +26,11 @@ export function DaySummaryCard({
     <>
       <button
         onClick={() => setOpen(true)}
-        className="card-surface mt-5 flex w-full items-center gap-3 p-4 text-left hover:border-primary/40"
+        className="card-surface mt-5 flex min-h-16 w-full items-center gap-4 p-4 text-left hover:border-primary/40"
       >
-        <PieChart className="h-4 w-4 shrink-0 text-primary" />
+        <PieChart className="h-6 w-6 shrink-0 text-primary" strokeWidth={1.75} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">Resumo do dia</p>
+          <p className="text-base font-medium">Resumo do dia</p>
           <p className="text-[11px] text-muted-foreground">Insight, reorganizar e fechar o dia</p>
         </div>
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />

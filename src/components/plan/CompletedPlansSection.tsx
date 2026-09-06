@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Trophy } from "lucide-react";
+import { ChevronRight, ChevronUp, Trophy } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { categoryMeta } from "@/lib/mock-data";
 import {
@@ -30,25 +30,32 @@ export function CompletedPlansSection({
   const [open, setOpen] = useState(false);
   const completed = goals.filter((g) => isGoalComplete(g, steps, executions));
 
-  if (completed.length === 0) return null;
-
   return (
-    <div className="mt-6 rounded-2xl border border-border bg-surface p-4">
+    <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-surface">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between"
+        className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-surface-2"
       >
-        <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          <Trophy className="h-3.5 w-3.5 text-warning" /> Planos concluídos ({completed.length})
+        <span className="flex min-w-0 items-center gap-3 text-sm text-muted-foreground">
+          <Trophy className="h-5 w-5 shrink-0" strokeWidth={1.75} />
+          <span>Planos concluídos</span>
+          <span className="rounded-lg bg-surface-2 px-2 py-1 text-xs font-semibold">
+            {completed.length}
+          </span>
         </span>
         {open ? (
           <ChevronUp className="h-4 w-4 text-muted-foreground" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
         )}
       </button>
-      {open && (
-        <div className="mt-3 space-y-2.5">
+      {open && completed.length === 0 && (
+        <p className="border-t border-border px-4 py-4 text-sm text-muted-foreground">
+          Seus planos concluídos aparecerão aqui.
+        </p>
+      )}
+      {open && completed.length > 0 && (
+        <div className="space-y-2.5 border-t border-border p-3">
           {completed.map((g) => {
             const cat = categoryMeta[g.category] ?? categoryMeta.generico;
             const gSteps = stepsForGoal(steps, g.id);

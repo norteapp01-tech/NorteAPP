@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { nowDate } from "@/lib/test-clock";
-import { Play, Check, Flame, EllipsisVertical, X, Sparkles, CalendarClock } from "lucide-react";
-import { categoryMeta, statusDot, statusLabel, type TaskStatus } from "@/lib/mock-data";
+import { Check, Ellipsis, EllipsisVertical, X, Sparkles, CalendarClock } from "lucide-react";
+import { categoryMeta } from "@/lib/mock-data";
 import { useProfile, greeting, updateProfile } from "@/lib/profile-store";
 import { formatTime } from "@/lib/format-utils";
 import { HydrationCard } from "@/components/hydration/HydrationCard";
@@ -28,7 +28,6 @@ import {
   rescheduleExecution,
   redistributeExecution,
   patchExecution,
-  confidenceIndexByCategory,
   streakForTitle,
   insightsComputed,
   isMissed,
@@ -42,9 +41,6 @@ import {
 
 type EnergyMood = "fogo" | "normal" | "cansado" | "doente" | null;
 
-const weightLabel: Record<string, string> = { leve: "Leve", medio: "Médio", pesado: "Pesado" };
-const weightDots: Record<string, number> = { leve: 1, medio: 2, pesado: 3 };
-
 const moodOptions = [
   { v: "fogo", emoji: "🔥", label: "Fogo" },
   { v: "normal", emoji: "😐", label: "Normal" },
@@ -52,17 +48,9 @@ const moodOptions = [
   { v: "doente", emoji: "🤒", label: "Doente" },
 ] as const;
 
-function reliabilityFor(category: string, executions: Execution[]): TaskStatus {
-  const entry = confidenceIndexByCategory(executions).find((c) => c.category === category);
-  if (!entry) return "white";
-  if (entry.pct >= 80) return "green";
-  if (entry.pct >= 40) return "yellow";
-  return "red";
-}
-
 export function TodayScreen() {
   const state = useGoalsStore((s) => s);
-  const { executions, goals } = state;
+  const { executions } = state;
   const profile = useProfile();
 
   const todayMood = (profile.moodDate === todayISO() ? profile.moodValue : null) as EnergyMood;
@@ -96,9 +84,9 @@ export function TodayScreen() {
   };
 
   return (
-    <div className="px-5 pt-12">
-      <header className="flex items-end justify-between">
-        <div>
+    <div className="px-5 pt-11">
+      <header className="relative">
+        <div className="pr-12">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             {nowDate().toLocaleDateString("pt-BR", {
               weekday: "long",
@@ -106,17 +94,24 @@ export function TodayScreen() {
               month: "short",
             })}
           </p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight">
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">
             {greeting()}
             {profile.displayName ? `, ${profile.displayName}` : ""}.
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground text-balance-tight">
+          <p className="mt-1 pr-32 text-sm text-muted-foreground text-balance-tight">
             {pendingTasks.some((t) => isMissed(t))
               ? "Tem coisa atrasada aí embaixo. Encara."
               : "Hoje é dia de seguir o plano."}
           </p>
         </div>
-        <div className="flex flex-col items-end gap-1">
+        <button
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Configurações"
+          className="absolute -right-2 -top-2 flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-surface"
+        >
+          <Ellipsis className="h-5 w-5" />
+        </button>
+        <div className="absolute right-0 bottom-0 flex w-28 flex-col items-end gap-1">
           <span className="text-xs font-medium text-muted-foreground">
             {done} de {total} concluídas
           </span>
@@ -124,20 +119,13 @@ export function TodayScreen() {
             <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
           </div>
         </div>
-        <button
-          onClick={() => setSettingsOpen(true)}
-          aria-label="Configurações"
-          className="-m-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-surface"
-        >
-          <EllipsisVertical className="h-4 w-4" />
-        </button>
         {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
       </header>
 
       {/* Como você está? — sempre visível, seleção persistida no perfil */}
-      <section className="mt-5">
-        <p className="text-sm font-medium">Como você está?</p>
-        <div className="mt-2.5 grid grid-cols-4 gap-2">
+      <section className="mt-7 flex items-center justify-between gap-3 border-y border-border/70 py-4">
+        <p className="shrink-0 text-sm font-medium">Como você está?</p>
+        <div className="flex min-w-0 items-center justify-end gap-2">
           {moodOptions.map((o) => {
             const selected = todayMood === o.v;
             return (
@@ -147,61 +135,56 @@ export function TodayScreen() {
                 disabled={savingMood}
                 aria-pressed={selected}
                 aria-label={o.label}
-                className={`flex min-h-11 flex-col items-center justify-center rounded-full border-2 py-2.5 transition-colors disabled:opacity-60 ${selected ? "border-primary bg-primary/10" : "border-transparent bg-surface-2 hover:border-border"}`}
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors disabled:opacity-60 ${selected ? "border-primary bg-primary/10" : "border-border bg-surface/80 hover:border-muted-foreground"}`}
               >
                 <span className={`text-xl ${selected ? "" : "opacity-70"}`}>{o.emoji}</span>
               </button>
             );
           })}
         </div>
-        {moodPanelFor && (
-          <MoodActionPanel
-            mood={moodPanelFor}
-            onFinish={async (action) => {
-              const tomorrow = toISODate(addDays(nowDate(), 1));
-              if (action === "adiar-pesados") {
-                await Promise.all(
-                  tasks
-                    .filter((t) => t.weight === "pesado" && t.status === "planejada" && !t.rigid)
-                    .map((t) =>
-                      rescheduleExecution(
-                        t.id,
-                        tomorrow,
-                        t.startTime ?? "09:00",
-                        t.endTime,
-                        "adiado — dia cansado",
-                      ),
-                    ),
-                );
-              }
-              if (action === "elevar") {
-                const leitura = tasks.find(
-                  (t) => t.category === "leitura" && t.status === "planejada",
-                );
-                if (leitura)
-                  await patchExecution(leitura.id, {
-                    how: "16 páginas (dobrado) — modo fogo",
-                    weight: "medio",
-                  });
-              }
-              if (action === "remover-flex") {
-                await Promise.all(
-                  tasks
-                    .filter((t) => t.status === "planejada" && !t.rigid)
-                    .map((t) => cancelExecution(t.id, "removida — dia sem energia pra flexíveis")),
-                );
-              }
-              setMoodPanelFor(null);
-            }}
-            onClose={() => setMoodPanelFor(null)}
-          />
-        )}
       </section>
-
-      <div className="mt-5 flex items-stretch gap-3">
-        <RemindersCard compact />
-        <HydrationCard className="flex-1" />
-      </div>
+      {moodPanelFor && (
+        <MoodActionPanel
+          mood={moodPanelFor}
+          onFinish={async (action) => {
+            const tomorrow = toISODate(addDays(nowDate(), 1));
+            if (action === "adiar-pesados") {
+              await Promise.all(
+                tasks
+                  .filter((t) => t.weight === "pesado" && t.status === "planejada" && !t.rigid)
+                  .map((t) =>
+                    rescheduleExecution(
+                      t.id,
+                      tomorrow,
+                      t.startTime ?? "09:00",
+                      t.endTime,
+                      "adiado — dia cansado",
+                    ),
+                  ),
+              );
+            }
+            if (action === "elevar") {
+              const leitura = tasks.find(
+                (t) => t.category === "leitura" && t.status === "planejada",
+              );
+              if (leitura)
+                await patchExecution(leitura.id, {
+                  how: "16 páginas (dobrado) — modo fogo",
+                  weight: "medio",
+                });
+            }
+            if (action === "remover-flex") {
+              await Promise.all(
+                tasks
+                  .filter((t) => t.status === "planejada" && !t.rigid)
+                  .map((t) => cancelExecution(t.id, "removida — dia sem energia pra flexíveis")),
+              );
+            }
+            setMoodPanelFor(null);
+          }}
+          onClose={() => setMoodPanelFor(null)}
+        />
+      )}
 
       <div className="mt-7 flex items-center justify-between">
         <h2 className="text-lg font-semibold">Tarefas de hoje</h2>
@@ -210,18 +193,16 @@ export function TodayScreen() {
         </span>
       </div>
 
-      <ul className="mt-3 space-y-3">
+      <ul className="card-surface mt-3 divide-y divide-border overflow-hidden">
         {displayTasks.map((t) => {
           const cat = categoryMeta[t.category] ?? categoryMeta.generico;
-          const streak = streakForTitle(executions, t.title);
-          const reliability = reliabilityFor(t.category, executions);
           const missed = isMissed(t);
           const doneNow = t.status === "concluida";
           const isNext = t.id === nextTaskId;
           return (
             <li
               key={`${t.id}-${t.agendaSessionId ?? t.agendaDate}`}
-              className={`card-surface group relative overflow-hidden p-4 transition-opacity ${doneNow ? "opacity-50" : ""} ${isNext ? "border-l-2 border-l-primary" : ""}`}
+              className={`group relative overflow-hidden px-4 py-4 transition-opacity ${doneNow ? "opacity-50" : ""} ${isNext ? "border-l-2 border-l-primary" : ""}`}
             >
               <div className="flex items-start gap-3">
                 <button
@@ -229,94 +210,45 @@ export function TodayScreen() {
                     await toggleExecutionDone(t.id);
                   }}
                   aria-label={doneNow ? "Reabrir tarefa" : "Concluir tarefa"}
-                  className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-colors ${doneNow ? "border-primary bg-primary text-primary-foreground" : "border-border bg-surface-2"}`}
+                  className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors ${doneNow ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground bg-transparent"}`}
                 >
                   {doneNow && <Check className="h-4 w-4" strokeWidth={3} />}
                 </button>
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    {isNext && (
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-primary">
+                  <button
+                    onClick={() => !doneNow && setFocus(t)}
+                    className={`block w-full text-left font-medium leading-snug ${doneNow ? "text-muted-foreground line-through" : ""}`}
+                  >
+                    {t.title}
+                  </button>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                    {isNext && !doneNow && (
+                      <span className="font-semibold uppercase tracking-wide text-primary">
                         Próxima
                       </span>
                     )}
-                    <span
-                      className={`h-2 w-2 rounded-full ${statusDot[reliability]}`}
-                      title={statusLabel[reliability]}
-                    />
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                      {cat.emoji} {cat.label}
-                    </span>
-                    {t.rigid && (
-                      <span className="rounded-full bg-danger/15 px-1.5 py-0.5 text-[10px] font-semibold text-danger">
-                        RÍGIDA
-                      </span>
-                    )}
-                    {missed && !doneNow && (
-                      <span className="rounded-full bg-danger/15 px-1.5 py-0.5 text-[10px] font-semibold text-danger">
-                        PERDIDA
-                      </span>
-                    )}
-                    {streak > 0 && (
-                      <span className="ml-auto flex items-center gap-0.5 text-[11px] text-warning">
-                        <Flame className="h-3 w-3" />
-                        {streak}
-                      </span>
-                    )}
-                  </div>
-                  <p
-                    className={`mt-1 font-semibold leading-snug ${doneNow ? "text-muted-foreground line-through" : ""}`}
-                  >
-                    {t.title}
-                  </p>
-                  {t.how && <p className="mt-0.5 text-xs text-muted-foreground">{t.how}</p>}
-                  {t.goalId && (
-                    <p className="mt-0.5 text-[11px] text-primary">
-                      ← {goals.find((g) => g.id === t.goalId)?.title ?? "planejamento"}
-                    </p>
-                  )}
-                  <div className="mt-2.5 flex items-center gap-3 text-[11px] text-muted-foreground">
-                    <span className="font-mono font-semibold text-foreground">
+                    <span className="font-mono">
                       {formatTime(t.startTime, profile.timeFormat)}
                       {t.endTime ? `–${formatTime(t.endTime, profile.timeFormat)}` : ""}
                     </span>
-                    <span className="flex gap-0.5">
-                      {[1, 2, 3].map((i) => (
-                        <span
-                          key={i}
-                          className={`h-1 w-3 rounded-full ${i <= weightDots[t.weight] ? "bg-foreground/80" : "bg-border"}`}
-                        />
-                      ))}
-                      <span className="ml-1">{weightLabel[t.weight]}</span>
-                    </span>
+                    <span>·</span>
+                    <span>{cat.label}</span>
+                    {missed && !doneNow && <span className="text-danger">· atrasada</span>}
                   </div>
                 </div>
-                <div className="flex shrink-0 flex-col items-end gap-2">
-                  {!doneNow && isNext && (
-                    <button
-                      onClick={() => setFocus(t)}
-                      aria-label="Iniciar Modo Foco"
-                      className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:scale-95"
-                    >
-                      <Play className="h-4 w-4 fill-current" />
-                    </button>
-                  )}
-                  {!doneNow && (
-                    <button
-                      onClick={() => setSkipping(t)}
-                      aria-label="Mais ações"
-                      className="-m-2 flex h-9 w-9 items-center justify-center text-muted-foreground hover:text-foreground"
-                    >
-                      <EllipsisVertical className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
+                <button
+                  onClick={() => setSkipping(t)}
+                  aria-label="Mais ações"
+                  className="-m-2 flex h-11 w-11 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
+                >
+                  <EllipsisVertical className="h-4 w-4" />
+                </button>
               </div>
             </li>
           );
         })}
         {tasks.length === 0 && (
-          <li className="card-surface flex flex-col items-center gap-2 p-6 text-center">
+          <li className="flex flex-col items-center gap-2 p-6 text-center">
             <p className="text-sm text-muted-foreground">Nada planejado para hoje.</p>
             <Link to="/agenda" className="text-xs font-semibold text-primary">
               Adicionar algo pro dia →
@@ -324,6 +256,11 @@ export function TodayScreen() {
           </li>
         )}
       </ul>
+
+      <div className="mt-4 flex items-stretch gap-3">
+        <RemindersCard compact />
+        <HydrationCard className="flex-1" />
+      </div>
 
       {/* Minha rotina */}
       <div className="mt-7">

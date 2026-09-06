@@ -21,8 +21,8 @@ const routineIcons: Record<string, LucideIcon> = {
 /** Faixa horizontal de sub-agendas ("Minha rotina") — usada na Hoje. Fonte única, não duplicar. */
 export function SubagendasGrid() {
   return (
-    <div className="-mx-5 overflow-x-auto px-5">
-      <div className="flex gap-3" style={{ width: "max-content" }}>
+    <div className="-mx-2 overflow-x-auto px-2">
+      <div className="flex min-w-max divide-x divide-border">
         {Object.entries(categoryMeta)
           .filter(([key]) => routineCategories.includes(key))
           .map(([key, m]) => {
@@ -32,9 +32,9 @@ export function SubagendasGrid() {
                 key={key}
                 to="/sub-agenda/$categoria"
                 params={{ categoria: key }}
-                className="flex w-[72px] shrink-0 flex-col items-center gap-2 rounded-xl py-1 text-center hover:bg-surface"
+                className="flex w-[78px] shrink-0 flex-col items-center gap-2 py-2 text-center hover:bg-surface"
               >
-                <span className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-surface-2 text-primary">
+                <span className="flex h-8 w-12 items-center justify-center text-primary">
                   {Icon && <Icon className="h-6 w-6" strokeWidth={1.75} />}
                 </span>
                 <span className="text-[11px] font-medium leading-tight text-foreground">

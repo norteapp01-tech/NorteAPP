@@ -72,30 +72,33 @@ export function RemindersCard({ compact = false }: { compact?: boolean }) {
           onFocus={pauseThenResume}
           onPointerDown={pauseThenResume}
           onClick={() => setShowModal(true)}
-          className="flex min-w-0 flex-1 flex-col items-start rounded-xl border border-border bg-surface p-3.5 text-left"
+          className="flex min-h-24 min-w-0 flex-1 items-center gap-3 rounded-xl border border-border bg-surface p-3.5 text-left"
         >
-          <span className="flex w-full items-center justify-between gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <Bell className="h-3.5 w-3.5 text-warning" /> Lembrete
+          <Bell className="h-7 w-7 shrink-0 text-primary" strokeWidth={1.75} />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[10px] font-semibold uppercase tracking-wider text-primary">
+              Lembrete
             </span>
-            <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-          </span>
-          {current ? (
-            <span
-              className={`mt-2 block w-full min-w-0 transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
-            >
-              <span className="block truncate text-sm font-semibold">{current.text}</span>
+            {current ? (
               <span
-                className={`block text-[11px] ${isOverdue ? "text-danger" : "text-muted-foreground"}`}
+                className={`mt-1 block min-w-0 transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
               >
-                {isOverdue ? "Atrasado" : formatRelativeDate(current.date)}
+                <span className="block line-clamp-2 text-sm font-medium leading-snug">
+                  {current.text}
+                </span>
+                <span
+                  className={`block text-[10px] ${isOverdue ? "text-danger" : "text-muted-foreground"}`}
+                >
+                  {isOverdue ? "Atrasado" : formatRelativeDate(current.date)}
+                </span>
               </span>
-            </span>
-          ) : (
-            <span className="mt-2 block text-[11px] text-muted-foreground">
-              Nenhum lembrete para hoje
-            </span>
-          )}
+            ) : (
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Nenhum lembrete para hoje
+              </span>
+            )}
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
         </button>
         {showModal && <RemindersModal onClose={() => setShowModal(false)} />}
       </>
