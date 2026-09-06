@@ -68,6 +68,13 @@ export type ExecutionHistoryEntry = {
   note?: string;
 };
 
+export type AgendaSession = {
+  id: string;
+  date: string;
+  startTime: string;
+  endTime?: string;
+};
+
 export type Execution = {
   id: string;
   title: string;
@@ -77,6 +84,9 @@ export type Execution = {
   agendaDate?: string; // YYYY-MM-DD
   startTime?: string; // HH:MM
   endTime?: string; // HH:MM
+  agendaSessions?: AgendaSession[];
+  /** Identifica uma ocorrência virtual quando a ação aparece várias vezes na Agenda. */
+  agendaSessionId?: string;
   /** CRONOGRAMA — em qual período do plano esta ação está sendo trabalhada.
    * Terceiro conceito de tempo, independente de prazo e agenda: uma ação pode
    * ter intervalo planejado sem estar na agenda, estar na agenda sem intervalo
@@ -101,7 +111,9 @@ export type Execution = {
 
 /** Uma execução "existe" sempre (tem prazo); só passa a valer pra Agenda/Hoje quando agendada. */
 export function isScheduled(e: Execution): boolean {
-  return !!e.agendaDate;
+  const today = todayISO();
+  if (e.agendaSessions?.some((session) => session.date >= today)) return true;
+  return !!e.agendaDate && e.agendaDate >= today;
 }
 
 /** Rotina configurada numa sub-agenda (ex.: Academia, Segunda 18h) — gera execuções reais na agenda. */
@@ -435,16 +447,14 @@ export function effectiveStatus(e: Execution): ExecutionStatus {
 
 /** Carga horária reservada num dia — só conta o que foi de fato agendado pra essa data. */
 export function plannedHoursForDate(executions: Execution[], date: string): number {
-  return executions
-    .filter((e) => e.agendaDate === date && (e.status === "planejada" || e.status === "concluida"))
+  return (agendaByDate(executions)[date] ?? [])
+    .filter((e) => e.status === "planejada" || e.status === "concluida")
     .reduce((sum, e) => sum + weightHours[e.weight], 0);
 }
 
 /** HOJE = o que chegou a hora de fazer — só execuções agendadas pra essa data. */
 export function todayExecutions(executions: Execution[], date = todayISO()): Execution[] {
-  return executions
-    .filter((e) => e.agendaDate === date && e.status !== "reagendada")
-    .sort((a, b) => (a.startTime ?? "").localeCompare(b.startTime ?? ""));
+  return agendaByDate(executions)[date] ?? [];
 }
 
 /** Ordena a lista "Hoje" pra exibição: pendentes por horário primeiro (mesma ordem
@@ -462,8 +472,27 @@ export function agendaByDate(executions: Execution[]): Record<string, Execution[
   const map: Record<string, Execution[]> = {};
   for (const e of executions) {
     if (e.status === "reagendada") continue; // substituída pela nova execução
-    if (!e.agendaDate) continue; // sem agenda não entra no calendário — só na aba Execuções do plano
-    (map[e.agendaDate] ??= []).push(e);
+    const sessions = e.agendaSessions?.length
+      ? e.agendaSessions
+      : e.agendaDate
+        ? [
+            {
+              id: `legacy-${e.id}`,
+              date: e.agendaDate,
+              startTime: e.startTime ?? "",
+              endTime: e.endTime,
+            },
+          ]
+        : [];
+    for (const session of sessions) {
+      (map[session.date] ??= []).push({
+        ...e,
+        agendaDate: session.date,
+        startTime: session.startTime,
+        endTime: session.endTime,
+        agendaSessionId: session.id,
+      });
+    }
   }
   for (const k in map) map[k].sort((a, b) => (a.startTime ?? "").localeCompare(b.startTime ?? ""));
   return map;
@@ -827,9 +856,10 @@ export function isPlannedOverdue(e: Execution, todayIso: string): boolean {
   return e.plannedEndDate < todayIso;
 }
 
-export type GanttScale = "semana" | "mes" | "45dias" | "90dias";
+export type GanttScale = "dia" | "semana" | "mes" | "45dias" | "90dias";
 
 export const ganttScaleLabel: Record<GanttScale, string> = {
+  dia: "Dia",
   semana: "Semana",
   mes: "Mês",
   "45dias": "45 dias",
@@ -837,6 +867,7 @@ export const ganttScaleLabel: Record<GanttScale, string> = {
 };
 
 const GANTT_SCALE_DAYS: Record<GanttScale, number> = {
+  dia: 7,
   semana: 7,
   mes: 28,
   "45dias": 45,
@@ -847,6 +878,7 @@ const GANTT_SCALE_DAYS: Record<GanttScale, number> = {
  * hoje fique grudada na borda esquerda da janela (a referência visual mostra
  * hoje já na 2ª semana da visão mensal, não na primeira). */
 const GANTT_SCALE_LOOKBACK: Record<GanttScale, number> = {
+  dia: 1,
   semana: 1,
   mes: 11,
   "45dias": 7,
@@ -867,6 +899,7 @@ export function ganttWindow(
 }
 
 const GANTT_BUCKET_DAYS: Record<GanttScale, number> = {
+  dia: 1,
   semana: 7,
   mes: 30,
   "45dias": 45,
@@ -881,28 +914,40 @@ function isoParts(iso: string): { y: number; m: number; d: number } {
 function ganttBucketLabel(startISO: string, endISO: string): string {
   const s = isoParts(startISO);
   const e = isoParts(endISO);
+  if (startISO === endISO) return `${s.d} ${MONTH_ABBR_PT[s.m - 1].toUpperCase()}`;
   if (s.m === e.m) return `${s.d}–${e.d} ${MONTH_ABBR_PT[s.m - 1].toUpperCase()}`;
   return `${s.d} ${MONTH_ABBR_PT[s.m - 1].toUpperCase()}–${e.d} ${MONTH_ABBR_PT[e.m - 1].toUpperCase()}`;
 }
 
 export type GanttBucket = { startISO: string; endISO: string; label: string };
 
-/** Régua do cronograma — cada escala define o tamanho real de uma coluna:
- * semana=7, mês=30, 45 dias=45 e 90 dias=90. */
+/** Régua do cronograma: dias individuais; semanas civis (dom–sáb); meses de
+ * calendário; ou blocos corridos de 45/90 dias. Início e prazo são clipados. */
 export function ganttBuckets(startISO: string, endISO: string, scale: GanttScale): GanttBucket[] {
-  const bucketDays = GANTT_BUCKET_DAYS[scale];
   const start = new Date(startISO + "T00:00:00");
   const end = new Date(endISO + "T00:00:00");
   const totalDays = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
   const buckets: GanttBucket[] = [];
-  for (let offset = 0; offset < totalDays; offset += bucketDays) {
+  let offset = 0;
+  while (offset < totalDays) {
     const bStartISO = toISODate(addDays(start, offset));
-    const bEndISO = toISODate(addDays(start, Math.min(offset + bucketDays, totalDays) - 1));
+    const cursor = addDays(start, offset);
+    let bucketDays = GANTT_BUCKET_DAYS[scale];
+    if (scale === "semana") {
+      const daysUntilSaturday = (6 - cursor.getDay() + 7) % 7;
+      bucketDays = daysUntilSaturday + 1;
+    } else if (scale === "mes") {
+      bucketDays =
+        new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate() - cursor.getDate() + 1;
+    }
+    const actualDays = Math.min(bucketDays, totalDays - offset);
+    const bEndISO = toISODate(addDays(start, offset + actualDays - 1));
     buckets.push({
       startISO: bStartISO,
       endISO: bEndISO,
       label: ganttBucketLabel(bStartISO, bEndISO),
     });
+    offset += actualDays;
   }
   return buckets;
 }
@@ -985,6 +1030,9 @@ function mapExecution(r: Row, history: ExecutionHistoryEntry[]): Execution {
     agendaDate: (r.agenda_date as string) ?? undefined,
     startTime: (r.start_time as string) ?? undefined,
     endTime: (r.end_time as string) ?? undefined,
+    agendaSessions: Array.isArray(r.agenda_sessions)
+      ? (r.agenda_sessions as AgendaSession[])
+      : undefined,
     plannedStartDate: (r.planned_start_date as string) ?? undefined,
     plannedEndDate: (r.planned_end_date as string) ?? undefined,
     category: r.category as string,
@@ -1363,10 +1411,36 @@ export async function scheduleExecution(
   startTime: string,
   endTime?: string,
 ): Promise<void> {
+  const row = await fetchExecutionRow(id);
+  const existing = Array.isArray(row.agenda_sessions)
+    ? (row.agenda_sessions as AgendaSession[])
+    : [];
+  const legacy =
+    existing.length === 0 && row.agenda_date
+      ? [
+          {
+            id: `legacy-${id}`,
+            date: row.agenda_date as string,
+            startTime: (row.start_time as string) ?? "",
+            endTime: (row.end_time as string) ?? undefined,
+          },
+        ]
+      : [];
+  const session: AgendaSession = {
+    id: crypto.randomUUID(),
+    date: agendaDate,
+    startTime,
+    endTime,
+  };
   unwrap(
     await supabase
       .from("executions")
-      .update({ agenda_date: agendaDate, start_time: startTime, end_time: endTime })
+      .update({
+        agenda_date: agendaDate,
+        start_time: startTime,
+        end_time: endTime,
+        agenda_sessions: [...legacy, ...existing, session],
+      })
       .eq("id", id)
       .select()
       .single(),
@@ -1385,8 +1459,25 @@ export async function setPlannedRange(
   unwrap(
     await supabase
       .from("executions")
-      .update({ planned_start_date: plannedStartDate, planned_end_date: plannedEndDate })
+      .update({
+        planned_start_date: plannedStartDate,
+        planned_end_date: plannedEndDate,
+        due_date: plannedEndDate,
+      })
       .eq("id", id)
+      .select()
+      .single(),
+  );
+  await invalidate();
+}
+
+/** Estender o cronograma além do prazo é uma decisão explícita do usuário. */
+export async function updateGoalDeadline(goalId: string, deadlineISO: string): Promise<void> {
+  unwrap(
+    await supabase
+      .from("goals")
+      .update({ deadline_date: deadlineISO })
+      .eq("id", goalId)
       .select()
       .single(),
   );

@@ -854,13 +854,13 @@ describe("ganttBuckets — régua calculada dinamicamente", () => {
     const buckets = ganttBuckets("2026-09-01", "2026-11-29", "mes");
     expect(buckets.length).toBe(3);
     expect(buckets[0]).toMatchObject({ startISO: "2026-09-01", endISO: "2026-09-30" });
-    expect(buckets[2]).toMatchObject({ startISO: "2026-10-31", endISO: "2026-11-29" });
+    expect(buckets[2]).toMatchObject({ startISO: "2026-11-01", endISO: "2026-11-29" });
   });
 
   it("escala mensal atravessando o mês: rótulo muda de mês corretamente", () => {
     const buckets = ganttBuckets("2026-09-22", "2026-10-21", "mes");
     expect(buckets[0].label).toContain("SET");
-    expect(buckets[0].label).toContain("OUT");
+    expect(buckets[1].label).toContain("OUT");
   });
 
   it("escala de 45 dias divide um plano de 90 dias em duas colunas", () => {

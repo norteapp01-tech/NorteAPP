@@ -5,6 +5,7 @@ import {
   daysBetweenISO,
   isPlannedOverdue,
   setPlannedRange,
+  updateGoalDeadline,
   toISODate,
   todayISO,
   type Execution,
@@ -38,6 +39,8 @@ export function GanttBar({
   isHighlighted,
   onOpenDetails,
   onError,
+  goalId,
+  goalDeadlineISO,
 }: {
   execution: Execution;
   windowStartISO: string;
@@ -47,6 +50,8 @@ export function GanttBar({
   isHighlighted: boolean;
   onOpenDetails: () => void;
   onError: (message: string) => void;
+  goalId: string;
+  goalDeadlineISO?: string;
 }) {
   const [optimisticRange, setOptimisticRange] = useState<{ start: string; end: string } | null>(
     null,
@@ -143,9 +148,19 @@ export function GanttBar({
       newEnd = candidate >= drag.origStart ? candidate : drag.origStart;
     }
     if (newStart === drag.origStart && newEnd === drag.origEnd) return; // não moveu de verdade
+    if (goalDeadlineISO && newEnd > goalDeadlineISO) {
+      const extension = daysBetweenISO(goalDeadlineISO, newEnd);
+      const accepted = window.confirm(
+        `Esta alteração ultrapassa o prazo do plano em ${extension} ${extension === 1 ? "dia" : "dias"}. O prazo final passará para ${newEnd.split("-").reverse().join("/")}. Deseja continuar?`,
+      );
+      if (!accepted) return;
+    }
     setOptimisticRange({ start: newStart, end: newEnd });
     navigator.vibrate?.(10);
     try {
+      if (goalDeadlineISO && newEnd > goalDeadlineISO) {
+        await updateGoalDeadline(goalId, newEnd);
+      }
       await setPlannedRange(execution.id, newStart, newEnd);
     } catch (err) {
       setOptimisticRange(null);

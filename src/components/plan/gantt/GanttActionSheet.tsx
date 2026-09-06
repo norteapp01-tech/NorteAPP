@@ -13,11 +13,11 @@ import {
   isScheduled,
   patchExecution,
   redistributeExecution,
-  rescheduleExecution,
   scheduleExecution,
   setPlannedRange,
   toggleExecutionDone,
   todayISO,
+  updateGoalDeadline,
   useGoalsStore,
   type Execution,
   type Goal,
@@ -74,8 +74,17 @@ export function GanttActionSheet({
       return;
     }
     setRangeError("");
+    if (goal.deadlineISO && plannedEnd > goal.deadlineISO) {
+      const accepted = window.confirm(
+        `Essa alteração fará o plano ultrapassar o prazo atual. O novo prazo será ${formatDateBR(plannedEnd)}. Deseja continuar?`,
+      );
+      if (!accepted) return;
+    }
     setSavingRange(true);
     try {
+      if (goal.deadlineISO && plannedEnd > goal.deadlineISO) {
+        await updateGoalDeadline(goal.id, plannedEnd);
+      }
       await setPlannedRange(e.id, plannedStart, plannedEnd);
     } catch (err) {
       setRangeError(err instanceof Error ? err.message : "Não foi possível salvar. Tente de novo.");
@@ -90,17 +99,7 @@ export function GanttActionSheet({
     setScheduleError("");
     setBusy(true);
     try {
-      if (scheduled) {
-        await rescheduleExecution(
-          e.id,
-          schedule.date,
-          schedule.startTime,
-          schedule.endTime,
-          "reagendado no cronograma",
-        );
-      } else {
-        await scheduleExecution(e.id, schedule.date, schedule.startTime, schedule.endTime);
-      }
+      await scheduleExecution(e.id, schedule.date, schedule.startTime, schedule.endTime);
       setScheduling(false);
     } catch (err) {
       setScheduleError(
@@ -199,7 +198,7 @@ export function GanttActionSheet({
                 onClick={() => setScheduling(true)}
                 className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold text-primary ${scheduled ? "border-primary/50" : "border-dashed border-primary/80 bg-primary/5"}`}
               >
-                {scheduled ? "Reagendar" : "Colocar na agenda"}
+                {scheduled ? "Agendar outra sessão" : "Colocar na agenda"}
               </button>
             </div>
           ) : (

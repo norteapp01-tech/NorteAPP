@@ -6,11 +6,11 @@ import { ScaleSelector } from "@/components/plan/gantt/ScaleSelector";
 import { UnscheduledDrawer } from "@/components/plan/gantt/UnscheduledDrawer";
 import {
   addDays,
-  assignLanes,
   daysBetweenISO,
   formatDateShortBR,
   ganttBuckets,
   hasPlannedRange,
+  isScheduled,
   nextPlanAction,
   stepsForGoal,
   toISODate,
@@ -21,11 +21,12 @@ import {
   type Step,
 } from "@/lib/goals-store";
 
-const MIN_BUCKET_WIDTH_PX: Record<GanttScale, number> = {
-  semana: 56,
-  mes: 88,
-  "45dias": 82,
-  "90dias": 78,
+const MIN_PX_PER_DAY: Record<GanttScale, number> = {
+  dia: 54,
+  semana: 8,
+  mes: 3,
+  "45dias": 2,
+  "90dias": 0.9,
 };
 const ROW_HEIGHT = 58;
 const STAGE_LABEL_HEIGHT = 42;
@@ -68,11 +69,7 @@ export function GanttChart({
       [e.plannedStartDate, e.plannedEndDate].filter((d): d is string => !!d),
     );
     const startISO = [createdISO, ...plannedDates, today].sort()[0];
-    const endISO =
-      [goal.deadlineISO, ...plannedDates, today]
-        .filter((d): d is string => !!d)
-        .sort()
-        .at(-1) ?? today;
+    const endISO = goal.deadlineISO ?? [createdISO, ...plannedDates, today].sort().at(-1) ?? today;
     return {
       startISO,
       endISO,
@@ -83,21 +80,20 @@ export function GanttChart({
     () => ganttBuckets(window_.startISO, window_.endISO, scale),
     [window_.startISO, window_.endISO, scale],
   );
-  const bucketDaySpan = daysBetweenISO(buckets[0].startISO, buckets[0].endISO) + 1;
-  // O painel sempre ocupa a largura disponível. Em escalas longas, preserva uma
-  // largura mínima e passa a rolar horizontalmente, como um calendário real.
-  const bucketWidth = Math.max(
-    MIN_BUCKET_WIDTH_PX[scale],
-    viewportWidth > 0 ? viewportWidth / buckets.length : 0,
+  const pxPerDay = Math.max(
+    MIN_PX_PER_DAY[scale],
+    viewportWidth > 0 ? viewportWidth / window_.totalDays : 0,
   );
-  const pxPerDay = bucketWidth / bucketDaySpan;
-  const totalWidth = buckets.length * bucketWidth;
+  const totalWidth = window_.totalDays * pxPerDay;
+  const bucketWidth = (startISO: string, endISO: string) =>
+    (daysBetweenISO(startISO, endISO) + 1) * pxPerDay;
 
   const planNext = nextPlanAction(goal, steps, executions);
   const highlightId = planNext.kind === "action" ? planNext.execution.id : null;
 
   const scheduled = executions.filter(hasPlannedRange);
   const todayOffsetDays = daysBetweenISO(window_.startISO, today);
+  const todayVisible = todayOffsetDays >= 0 && todayOffsetDays < window_.totalDays;
   const deadlineOffsetDays = goal.deadlineISO
     ? daysBetweenISO(window_.startISO, goal.deadlineISO)
     : null;
@@ -107,7 +103,11 @@ export function GanttChart({
     deadlineOffsetDays < window_.totalDays;
   const deadlineOutOfView = deadlineOffsetDays !== null && !deadlineVisible;
 
-  const unscheduled = executions.filter((e) => !hasPlannedRange(e));
+  const toSchedule = executions
+    .filter((e) => e.status !== "concluida" && e.status !== "cancelada" && !isScheduled(e))
+    .sort((a, b) =>
+      (a.plannedStartDate ?? a.dueDate).localeCompare(b.plannedStartDate ?? b.dueDate),
+    );
 
   if (ordered.length === 0) {
     return (
@@ -123,10 +123,14 @@ export function GanttChart({
   }
 
   const corridors = ordered.map((step, i) => {
-    const stepExecs = scheduled.filter((e) => e.stepId === step.id);
-    const { laneOf, laneCount } = assignLanes(
-      stepExecs.map((e) => ({ id: e.id, start: e.plannedStartDate!, end: e.plannedEndDate! })),
-    );
+    const stepExecs = scheduled
+      .filter((e) => e.stepId === step.id)
+      .sort((a, b) => {
+        const byStart = a.plannedStartDate!.localeCompare(b.plannedStartDate!);
+        return byStart !== 0 ? byStart : a.plannedEndDate!.localeCompare(b.plannedEndDate!);
+      });
+    const laneOf = Object.fromEntries(stepExecs.map((execution, lane) => [execution.id, lane]));
+    const laneCount = Math.max(1, stepExecs.length);
     return { step, index: i, stepExecs, laneOf, laneCount };
   });
 
@@ -135,7 +139,10 @@ export function GanttChart({
     const offsetX = e.clientX - rect.left;
     const dayOffset = Math.max(0, Math.floor(offsetX / pxPerDay));
     const startISO = toISODate(addDays(new Date(window_.startISO + "T00:00:00"), dayOffset));
-    const endISO = toISODate(addDays(new Date(startISO + "T00:00:00"), 2));
+    const suggestedEnd = toISODate(addDays(new Date(startISO + "T00:00:00"), 2));
+    const endISO =
+      goal.deadlineISO && suggestedEnd > goal.deadlineISO ? goal.deadlineISO : suggestedEnd;
+    if (goal.deadlineISO && startISO > goal.deadlineISO) return;
     setCreateFor({ step, startISO, endISO });
   };
 
@@ -153,7 +160,7 @@ export function GanttChart({
               <div
                 key={b.startISO}
                 className="flex shrink-0 items-center justify-center border-r border-border/60 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground last:border-r-0"
-                style={{ width: bucketWidth }}
+                style={{ width: bucketWidth(b.startISO, b.endISO) }}
               >
                 {b.label}
               </div>
@@ -167,7 +174,7 @@ export function GanttChart({
                 <div
                   key={`grid-${b.startISO}`}
                   className="h-full shrink-0 border-r border-border/50 last:border-r-0"
-                  style={{ width: bucketWidth }}
+                  style={{ width: bucketWidth(b.startISO, b.endISO) }}
                 />
               ))}
             </div>
@@ -197,6 +204,8 @@ export function GanttChart({
                       isHighlighted={e.id === highlightId}
                       onOpenDetails={() => setOpenExecution(e)}
                       onError={setError}
+                      goalId={goal.id}
+                      goalDeadlineISO={goal.deadlineISO}
                     />
                   ))}
                 </div>
@@ -204,14 +213,16 @@ export function GanttChart({
             ))}
 
             {/* linha de hoje */}
-            <div
-              className="pointer-events-none absolute bottom-0 top-0 z-30 w-px bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.2)]"
-              style={{ left: todayOffsetDays * pxPerDay }}
-            >
-              <span className="absolute left-1 top-1 whitespace-nowrap rounded-md bg-primary px-2 py-1 text-[9px] font-bold text-primary-foreground">
-                HOJE · {new Date(today + "T00:00:00").getDate()}
-              </span>
-            </div>
+            {todayVisible && (
+              <div
+                className="pointer-events-none absolute bottom-0 top-0 z-30 w-px bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.2)]"
+                style={{ left: todayOffsetDays * pxPerDay }}
+              >
+                <span className="absolute left-1 top-1 whitespace-nowrap rounded-md bg-primary px-2 py-1 text-[9px] font-bold text-primary-foreground">
+                  HOJE · {new Date(today + "T00:00:00").getDate()}
+                </span>
+              </div>
+            )}
 
             {/* prazo final */}
             {deadlineVisible && (
@@ -244,7 +255,7 @@ export function GanttChart({
         </p>
       </div>
 
-      <UnscheduledDrawer executions={unscheduled} steps={ordered} onOpen={setOpenExecution} />
+      <UnscheduledDrawer executions={toSchedule} steps={ordered} onOpen={setOpenExecution} />
 
       {openExecution && (
         <GanttActionSheet

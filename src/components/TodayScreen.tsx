@@ -11,6 +11,11 @@ import { SubagendasGrid } from "@/components/SubagendasGrid";
 import { DaySummaryCard } from "@/components/DaySummaryCard";
 import { Modal } from "@/components/ui/modal";
 import { DateField } from "@/components/ui/date-wheel-picker";
+import {
+  ScheduleFields,
+  scheduleTimesValid,
+  type ScheduleValue,
+} from "@/components/plan/ScheduleFields";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import {
   useGoalsStore,
@@ -31,6 +36,7 @@ import {
   addDays,
   todayISO,
   formatDateBR,
+  scheduleExecution,
   type Execution,
 } from "@/lib/goals-store";
 
@@ -214,7 +220,7 @@ export function TodayScreen() {
           const isNext = t.id === nextTaskId;
           return (
             <li
-              key={t.id}
+              key={`${t.id}-${t.agendaSessionId ?? t.agendaDate}`}
               className={`card-surface group relative overflow-hidden p-4 transition-opacity ${doneNow ? "opacity-50" : ""} ${isNext ? "border-l-2 border-l-primary" : ""}`}
             >
               <div className="flex items-start gap-3">
@@ -464,12 +470,77 @@ function FocusModal({
   onDone: () => void;
 }) {
   const [seconds, setSeconds] = useState(0);
+  const [askingCompletion, setAskingCompletion] = useState(false);
+  const [schedulingAgain, setSchedulingAgain] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const tomorrow = toISODate(addDays(nowDate(), 1));
+  const [nextSession, setNextSession] = useState<ScheduleValue>({
+    date: tomorrow,
+    startTime: "",
+    endTime: "",
+  });
   useEffect(() => {
     const id = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => clearInterval(id);
   }, []);
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(seconds % 60).padStart(2, "0");
+  if (askingCompletion) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 px-5 backdrop-blur-xl">
+        <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5">
+          <p className="text-xs uppercase tracking-[0.18em] text-primary">Sessão finalizada</p>
+          <h2 className="mt-2 text-xl font-bold">Você concluiu 100% desta ação?</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{task.title}</p>
+          {!schedulingAgain ? (
+            <div className="mt-5 space-y-2">
+              <button
+                onClick={onDone}
+                className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
+              >
+                Sim, concluir ação
+              </button>
+              <button
+                onClick={() => setSchedulingAgain(true)}
+                className="w-full rounded-xl border border-dashed border-primary/70 py-3 text-sm font-semibold text-primary"
+              >
+                Ainda não — agendar outra sessão
+              </button>
+            </div>
+          ) : (
+            <div className="mt-5">
+              <ScheduleFields
+                value={nextSession}
+                onChange={setNextSession}
+                disabled={saving}
+                size="md"
+              />
+              <button
+                disabled={!scheduleTimesValid(nextSession) || saving}
+                onClick={async () => {
+                  setSaving(true);
+                  try {
+                    await scheduleExecution(
+                      task.id,
+                      nextSession.date,
+                      nextSession.startTime,
+                      nextSession.endTime,
+                    );
+                    onClose();
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                className="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {saving ? "Agendando…" : "Confirmar nova sessão"}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-xl">
       <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Modo Foco</p>
@@ -490,7 +561,7 @@ function FocusModal({
           Pausar
         </button>
         <button
-          onClick={onDone}
+          onClick={() => setAskingCompletion(true)}
           className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground"
         >
           Conseguiu? ✓

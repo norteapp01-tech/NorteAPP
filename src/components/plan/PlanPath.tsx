@@ -91,7 +91,18 @@ export function PlanPath({
                 ? "current"
                 : "future";
             const nodeGreen = state !== "future";
-            const stepExecs = executions.filter((e) => e.stepId === step.id);
+            const stepExecs = executions
+              .filter((e) => e.stepId === step.id)
+              .sort((a, b) => {
+                const byStart = (a.plannedStartDate ?? a.dueDate).localeCompare(
+                  b.plannedStartDate ?? b.dueDate,
+                );
+                if (byStart !== 0) return byStart;
+                const byEnd = (a.plannedEndDate ?? a.dueDate).localeCompare(
+                  b.plannedEndDate ?? b.dueDate,
+                );
+                return byEnd !== 0 ? byEnd : a.createdAt.localeCompare(b.createdAt);
+              });
             return (
               <div key={step.id} className="flex gap-3">
                 <div className="flex flex-col items-center">

@@ -2,9 +2,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp, Calendar } from "lucide-react";
 import { formatDateShortBR, type Execution, type Step } from "@/lib/goals-store";
 
-/** Ações que ainda não têm intervalo planejado — ficam fora do painel visual
- * (não inventamos uma duração pra elas) até o usuário definir um período
- * tocando aqui. Recolhida por padrão; some inteiramente se não houver nenhuma. */
+/** Ações incompletas que ainda não têm tempo reservado na Agenda. */
 export function UnscheduledDrawer({
   executions,
   steps,
@@ -24,7 +22,7 @@ export function UnscheduledDrawer({
         className="flex w-full items-center justify-between"
       >
         <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          Ações sem data · {executions.length}
+          Ações para agendar · {executions.length}
         </span>
         {open ? (
           <ChevronUp className="h-4 w-4 text-muted-foreground" />

@@ -154,7 +154,11 @@ function AgendaScreen() {
               </div>
             ) : (
               selectedEvents.map((e) => (
-                <EventCard key={e.id} e={e} timeFormat={profile.timeFormat} />
+                <EventCard
+                  key={`${e.id}-${e.agendaSessionId ?? e.agendaDate}`}
+                  e={e}
+                  timeFormat={profile.timeFormat}
+                />
               ))
             )}
           </div>
