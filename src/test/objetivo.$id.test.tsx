@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { QueryClient } from "@tanstack/react-query";
 import type { Goal, Step, Execution } from "@/lib/goals-store";
@@ -130,15 +130,20 @@ describe("GoalDetail — abas: só Planejamento e Evolução", () => {
     expect(screen.queryByText("Registrar avanço")).not.toBeInTheDocument();
   });
 
-  it("as etapas (lista + form de nova etapa) aparecem dentro de Planejamento, sem precisar trocar de aba", () => {
+  it("as etapas aparecem dentro de Planejamento, com 'Nova etapa' abrindo um modal (sem input permanente na tela)", () => {
     renderGoalDetail();
     expect(screen.getAllByText("Terminar front-end").length).toBeGreaterThan(0);
+    expect(screen.queryByPlaceholderText("Ex: Terminar capítulo 3")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /nova etapa/i }));
     expect(screen.getByPlaceholderText("Ex: Terminar capítulo 3")).toBeInTheDocument();
   });
 
   it("a execução aparece aninhada dentro do card da etapa, não numa lista separada", () => {
     renderGoalDetail();
-    expect(screen.getByText("Decidir layout")).toBeInTheDocument();
+    // Também pode aparecer resumida no módulo "Próxima ação" — o que importa é
+    // que não existe uma seção "Execuções" à parte listando-a como item independente.
+    expect(screen.getAllByText("Decidir layout").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/^Execuções$/)).not.toBeInTheDocument();
   });
 });
 

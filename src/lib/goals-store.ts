@@ -410,6 +410,17 @@ export function todayExecutions(executions: Execution[], date = todayISO()): Exe
     .sort((a, b) => (a.startTime ?? "").localeCompare(b.startTime ?? ""));
 }
 
+/** Ordena a lista "Hoje" pra exibição: pendentes por horário primeiro (mesma ordem
+ * que todayExecutions já entrega), concluídas por último — sort é estável, então a
+ * ordem cronológica dentro de cada grupo se preserva sem precisar reordenar por hora. */
+export function orderedTodayTasks(tasks: Execution[]): Execution[] {
+  return [...tasks].sort((a, b) => {
+    const aDone = a.status === "concluida" ? 1 : 0;
+    const bDone = b.status === "concluida" ? 1 : 0;
+    return aDone - bDone;
+  });
+}
+
 export function agendaByDate(executions: Execution[]): Record<string, Execution[]> {
   const map: Record<string, Execution[]> = {};
   for (const e of executions) {
@@ -665,6 +676,59 @@ export function kpisForRange(state: State, range: Range, offsetDays = 0) {
 
 export function stepsForGoalId(steps: Step[], goalId: string): Step[] {
   return stepsForGoal(steps, goalId);
+}
+
+/** Próxima ação real de um plano — única fonte usada por "Em foco", "Outros
+ * planos" (planejamento.tsx) e pelo módulo "Próxima ação" (objetivo.$id.tsx),
+ * pra nunca haver dois caminhos calculando isso de formas diferentes. */
+export type NextAction =
+  | { kind: "execution"; step: Step; execution: Execution }
+  | { kind: "step"; step: Step }
+  | { kind: "define"; step: Step }
+  | { kind: "none" };
+
+export function nextActionForGoal(goal: Goal, steps: Step[], executions: Execution[]): NextAction {
+  const openStep = stepsForGoal(steps, goal.id).find((s) => !s.done);
+  if (!openStep) return { kind: "none" };
+  const stepExecs = executionsForGoal(executions, goal.id).filter((e) => e.stepId === openStep.id);
+  const pending = stepExecs
+    .filter((e) => e.status !== "concluida" && e.status !== "cancelada")
+    .sort((a, b) => relevantDate(a).localeCompare(relevantDate(b)))[0];
+  if (pending) return { kind: "execution", step: openStep, execution: pending };
+  if (stepExecs.length === 0) return { kind: "define", step: openStep };
+  return { kind: "step", step: openStep };
+}
+
+/** Data que rege a urgência de uma NextAction — usada só pro desempate de `focusGoal`. */
+function nextActionDate(action: NextAction): string {
+  if (action.kind === "execution") return relevantDate(action.execution);
+  if (action.kind === "step" || action.kind === "define")
+    return action.step.targetDate ?? "9999-99-99";
+  return "9999-99-99";
+}
+
+/** Escolhe UM plano pra destacar em "Em foco" — nunca duplica o registro, só
+ * ordena os mesmos planos já filtrados pelo horizonte atual. Prioridade:
+ * (1) em risco/atrasado primeiro; (2) tem ação pendente real antes de precisar
+ * "definir"; (3) ação/etapa mais próxima; (4) prazo do plano como desempate. */
+export function focusGoal(goals: Goal[], steps: Step[], executions: Execution[]): Goal | null {
+  if (goals.length === 0) return null;
+  const rank = (g: Goal): [number, number, string, string] => {
+    const status = planningStatus(g, steps, executions);
+    const statusRank = status === "atrasado" || status === "em_risco" ? 0 : 1;
+    const action = nextActionForGoal(g, steps, executions);
+    const hasAction = action.kind === "execution" || action.kind === "step" ? 0 : 1;
+    return [statusRank, hasAction, nextActionDate(action), g.deadlineISO ?? "9999-99-99"];
+  };
+  return [...goals].sort((a, b) => {
+    const ra = rank(a);
+    const rb = rank(b);
+    for (let i = 0; i < ra.length; i++) {
+      if (ra[i] < rb[i]) return -1;
+      if (ra[i] > rb[i]) return 1;
+    }
+    return 0;
+  })[0];
 }
 
 // ---------------------------------------------------------------------------
@@ -934,17 +998,35 @@ export async function addStep(
   await invalidate();
 }
 
+/** Toque em "concluir etapa" é o gesto mais repetido da tela do plano — atualiza o
+ * cache local na hora (checkbox responde no mesmo frame do toque) e só then espera
+ * o servidor; se a escrita falhar, desfaz o otimismo pro valor anterior. */
 export async function toggleStep(stepId: string, currentlyDone: boolean) {
   const nowDone = !currentlyDone;
-  unwrap(
-    await supabase
-      .from("steps")
-      .update({ done: nowDone, completed_at: nowDone ? nowDate().toISOString() : null })
-      .eq("id", stepId)
-      .select()
-      .single(),
-  );
-  await invalidate();
+  const completedAt = nowDone ? nowDate().toISOString() : undefined;
+  const previous = queryClient.getQueryData<State>(QUERY_KEY);
+  if (previous) {
+    queryClient.setQueryData<State>(QUERY_KEY, {
+      ...previous,
+      steps: previous.steps.map((s) =>
+        s.id === stepId ? { ...s, done: nowDone, completedAt } : s,
+      ),
+    });
+  }
+  try {
+    unwrap(
+      await supabase
+        .from("steps")
+        .update({ done: nowDone, completed_at: nowDone ? nowDate().toISOString() : null })
+        .eq("id", stepId)
+        .select()
+        .single(),
+    );
+    await invalidate();
+  } catch (err) {
+    if (previous) queryClient.setQueryData(QUERY_KEY, previous);
+    throw err;
+  }
 }
 
 export async function removeStep(stepId: string) {

@@ -76,6 +76,7 @@ import {
   createGoal,
   scheduleExecution,
   setCurrentStep,
+  toggleStep,
   formatDateBR,
   agendaByDate,
   isMissed,
@@ -84,11 +85,14 @@ import {
   isGoalComplete,
   goalCompletionDate,
   scheduleStepAsExecution,
+  orderedTodayTasks,
   progressOverTime,
   plannedVsActual,
   toISODate,
   fetchState,
   QUERY_KEY,
+  nextActionForGoal,
+  focusGoal,
 } from "./goals-store";
 import type { Execution, Goal, Step } from "./goals-store";
 import { setTestClockOverride } from "./test-clock";
@@ -271,6 +275,28 @@ function makeStep(overrides: Partial<Step> = {}): Step {
     ...overrides,
   };
 }
+
+describe("toggleStep — atualização otimista do cache (item de performance)", () => {
+  it("o cache já reflete o novo valor de 'done' antes do round-trip terminar", async () => {
+    await queryClient.prefetchQuery({ queryKey: QUERY_KEY, queryFn: fetchState });
+    queryClient.setQueryData(QUERY_KEY, {
+      goals: [makeGoal()],
+      steps: [makeStep({ id: "step-9", done: false })],
+      executions: [],
+      routines: [],
+    });
+
+    const promise = toggleStep("step-9", false);
+    const duringCache = queryClient.getQueryData<{ steps: Step[] }>(QUERY_KEY);
+    expect(duringCache?.steps.find((s) => s.id === "step-9")?.done).toBe(true);
+
+    await promise;
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+    const [table, payload] = updateSpy.mock.calls[0] as [string, Row];
+    expect(table).toBe("steps");
+    expect(payload).toMatchObject({ done: true });
+  });
+});
 
 describe("isPlanStalled — plano ativo sem próxima ação visível", () => {
   afterEach(() => setTestClockOverride(null));
@@ -474,5 +500,159 @@ describe("createGoal — a primeira execução do cadastro recebe o stepId corre
       metric: { target: 1, unit: "etapas" },
     });
     expect(firstStepId).toBeUndefined();
+  });
+});
+
+describe("orderedTodayTasks — pendente-mais-próxima primeiro, concluídas por último", () => {
+  it("mantém pendentes na frente das concluídas, mesmo que a concluída seja mais cedo no dia", () => {
+    const earlyDone = makeExecution({ id: "early-done", startTime: "08:00", status: "concluida" });
+    const laterPending = makeExecution({
+      id: "later-pending",
+      startTime: "14:00",
+      status: "planejada",
+    });
+    const result = orderedTodayTasks([earlyDone, laterPending]);
+    expect(result.map((t) => t.id)).toEqual(["later-pending", "early-done"]);
+  });
+
+  it("preserva a ordem cronológica dentro de cada grupo (pendentes por horário)", () => {
+    // todayExecutions() já entrega em ordem de horário — este teste prova que
+    // orderedTodayTasks não embaralha essa ordem ao particionar por status.
+    const tasks = [
+      makeExecution({ id: "afternoon", startTime: "14:00", status: "planejada" }),
+      makeExecution({ id: "morning", startTime: "08:00", status: "planejada" }),
+      makeExecution({ id: "evening", startTime: "19:00", status: "planejada" }),
+    ];
+    const result = orderedTodayTasks(tasks);
+    expect(result.map((t) => t.id)).toEqual(["afternoon", "morning", "evening"]);
+  });
+
+  it("com tudo concluído ou tudo pendente, não quebra e mantém a ordem original", () => {
+    const allDone = [
+      makeExecution({ id: "a", status: "concluida" }),
+      makeExecution({ id: "b", status: "concluida" }),
+    ];
+    expect(orderedTodayTasks(allDone).map((t) => t.id)).toEqual(["a", "b"]);
+
+    const allPending = [
+      makeExecution({ id: "c", status: "planejada" }),
+      makeExecution({ id: "d", status: "planejada" }),
+    ];
+    expect(orderedTodayTasks(allPending).map((t) => t.id)).toEqual(["c", "d"]);
+  });
+
+  it("não muta o array original", () => {
+    const tasks = [
+      makeExecution({ id: "x", status: "concluida" }),
+      makeExecution({ id: "y", status: "planejada" }),
+    ];
+    const original = [...tasks];
+    orderedTodayTasks(tasks);
+    expect(tasks).toEqual(original);
+  });
+});
+
+describe("nextActionForGoal — resolução única de 'próxima ação' (Em foco, Outros planos, Próxima ação)", () => {
+  it("execução pendente da primeira etapa aberta vence sobre a etapa em si", () => {
+    const goal = makeGoal();
+    const steps = [makeStep({ id: "s1", done: false, order: 0 })];
+    const exec = makeExecution({
+      id: "e1",
+      goalId: "goal-1",
+      stepId: "s1",
+      status: "planejada",
+      dueDate: "2026-09-10",
+    });
+    const result = nextActionForGoal(goal, steps, [exec]);
+    expect(result).toEqual({ kind: "execution", step: steps[0], execution: exec });
+  });
+
+  it("etapa aberta sem nenhuma execução -> 'define'", () => {
+    const goal = makeGoal();
+    const steps = [makeStep({ id: "s1", done: false, order: 0 })];
+    expect(nextActionForGoal(goal, steps, [])).toEqual({ kind: "define", step: steps[0] });
+  });
+
+  it("etapa aberta com execuções mas todas concluídas/canceladas -> 'step'", () => {
+    const goal = makeGoal();
+    const steps = [makeStep({ id: "s1", done: false, order: 0 })];
+    const execs = [
+      makeExecution({ id: "e1", goalId: "goal-1", stepId: "s1", status: "concluida" }),
+      makeExecution({ id: "e2", goalId: "goal-1", stepId: "s1", status: "cancelada" }),
+    ];
+    expect(nextActionForGoal(goal, steps, execs)).toEqual({ kind: "step", step: steps[0] });
+  });
+
+  it("nenhuma etapa aberta -> 'none'", () => {
+    const goal = makeGoal();
+    const steps = [makeStep({ id: "s1", done: true, order: 0 })];
+    expect(nextActionForGoal(goal, steps, [])).toEqual({ kind: "none" });
+  });
+
+  it("entre duas execuções pendentes da mesma etapa, escolhe a de data mais próxima", () => {
+    const goal = makeGoal();
+    const steps = [makeStep({ id: "s1", done: false, order: 0 })];
+    const near = makeExecution({
+      id: "near",
+      goalId: "goal-1",
+      stepId: "s1",
+      status: "planejada",
+      dueDate: "2026-09-05",
+    });
+    const far = makeExecution({
+      id: "far",
+      goalId: "goal-1",
+      stepId: "s1",
+      status: "planejada",
+      dueDate: "2026-09-20",
+    });
+    const result = nextActionForGoal(goal, steps, [far, near]);
+    expect(result.kind).toBe("execution");
+    expect(result.kind === "execution" && result.execution.id).toBe("near");
+  });
+});
+
+describe("focusGoal — escolhe UM plano em destaque sem duplicar registros", () => {
+  it("prioriza plano em risco/atrasado sobre um só 'ativo'", () => {
+    const onTrack = makeGoal({ id: "g-ontrack", deadlineISO: "2026-12-31" });
+    const behind = makeGoal({
+      id: "g-behind",
+      deadlineISO: "2026-09-02",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    const steps = [
+      makeStep({ id: "s-ontrack", goalId: "g-ontrack", done: false, order: 0 }),
+      makeStep({ id: "s-behind", goalId: "g-behind", done: false, order: 0 }),
+    ];
+    const result = focusGoal([onTrack, behind], steps, []);
+    expect(result?.id).toBe("g-behind");
+  });
+
+  it("entre dois planos igualmente 'ativos', prioriza quem já tem ação pendente real", () => {
+    const withAction = makeGoal({ id: "g-action" });
+    const withoutAction = makeGoal({ id: "g-none" });
+    const steps = [
+      makeStep({ id: "s-action", goalId: "g-action", done: false, order: 0 }),
+      makeStep({ id: "s-none", goalId: "g-none", done: true, order: 0 }),
+    ];
+    const exec = makeExecution({
+      id: "e1",
+      goalId: "g-action",
+      stepId: "s-action",
+      status: "planejada",
+    });
+    const result = focusGoal([withoutAction, withAction], steps, [exec]);
+    expect(result?.id).toBe("g-action");
+  });
+
+  it("desempata por prazo do plano quando o resto é igual", () => {
+    const soon = makeGoal({ id: "g-soon", deadlineISO: "2026-09-10" });
+    const later = makeGoal({ id: "g-later", deadlineISO: "2026-12-01" });
+    const result = focusGoal([later, soon], [], []);
+    expect(result?.id).toBe("g-soon");
+  });
+
+  it("lista vazia retorna null", () => {
+    expect(focusGoal([], [], [])).toBeNull();
   });
 });
