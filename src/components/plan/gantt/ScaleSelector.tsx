@@ -10,7 +10,7 @@ export function ScaleSelector({
   onChange: (s: GanttScale) => void;
 }) {
   return (
-    <div className="-mx-5 overflow-x-auto px-5">
+    <div className="-mx-5 overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div
         className="flex gap-1 rounded-2xl border border-border bg-surface p-1"
         style={{ width: "max-content", minWidth: "100%" }}
@@ -19,7 +19,7 @@ export function ScaleSelector({
           <button
             key={s}
             onClick={() => onChange(s)}
-            className={`min-h-11 rounded-xl px-4 py-2 text-xs font-semibold transition-colors ${
+            className={`min-h-10 flex-1 rounded-xl px-4 py-2 text-xs font-semibold transition-colors ${
               scale === s ? "bg-primary text-primary-foreground" : "text-muted-foreground"
             }`}
           >

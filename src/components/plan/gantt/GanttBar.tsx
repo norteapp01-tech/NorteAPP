@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, GripVertical, MoreHorizontal } from "lucide-react";
 import {
   addDays,
   daysBetweenISO,
@@ -162,7 +162,7 @@ export function GanttBar({
         ? durationDays + liveDeltaDays
         : durationDays;
   const left = (startOffsetDays + leftShiftDays) * pxPerDay;
-  const width = Math.max(widthDays, 1) * pxPerDay - 4;
+  const width = Math.max(Math.max(widthDays, 1) * pxPerDay - 8, 52);
   // Barras curtas não podem deixar as duas alças comerem a área de mover
   // inteira (senão nunca sobra espaço pra "pegar" a barra pelo meio) — encolhe
   // as alças proporcionalmente e, abaixo de um mínimo, esconde-as (a barra
@@ -174,17 +174,17 @@ export function GanttBar({
   const showHandles = !done && handleWidth >= 6;
 
   const tone = done
-    ? "border-border bg-surface-2/50 text-muted-foreground"
+    ? "border-border/80 bg-surface-2/60 text-muted-foreground"
     : isHighlighted
-      ? "border-primary bg-primary/10 text-foreground"
-      : "border-border bg-surface-2 text-foreground";
+      ? "border-primary bg-primary/10 text-primary"
+      : "border-border bg-surface-2/95 text-foreground";
 
   const reduceMotion = prefersReducedMotion();
 
   return (
     <div
-      className={`absolute select-none rounded-lg border px-2 py-1.5 ${tone} ${dragging ? "z-20 opacity-90 shadow-lg" : "z-10"} ${!dragging && !reduceMotion ? "transition-[left,width] duration-150" : ""}`}
-      style={{ left, width, top: lane * rowHeight + 4, height: rowHeight - 8 }}
+      className={`absolute select-none overflow-hidden rounded-lg border px-2 py-1.5 ${tone} ${dragging ? "z-20 opacity-90 shadow-lg" : "z-10 shadow-sm"} ${!dragging && !reduceMotion ? "transition-[left,width] duration-150" : ""}`}
+      style={{ left, width, top: lane * rowHeight + 4, height: rowHeight - 10 }}
       onPointerDown={onPointerDown("move")}
       onPointerMove={onPointerMove}
       onPointerUp={finishDrag}
@@ -192,11 +192,17 @@ export function GanttBar({
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex h-full items-center gap-1.5 overflow-hidden">
+        {isHighlighted && showHandles && (
+          <GripVertical className="h-4 w-3 shrink-0 text-primary/80" aria-hidden />
+        )}
         {done && <Check className="h-3.5 w-3.5 shrink-0 text-primary" strokeWidth={2.5} />}
         <span className={`truncate text-xs font-medium ${done ? "line-through" : ""}`}>
           {execution.title}
         </span>
         {overdue && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-danger" aria-hidden />}
+        {!done && width >= 120 && (
+          <MoreHorizontal className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+        )}
       </div>
       {showHandles && (
         <>

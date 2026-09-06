@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { GanttBar } from "@/components/plan/gantt/GanttBar";
 import { GanttActionSheet } from "@/components/plan/gantt/GanttActionSheet";
 import { CreateActionOnGanttSheet } from "@/components/plan/gantt/CreateActionOnGanttSheet";
@@ -22,14 +22,14 @@ import {
   type Step,
 } from "@/lib/goals-store";
 
-const BUCKET_WIDTH_PX: Record<GanttScale, number> = {
+const MIN_BUCKET_WIDTH_PX: Record<GanttScale, number> = {
   semana: 56,
-  mes: 90,
-  "45dias": 90,
-  "90dias": 90,
+  mes: 88,
+  "45dias": 82,
+  "90dias": 78,
 };
-const ROW_HEIGHT = 44;
-const CORRIDOR_GAP = 12;
+const ROW_HEIGHT = 58;
+const STAGE_LABEL_HEIGHT = 42;
 
 export function GanttChart({
   goal,
@@ -48,6 +48,18 @@ export function GanttChart({
     startISO: string;
     endISO: string;
   } | null>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [viewportWidth, setViewportWidth] = useState(0);
+
+  useEffect(() => {
+    const element = viewportRef.current;
+    if (!element) return;
+    const update = () => setViewportWidth(element.clientWidth);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   const ordered = useMemo(() => stepsForGoal(steps, goal.id), [steps, goal.id]);
   const today = todayISO();
@@ -57,8 +69,14 @@ export function GanttChart({
     [window_.startISO, window_.endISO, scale],
   );
   const bucketDaySpan = daysBetweenISO(buckets[0].startISO, buckets[0].endISO) + 1;
-  const pxPerDay = BUCKET_WIDTH_PX[scale] / bucketDaySpan;
-  const totalWidth = buckets.length * BUCKET_WIDTH_PX[scale];
+  // O painel sempre ocupa a largura disponível. Em escalas longas, preserva uma
+  // largura mínima e passa a rolar horizontalmente, como um calendário real.
+  const bucketWidth = Math.max(
+    MIN_BUCKET_WIDTH_PX[scale],
+    viewportWidth > 0 ? viewportWidth / buckets.length : 0,
+  );
+  const pxPerDay = bucketWidth / bucketDaySpan;
+  const totalWidth = buckets.length * bucketWidth;
 
   const planNext = nextPlanAction(goal, steps, executions);
   const highlightId = planNext.kind === "action" ? planNext.execution.id : null;
@@ -109,31 +127,48 @@ export function GanttChart({
   return (
     <div>
       <ScaleSelector scale={scale} onChange={setScale} />
-      <div className="mt-3 -mx-5 overflow-x-auto px-5">
-        <div className="relative" style={{ width: totalWidth }}>
-          {/* régua */}
-          <div className="flex border-b border-border pb-2">
+      <div
+        ref={viewportRef}
+        className="mt-4 -mx-5 overflow-x-auto border-y border-border bg-background [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        <div className="relative min-h-[320px]" style={{ width: totalWidth }}>
+          {/* régua temporal fixa ao topo do painel */}
+          <div className="sticky top-0 z-40 flex h-12 border-b border-border bg-background/95 backdrop-blur">
             {buckets.map((b) => (
               <div
                 key={b.startISO}
-                className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
-                style={{ width: BUCKET_WIDTH_PX[scale] }}
+                className="flex shrink-0 items-center justify-center border-r border-border/60 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground last:border-r-0"
+                style={{ width: bucketWidth }}
               >
                 {b.label}
               </div>
             ))}
           </div>
 
-          {/* corredores */}
-          <div className="relative mt-2" style={{ paddingBottom: 8 }}>
-            {corridors.map(({ step, index, stepExecs, laneOf, laneCount }) => (
-              <div key={step.id} style={{ marginBottom: CORRIDOR_GAP }}>
-                <p className="mb-1 truncate text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {index + 1}. {step.title}
-                </p>
+          {/* corredores: uma única grade contínua, não uma pilha de caixas vazias */}
+          <div className="relative">
+            <div className="pointer-events-none absolute inset-0 z-0 flex">
+              {buckets.map((b) => (
                 <div
-                  className="relative rounded-lg border border-border/60 bg-surface/40"
-                  style={{ height: laneCount * ROW_HEIGHT }}
+                  key={`grid-${b.startISO}`}
+                  className="h-full shrink-0 border-r border-border/50 last:border-r-0"
+                  style={{ width: bucketWidth }}
+                />
+              ))}
+            </div>
+            {corridors.map(({ step, index, stepExecs, laneOf, laneCount }) => (
+              <section
+                key={step.id}
+                className="relative z-10 border-b border-border/70 last:border-b-0"
+              >
+                <div className="flex items-end px-4 pb-2" style={{ height: STAGE_LABEL_HEIGHT }}>
+                  <p className="max-w-[min(72vw,420px)] truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    {index + 1}. {step.title}
+                  </p>
+                </div>
+                <div
+                  className="relative cursor-crosshair bg-surface/10 transition-colors hover:bg-surface/20"
+                  style={{ height: Math.max(1, laneCount) * ROW_HEIGHT + 8 }}
                   onClick={handleEmptySpaceClick(step)}
                 >
                   {stepExecs.map((e) => (
@@ -150,15 +185,15 @@ export function GanttChart({
                     />
                   ))}
                 </div>
-              </div>
+              </section>
             ))}
 
             {/* linha de hoje */}
             <div
-              className="pointer-events-none absolute -top-[26px] bottom-0 z-30 w-px bg-primary"
+              className="pointer-events-none absolute bottom-0 top-0 z-30 w-px bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.2)]"
               style={{ left: todayOffsetDays * pxPerDay }}
             >
-              <span className="absolute -top-[2px] left-1 whitespace-nowrap rounded bg-primary px-1.5 py-0.5 text-[9px] font-bold text-primary-foreground">
+              <span className="absolute left-1 top-1 whitespace-nowrap rounded-md bg-primary px-2 py-1 text-[9px] font-bold text-primary-foreground">
                 HOJE · {new Date(today + "T00:00:00").getDate()}
               </span>
             </div>
@@ -166,10 +201,10 @@ export function GanttChart({
             {/* prazo final */}
             {deadlineVisible && (
               <div
-                className="pointer-events-none absolute -top-[26px] bottom-0 z-20 border-l border-dashed border-muted-foreground/50"
+                className="pointer-events-none absolute bottom-0 top-0 z-20 border-l border-dashed border-muted-foreground/60"
                 style={{ left: deadlineOffsetDays! * pxPerDay }}
               >
-                <span className="absolute -top-[2px] left-1 whitespace-nowrap text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <span className="absolute left-1 top-2 whitespace-nowrap text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Prazo
                 </span>
               </div>
@@ -188,9 +223,11 @@ export function GanttChart({
 
       {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
 
-      <p className="mt-4 text-center text-[11px] text-muted-foreground">
-        Arraste para mover · puxe as bordas para ajustar duração
-      </p>
+      <div className="mt-4 flex items-center justify-center rounded-xl border border-border/70 px-3 py-3">
+        <p className="text-center text-[11px] text-muted-foreground">
+          Arraste para mover · puxe as bordas para ajustar duração
+        </p>
+      </div>
 
       <UnscheduledDrawer executions={unscheduled} steps={ordered} onOpen={setOpenExecution} />
 
