@@ -11,6 +11,7 @@ import {
   formatDateBR,
   scheduleExecution,
   todayISO,
+  useGoalsStore,
   type Goal,
   type Step,
   type TaskWeight,
@@ -34,9 +35,23 @@ export function CreateActionSheet({
   goal: Goal;
   onClose: () => void;
 }) {
+  const allExecutions = useGoalsStore((s) => s.executions);
+  const stepExecutions = allExecutions.filter(
+    (e) => e.stepId === step.id && e.status !== "cancelada",
+  );
+  const previousEnd = stepExecutions
+    .map((e) => e.plannedEndDate)
+    .filter((date): date is string => !!date)
+    .sort()
+    .at(-1);
+  const rawSuggestedStart = previousEnd ?? todayISO();
+  const actionLimit = step.targetDate ?? goal.deadlineISO;
+  const suggestedStart =
+    actionLimit && rawSuggestedStart > actionLimit ? actionLimit : rawSuggestedStart;
   const [form, setForm] = useState({
     title: "",
-    dueDate: "",
+    plannedStartDate: suggestedStart,
+    plannedEndDate: suggestedStart,
     weight: undefined as TaskWeight | undefined,
   });
   const [formError, setFormError] = useState("");
@@ -59,8 +74,12 @@ export function CreateActionSheet({
       : "";
 
   const save = async () => {
-    if (!form.title || !form.dueDate || saving) return;
-    if (dueLimit && form.dueDate > dueLimit) {
+    if (!form.title || !form.plannedStartDate || !form.plannedEndDate || saving) return;
+    if (form.plannedEndDate < form.plannedStartDate) {
+      setFormError("O fim não pode ser antes do início.");
+      return;
+    }
+    if (dueLimit && form.plannedEndDate > dueLimit) {
       setFormError(`O prazo da ação não pode ser depois do prazo d${dueLimitLabel}.`);
       return;
     }
@@ -69,7 +88,9 @@ export function CreateActionSheet({
     try {
       const id = await createExecution({
         title: form.title,
-        dueDate: form.dueDate,
+        dueDate: form.plannedEndDate,
+        plannedStartDate: form.plannedStartDate,
+        plannedEndDate: form.plannedEndDate,
         category: goal.category,
         weight: form.weight ?? "medio",
         goalId: goal.id,
@@ -104,7 +125,8 @@ export function CreateActionSheet({
     return (
       <Modal onClose={onClose} title="Ação criada">
         <p className="text-sm text-balance-tight">
-          "{form.title}" criada. Prazo: {formatDateBR(form.dueDate)}.
+          "{form.title}" criada no cronograma de {formatDateBR(form.plannedStartDate)} até{" "}
+          {formatDateBR(form.plannedEndDate)}.
         </p>
         {!scheduleOpen ? (
           <div className="mt-4 flex gap-2">
@@ -158,15 +180,38 @@ export function CreateActionSheet({
         />
       </label>
       <div className="mt-3">
-        <DateField
-          label="Realizar até"
-          value={form.dueDate}
-          onChange={(v) => {
-            setForm({ ...form, dueDate: v });
-            setFormError("");
-          }}
-          className="flex w-full items-center gap-2 rounded-xl border border-border bg-surface px-3 py-3 text-left text-sm outline-none focus:border-primary"
-        />
+        <span className="mb-1 block text-[11px] uppercase tracking-wider text-muted-foreground">
+          Período no cronograma
+        </span>
+        <div className="grid grid-cols-2 gap-2">
+          <DateField
+            label="Início"
+            value={form.plannedStartDate}
+            onChange={(value) => {
+              setForm({
+                ...form,
+                plannedStartDate: value,
+                plannedEndDate: form.plannedEndDate < value ? value : form.plannedEndDate,
+              });
+              setFormError("");
+            }}
+            className="flex w-full items-center gap-2 rounded-xl border border-border bg-surface px-3 py-3 text-left text-sm outline-none focus:border-primary"
+          />
+          <DateField
+            label="Fim"
+            value={form.plannedEndDate}
+            onChange={(value) => {
+              setForm({ ...form, plannedEndDate: value });
+              setFormError("");
+            }}
+            className="flex w-full items-center gap-2 rounded-xl border border-border bg-surface px-3 py-3 text-left text-sm outline-none focus:border-primary"
+          />
+        </div>
+        {previousEnd && (
+          <p className="mt-1.5 text-[10px] text-muted-foreground">
+            Sugerimos começar quando a ação anterior termina. Você pode alterar.
+          </p>
+        )}
       </div>
       <div className="mt-3">
         <span className="mb-1 block text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -189,7 +234,7 @@ export function CreateActionSheet({
       </div>
       {formError && <p className="mt-2 text-[11px] text-danger">{formError}</p>}
       <button
-        disabled={!form.title || !form.dueDate || saving}
+        disabled={!form.title || !form.plannedStartDate || !form.plannedEndDate || saving}
         onClick={save}
         className="mt-4 w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
       >

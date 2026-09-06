@@ -10,7 +10,6 @@ import {
   daysBetweenISO,
   formatDateShortBR,
   ganttBuckets,
-  ganttWindow,
   hasPlannedRange,
   nextPlanAction,
   stepsForGoal,
@@ -63,7 +62,23 @@ export function GanttChart({
 
   const ordered = useMemo(() => stepsForGoal(steps, goal.id), [steps, goal.id]);
   const today = todayISO();
-  const window_ = useMemo(() => ganttWindow(scale, today), [scale, today]);
+  const window_ = useMemo(() => {
+    const createdISO = goal.createdAt.slice(0, 10);
+    const plannedDates = executions.flatMap((e) =>
+      [e.plannedStartDate, e.plannedEndDate].filter((d): d is string => !!d),
+    );
+    const startISO = [createdISO, ...plannedDates, today].sort()[0];
+    const endISO =
+      [goal.deadlineISO, ...plannedDates, today]
+        .filter((d): d is string => !!d)
+        .sort()
+        .at(-1) ?? today;
+    return {
+      startISO,
+      endISO,
+      totalDays: daysBetweenISO(startISO, endISO) + 1,
+    };
+  }, [executions, goal.createdAt, goal.deadlineISO, today]);
   const buckets = useMemo(
     () => ganttBuckets(window_.startISO, window_.endISO, scale),
     [window_.startISO, window_.endISO, scale],

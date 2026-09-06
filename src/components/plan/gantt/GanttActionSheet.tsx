@@ -197,7 +197,7 @@ export function GanttActionSheet({
               </p>
               <button
                 onClick={() => setScheduling(true)}
-                className="rounded-lg border border-primary/50 px-2.5 py-1 text-[11px] font-semibold text-primary"
+                className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold text-primary ${scheduled ? "border-primary/50" : "border-dashed border-primary/80 bg-primary/5"}`}
               >
                 {scheduled ? "Reagendar" : "Colocar na agenda"}
               </button>

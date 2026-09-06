@@ -867,35 +867,28 @@ export function ganttWindow(
 }
 
 const GANTT_BUCKET_DAYS: Record<GanttScale, number> = {
-  semana: 1,
-  mes: 7,
-  "45dias": 7,
-  "90dias": 14,
+  semana: 7,
+  mes: 30,
+  "45dias": 45,
+  "90dias": 90,
 };
-
-const WEEKDAY_ABBR_PT = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 
 function isoParts(iso: string): { y: number; m: number; d: number } {
   const [y, m, d] = iso.split("-").map(Number);
   return { y, m, d };
 }
 
-function ganttBucketLabel(startISO: string, endISO: string, scale: GanttScale): string {
+function ganttBucketLabel(startISO: string, endISO: string): string {
   const s = isoParts(startISO);
   const e = isoParts(endISO);
-  if (scale === "semana") {
-    const weekday = WEEKDAY_ABBR_PT[new Date(startISO + "T00:00:00").getDay()];
-    return `${weekday} ${s.d}`;
-  }
   if (s.m === e.m) return `${s.d}–${e.d} ${MONTH_ABBR_PT[s.m - 1].toUpperCase()}`;
   return `${s.d} ${MONTH_ABBR_PT[s.m - 1].toUpperCase()}–${e.d} ${MONTH_ABBR_PT[e.m - 1].toUpperCase()}`;
 }
 
 export type GanttBucket = { startISO: string; endISO: string; label: string };
 
-/** Régua do cronograma — calculada dinamicamente a partir da janela real
- * (nunca datas fixas). `semana` = 1 dia por coluna; `mes`/`45dias` = semanas;
- * `90dias` = quinzenas (pra não passar de ~7 colunas na tela). */
+/** Régua do cronograma — cada escala define o tamanho real de uma coluna:
+ * semana=7, mês=30, 45 dias=45 e 90 dias=90. */
 export function ganttBuckets(startISO: string, endISO: string, scale: GanttScale): GanttBucket[] {
   const bucketDays = GANTT_BUCKET_DAYS[scale];
   const start = new Date(startISO + "T00:00:00");
@@ -908,7 +901,7 @@ export function ganttBuckets(startISO: string, endISO: string, scale: GanttScale
     buckets.push({
       startISO: bStartISO,
       endISO: bEndISO,
-      label: ganttBucketLabel(bStartISO, bEndISO, scale),
+      label: ganttBucketLabel(bStartISO, bEndISO),
     });
   }
   return buckets;

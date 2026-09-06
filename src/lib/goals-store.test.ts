@@ -844,29 +844,33 @@ describe("ganttWindow — janela ancorada perto de hoje, nunca datas fixas", () 
 });
 
 describe("ganttBuckets — régua calculada dinamicamente", () => {
-  it("escala semanal: 1 dia por bucket, 7 buckets numa janela de 7 dias", () => {
+  it("escala semanal: cada coluna representa 7 dias", () => {
     const buckets = ganttBuckets("2026-09-06", "2026-09-12", "semana");
-    expect(buckets.length).toBe(7);
-    expect(buckets[0].startISO).toBe(buckets[0].endISO);
+    expect(buckets.length).toBe(1);
+    expect(buckets[0]).toMatchObject({ startISO: "2026-09-06", endISO: "2026-09-12" });
   });
 
-  it("escala mensal: buckets de 7 dias, último clipado ao fim real da janela", () => {
-    const buckets = ganttBuckets("2026-09-01", "2026-09-28", "mes");
-    expect(buckets.length).toBe(4);
-    expect(buckets[0]).toMatchObject({ startISO: "2026-09-01", endISO: "2026-09-07" });
-    expect(buckets[3]).toMatchObject({ startISO: "2026-09-22", endISO: "2026-09-28" });
+  it("escala mensal: cada coluna representa 30 dias", () => {
+    const buckets = ganttBuckets("2026-09-01", "2026-11-29", "mes");
+    expect(buckets.length).toBe(3);
+    expect(buckets[0]).toMatchObject({ startISO: "2026-09-01", endISO: "2026-09-30" });
+    expect(buckets[2]).toMatchObject({ startISO: "2026-10-31", endISO: "2026-11-29" });
   });
 
   it("escala mensal atravessando o mês: rótulo muda de mês corretamente", () => {
-    const buckets = ganttBuckets("2026-09-22", "2026-10-19", "mes");
-    const crossing = buckets.find((b) => b.startISO === "2026-09-29");
-    expect(crossing?.label).toContain("SET");
-    expect(crossing?.label).toContain("OUT");
+    const buckets = ganttBuckets("2026-09-22", "2026-10-21", "mes");
+    expect(buckets[0].label).toContain("SET");
+    expect(buckets[0].label).toContain("OUT");
   });
 
-  it("escala 90 dias usa buckets de 14 dias (no máximo ~7 colunas)", () => {
+  it("escala de 45 dias divide um plano de 90 dias em duas colunas", () => {
+    const buckets = ganttBuckets("2026-09-01", "2026-11-29", "45dias");
+    expect(buckets.length).toBe(2);
+  });
+
+  it("escala 90 dias condensa um plano de 90 dias em uma coluna", () => {
     const buckets = ganttBuckets("2026-09-01", "2026-11-29", "90dias");
-    expect(buckets.length).toBeLessThanOrEqual(7);
+    expect(buckets.length).toBe(1);
   });
 });
 
