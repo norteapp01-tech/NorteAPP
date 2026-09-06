@@ -1448,6 +1448,88 @@ export async function scheduleExecution(
   await invalidate();
 }
 
+/** Edita uma ocorrência específica na Agenda sem alterar prazo ou intervalo do
+ * Cronograma. A ação pode possuir várias sessões, portanto nunca clonamos nem
+ * movemos as demais ocorrências. */
+export async function updateAgendaSession(
+  id: string,
+  sessionId: string | undefined,
+  agendaDate: string,
+  startTime: string,
+  endTime?: string,
+): Promise<void> {
+  const row = await fetchExecutionRow(id);
+  const sessions = Array.isArray(row.agenda_sessions)
+    ? (row.agenda_sessions as AgendaSession[])
+    : [];
+
+  if (sessions.length > 0 && sessionId && !sessionId.startsWith("legacy-")) {
+    const updated = sessions.map((session) =>
+      session.id === sessionId ? { ...session, date: agendaDate, startTime, endTime } : session,
+    );
+    unwrap(
+      await supabase
+        .from("executions")
+        .update({
+          agenda_sessions: updated,
+          agenda_date: agendaDate,
+          start_time: startTime,
+          end_time: endTime,
+        })
+        .eq("id", id)
+        .select()
+        .single(),
+    );
+  } else {
+    unwrap(
+      await supabase
+        .from("executions")
+        .update({ agenda_date: agendaDate, start_time: startTime, end_time: endTime })
+        .eq("id", id)
+        .select()
+        .single(),
+    );
+  }
+  await invalidate();
+}
+
+/** Remove apenas a sessão tocada da Agenda. A ação do planejamento continua
+ * existindo e pode ser agendada novamente. */
+export async function removeAgendaSession(id: string, sessionId?: string): Promise<void> {
+  const row = await fetchExecutionRow(id);
+  const sessions = Array.isArray(row.agenda_sessions)
+    ? (row.agenda_sessions as AgendaSession[])
+    : [];
+
+  if (sessions.length > 0 && sessionId && !sessionId.startsWith("legacy-")) {
+    const remaining = sessions.filter((session) => session.id !== sessionId);
+    const fallback = remaining.at(-1);
+    unwrap(
+      await supabase
+        .from("executions")
+        .update({
+          agenda_sessions: remaining,
+          agenda_date: fallback?.date ?? null,
+          start_time: fallback?.startTime ?? null,
+          end_time: fallback?.endTime ?? null,
+        })
+        .eq("id", id)
+        .select()
+        .single(),
+    );
+  } else {
+    unwrap(
+      await supabase
+        .from("executions")
+        .update({ agenda_date: null, start_time: null, end_time: null })
+        .eq("id", id)
+        .select()
+        .single(),
+    );
+  }
+  await invalidate();
+}
+
 /** Move/redimensiona uma ação no Cronograma — atualiza a MESMA linha, nunca
  * mexe em dueDate/agendaDate/startTime/endTime (três conceitos de tempo
  * independentes). Usado no `pointerup` do arrasto, nunca a cada pixel. */

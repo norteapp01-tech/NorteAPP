@@ -1,8 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
 import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import {
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Plus,
   MapPin,
   Lock,
@@ -11,6 +20,8 @@ import {
   X,
   Check,
   AlertTriangle,
+  RotateCcw,
+  Trash2,
 } from "lucide-react";
 import { categoryMeta } from "@/lib/mock-data";
 import {
@@ -19,6 +30,8 @@ import {
   linkExecutionToGoal,
   effectiveStatus,
   isGoalComplete,
+  removeAgendaSession,
+  updateAgendaSession,
   type Execution,
 } from "@/lib/goals-store";
 import { useProfile } from "@/lib/profile-store";
@@ -31,13 +44,16 @@ import {
 import type { TimeFormat, WeekStart } from "@/lib/profile-store";
 import { nowDate } from "@/lib/test-clock";
 import { Modal } from "@/components/ui/modal";
+import {
+  ScheduleFields,
+  scheduleTimesValid,
+  type ScheduleValue,
+} from "@/components/plan/ScheduleFields";
 
 export const Route = createFileRoute("/agenda")({
   head: () => ({ meta: [{ title: "Agenda — Norte" }] }),
   component: AgendaScreen,
 });
-
-type View = "mes" | "semana" | "dia" | "ano";
 
 const monthNames = [
   "Janeiro",
@@ -60,110 +76,102 @@ function localISO(d: Date) {
 }
 
 function AgendaScreen() {
-  const [view, setView] = useState<View>("mes");
   const [cursor, setCursor] = useState(() => nowDate());
   const [selectedDate, setSelectedDate] = useState<string>(() => localISO(nowDate()));
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const executions = useGoalsStore((s) => s.executions);
   const eventsByDate = useMemo(() => agendaByDate(executions), [executions]);
   const profile = useProfile();
 
   const selectedEvents = eventsByDate[selectedDate] ?? [];
+  const occupiedMinutes = selectedEvents.reduce((sum, event) => {
+    const start = timeToMinutes(event.startTime ?? "00:00");
+    const end = timeToMinutes(event.endTime ?? event.startTime ?? "00:00");
+    return sum + Math.max(0, end - start);
+  }, 0);
+  const availableMinutes = Math.max(0, 15 * 60 - occupiedMinutes);
 
   return (
     <div className="px-5 pt-12">
-      <header>
+      <header className="relative pr-14">
         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Agenda</p>
         <h1 className="mt-1 text-3xl font-bold">Seus compromissos</h1>
-        <p className="mt-2 text-sm text-muted-foreground text-balance-tight">
-          Calendário limpo. Aqui vive o que tem hora marcada — sem planejamentos.
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">Seu tempo, com clareza.</p>
+        <button
+          onClick={() => setCalendarOpen(true)}
+          aria-label="Abrir calendário do mês"
+          className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface text-muted-foreground hover:border-primary/40 hover:text-primary"
+        >
+          <CalendarDays className="h-5 w-5" />
+        </button>
       </header>
 
-      <div className="mt-5 flex gap-1 rounded-2xl border border-border bg-surface p-1">
-        {(["dia", "semana", "mes", "ano"] as View[]).map((v) => (
-          <button
-            key={v}
-            onClick={() => setView(v)}
-            className={`flex-1 rounded-xl py-2 text-xs font-semibold capitalize transition-colors ${view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-          >
-            {v === "dia" ? "Dia" : v === "semana" ? "Semana" : v === "mes" ? "Mês" : "Ano"}
-          </button>
-        ))}
+      <WeekStrip
+        cursor={cursor}
+        setCursor={setCursor}
+        eventsByDate={eventsByDate}
+        selectedDate={selectedDate}
+        onSelect={(date) => {
+          setSelectedDate(date);
+          setCursor(new Date(date + "T00:00:00"));
+        }}
+        onOpenCalendar={() => setCalendarOpen(true)}
+        weekStart={profile.weekStart}
+      />
+
+      <p className="mt-3 text-center text-[11px] text-muted-foreground">
+        {selectedEvents.length} compromisso{selectedEvents.length === 1 ? "" : "s"} ·{" "}
+        {formatMinutes(occupiedMinutes)} ocupada · {formatMinutes(availableMinutes)} livres
+      </p>
+
+      <div className="mt-6 flex items-center justify-between">
+        <h2 className="text-base font-semibold">{formatLongDate(selectedDate)}</h2>
+        <Link
+          to="/criar"
+          search={{ modo: "agenda" }}
+          className="flex min-h-11 items-center gap-1 px-2 text-xs font-semibold text-primary"
+        >
+          <Plus className="h-4 w-4" /> Novo
+        </Link>
       </div>
 
-      {view === "mes" && (
-        <MonthGrid
-          cursor={cursor}
-          setCursor={setCursor}
-          eventsByDate={eventsByDate}
-          selectedDate={selectedDate}
-          onSelect={setSelectedDate}
-          weekStart={profile.weekStart}
-        />
-      )}
-      {view === "semana" && (
-        <WeekStrip
-          cursor={cursor}
-          setCursor={setCursor}
-          eventsByDate={eventsByDate}
-          selectedDate={selectedDate}
-          onSelect={setSelectedDate}
-          weekStart={profile.weekStart}
-        />
-      )}
-      {view === "dia" && (
-        <DayView
-          date={selectedDate}
-          onNav={(d) => setSelectedDate(d)}
-          eventsByDate={eventsByDate}
-          timeFormat={profile.timeFormat}
-        />
-      )}
-      {view === "ano" && (
-        <YearGrid
-          cursor={cursor}
-          setCursor={setCursor}
-          eventsByDate={eventsByDate}
-          onPick={(d) => {
-            setSelectedDate(d);
-            setView("mes");
-            setCursor(new Date(d));
-          }}
-        />
-      )}
+      <DayView date={selectedDate} events={selectedEvents} timeFormat={profile.timeFormat} />
 
-      {view !== "ano" && (
-        <div className="mt-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              {formatFullDate(selectedDate)}
-            </h2>
-            <Link
-              to="/criar"
-              search={{ modo: "agenda" }}
-              className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary"
-            >
-              <Plus className="h-3 w-3" /> novo
-            </Link>
-          </div>
-          <div className="mt-3 space-y-2.5">
+      <div className="card-surface mt-5 overflow-hidden">
+        <button
+          onClick={() => setDetailsOpen((open) => !open)}
+          className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        >
+          <span className="font-semibold">Agenda detalhada</span>
+          <span className="ml-auto text-xs text-muted-foreground">
+            {selectedEvents.length} compromisso{selectedEvents.length === 1 ? "" : "s"}
+          </span>
+          {detailsOpen ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </button>
+        {detailsOpen && (
+          <div className="space-y-2.5 border-t border-border p-3">
             {selectedEvents.length === 0 ? (
-              <div className="card-surface p-6 text-center">
-                <p className="text-sm text-muted-foreground">Nada agendado nesse dia.</p>
-              </div>
+              <p className="py-5 text-center text-sm text-muted-foreground">
+                Nada agendado nesse dia.
+              </p>
             ) : (
-              selectedEvents.map((e) => (
+              selectedEvents.map((event) => (
                 <EventCard
-                  key={`${e.id}-${e.agendaSessionId ?? e.agendaDate}`}
-                  e={e}
+                  key={`${event.id}-${event.agendaSessionId ?? event.agendaDate}`}
+                  e={event}
                   timeFormat={profile.timeFormat}
                 />
               ))
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="mt-6 rounded-2xl border border-border bg-surface/60 p-4 text-xs text-muted-foreground">
         <span className="font-semibold text-foreground">Agenda ≠ Planejamento.</span> Aqui só entram
@@ -173,6 +181,22 @@ function AgendaScreen() {
         </Link>
         .
       </div>
+
+      {calendarOpen && (
+        <CalendarPicker
+          cursor={cursor}
+          setCursor={setCursor}
+          eventsByDate={eventsByDate}
+          selectedDate={selectedDate}
+          onSelect={(date) => {
+            setSelectedDate(date);
+            setCursor(new Date(date + "T00:00:00"));
+            setCalendarOpen(false);
+          }}
+          weekStart={profile.weekStart}
+          onClose={() => setCalendarOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -224,6 +248,7 @@ function EventCard({ e, timeFormat }: { e: Execution; timeFormat: TimeFormat }) 
             )}
           </div>
           <p className="mt-1 font-semibold leading-snug">{e.title}</p>
+          {e.how && <p className="mt-0.5 text-[11px] text-muted-foreground">{e.how}</p>}
           {e.location && (
             <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
               <MapPin className="h-3 w-3" /> {e.location}
@@ -412,6 +437,7 @@ function WeekStrip({
   eventsByDate,
   selectedDate,
   onSelect,
+  onOpenCalendar,
   weekStart,
 }: {
   cursor: Date;
@@ -419,6 +445,7 @@ function WeekStrip({
   eventsByDate: Record<string, Execution[]>;
   selectedDate: string;
   onSelect: (d: string) => void;
+  onOpenCalendar: () => void;
   weekStart: WeekStart;
 }) {
   const start = startOfWeekLocal(cursor, weekStart);
@@ -428,7 +455,7 @@ function WeekStrip({
     return d;
   });
   return (
-    <div className="card-surface mt-4 p-4">
+    <div className="card-surface mt-6 overflow-hidden">
       <div className="flex items-center justify-between">
         <button
           onClick={() => {
@@ -436,25 +463,30 @@ function WeekStrip({
             d.setDate(d.getDate() - 7);
             setCursor(d);
           }}
-          className="rounded-full p-1.5 hover:bg-surface-2"
+          className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-2"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <p className="text-sm font-bold">
-          Semana de {start.getDate()}/{start.getMonth() + 1}
-        </p>
+        <button
+          onClick={onOpenCalendar}
+          className="flex min-h-11 items-center gap-1.5 px-3 text-sm font-bold"
+        >
+          {monthNames[new Date(selectedDate + "T00:00:00").getMonth()]}{" "}
+          {new Date(selectedDate + "T00:00:00").getFullYear()}
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
         <button
           onClick={() => {
             const d = new Date(cursor);
             d.setDate(d.getDate() + 7);
             setCursor(d);
           }}
-          className="rounded-full p-1.5 hover:bg-surface-2"
+          className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-2"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
-      <div className="mt-3 grid grid-cols-7 gap-1.5">
+      <div className="grid grid-cols-7 gap-1 px-3 pb-4">
         {week.map((d) => {
           const iso = localISO(d);
           const evts = eventsByDate[iso] ?? [];
@@ -463,13 +495,13 @@ function WeekStrip({
             <button
               key={iso}
               onClick={() => onSelect(iso)}
-              className={`rounded-lg p-2 text-center transition-colors ${isSel ? "bg-primary text-primary-foreground" : "bg-surface-2"}`}
+              className={`flex min-h-16 flex-col items-center justify-center rounded-2xl px-1 text-center transition-colors ${isSel ? "bg-primary text-primary-foreground" : "hover:bg-surface-2"}`}
             >
-              <p className="text-[10px] uppercase">{weekLabels[d.getDay()]}</p>
+              <p className="text-[9px] uppercase opacity-75">{weekLabels[d.getDay()]}</p>
               <p className="mt-1 text-base font-bold">{d.getDate()}</p>
-              <p className="mt-1 text-[10px] opacity-80">
-                {evts.length ? `${evts.length} ev` : "—"}
-              </p>
+              <span
+                className={`mt-1 h-1 w-1 rounded-full ${evts.length > 0 ? (isSel ? "bg-primary-foreground" : "bg-primary") : "bg-transparent"}`}
+              />
             </button>
           );
         })}
@@ -480,60 +512,303 @@ function WeekStrip({
 
 function DayView({
   date,
-  onNav,
-  eventsByDate,
+  events,
   timeFormat,
 }: {
   date: string;
-  onNav: (d: string) => void;
-  eventsByDate: Record<string, Execution[]>;
+  events: Execution[];
   timeFormat: TimeFormat;
 }) {
-  const d = new Date(date + "T00:00:00");
-  const shift = (n: number) => {
-    const x = new Date(d);
-    x.setDate(d.getDate() + n);
-    onNav(localISO(x));
-  };
-  const hours = Array.from({ length: 15 }, (_, i) => 7 + i);
-  const evts = eventsByDate[date] ?? [];
+  const startHour = 7;
+  const endHour = 22;
+  const hourHeight = 52;
+  const hours = Array.from({ length: endHour - startHour + 1 }, (_, i) => startHour + i);
   return (
-    <div className="card-surface mt-4 p-4">
-      <div className="flex items-center justify-between">
-        <button onClick={() => shift(-1)} className="rounded-full p-1.5 hover:bg-surface-2">
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <p className="text-sm font-bold">{formatFullDate(date)}</p>
-        <button onClick={() => shift(1)} className="rounded-full p-1.5 hover:bg-surface-2">
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
-      <div className="mt-3 space-y-0.5">
-        {hours.map((h) => {
-          const hh = String(h).padStart(2, "0");
-          const ev = evts.find((e) => e.startTime?.startsWith(hh));
-          return (
-            <div key={h} className="flex items-start gap-3">
-              <span className="w-12 pt-1 font-mono text-[10px] text-muted-foreground">
-                {formatTime(`${hh}:00`, timeFormat)}
-              </span>
-              <div className="flex-1 border-t border-border/50 py-2">
-                {ev && (
-                  <div className="rounded-lg border border-primary/30 bg-primary/10 p-2">
-                    <p className="text-xs font-semibold">{ev.title}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {formatTime(ev.startTime, timeFormat)}
-                      {ev.endTime ? `–${formatTime(ev.endTime, timeFormat)}` : ""}{" "}
-                      {ev.location ? `· ${ev.location}` : ""}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+    <div className="card-surface relative mt-3 overflow-hidden px-3 py-4">
+      <div className="relative ml-14" style={{ height: (endHour - startHour) * hourHeight }}>
+        {hours.map((hour, index) => (
+          <div
+            key={hour}
+            className="absolute right-0 left-0 border-t border-border/50"
+            style={{ top: index * hourHeight }}
+          >
+            <span className="absolute -left-14 -translate-y-1/2 font-mono text-[10px] text-muted-foreground">
+              {formatTime(`${String(hour).padStart(2, "0")}:00`, timeFormat)}
+            </span>
+          </div>
+        ))}
+        {events.map((event) => (
+          <AgendaEventBlock
+            key={`${event.id}-${event.agendaSessionId ?? event.agendaDate}`}
+            event={event}
+            date={date}
+            startHour={startHour}
+            endHour={endHour}
+            hourHeight={hourHeight}
+            timeFormat={timeFormat}
+          />
+        ))}
       </div>
     </div>
+  );
+}
+
+function AgendaEventBlock({
+  event,
+  date,
+  startHour,
+  endHour,
+  hourHeight,
+  timeFormat,
+}: {
+  event: Execution;
+  date: string;
+  startHour: number;
+  endHour: number;
+  hourHeight: number;
+  timeFormat: TimeFormat;
+}) {
+  const initialStart = timeToMinutes(event.startTime ?? `${String(startHour).padStart(2, "0")}:00`);
+  const initialEnd = timeToMinutes(event.endTime ?? minutesToTime(initialStart + 60));
+  const [start, setStart] = useState(initialStart);
+  const [end, setEnd] = useState(Math.max(initialStart + 15, initialEnd));
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [schedule, setSchedule] = useState<ScheduleValue>({
+    date,
+    startTime: event.startTime ?? minutesToTime(initialStart),
+    endTime: event.endTime ?? minutesToTime(initialEnd),
+  });
+  const drag = useRef<{
+    mode: "move" | "resize";
+    y: number;
+    start: number;
+    end: number;
+    moved: boolean;
+  } | null>(null);
+  const preview = useRef({ start: initialStart, end: Math.max(initialStart + 15, initialEnd) });
+
+  useEffect(() => {
+    const nextStart = timeToMinutes(event.startTime ?? `${String(startHour).padStart(2, "0")}:00`);
+    const nextEnd = timeToMinutes(event.endTime ?? minutesToTime(nextStart + 60));
+    setStart(nextStart);
+    setEnd(Math.max(nextStart + 15, nextEnd));
+    preview.current = { start: nextStart, end: Math.max(nextStart + 15, nextEnd) };
+    setSchedule({
+      date,
+      startTime: event.startTime ?? minutesToTime(nextStart),
+      endTime: event.endTime ?? minutesToTime(nextEnd),
+    });
+  }, [date, event.endTime, event.startTime, startHour]);
+
+  const beginDrag = (mode: "move" | "resize", e: ReactPointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { mode, y: e.clientY, start, end, moved: false };
+  };
+
+  const moveDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!drag.current) return;
+    const delta = Math.round(((e.clientY - drag.current.y) / hourHeight) * 4) * 15;
+    if (Math.abs(delta) >= 15) drag.current.moved = true;
+    const min = startHour * 60;
+    const max = endHour * 60;
+    if (drag.current.mode === "move") {
+      const duration = drag.current.end - drag.current.start;
+      const nextStart = Math.max(min, Math.min(max - duration, drag.current.start + delta));
+      setStart(nextStart);
+      setEnd(nextStart + duration);
+      preview.current = { start: nextStart, end: nextStart + duration };
+    } else {
+      const nextEnd = Math.max(drag.current.start + 15, Math.min(max, drag.current.end + delta));
+      setEnd(nextEnd);
+      preview.current = { start: drag.current.start, end: nextEnd };
+    }
+  };
+
+  const finishDrag = async (e: ReactPointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    const changed = drag.current?.moved;
+    drag.current = null;
+    if (!changed) {
+      setMenuOpen(true);
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateAgendaSession(
+        event.id,
+        event.agendaSessionId,
+        date,
+        minutesToTime(preview.current.start),
+        minutesToTime(preview.current.end),
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const top = ((start - startHour * 60) / 60) * hourHeight;
+  const height = Math.max(34, ((end - start) / 60) * hourHeight);
+
+  return (
+    <>
+      <div
+        onPointerDown={(e) => beginDrag("move", e)}
+        onPointerMove={moveDrag}
+        onPointerUp={finishDrag}
+        className={`absolute right-1 left-0 z-10 touch-none select-none rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-left shadow-sm ${saving ? "opacity-60" : "cursor-grab active:cursor-grabbing"}`}
+        style={{ top, height }}
+        role="button"
+        tabIndex={0}
+        aria-label={`${event.title}. Arraste para mudar o horário ou toque para mais opções.`}
+      >
+        <p className="truncate text-xs font-semibold">{event.title}</p>
+        <p className="text-[10px] text-muted-foreground">
+          {formatTime(minutesToTime(start), timeFormat)}–
+          {formatTime(minutesToTime(end), timeFormat)}
+        </p>
+        <div
+          onPointerDown={(e) => beginDrag("resize", e)}
+          onPointerMove={moveDrag}
+          onPointerUp={finishDrag}
+          className="absolute right-0 bottom-0 left-0 flex h-4 touch-none items-end justify-center pb-1"
+          aria-label="Ajustar duração"
+        >
+          <span className="h-0.5 w-8 rounded-full bg-primary/60" />
+        </div>
+      </div>
+
+      {menuOpen && (
+        <Modal onClose={() => setMenuOpen(false)} title={event.title}>
+          {!deleting ? (
+            <div>
+              <p className="text-xs text-muted-foreground">
+                {formatLongDate(schedule.date)} · {schedule.startTime}–{schedule.endTime}
+              </p>
+              <div className="mt-4">
+                <ScheduleFields
+                  value={schedule}
+                  onChange={setSchedule}
+                  disabled={saving}
+                  size="md"
+                />
+              </div>
+              <button
+                disabled={!scheduleTimesValid(schedule) || saving}
+                onClick={async () => {
+                  setSaving(true);
+                  try {
+                    await updateAgendaSession(
+                      event.id,
+                      event.agendaSessionId,
+                      schedule.date,
+                      schedule.startTime,
+                      schedule.endTime,
+                    );
+                    setMenuOpen(false);
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+              >
+                <RotateCcw className="h-4 w-4" /> {saving ? "Salvando…" : "Reagendar"}
+              </button>
+              <button
+                onClick={() => setDeleting(true)}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-danger/40 py-3 text-sm font-semibold text-danger"
+              >
+                <Trash2 className="h-4 w-4" /> Excluir da Agenda
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-sm font-semibold">Excluir este compromisso da Agenda?</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {event.goalId
+                  ? "A ação continuará existindo no planejamento e poderá ser agendada novamente."
+                  : "O compromisso deixará de aparecer no calendário."}
+              </p>
+              <button
+                disabled={saving}
+                onClick={async () => {
+                  setSaving(true);
+                  try {
+                    await removeAgendaSession(event.id, event.agendaSessionId);
+                    setMenuOpen(false);
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                className="mt-4 w-full rounded-xl bg-danger py-3 text-sm font-semibold text-white disabled:opacity-40"
+              >
+                {saving ? "Excluindo…" : "Sim, excluir da Agenda"}
+              </button>
+              <button
+                onClick={() => setDeleting(false)}
+                className="mt-2 w-full rounded-xl border border-border py-3 text-sm text-muted-foreground"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+        </Modal>
+      )}
+    </>
+  );
+}
+
+function CalendarPicker({
+  cursor,
+  setCursor,
+  eventsByDate,
+  selectedDate,
+  onSelect,
+  weekStart,
+  onClose,
+}: {
+  cursor: Date;
+  setCursor: (date: Date) => void;
+  eventsByDate: Record<string, Execution[]>;
+  selectedDate: string;
+  onSelect: (date: string) => void;
+  weekStart: WeekStart;
+  onClose: () => void;
+}) {
+  const [annual, setAnnual] = useState(false);
+  return (
+    <Modal onClose={onClose} title={annual ? "Escolher mês" : "Escolher data"}>
+      <button
+        onClick={() => setAnnual((value) => !value)}
+        className="mx-auto flex min-h-11 items-center gap-1 text-sm font-semibold text-primary"
+      >
+        {annual ? "Voltar ao mês" : `Ver ${cursor.getFullYear()} completo`}
+        <ChevronRight className="h-3.5 w-3.5" />
+      </button>
+      {annual ? (
+        <YearGrid
+          cursor={cursor}
+          setCursor={setCursor}
+          eventsByDate={eventsByDate}
+          onPick={(date) => {
+            setCursor(new Date(date + "T00:00:00"));
+            setAnnual(false);
+          }}
+        />
+      ) : (
+        <MonthGrid
+          cursor={cursor}
+          setCursor={setCursor}
+          eventsByDate={eventsByDate}
+          selectedDate={selectedDate}
+          onSelect={onSelect}
+          weekStart={weekStart}
+        />
+      )}
+    </Modal>
   );
 }
 
@@ -598,8 +873,27 @@ function YearGrid({
   );
 }
 
-function formatFullDate(iso: string) {
-  const d = new Date(iso + "T00:00:00");
-  const dias = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-  return `${dias[d.getDay()]}, ${d.getDate()} ${monthNames[d.getMonth()].slice(0, 3)}`;
+function formatLongDate(iso: string) {
+  const date = new Date(iso + "T00:00:00");
+  const weekdays = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+  return `${weekdays[date.getDay()]}, ${date.getDate()} de ${monthNames[date.getMonth()].toLowerCase()}`;
+}
+
+function timeToMinutes(time: string) {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function minutesToTime(total: number) {
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function formatMinutes(total: number) {
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  if (hours === 0) return `${minutes}min`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h${String(minutes).padStart(2, "0")}`;
 }
