@@ -93,6 +93,13 @@ import {
   QUERY_KEY,
   nextActionForGoal,
   focusGoal,
+  nextPlanAction,
+  formatDateShortBR,
+  ganttWindow,
+  ganttBuckets,
+  assignLanes,
+  hasPlannedRange,
+  isPlannedOverdue,
 } from "./goals-store";
 import type { Execution, Goal, Step } from "./goals-store";
 import { setTestClockOverride } from "./test-clock";
@@ -654,5 +661,245 @@ describe("focusGoal — escolhe UM plano em destaque sem duplicar registros", ()
 
   it("lista vazia retorna null", () => {
     expect(focusGoal([], [], [])).toBeNull();
+  });
+});
+
+describe("formatDateShortBR", () => {
+  it("formata 'YYYY-MM-DD' em 'D mmm.' sem passar por Date/UTC", () => {
+    expect(formatDateShortBR("2026-09-12")).toBe("12 set.");
+    expect(formatDateShortBR("2026-01-01")).toBe("1 jan.");
+    expect(formatDateShortBR("2026-12-31")).toBe("31 dez.");
+  });
+});
+
+describe("nextPlanAction — 'Próximo passo' do detalhe do plano (pool = qualquer etapa aberta)", () => {
+  it("ação agendada mais próxima vence uma não-agendada, mesmo em etapas diferentes", () => {
+    const goal = makeGoal();
+    const steps = [
+      makeStep({ id: "s1", done: false, order: 0 }),
+      makeStep({ id: "s2", done: false, order: 1 }),
+    ];
+    const dueSoon = makeExecution({
+      id: "due-soon",
+      goalId: "goal-1",
+      stepId: "s1",
+      status: "planejada",
+      dueDate: "2026-09-05",
+    });
+    const scheduled = makeExecution({
+      id: "scheduled",
+      goalId: "goal-1",
+      stepId: "s2",
+      status: "planejada",
+      dueDate: "2026-09-20",
+      agendaDate: "2026-09-10",
+      startTime: "09:00",
+    });
+    const result = nextPlanAction(goal, steps, [dueSoon, scheduled]);
+    expect(result.kind).toBe("action");
+    expect(result.kind === "action" && result.execution.id).toBe("scheduled");
+  });
+
+  it("entre duas agendadas, escolhe a data+hora mais próxima", () => {
+    const goal = makeGoal();
+    const steps = [makeStep({ id: "s1", done: false, order: 0 })];
+    const later = makeExecution({
+      id: "later",
+      goalId: "goal-1",
+      stepId: "s1",
+      status: "planejada",
+      agendaDate: "2026-09-15",
+      startTime: "10:00",
+    });
+    const sooner = makeExecution({
+      id: "sooner",
+      goalId: "goal-1",
+      stepId: "s1",
+      status: "planejada",
+      agendaDate: "2026-09-10",
+      startTime: "18:00",
+    });
+    const result = nextPlanAction(goal, steps, [later, sooner]);
+    expect(result.kind === "action" && result.execution.id).toBe("sooner");
+  });
+
+  it("entre duas não-agendadas, escolhe o menor dueDate", () => {
+    const goal = makeGoal();
+    const steps = [makeStep({ id: "s1", done: false, order: 0 })];
+    const far = makeExecution({
+      id: "far",
+      goalId: "goal-1",
+      stepId: "s1",
+      status: "planejada",
+      dueDate: "2026-09-25",
+    });
+    const near = makeExecution({
+      id: "near",
+      goalId: "goal-1",
+      stepId: "s1",
+      status: "planejada",
+      dueDate: "2026-09-06",
+    });
+    const result = nextPlanAction(goal, steps, [far, near]);
+    expect(result.kind === "action" && result.execution.id).toBe("near");
+  });
+
+  it("empate exato: desempata preferindo a ação da primeira etapa aberta", () => {
+    const goal = makeGoal();
+    const steps = [
+      makeStep({ id: "s1", done: false, order: 0 }),
+      makeStep({ id: "s2", done: false, order: 1 }),
+    ];
+    const inSecond = makeExecution({
+      id: "in-second",
+      goalId: "goal-1",
+      stepId: "s2",
+      status: "planejada",
+      dueDate: "2026-09-10",
+    });
+    const inFirst = makeExecution({
+      id: "in-first",
+      goalId: "goal-1",
+      stepId: "s1",
+      status: "planejada",
+      dueDate: "2026-09-10",
+    });
+    const result = nextPlanAction(goal, steps, [inSecond, inFirst]);
+    expect(result.kind === "action" && result.execution.id).toBe("in-first");
+  });
+
+  it("etapa aberta sem nenhuma ação candidata -> 'define'", () => {
+    const goal = makeGoal();
+    const steps = [makeStep({ id: "s1", done: false, order: 0 })];
+    const cancelled = makeExecution({
+      id: "e1",
+      goalId: "goal-1",
+      stepId: "s1",
+      status: "cancelada",
+    });
+    const result = nextPlanAction(goal, steps, [cancelled]);
+    expect(result).toEqual({ kind: "define", step: steps[0] });
+  });
+
+  it("nenhuma etapa aberta -> 'none'", () => {
+    const goal = makeGoal();
+    const steps = [makeStep({ id: "s1", done: true, order: 0 })];
+    expect(nextPlanAction(goal, steps, [])).toEqual({ kind: "none" });
+  });
+});
+
+describe("hasPlannedRange / isPlannedOverdue", () => {
+  it("só conta como período planejado quando início E fim existem", () => {
+    expect(hasPlannedRange(makeExecution({}))).toBe(false);
+    expect(hasPlannedRange(makeExecution({ plannedStartDate: "2026-09-01" }))).toBe(false);
+    expect(
+      hasPlannedRange(
+        makeExecution({ plannedStartDate: "2026-09-01", plannedEndDate: "2026-09-03" }),
+      ),
+    ).toBe(true);
+  });
+
+  it("atrasada só quando o fim planejado já passou e não está concluída/cancelada", () => {
+    const overdue = makeExecution({ plannedEndDate: "2026-09-01", status: "planejada" });
+    expect(isPlannedOverdue(overdue, "2026-09-05")).toBe(true);
+    expect(isPlannedOverdue(overdue, "2026-08-01")).toBe(false);
+    expect(
+      isPlannedOverdue(
+        makeExecution({ plannedEndDate: "2026-09-01", status: "concluida" }),
+        "2026-09-05",
+      ),
+    ).toBe(false);
+    expect(
+      isPlannedOverdue(
+        makeExecution({ plannedEndDate: "2026-09-01", status: "cancelada" }),
+        "2026-09-05",
+      ),
+    ).toBe(false);
+    expect(isPlannedOverdue(makeExecution({}), "2026-09-05")).toBe(false);
+  });
+});
+
+describe("ganttWindow — janela ancorada perto de hoje, nunca datas fixas", () => {
+  it("cada escala produz o total de dias esperado e contém hoje", () => {
+    const today = "2026-09-12";
+    for (const scale of ["semana", "mes", "45dias", "90dias"] as const) {
+      const w = ganttWindow(scale, today);
+      expect(w.startISO <= today && today <= w.endISO).toBe(true);
+    }
+    expect(ganttWindow("semana", today).totalDays).toBe(7);
+    expect(ganttWindow("mes", today).totalDays).toBe(28);
+    expect(ganttWindow("45dias", today).totalDays).toBe(45);
+    expect(ganttWindow("90dias", today).totalDays).toBe(90);
+  });
+
+  it("hoje não fica grudado na borda esquerda na escala mensal (bate com a referência visual)", () => {
+    const w = ganttWindow("mes", "2026-09-12");
+    // referência: "HOJE·12" cai na 2ª semana (coluna "8–14"), não na 1ª.
+    const daysFromStart = Math.round(
+      (new Date("2026-09-12").getTime() - new Date(w.startISO).getTime()) / 86400000,
+    );
+    expect(daysFromStart).toBeGreaterThanOrEqual(7);
+    expect(daysFromStart).toBeLessThan(14);
+  });
+});
+
+describe("ganttBuckets — régua calculada dinamicamente", () => {
+  it("escala semanal: 1 dia por bucket, 7 buckets numa janela de 7 dias", () => {
+    const buckets = ganttBuckets("2026-09-06", "2026-09-12", "semana");
+    expect(buckets.length).toBe(7);
+    expect(buckets[0].startISO).toBe(buckets[0].endISO);
+  });
+
+  it("escala mensal: buckets de 7 dias, último clipado ao fim real da janela", () => {
+    const buckets = ganttBuckets("2026-09-01", "2026-09-28", "mes");
+    expect(buckets.length).toBe(4);
+    expect(buckets[0]).toMatchObject({ startISO: "2026-09-01", endISO: "2026-09-07" });
+    expect(buckets[3]).toMatchObject({ startISO: "2026-09-22", endISO: "2026-09-28" });
+  });
+
+  it("escala mensal atravessando o mês: rótulo muda de mês corretamente", () => {
+    const buckets = ganttBuckets("2026-09-22", "2026-10-19", "mes");
+    const crossing = buckets.find((b) => b.startISO === "2026-09-29");
+    expect(crossing?.label).toContain("SET");
+    expect(crossing?.label).toContain("OUT");
+  });
+
+  it("escala 90 dias usa buckets de 14 dias (no máximo ~7 colunas)", () => {
+    const buckets = ganttBuckets("2026-09-01", "2026-11-29", "90dias");
+    expect(buckets.length).toBeLessThanOrEqual(7);
+  });
+});
+
+describe("assignLanes — empacotamento por sobreposição", () => {
+  it("ações sem sobreposição temporal ficam todas na mesma lane", () => {
+    const items = [
+      { id: "a", start: "2026-09-01", end: "2026-09-05" },
+      { id: "b", start: "2026-09-06", end: "2026-09-10" },
+    ];
+    const { laneOf, laneCount } = assignLanes(items);
+    expect(laneCount).toBe(1);
+    expect(laneOf.a).toBe(0);
+    expect(laneOf.b).toBe(0);
+  });
+
+  it("ações com período sobreposto vão pra lanes diferentes", () => {
+    const items = [
+      { id: "a", start: "2026-09-01", end: "2026-09-10" },
+      { id: "b", start: "2026-09-05", end: "2026-09-08" },
+    ];
+    const { laneOf, laneCount } = assignLanes(items);
+    expect(laneCount).toBe(2);
+    expect(laneOf.a).not.toBe(laneOf.b);
+  });
+
+  it("reaproveita uma lane liberada em vez de sempre criar uma nova", () => {
+    const items = [
+      { id: "a", start: "2026-09-01", end: "2026-09-03" },
+      { id: "b", start: "2026-09-01", end: "2026-09-05" }, // sobrepõe 'a' -> lane 1
+      { id: "c", start: "2026-09-04", end: "2026-09-06" }, // 'a' já liberou a lane 0
+    ];
+    const { laneOf, laneCount } = assignLanes(items);
+    expect(laneCount).toBe(2);
+    expect(laneOf.c).toBe(laneOf.a);
   });
 });

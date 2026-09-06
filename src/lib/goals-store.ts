@@ -77,6 +77,12 @@ export type Execution = {
   agendaDate?: string; // YYYY-MM-DD
   startTime?: string; // HH:MM
   endTime?: string; // HH:MM
+  /** CRONOGRAMA — em qual período do plano esta ação está sendo trabalhada.
+   * Terceiro conceito de tempo, independente de prazo e agenda: uma ação pode
+   * ter intervalo planejado sem estar na agenda, estar na agenda sem intervalo
+   * planejado, ou as duas coisas ao mesmo tempo. Os dois nascem juntos. */
+  plannedStartDate?: string; // YYYY-MM-DD
+  plannedEndDate?: string; // YYYY-MM-DD
   category: string;
   location?: string;
   rigid: boolean;
@@ -127,6 +133,13 @@ export function addDays(base: Date, n: number) {
   d.setDate(d.getDate() + n);
   return d;
 }
+/** Dias entre duas datas ISO (b - a) — usado pro cronograma posicionar barras
+ * relativas ao início da janela sem repetir aritmética de Date espalhada. */
+export function daysBetweenISO(a: string, b: string): number {
+  const da = new Date(a + "T00:00:00").getTime();
+  const db = new Date(b + "T00:00:00").getTime();
+  return Math.round((db - da) / 86400000);
+}
 export function todayISO() {
   return toISODate(nowDate());
 }
@@ -139,6 +152,30 @@ export function nowHM() {
 export function formatDateBR(iso: string): string {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
+}
+
+const MONTH_ABBR_PT = [
+  "jan",
+  "fev",
+  "mar",
+  "abr",
+  "mai",
+  "jun",
+  "jul",
+  "ago",
+  "set",
+  "out",
+  "nov",
+  "dez",
+];
+
+/** "YYYY-MM-DD" -> "12 set." — mesma regra de `formatDateBR` (split de string,
+ * nunca `Date`/UTC), só pra rótulos curtos como "Até 12 set." no card de
+ * próximo passo e nas linhas de ação. */
+export function formatDateShortBR(iso: string): string {
+  const [, m, d] = iso.split("-");
+  const monthIdx = Number(m) - 1;
+  return `${Number(d)} ${MONTH_ABBR_PT[monthIdx] ?? m}.`;
 }
 
 const weightHours: Record<TaskWeight, number> = { leve: 0.5, medio: 1.5, pesado: 2.5 };
@@ -731,6 +768,175 @@ export function focusGoal(goals: Goal[], steps: Step[], executions: Execution[])
   })[0];
 }
 
+/** "Próximo passo" do detalhe do plano — algoritmo próprio, diferente de
+ * `nextActionForGoal` (que só olha a primeira etapa aberta): aqui o pool são
+ * as ações de QUALQUER etapa ainda aberta, priorizando agendadas mais
+ * próximas, depois prazo mais próximo, com a primeira etapa aberta como
+ * desempate final. Nunca cria/copia registro — só escolhe qual mostrar. */
+export type PlanNextAction =
+  | { kind: "action"; step: Step; execution: Execution }
+  | { kind: "define"; step: Step }
+  | { kind: "none" };
+
+export function nextPlanAction(goal: Goal, steps: Step[], executions: Execution[]): PlanNextAction {
+  const openSteps = stepsForGoal(steps, goal.id).filter((s) => !s.done);
+  if (openSteps.length === 0) return { kind: "none" };
+  const openStepIds = new Set(openSteps.map((s) => s.id));
+  const firstOpenId = openSteps[0].id;
+  const candidates = executionsForGoal(executions, goal.id).filter(
+    (e) =>
+      e.stepId &&
+      openStepIds.has(e.stepId) &&
+      e.status !== "cancelada" &&
+      e.status !== "reagendada" &&
+      e.status !== "concluida",
+  );
+  if (candidates.length === 0) return { kind: "define", step: openSteps[0] };
+
+  const rank = (e: Execution): [number, string, number] => {
+    const belongsFirst = e.stepId === firstOpenId ? 0 : 1;
+    if (isScheduled(e)) return [0, `${e.agendaDate}${e.startTime ?? "00:00"}`, belongsFirst];
+    return [1, e.dueDate, belongsFirst];
+  };
+  const winner = [...candidates].sort((a, b) => {
+    const ra = rank(a);
+    const rb = rank(b);
+    for (let i = 0; i < ra.length; i++) {
+      if (ra[i] < rb[i]) return -1;
+      if (ra[i] > rb[i]) return 1;
+    }
+    return 0;
+  })[0];
+  const step = openSteps.find((s) => s.id === winner.stepId)!;
+  return { kind: "action", step, execution: winner };
+}
+
+// ---------------------------------------------------------------------------
+// Cronograma (Gantt) — seletores puros. Nenhum depende do store; recebem
+// datas/escala e devolvem geometria/agrupamento pro componente desenhar.
+// ---------------------------------------------------------------------------
+export function hasPlannedRange(e: Execution): boolean {
+  return !!e.plannedStartDate && !!e.plannedEndDate;
+}
+
+/** Vencida no cronograma: o fim planejado já passou e a ação não foi concluída
+ * (nem cancelada — descartada não é "atrasada", só deixou de valer). */
+export function isPlannedOverdue(e: Execution, todayIso: string): boolean {
+  if (!e.plannedEndDate) return false;
+  if (e.status === "concluida" || e.status === "cancelada") return false;
+  return e.plannedEndDate < todayIso;
+}
+
+export type GanttScale = "semana" | "mes" | "45dias" | "90dias";
+
+export const ganttScaleLabel: Record<GanttScale, string> = {
+  semana: "Semana",
+  mes: "Mês",
+  "45dias": "45 dias",
+  "90dias": "90 dias",
+};
+
+const GANTT_SCALE_DAYS: Record<GanttScale, number> = {
+  semana: 7,
+  mes: 28,
+  "45dias": 45,
+  "90dias": 90,
+};
+
+/** Quanto cada escala "olha pra trás" a partir de hoje — evita que a linha de
+ * hoje fique grudada na borda esquerda da janela (a referência visual mostra
+ * hoje já na 2ª semana da visão mensal, não na primeira). */
+const GANTT_SCALE_LOOKBACK: Record<GanttScale, number> = {
+  semana: 1,
+  mes: 11,
+  "45dias": 7,
+  "90dias": 14,
+};
+
+/** Janela do cronograma pra uma escala — ancorada perto de hoje (não no
+ * prazo do plano, que pode estar muito longe). Nunca datas fixas no código:
+ * tudo deriva de `todayIso`. */
+export function ganttWindow(
+  scale: GanttScale,
+  todayIso: string,
+): { startISO: string; endISO: string; totalDays: number } {
+  const totalDays = GANTT_SCALE_DAYS[scale];
+  const start = addDays(new Date(todayIso + "T00:00:00"), -GANTT_SCALE_LOOKBACK[scale]);
+  const end = addDays(start, totalDays - 1);
+  return { startISO: toISODate(start), endISO: toISODate(end), totalDays };
+}
+
+const GANTT_BUCKET_DAYS: Record<GanttScale, number> = {
+  semana: 1,
+  mes: 7,
+  "45dias": 7,
+  "90dias": 14,
+};
+
+const WEEKDAY_ABBR_PT = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
+
+function isoParts(iso: string): { y: number; m: number; d: number } {
+  const [y, m, d] = iso.split("-").map(Number);
+  return { y, m, d };
+}
+
+function ganttBucketLabel(startISO: string, endISO: string, scale: GanttScale): string {
+  const s = isoParts(startISO);
+  const e = isoParts(endISO);
+  if (scale === "semana") {
+    const weekday = WEEKDAY_ABBR_PT[new Date(startISO + "T00:00:00").getDay()];
+    return `${weekday} ${s.d}`;
+  }
+  if (s.m === e.m) return `${s.d}–${e.d} ${MONTH_ABBR_PT[s.m - 1].toUpperCase()}`;
+  return `${s.d} ${MONTH_ABBR_PT[s.m - 1].toUpperCase()}–${e.d} ${MONTH_ABBR_PT[e.m - 1].toUpperCase()}`;
+}
+
+export type GanttBucket = { startISO: string; endISO: string; label: string };
+
+/** Régua do cronograma — calculada dinamicamente a partir da janela real
+ * (nunca datas fixas). `semana` = 1 dia por coluna; `mes`/`45dias` = semanas;
+ * `90dias` = quinzenas (pra não passar de ~7 colunas na tela). */
+export function ganttBuckets(startISO: string, endISO: string, scale: GanttScale): GanttBucket[] {
+  const bucketDays = GANTT_BUCKET_DAYS[scale];
+  const start = new Date(startISO + "T00:00:00");
+  const end = new Date(endISO + "T00:00:00");
+  const totalDays = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+  const buckets: GanttBucket[] = [];
+  for (let offset = 0; offset < totalDays; offset += bucketDays) {
+    const bStartISO = toISODate(addDays(start, offset));
+    const bEndISO = toISODate(addDays(start, Math.min(offset + bucketDays, totalDays) - 1));
+    buckets.push({
+      startISO: bStartISO,
+      endISO: bEndISO,
+      label: ganttBucketLabel(bStartISO, bEndISO, scale),
+    });
+  }
+  return buckets;
+}
+
+/** Aloca cada item numa "lane" (linha visual) dentro do corredor da etapa —
+ * packing guloso por intervalo: duas ações com período sobreposto nunca
+ * caem na mesma lane, então nunca ficam desenhadas uma em cima da outra. */
+export function assignLanes(items: { id: string; start: string; end: string }[]): {
+  laneOf: Record<string, number>;
+  laneCount: number;
+} {
+  const sorted = [...items].sort((a, b) => a.start.localeCompare(b.start));
+  const laneEnds: string[] = [];
+  const laneOf: Record<string, number> = {};
+  for (const item of sorted) {
+    let lane = laneEnds.findIndex((end) => end < item.start);
+    if (lane === -1) {
+      lane = laneEnds.length;
+      laneEnds.push(item.end);
+    } else {
+      laneEnds[lane] = item.end;
+    }
+    laneOf[item.id] = lane;
+  }
+  return { laneOf, laneCount: Math.max(1, laneEnds.length) };
+}
+
 // ---------------------------------------------------------------------------
 // Mapeamento de linhas do banco (snake_case) para os tipos acima (camelCase) —
 // única fronteira que conhece o formato das tabelas.
@@ -786,6 +992,8 @@ function mapExecution(r: Row, history: ExecutionHistoryEntry[]): Execution {
     agendaDate: (r.agenda_date as string) ?? undefined,
     startTime: (r.start_time as string) ?? undefined,
     endTime: (r.end_time as string) ?? undefined,
+    plannedStartDate: (r.planned_start_date as string) ?? undefined,
+    plannedEndDate: (r.planned_end_date as string) ?? undefined,
     category: r.category as string,
     location: (r.location as string) ?? undefined,
     rigid: r.rigid as boolean,
@@ -1087,6 +1295,9 @@ export async function createExecution(input: {
   agendaDate?: string;
   startTime?: string;
   endTime?: string;
+  /** CRONOGRAMA — opcional. Independente de agenda; os dois nascem juntos ou nenhum. */
+  plannedStartDate?: string;
+  plannedEndDate?: string;
   category: string;
   location?: string;
   rigid?: boolean;
@@ -1108,6 +1319,8 @@ export async function createExecution(input: {
         agenda_date: input.agendaDate,
         start_time: input.startTime,
         end_time: input.endTime,
+        planned_start_date: input.plannedStartDate,
+        planned_end_date: input.plannedEndDate,
         category: input.category,
         location: input.location,
         rigid: input.rigid ?? false,
@@ -1161,6 +1374,25 @@ export async function scheduleExecution(
     await supabase
       .from("executions")
       .update({ agenda_date: agendaDate, start_time: startTime, end_time: endTime })
+      .eq("id", id)
+      .select()
+      .single(),
+  );
+  await invalidate();
+}
+
+/** Move/redimensiona uma ação no Cronograma — atualiza a MESMA linha, nunca
+ * mexe em dueDate/agendaDate/startTime/endTime (três conceitos de tempo
+ * independentes). Usado no `pointerup` do arrasto, nunca a cada pixel. */
+export async function setPlannedRange(
+  id: string,
+  plannedStartDate: string,
+  plannedEndDate: string,
+): Promise<void> {
+  unwrap(
+    await supabase
+      .from("executions")
+      .update({ planned_start_date: plannedStartDate, planned_end_date: plannedEndDate })
       .eq("id", id)
       .select()
       .single(),

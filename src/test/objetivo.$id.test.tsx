@@ -152,12 +152,12 @@ describe("GoalDetail — plano sem etapas (cenário 1 da checklist)", () => {
     seed({ steps: [], executions: [] });
     renderGoalDetail();
     expect(screen.getByText(/sem uma próxima ação/i)).toBeInTheDocument();
-    expect(screen.getByText(/adicione uma abaixo/i)).toBeInTheDocument();
+    expect(screen.getByText(/defina o primeiro passo deste plano/i)).toBeInTheDocument();
   });
 });
 
-describe("GoalDetail — subtarefas legadas: exibidas, nunca criáveis pela UI", () => {
-  it("não existe nenhum jeito de criar uma subtarefa nova, mesmo com dado legado presente", () => {
+describe("GoalDetail — subtarefas legadas: dado preservado no banco, mas sem UI nesta tela", () => {
+  it("não introduz o quarto nível — subtarefa legada não aparece nem é criável", () => {
     seed({
       steps: [
         fixtureStep({
@@ -166,24 +166,24 @@ describe("GoalDetail — subtarefas legadas: exibidas, nunca criáveis pela UI",
       ],
     });
     renderGoalDetail();
-    // dado legado continua visível...
-    expect(screen.getByText("Rascunho antigo")).toBeInTheDocument();
-    // ...mas não há campo/botão de criar subtarefa nova em lugar nenhum da tela
+    // a V1 da nova experiência não introduz o nível de subtarefa na UI — o
+    // dado legado continua no banco (não é apagado), só não ganha superfície aqui.
+    expect(screen.queryByText("Rascunho antigo")).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/subtarefa/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/nova subtarefa/i)).not.toBeInTheDocument();
   });
 });
 
 describe("GoalDetail — etapa atual", () => {
-  it("etapa marcada como isCurrent aparece destacada como 'etapa atual'", () => {
-    seed({ steps: [fixtureStep({ isCurrent: true })] });
+  it("primeira etapa não concluída aparece destacada como 'Etapa atual' (derivado da ordem, não de isCurrent)", () => {
+    seed({ steps: [fixtureStep({ isCurrent: false })] });
     renderGoalDetail();
     expect(screen.getByText(/etapa atual/i)).toBeInTheDocument();
   });
 });
 
 describe("GoalDetail — execução sem etapa (órfã)", () => {
-  it("aparece numa seção própria 'Execuções sem etapa', não se perde", () => {
+  it("aparece numa seção própria 'Ações sem etapa', não se perde", () => {
     seed({
       steps: [fixtureStep()],
       executions: [
@@ -191,28 +191,31 @@ describe("GoalDetail — execução sem etapa (órfã)", () => {
       ],
     });
     renderGoalDetail();
-    expect(screen.getByText("Execuções sem etapa")).toBeInTheDocument();
+    expect(screen.getByText("Ações sem etapa")).toBeInTheDocument();
     expect(screen.getByText("Sem etapa nenhuma")).toBeInTheDocument();
   });
 });
 
-describe("GoalDetail — 'Colocar etapa na agenda' (item 3)", () => {
-  it("aparece só quando a etapa não tem nenhuma execução", () => {
+describe("GoalDetail — etapa sem ações (estado vazio, item 18)", () => {
+  it("mostra 'Criar primeira ação' só quando a etapa não tem nenhuma ação", () => {
     seed({ steps: [fixtureStep()], executions: [] });
     renderGoalDetail();
-    expect(screen.getByText("Colocar etapa na agenda")).toBeInTheDocument();
+    expect(
+      screen.getByText(/o que precisa acontecer para concluir esta etapa/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /criar primeira ação/i })).toBeInTheDocument();
   });
 
-  it("some assim que a etapa já tem uma execução própria", () => {
+  it("some assim que a etapa já tem uma ação própria", () => {
     seed({ steps: [fixtureStep()], executions: [fixtureExecution()] });
     renderGoalDetail();
-    expect(screen.queryByText("Colocar etapa na agenda")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /criar primeira ação/i })).not.toBeInTheDocument();
   });
 
-  it("não aparece pra etapa já concluída", () => {
+  it("não aparece pra etapa já concluída (nasce recolhida)", () => {
     seed({ steps: [fixtureStep({ done: true })], executions: [] });
     renderGoalDetail();
-    expect(screen.queryByText("Colocar etapa na agenda")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /criar primeira ação/i })).not.toBeInTheDocument();
   });
 });
 
