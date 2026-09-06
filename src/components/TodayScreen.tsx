@@ -1,31 +1,21 @@
 import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { nowDate } from "@/lib/test-clock";
-import {
-  Play,
-  Check,
-  Flame,
-  Zap,
-  MoreHorizontal,
-  X,
-  Sparkles,
-  Lightbulb,
-  Moon,
-  CalendarClock,
-  RefreshCcw,
-  EllipsisVertical,
-} from "lucide-react";
+import { Play, Check, Flame, EllipsisVertical, X, Sparkles, CalendarClock } from "lucide-react";
 import { categoryMeta, statusDot, statusLabel, type TaskStatus } from "@/lib/mock-data";
-import { useProfile, greeting } from "@/lib/profile-store";
+import { useProfile, greeting, updateProfile } from "@/lib/profile-store";
 import { formatTime } from "@/lib/format-utils";
 import { HydrationCard } from "@/components/hydration/HydrationCard";
+import { RemindersCard } from "@/components/RemindersCard";
 import { SubagendasGrid } from "@/components/SubagendasGrid";
+import { DaySummaryCard } from "@/components/DaySummaryCard";
 import { Modal } from "@/components/ui/modal";
 import { DateField } from "@/components/ui/date-wheel-picker";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import {
   useGoalsStore,
   todayExecutions,
+  orderedTodayTasks,
   toggleExecutionDone,
   completeExecution,
   markMissed,
@@ -33,7 +23,6 @@ import {
   rescheduleExecution,
   redistributeExecution,
   patchExecution,
-  plannedHoursForDate,
   confidenceIndexByCategory,
   streakForTitle,
   insightsComputed,
@@ -42,7 +31,6 @@ import {
   addDays,
   todayISO,
   formatDateBR,
-  DAILY_CAPACITY_HOURS,
   type Execution,
 } from "@/lib/goals-store";
 
@@ -50,7 +38,13 @@ type EnergyMood = "fogo" | "normal" | "cansado" | "doente" | null;
 
 const weightLabel: Record<string, string> = { leve: "Leve", medio: "Médio", pesado: "Pesado" };
 const weightDots: Record<string, number> = { leve: 1, medio: 2, pesado: 3 };
-const weightHours: Record<string, number> = { leve: 0.5, medio: 1.5, pesado: 2.5 };
+
+const moodOptions = [
+  { v: "fogo", emoji: "🔥", label: "Fogo" },
+  { v: "normal", emoji: "😐", label: "Normal" },
+  { v: "cansado", emoji: "😴", label: "Cansado" },
+  { v: "doente", emoji: "🤒", label: "Doente" },
+] as const;
 
 function reliabilityFor(category: string, executions: Execution[]): TaskStatus {
   const entry = confidenceIndexByCategory(executions).find((c) => c.category === category);
@@ -65,8 +59,9 @@ export function TodayScreen() {
   const { executions, goals } = state;
   const profile = useProfile();
 
-  const [mood, setMood] = useState<EnergyMood>(null);
-  const [moodStep, setMoodStep] = useState<"ask" | "converse" | "done">("ask");
+  const todayMood = (profile.moodDate === todayISO() ? profile.moodValue : null) as EnergyMood;
+  const [moodPanelFor, setMoodPanelFor] = useState<EnergyMood>(null);
+  const [savingMood, setSavingMood] = useState(false);
   const [focus, setFocus] = useState<Execution | null>(null);
   const [skipping, setSkipping] = useState<Execution | null>(null);
   const [showEod, setShowEod] = useState(false);
@@ -77,11 +72,22 @@ export function TodayScreen() {
   const done = tasks.filter((t) => t.status === "concluida").length;
   const total = tasks.length;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  const capacity = DAILY_CAPACITY_HOURS;
-  const planned = plannedHoursForDate(executions, todayISO());
+  const displayTasks = orderedTodayTasks(tasks);
+  const nextTaskId = displayTasks.find((t) => t.status !== "concluida")?.id;
 
   const pendingTasks = tasks.filter((t) => t.status === "planejada");
   const insight = insightsComputed(state)[0];
+
+  const pickMood = async (m: EnergyMood) => {
+    if (savingMood || m === todayMood) return;
+    setSavingMood(true);
+    try {
+      await updateProfile({ moodDate: todayISO(), moodValue: m });
+      setMoodPanelFor(m);
+    } finally {
+      setSavingMood(false);
+    }
+  };
 
   return (
     <div className="px-5 pt-12">
@@ -104,146 +110,91 @@ export function TodayScreen() {
               : "Hoje é dia de seguir o plano."}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold text-primary">
-            {pct}%
+        <div className="flex flex-col items-end gap-1">
+          <span className="text-xs font-medium text-muted-foreground">
+            {done} de {total} concluídas
+          </span>
+          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-2">
+            <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
           </div>
-          <button
-            onClick={() => setSettingsOpen(true)}
-            aria-label="Configurações"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-surface"
-          >
-            <EllipsisVertical className="h-4 w-4" />
-          </button>
-          {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
         </div>
+        <button
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Configurações"
+          className="-m-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-surface"
+        >
+          <EllipsisVertical className="h-4 w-4" />
+        </button>
+        {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
       </header>
 
-      {/* Morning conversation */}
-      {moodStep !== "done" && (
-        <MorningConversation
-          mood={mood}
-          step={moodStep}
-          onPick={(m) => {
-            setMood(m);
-            setMoodStep("converse");
-          }}
-          onFinish={async (action) => {
-            const tomorrow = toISODate(addDays(nowDate(), 1));
-            if (action === "adiar-pesados") {
-              await Promise.all(
-                tasks
-                  .filter((t) => t.weight === "pesado" && t.status === "planejada" && !t.rigid)
-                  .map((t) =>
-                    rescheduleExecution(
-                      t.id,
-                      tomorrow,
-                      t.startTime ?? "09:00",
-                      t.endTime,
-                      "adiado — dia cansado",
-                    ),
-                  ),
-              );
-            }
-            if (action === "elevar") {
-              const leitura = tasks.find(
-                (t) => t.category === "leitura" && t.status === "planejada",
-              );
-              if (leitura)
-                await patchExecution(leitura.id, {
-                  how: "16 páginas (dobrado) — modo fogo",
-                  weight: "medio",
-                });
-            }
-            if (action === "remover-flex") {
-              await Promise.all(
-                tasks
-                  .filter((t) => t.status === "planejada" && !t.rigid)
-                  .map((t) => cancelExecution(t.id, "removida — dia sem energia pra flexíveis")),
-              );
-            }
-            setMoodStep("done");
-          }}
-          onReset={() => {
-            setMood(null);
-            setMoodStep("ask");
-          }}
-        />
-      )}
-      {moodStep === "done" && mood && (
-        <section className="card-surface mt-6 flex items-center justify-between p-4">
-          <div className="text-sm">
-            <p className="font-medium">
-              {mood === "doente" && "Dia doente — modo mínimo ativo."}
-              {mood === "cansado" && "Dia cansado — pesados adiados."}
-              {mood === "normal" && "Dia normal — plano preservado."}
-              {mood === "fogo" && "Modo fogo — metas elevadas."}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {mood === "doente" && "Só o essencial. Resto reagendei."}
-              {mood === "cansado" && "Amanhã você pega os pesos."}
-              {mood === "fogo" && "Aproveita — hoje é raro."}
-              {mood === "normal" && "Capacidade do dia ok."}
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              setMood(null);
-              setMoodStep("ask");
-            }}
-            className="text-xs text-muted-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </section>
-      )}
-
-      {/* Capacity */}
-      <section className="mt-4 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3">
-        <Zap className="h-4 w-4 text-warning" />
-        <div className="flex-1">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Capacidade do dia</span>
-            <span className="font-semibold">
-              {planned.toFixed(1)}h / {capacity}h
-            </span>
-          </div>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-2">
-            <div
-              className={`h-full rounded-full ${planned > capacity ? "bg-danger" : "bg-primary"}`}
-              style={{ width: `${Math.min(100, (planned / capacity) * 100)}%` }}
-            />
-          </div>
-          {planned > capacity && (
-            <p className="mt-1 text-[10px] text-danger">
-              Sobrecarregado — considere redistribuir algo.
-            </p>
-          )}
+      {/* Como você está? — sempre visível, seleção persistida no perfil */}
+      <section className="mt-5">
+        <p className="text-sm font-medium">Como você está?</p>
+        <div className="mt-2.5 grid grid-cols-4 gap-2">
+          {moodOptions.map((o) => {
+            const selected = todayMood === o.v;
+            return (
+              <button
+                key={o.v}
+                onClick={() => pickMood(o.v)}
+                disabled={savingMood}
+                aria-pressed={selected}
+                aria-label={o.label}
+                className={`flex min-h-11 flex-col items-center justify-center rounded-full border-2 py-2.5 transition-colors disabled:opacity-60 ${selected ? "border-primary bg-primary/10" : "border-transparent bg-surface-2 hover:border-border"}`}
+              >
+                <span className={`text-xl ${selected ? "" : "opacity-70"}`}>{o.emoji}</span>
+              </button>
+            );
+          })}
         </div>
+        {moodPanelFor && (
+          <MoodActionPanel
+            mood={moodPanelFor}
+            onFinish={async (action) => {
+              const tomorrow = toISODate(addDays(nowDate(), 1));
+              if (action === "adiar-pesados") {
+                await Promise.all(
+                  tasks
+                    .filter((t) => t.weight === "pesado" && t.status === "planejada" && !t.rigid)
+                    .map((t) =>
+                      rescheduleExecution(
+                        t.id,
+                        tomorrow,
+                        t.startTime ?? "09:00",
+                        t.endTime,
+                        "adiado — dia cansado",
+                      ),
+                    ),
+                );
+              }
+              if (action === "elevar") {
+                const leitura = tasks.find(
+                  (t) => t.category === "leitura" && t.status === "planejada",
+                );
+                if (leitura)
+                  await patchExecution(leitura.id, {
+                    how: "16 páginas (dobrado) — modo fogo",
+                    weight: "medio",
+                  });
+              }
+              if (action === "remover-flex") {
+                await Promise.all(
+                  tasks
+                    .filter((t) => t.status === "planejada" && !t.rigid)
+                    .map((t) => cancelExecution(t.id, "removida — dia sem energia pra flexíveis")),
+                );
+              }
+              setMoodPanelFor(null);
+            }}
+            onClose={() => setMoodPanelFor(null)}
+          />
+        )}
       </section>
 
-      {/* Insight do dia + Hidratação */}
-      <div className="mt-4 flex items-stretch gap-3">
-        {insight && (
-          <section className="card-surface flex min-w-0 flex-1 items-start gap-3 border-primary/40 bg-primary/5 p-4">
-            <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
-                Insight do dia
-              </p>
-              <p className="mt-1 text-sm font-medium text-balance-tight">{insight.detail}</p>
-              {insight.action && (
-                <Link
-                  to="/dashboard"
-                  className="mt-2 inline-block text-xs font-semibold text-primary"
-                >
-                  {insight.action} →
-                </Link>
-              )}
-            </div>
-          </section>
-        )}
-        <HydrationCard className="w-28 shrink-0" />
+      <div className="mt-5 flex items-stretch gap-3">
+        <RemindersCard compact />
+        <HydrationCard className="flex-1" />
       </div>
 
       <div className="mt-7 flex items-center justify-between">
@@ -254,28 +205,35 @@ export function TodayScreen() {
       </div>
 
       <ul className="mt-3 space-y-3">
-        {tasks.map((t) => {
+        {displayTasks.map((t) => {
           const cat = categoryMeta[t.category] ?? categoryMeta.generico;
           const streak = streakForTitle(executions, t.title);
           const reliability = reliabilityFor(t.category, executions);
           const missed = isMissed(t);
           const doneNow = t.status === "concluida";
+          const isNext = t.id === nextTaskId;
           return (
             <li
               key={t.id}
-              className={`card-surface group relative overflow-hidden p-4 transition-opacity ${doneNow ? "opacity-50" : ""}`}
+              className={`card-surface group relative overflow-hidden p-4 transition-opacity ${doneNow ? "opacity-50" : ""} ${isNext ? "border-l-2 border-l-primary" : ""}`}
             >
               <div className="flex items-start gap-3">
                 <button
                   onClick={async () => {
                     await toggleExecutionDone(t.id);
                   }}
+                  aria-label={doneNow ? "Reabrir tarefa" : "Concluir tarefa"}
                   className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-colors ${doneNow ? "border-primary bg-primary text-primary-foreground" : "border-border bg-surface-2"}`}
                 >
                   {doneNow && <Check className="h-4 w-4" strokeWidth={3} />}
                 </button>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    {isNext && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-primary">
+                        Próxima
+                      </span>
+                    )}
                     <span
                       className={`h-2 w-2 rounded-full ${statusDot[reliability]}`}
                       title={statusLabel[reliability]}
@@ -300,7 +258,9 @@ export function TodayScreen() {
                       </span>
                     )}
                   </div>
-                  <p className={`mt-1 font-semibold leading-snug ${doneNow ? "line-through" : ""}`}>
+                  <p
+                    className={`mt-1 font-semibold leading-snug ${doneNow ? "text-muted-foreground line-through" : ""}`}
+                  >
                     {t.title}
                   </p>
                   {t.how && <p className="mt-0.5 text-xs text-muted-foreground">{t.how}</p>}
@@ -325,10 +285,11 @@ export function TodayScreen() {
                     </span>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  {!doneNow && (
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  {!doneNow && isNext && (
                     <button
                       onClick={() => setFocus(t)}
+                      aria-label="Iniciar Modo Foco"
                       className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:scale-95"
                     >
                       <Play className="h-4 w-4 fill-current" />
@@ -337,9 +298,10 @@ export function TodayScreen() {
                   {!doneNow && (
                     <button
                       onClick={() => setSkipping(t)}
-                      className="text-muted-foreground hover:text-foreground"
+                      aria-label="Mais ações"
+                      className="-m-2 flex h-9 w-9 items-center justify-center text-muted-foreground hover:text-foreground"
                     >
-                      <MoreHorizontal className="h-4 w-4" />
+                      <EllipsisVertical className="h-4 w-4" />
                     </button>
                   )}
                 </div>
@@ -348,43 +310,29 @@ export function TodayScreen() {
           );
         })}
         {tasks.length === 0 && (
-          <li className="card-surface p-6 text-center text-sm text-muted-foreground">
-            Nada planejado para hoje.
+          <li className="card-surface flex flex-col items-center gap-2 p-6 text-center">
+            <p className="text-sm text-muted-foreground">Nada planejado para hoje.</p>
+            <Link to="/agenda" className="text-xs font-semibold text-primary">
+              Adicionar algo pro dia →
+            </Link>
           </li>
         )}
       </ul>
 
-      {/* End of day / reorganize triggers */}
-      <div className="mt-5 flex gap-2.5">
-        <button
-          onClick={() => setReorganizing(true)}
-          className="card-surface flex flex-1 items-center gap-2.5 p-4 text-left transition-colors hover:border-primary/50"
-        >
-          <RefreshCcw className="h-4 w-4 text-primary" />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold">Reorganizar meu dia</p>
-            <p className="text-[11px] text-muted-foreground">Seu dia mudou? Ajuste agora.</p>
-          </div>
-        </button>
-        <button
-          onClick={() => setShowEod(true)}
-          className="card-surface flex flex-1 items-center gap-2.5 p-4 text-left transition-colors hover:border-primary/50"
-        >
-          <Moon className="h-4 w-4 text-warning" />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold">Fechar o dia</p>
-            <p className="text-[11px] text-muted-foreground">{pendingTasks.length} pendentes.</p>
-          </div>
-        </button>
-      </div>
-
       {/* Minha rotina */}
-      <div className="mt-8">
+      <div className="mt-7">
         <h2 className="text-lg font-semibold">Minha rotina</h2>
       </div>
       <div className="mt-3">
         <SubagendasGrid />
       </div>
+
+      <DaySummaryCard
+        insight={insight}
+        pendingCount={pendingTasks.length}
+        onReorganize={() => setReorganizing(true)}
+        onCloseDay={() => setShowEod(true)}
+      />
 
       {focus && (
         <FocusModal
@@ -411,46 +359,18 @@ export function TodayScreen() {
   );
 }
 
-function MorningConversation({
+/** Painel de ação contextual do humor — reaproveita as mesmas opções/ações de sempre
+ * (adiar pesados, elevar metas, remover flexíveis), só deixou de tomar a tela inteira:
+ * some assim que o usuário escolhe uma ação ou fecha, a seleção acima continua marcada. */
+function MoodActionPanel({
   mood,
-  step,
-  onPick,
   onFinish,
-  onReset,
+  onClose,
 }: {
   mood: EnergyMood;
-  step: "ask" | "converse";
-  onPick: (m: EnergyMood) => void;
   onFinish: (action: string) => void;
-  onReset: () => void;
+  onClose: () => void;
 }) {
-  if (step === "ask") {
-    return (
-      <section className="card-surface mt-6 p-4">
-        <p className="text-sm font-medium">Como você está hoje?</p>
-        <div className="mt-3 grid grid-cols-4 gap-2">
-          {(
-            [
-              { v: "fogo", emoji: "🔥", label: "Fogo" },
-              { v: "normal", emoji: "😐", label: "Normal" },
-              { v: "cansado", emoji: "😴", label: "Cansado" },
-              { v: "doente", emoji: "🤒", label: "Doente" },
-            ] as const
-          ).map((o) => (
-            <button
-              key={o.v}
-              onClick={() => onPick(o.v)}
-              className="rounded-xl border border-border bg-surface-2 py-3 text-center transition-colors hover:border-primary/50"
-            >
-              <div className="text-2xl">{o.emoji}</div>
-              <div className="mt-1 text-[10px] text-muted-foreground">{o.label}</div>
-            </button>
-          ))}
-        </div>
-      </section>
-    );
-  }
-
   const opening: Record<
     Exclude<EnergyMood, null>,
     { line: string; prompt: string; options: { label: string; action: string; tone?: string }[] }
@@ -504,19 +424,18 @@ function MorningConversation({
   const cfg = opening[mood];
 
   return (
-    <section className="card-surface mt-6 space-y-4 border-primary/30 bg-primary/5 p-5">
+    <section className="card-surface mt-3 space-y-4 border-primary/30 bg-primary/5 p-4">
       <div className="flex items-start gap-3">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15">
           <Sparkles className="h-4 w-4 text-primary" />
         </div>
         <div className="flex-1">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
-            Revisão matinal
+            {cfg.line}
           </p>
-          <p className="mt-1 text-base font-semibold text-balance-tight">{cfg.line}</p>
-          <p className="mt-2 text-sm text-muted-foreground">{cfg.prompt}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{cfg.prompt}</p>
         </div>
-        <button onClick={onReset} className="text-muted-foreground">
+        <button onClick={onClose} aria-label="Fechar" className="text-muted-foreground">
           <X className="h-4 w-4" />
         </button>
       </div>

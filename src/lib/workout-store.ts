@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { todayISO } from "./goals-store";
+import { todayISO, toISODate } from "./goals-store";
 import { supabase, ensureSession, useSupabaseUserId } from "./supabase/client";
 import { queryClient } from "./query-client";
 import { nowDate } from "./test-clock";
@@ -142,17 +142,54 @@ export type ExerciseSummary = {
   repsAtMaxWeight: number;
   targetWeight: number;
   targetReps: number;
+  volume: number;
   deltaWeightVsPrevious?: number;
+  previousVolume?: number;
+  isPersonalRecord: boolean;
 };
+
+/** Soma peso×reps de todas as séries do log — volume real do exercício na sessão. */
+function logVolume(log: ExerciseLog): number {
+  return log.sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
+}
+
+/** Carga máxima já registrada pra esse exercício em QUALQUER sessão concluída
+ * (não só a anterior imediata) — usada pra reconhecer recorde pessoal de verdade,
+ * não só "melhor que da última vez". */
+export function allTimeMaxWeight(
+  sessions: WorkoutSession[],
+  planId: string,
+  exerciseId: string,
+  excludeSessionId?: string,
+): number {
+  let max = 0;
+  for (const s of sessions) {
+    if (s.planId !== planId || s.status !== "concluido" || s.id === excludeSessionId) continue;
+    const log = s.exerciseLogs.find((l) => l.exerciseId === exerciseId);
+    if (!log?.sets.length) continue;
+    max = Math.max(max, ...log.sets.map((set) => set.weight));
+  }
+  return max;
+}
 
 export function sessionSummary(
   session: WorkoutSession,
   previous: WorkoutSession | undefined,
   exercises: Exercise[],
-): { exercises: ExerciseSummary[]; totalSets: number; completedExercises: number } {
+  allSessions: WorkoutSession[] = [],
+): {
+  exercises: ExerciseSummary[];
+  totalSets: number;
+  completedExercises: number;
+  totalVolume: number;
+  previousTotalVolume?: number;
+  durationMinutes?: number;
+} {
   const rows: ExerciseSummary[] = [];
   let totalSets = 0;
   let completedExercises = 0;
+  let totalVolume = 0;
+  let previousTotalVolume: number | undefined = previous ? 0 : undefined;
   for (const log of session.exerciseLogs) {
     if (log.sets.length === 0) continue;
     const ex = exercises.find((e) => e.id === log.exerciseId);
@@ -160,10 +197,19 @@ export function sessionSummary(
     totalSets += log.sets.length;
     if (log.done) completedExercises += 1;
     const best = log.sets.reduce((a, b) => (b.weight > a.weight ? b : a), log.sets[0]);
+    const volume = logVolume(log);
+    totalVolume += volume;
     const prevLog = previous?.exerciseLogs.find((l) => l.exerciseId === log.exerciseId);
     const prevBest = prevLog?.sets.length
       ? Math.max(...prevLog.sets.map((s) => s.weight))
       : undefined;
+    const previousVolume = prevLog ? logVolume(prevLog) : undefined;
+    if (previousVolume !== undefined && previousTotalVolume !== undefined) {
+      previousTotalVolume += previousVolume;
+    }
+    const priorMax = allSessions.length
+      ? allTimeMaxWeight(allSessions, session.planId, ex.id, session.id)
+      : (prevBest ?? 0);
     rows.push({
       exerciseId: ex.id,
       name: ex.name,
@@ -172,10 +218,79 @@ export function sessionSummary(
       repsAtMaxWeight: best.reps,
       targetWeight: ex.loadTarget,
       targetReps: ex.repsTarget,
+      volume,
       deltaWeightVsPrevious: prevBest !== undefined ? best.weight - prevBest : undefined,
+      previousVolume,
+      isPersonalRecord: best.weight > 0 && best.weight >= priorMax && priorMax > 0,
     });
   }
-  return { exercises: rows, totalSets, completedExercises };
+  const durationMinutes = session.finishedAt
+    ? Math.round(
+        (new Date(session.finishedAt).getTime() - new Date(session.startedAt).getTime()) / 60000,
+      )
+    : undefined;
+  return {
+    exercises: rows,
+    totalSets,
+    completedExercises,
+    totalVolume,
+    previousTotalVolume,
+    durationMinutes,
+  };
+}
+
+/** No máximo 2 frases curtas, honestas — nunca afirma causa que os dados não provam
+ * (usa "pode ter contribuído"/"coincide com" ao combinar dois fatos). Sem sessão
+ * anterior, diz isso claramente em vez de inventar uma comparação. */
+export function workoutInsights(
+  session: WorkoutSession,
+  previous: WorkoutSession | undefined,
+  allSessionsForPlan: WorkoutSession[],
+  summary: ReturnType<typeof sessionSummary>,
+): string[] {
+  if (!previous) return ["Ainda não há treinos suficientes pra comparar."];
+
+  const insights: string[] = [];
+  const daysSince = Math.round(
+    (new Date(session.date + "T00:00:00").getTime() -
+      new Date(previous.date + "T00:00:00").getTime()) /
+      86400000,
+  );
+
+  if (summary.previousTotalVolume !== undefined && summary.previousTotalVolume > 0) {
+    const pct = Math.round(
+      ((summary.totalVolume - summary.previousTotalVolume) / summary.previousTotalVolume) * 100,
+    );
+    if (pct <= -5 && daysSince > 7) {
+      insights.push(
+        `O volume caiu ${Math.abs(pct)}% após ${daysSince} dias sem esse treino. O intervalo maior pode ter contribuído.`,
+      );
+    } else if (pct <= -5) {
+      insights.push(`O volume caiu ${Math.abs(pct)}% em relação ao treino anterior.`);
+    } else if (pct >= 5) {
+      insights.push(`Você aumentou o volume em ${pct}% em relação ao treino anterior.`);
+    }
+  }
+
+  if (insights.length < 2) {
+    const recentCount = allSessionsForPlan.filter(
+      (s) =>
+        s.status === "concluido" && s.date <= session.date && s.date >= toISODate14(session.date),
+    ).length;
+    if (daysSince > 10) {
+      insights.push(`Fazia ${daysSince} dias desde o último registro deste treino.`);
+    } else if (recentCount >= 4) {
+      insights.push(`${recentCount} sessões deste treino nos últimos 14 dias — ritmo consistente.`);
+    }
+  }
+
+  return insights.slice(0, 2);
+}
+
+function toISODate14(dateIso: string): string {
+  const d = new Date(dateIso + "T00:00:00");
+  d.setDate(d.getDate() - 14);
+  return toISODate(d);
 }
 
 // ---------------------------------------------------------------------------

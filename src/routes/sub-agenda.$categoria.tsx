@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -34,6 +34,7 @@ import {
   exerciseWeightSeries,
   previousFinishedSession,
   sessionSummary,
+  workoutInsights,
   createPlan,
   removePlan,
   addExercise,
@@ -43,6 +44,7 @@ import {
   startSession,
   logSet,
   updateSet,
+  removeLastSet,
   completeExerciseLog,
   finishSession,
   addBodyWeight,
@@ -57,7 +59,16 @@ import { AlimentacaoModule } from "@/components/nutrition/AlimentacaoModule";
 import { FinancasModule } from "@/components/finance/FinancasModule";
 import { FeModule } from "@/components/fe/FeModule";
 import { Modal } from "@/components/ui/modal";
-import { ExerciseEvolutionChart } from "@/components/academia/ExerciseEvolutionChart";
+import { ChartSkeleton } from "@/components/ui/chart-skeleton";
+
+// recharts só baixa quando o modal de um exercício realmente abre — Leitura,
+// Alimentação, Finanças, Fé e Trabalho (que também passam por este arquivo)
+// nunca precisam desse chunk.
+const ExerciseEvolutionChart = lazy(() =>
+  import("@/components/academia/ExerciseEvolutionChart").then((m) => ({
+    default: m.ExerciseEvolutionChart,
+  })),
+);
 import {
   Card,
   weekdayLabels,
@@ -378,12 +389,15 @@ function AcademiaModule() {
         )}
 
         {todayPlan && todaySession && todaySession.status === "concluido" && (
-          <button
-            onClick={() => setSummarySessionId(todaySession.id)}
-            className="flex items-center gap-1.5 text-sm text-success"
-          >
-            <Check className="h-4 w-4" /> Treino concluído hoje — ver resumo
-          </button>
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Check className="h-4 w-4 shrink-0 text-success" /> Treino concluído hoje —{" "}
+            <button
+              onClick={() => setSummarySessionId(todaySession.id)}
+              className="-my-2 rounded px-1 py-2 font-medium text-[oklch(0.88_0.16_145)] decoration-2 underline decoration-dotted underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success"
+            >
+              ver resumo
+            </button>
+          </div>
         )}
       </Card>
 
@@ -813,38 +827,58 @@ function ExerciseModal({
       </p>
 
       <div className="mt-4 space-y-1.5">
-        {(log?.sets ?? []).map((s) => (
-          <div
-            key={s.setIndex}
-            className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 p-2"
-          >
-            <span className="w-14 shrink-0 text-[11px] text-muted-foreground">
-              Série {s.setIndex + 1}
-            </span>
-            <input
-              type="number"
-              value={s.weight}
-              onChange={(e) =>
-                void updateSet(liveSession.id, exercise.id, s.setIndex, {
-                  weight: parseFloat(e.target.value) || 0,
-                })
-              }
-              className="w-16 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
-            />
-            <span className="text-[10px] text-muted-foreground">kg</span>
-            <input
-              type="number"
-              value={s.reps}
-              onChange={(e) =>
-                void updateSet(liveSession.id, exercise.id, s.setIndex, {
-                  reps: parseInt(e.target.value, 10) || 0,
-                })
-              }
-              className="w-14 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
-            />
-            <span className="text-[10px] text-muted-foreground">reps</span>
-          </div>
-        ))}
+        {(log?.sets ?? []).map((s, i, arr) => {
+          const isLast = i === arr.length - 1;
+          return (
+            <div
+              key={s.setIndex}
+              className="flex items-center gap-2 rounded-lg border border-dashed border-success/40 bg-success/5 p-2 opacity-90"
+            >
+              {isLast ? (
+                <button
+                  onClick={() => void removeLastSet(liveSession.id, exercise.id)}
+                  aria-label="Desfazer última série"
+                  title="Desfazer última série"
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground"
+                >
+                  <Check className="h-3 w-3" strokeWidth={3} />
+                </button>
+              ) : (
+                <span
+                  aria-label="Série concluída"
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground"
+                >
+                  <Check className="h-3 w-3" strokeWidth={3} />
+                </span>
+              )}
+              <span className="w-12 shrink-0 text-[11px] text-muted-foreground">
+                Série {s.setIndex + 1}
+              </span>
+              <input
+                type="number"
+                value={s.weight}
+                onChange={(e) =>
+                  void updateSet(liveSession.id, exercise.id, s.setIndex, {
+                    weight: parseFloat(e.target.value) || 0,
+                  })
+                }
+                className="w-16 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
+              />
+              <span className="text-[10px] text-muted-foreground">kg</span>
+              <input
+                type="number"
+                value={s.reps}
+                onChange={(e) =>
+                  void updateSet(liveSession.id, exercise.id, s.setIndex, {
+                    reps: parseInt(e.target.value, 10) || 0,
+                  })
+                }
+                className="w-14 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
+              />
+              <span className="text-[10px] text-muted-foreground">reps</span>
+            </div>
+          );
+        })}
       </div>
 
       {plannedRemaining > 0 && (
@@ -854,9 +888,15 @@ function ExerciseModal({
             return (
               <div
                 key={idx}
-                className="flex items-center gap-2 rounded-lg border border-dashed border-primary/40 bg-primary/5 p-2"
+                className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 p-2"
               >
-                <span className="w-14 shrink-0 text-[11px] text-muted-foreground">
+                <button
+                  onClick={() => registerPlanned(idx)}
+                  aria-label="Concluir série"
+                  title="Concluir série"
+                  className="h-5 w-5 shrink-0 rounded-full border-2 border-muted-foreground/40"
+                />
+                <span className="w-12 shrink-0 text-[11px] text-muted-foreground">
                   Série {idx + 1}
                 </span>
                 <input
@@ -873,13 +913,6 @@ function ExerciseModal({
                   className="w-14 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
                 />
                 <span className="text-[10px] text-muted-foreground">reps</span>
-                <button
-                  onClick={() => registerPlanned(idx)}
-                  className="ml-auto rounded-lg bg-primary p-1.5 text-primary-foreground"
-                  title="Registrar série"
-                >
-                  <Check className="h-3.5 w-3.5" />
-                </button>
               </div>
             );
           })}
@@ -887,8 +920,14 @@ function ExerciseModal({
       )}
 
       {plannedRemaining === 0 && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-dashed border-border p-2">
-          <span className="w-14 shrink-0 text-[11px] text-muted-foreground">
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-surface-2 p-2">
+          <button
+            onClick={addExtraSet}
+            aria-label="Concluir série extra"
+            title="Concluir série extra"
+            className="h-5 w-5 shrink-0 rounded-full border-2 border-muted-foreground/40"
+          />
+          <span className="w-12 shrink-0 text-[11px] text-muted-foreground">
             Série {registeredCount + 1}
           </span>
           <input
@@ -905,13 +944,6 @@ function ExerciseModal({
             className="w-14 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
           />
           <span className="text-[10px] text-muted-foreground">reps</span>
-          <button
-            onClick={addExtraSet}
-            className="ml-auto rounded-lg bg-primary p-1.5 text-primary-foreground"
-            title="Adicionar série extra"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </button>
         </div>
       )}
 
@@ -920,7 +952,9 @@ function ExerciseModal({
           Evolução de carga
         </p>
         <div className="mt-2">
-          <ExerciseEvolutionChart series={series} />
+          <Suspense fallback={<ChartSkeleton height={100} />}>
+            <ExerciseEvolutionChart series={series} />
+          </Suspense>
         </div>
         {series.length > 0 && (
           <>
@@ -969,13 +1003,21 @@ function FinishSummaryModal({ sessionId, onClose }: { sessionId: string; onClose
   if (!session) return null;
   const plan = plans.find((p) => p.id === session.planId);
   const previous = previousFinishedSession(sessions, session.planId, session.id);
-  const summary = sessionSummary(session, previous, exercises);
+  const summary = sessionSummary(session, previous, exercises, sessions);
+  const insights = workoutInsights(session, previous, sessions, summary);
+  const volumeDeltaPct =
+    summary.previousTotalVolume && summary.previousTotalVolume > 0
+      ? Math.round(
+          ((summary.totalVolume - summary.previousTotalVolume) / summary.previousTotalVolume) * 100,
+        )
+      : undefined;
 
   return (
     <Modal onClose={onClose} title="Treino concluído">
       <h3 className="text-xl font-bold">
         {plan ? `Treino ${plan.letter} — ${plan.name}` : "Treino"}
       </h3>
+
       <div className="mt-4 grid grid-cols-2 gap-2 text-center">
         <div className="rounded-xl bg-success/10 p-3">
           <p className="text-xl font-bold text-success">{summary.completedExercises}</p>
@@ -985,27 +1027,78 @@ function FinishSummaryModal({ sessionId, onClose }: { sessionId: string; onClose
           <p className="text-xl font-bold text-primary">{summary.totalSets}</p>
           <p className="text-[10px] uppercase text-muted-foreground">séries realizadas</p>
         </div>
+        {summary.durationMinutes !== undefined && (
+          <div className="rounded-xl bg-surface-2 p-3">
+            <p className="text-xl font-bold">{summary.durationMinutes}min</p>
+            <p className="text-[10px] uppercase text-muted-foreground">duração</p>
+          </div>
+        )}
+        <div className="rounded-xl bg-surface-2 p-3">
+          <p className="text-xl font-bold">{Math.round(summary.totalVolume)}kg</p>
+          <p className="text-[10px] uppercase text-muted-foreground">
+            volume total
+            {volumeDeltaPct !== undefined && (
+              <span className={volumeDeltaPct >= 0 ? " text-success" : " text-danger"}>
+                {" "}
+                ({volumeDeltaPct > 0 ? "+" : ""}
+                {volumeDeltaPct}%)
+              </span>
+            )}
+          </p>
+        </div>
       </div>
+
+      {insights.length > 0 && (
+        <div className="mt-4 space-y-1.5">
+          {insights.map((text, i) => (
+            <p
+              key={i}
+              className="rounded-lg border border-primary/25 bg-primary/5 p-2.5 text-[11px] text-foreground"
+            >
+              {text}
+            </p>
+          ))}
+        </div>
+      )}
+
       <ul className="mt-4 space-y-2">
         {summary.exercises.map((e) => (
-          <li
-            key={e.exerciseId}
-            className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface-2 p-3"
-          >
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{e.name}</p>
-              <p className="text-[11px] text-muted-foreground">
-                {e.maxWeight}kg × {e.repsAtMaxWeight} reps · meta {e.targetWeight}kg ×{" "}
-                {e.targetReps}
-              </p>
+          <li key={e.exerciseId} className="rounded-lg border border-border bg-surface-2 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
+                  {e.name}
+                  {e.isPersonalRecord && (
+                    <span className="shrink-0 rounded-full bg-warning/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-warning">
+                      recorde
+                    </span>
+                  )}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {e.maxWeight}kg × {e.repsAtMaxWeight} reps · meta {e.targetWeight}kg ×{" "}
+                  {e.targetReps}
+                </p>
+              </div>
+              {e.deltaWeightVsPrevious !== undefined ? (
+                <span
+                  className={`flex shrink-0 items-center gap-0.5 text-xs font-bold ${e.deltaWeightVsPrevious > 0 ? "text-success" : e.deltaWeightVsPrevious < 0 ? "text-danger" : "text-muted-foreground"}`}
+                >
+                  {e.deltaWeightVsPrevious > 0 ? (
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  ) : e.deltaWeightVsPrevious < 0 ? (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  ) : null}
+                  {e.deltaWeightVsPrevious > 0 ? "+" : ""}
+                  {e.deltaWeightVsPrevious}kg
+                </span>
+              ) : (
+                <span className="shrink-0 text-[10px] text-muted-foreground">sem histórico</span>
+              )}
             </div>
-            {e.deltaWeightVsPrevious !== undefined && e.deltaWeightVsPrevious !== 0 && (
-              <span
-                className={`shrink-0 text-xs font-bold ${e.deltaWeightVsPrevious > 0 ? "text-success" : "text-danger"}`}
-              >
-                {e.deltaWeightVsPrevious > 0 ? "+" : ""}
-                {e.deltaWeightVsPrevious}kg
-              </span>
+            {e.previousVolume !== undefined && (
+              <p className="mt-1.5 text-[10px] text-muted-foreground">
+                Volume: {Math.round(e.volume)}kg vs. {Math.round(e.previousVolume)}kg anterior
+              </p>
             )}
           </li>
         ))}

@@ -8,6 +8,9 @@ export const getRouter = () => {
     context: { queryClient },
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
+    // Prefetch a rota ao tocar/passar o mouse nos links (ex.: nav inferior) —
+    // quando o clique realmente acontece, o código da rota já está baixado.
+    defaultPreload: "intent",
   });
 
   return router;

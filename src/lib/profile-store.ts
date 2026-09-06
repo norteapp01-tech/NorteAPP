@@ -22,6 +22,10 @@ export type Profile = {
   notifyPlans: boolean;
   notifyRoutines: boolean;
   notifyReminders: boolean;
+  /** "Como você está?" do dia — null se ainda não escolhido hoje. Comparar
+   * sempre com todayISO(): um valor de um dia anterior não é o humor de hoje. */
+  moodDate: string | null;
+  moodValue: string | null;
 };
 
 const DEFAULT_PROFILE: Profile = {
@@ -35,6 +39,8 @@ const DEFAULT_PROFILE: Profile = {
   notifyPlans: true,
   notifyRoutines: true,
   notifyReminders: true,
+  moodDate: null,
+  moodValue: null,
 };
 
 type Row = Record<string, unknown>;
@@ -51,6 +57,8 @@ function mapProfile(r: Row): Profile {
     notifyPlans: (r.notify_plans as boolean) ?? true,
     notifyRoutines: (r.notify_routines as boolean) ?? true,
     notifyReminders: (r.notify_reminders as boolean) ?? true,
+    moodDate: (r.mood_date as string) ?? null,
+    moodValue: (r.mood_value as string) ?? null,
   };
 }
 
@@ -93,6 +101,8 @@ export async function updateProfile(patch: {
   notifyPlans?: boolean;
   notifyRoutines?: boolean;
   notifyReminders?: boolean;
+  moodDate?: string | null;
+  moodValue?: string | null;
 }) {
   const userId = await ensureSession();
   const dbPatch: Row = {};
@@ -106,6 +116,8 @@ export async function updateProfile(patch: {
   if (patch.notifyPlans !== undefined) dbPatch.notify_plans = patch.notifyPlans;
   if (patch.notifyRoutines !== undefined) dbPatch.notify_routines = patch.notifyRoutines;
   if (patch.notifyReminders !== undefined) dbPatch.notify_reminders = patch.notifyReminders;
+  if (patch.moodDate !== undefined) dbPatch.mood_date = patch.moodDate;
+  if (patch.moodValue !== undefined) dbPatch.mood_value = patch.moodValue;
 
   const { error } = await supabase
     .from("profiles")
