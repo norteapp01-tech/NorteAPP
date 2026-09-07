@@ -23,7 +23,7 @@ export function ReadingNoteEditor({
   onSaved,
 }: {
   book: Book;
-  sessionId: string;
+  sessionId?: string;
   type: ReadingNoteType;
   onClose: () => void;
   onSaved: () => void;
@@ -99,7 +99,7 @@ export function ReadingNoteEditor({
         disabled={!content.trim() || saving}
         className="mt-4 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
       >
-        {saving ? "Salvando…" : "Salvar e continuar lendo"}
+        {saving ? "Salvando…" : sessionId ? "Salvar e continuar lendo" : "Salvar anotação"}
       </button>
     </Modal>
   );

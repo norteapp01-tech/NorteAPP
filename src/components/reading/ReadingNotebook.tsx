@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Quote, Lightbulb, StickyNote } from "lucide-react";
+import { Search, Quote, Lightbulb, StickyNote, Plus, ChevronRight } from "lucide-react";
 import { useReadingStore, searchReadingNotes, type ReadingNoteType } from "@/lib/reading-store";
 import { Card } from "@/components/sub-agenda-shared";
 import { Modal } from "@/components/ui/modal";
@@ -24,7 +24,13 @@ function positionText(
 }
 
 /** Preview leve na home: busca + poucos itens recentes/relevantes. */
-export function ReadingNotebookPreview({ onOpenFull }: { onOpenFull: () => void }) {
+export function ReadingNotebookPreview({
+  onOpenFull,
+  onAddNote,
+}: {
+  onOpenFull: () => void;
+  onAddNote: () => void;
+}) {
   const state = useReadingStore((s) => s);
   const [query, setQuery] = useState("");
   const results = query.trim()
@@ -36,6 +42,14 @@ export function ReadingNotebookPreview({ onOpenFull }: { onOpenFull: () => void 
 
   return (
     <Card title="Caderno de leitura">
+      <div className="-mt-1 mb-3 flex justify-end">
+        <button
+          onClick={onAddNote}
+          className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground hover:border-primary/50"
+        >
+          <Plus className="h-3.5 w-3.5 text-primary" /> Nova anotação
+        </button>
+      </div>
       <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2">
         <Search className="h-3.5 w-3.5 text-muted-foreground" />
         <input
@@ -64,7 +78,7 @@ export function ReadingNotebookPreview({ onOpenFull }: { onOpenFull: () => void 
         })}
       </div>
       <button onClick={onOpenFull} className="mt-3 text-xs text-primary">
-        Ver caderno
+        Abrir caderno <ChevronRight className="inline h-3.5 w-3.5" />
       </button>
     </Card>
   );

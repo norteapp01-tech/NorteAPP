@@ -17,7 +17,7 @@ type Step = "search" | "details" | "plan";
 type QuickStatus = "reading" | "want_to_read";
 
 export function AddBookFlow({ onClose }: { onClose: () => void }) {
-  const [step, setStep] = useState<Step>("search");
+  const [step, setStep] = useState<Step>("details");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchBookResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -28,6 +28,7 @@ export function AddBookFlow({ onClose }: { onClose: () => void }) {
   const [format, setFormat] = useState<BookFormat>("physical");
   const [ebookMode, setEbookMode] = useState<"pages" | "percentage">("pages");
   const [totalPages, setTotalPages] = useState("");
+  const [totalChapters, setTotalChapters] = useState("");
   const [totalMinutes, setTotalMinutes] = useState("");
   const [coverDataUrl, setCoverDataUrl] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState<QuickStatus>("reading");
@@ -94,6 +95,7 @@ export function AddBookFlow({ onClose }: { onClose: () => void }) {
       status,
       progressMode: effectiveMode,
       totalPages: effectiveMode === "pages" ? parseInt(totalPages, 10) || undefined : undefined,
+      totalChapters: parseInt(totalChapters, 10) || undefined,
       totalSeconds: effectiveMode === "time" ? (parseInt(totalMinutes, 10) || 0) * 60 : undefined,
     };
     try {
@@ -263,17 +265,30 @@ export function AddBookFlow({ onClose }: { onClose: () => void }) {
             )}
 
             {effectiveMode === "pages" && (
-              <label className="block">
-                <span className="mb-0.5 block text-[10px] uppercase text-muted-foreground">
-                  Total de páginas
-                </span>
-                <input
-                  type="number"
-                  value={totalPages}
-                  onChange={(e) => setTotalPages(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
-                />
-              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block">
+                  <span className="mb-0.5 block text-[10px] uppercase text-muted-foreground">
+                    Páginas (opcional)
+                  </span>
+                  <input
+                    type="number"
+                    value={totalPages}
+                    onChange={(e) => setTotalPages(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-0.5 block text-[10px] uppercase text-muted-foreground">
+                    Capítulos (opcional)
+                  </span>
+                  <input
+                    type="number"
+                    value={totalChapters}
+                    onChange={(e) => setTotalChapters(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </label>
+              </div>
             )}
             {effectiveMode === "time" && (
               <label className="block">

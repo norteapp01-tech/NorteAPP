@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Library, BarChart3, CalendarClock, ChevronDown } from "lucide-react";
 import { useGoalsStore } from "@/lib/goals-store";
 import {
   useReadingStore,
@@ -23,7 +23,7 @@ import { AddBookFlow } from "./AddBookFlow";
 import { ReadingLibrary } from "./ReadingLibrary";
 import { BookDetails } from "./BookDetails";
 import { ReadingNotebookPreview, ReadingNotebook } from "./ReadingNotebook";
-import { QuickWantToRead } from "./QuickWantToRead";
+import { ReadingNoteEditor } from "./ReadingNoteEditor";
 import { ReadingStats, ReadingResurfaceCard } from "./ReadingStats";
 import { MissedTargetAdjustment } from "./MissedTargetAdjustment";
 import { BookCover } from "./BookCover";
@@ -37,6 +37,7 @@ type Modal =
   | { type: "library" }
   | { type: "bookDetails"; bookId: string }
   | { type: "notebook"; bookId?: string }
+  | { type: "note"; book: Book }
   | null;
 
 export function LeituraModule() {
@@ -158,34 +159,64 @@ export function LeituraModule() {
         </Card>
       )}
 
-      <ReadingNotebookPreview onOpenFull={() => setModal({ type: "notebook" })} />
+      <ReadingNotebookPreview
+        onOpenFull={() => setModal({ type: "notebook" })}
+        onAddNote={() => selectedBook && setModal({ type: "note", book: selectedBook })}
+      />
 
-      <Card title="Sua biblioteca">
-        <p className="text-xs text-muted-foreground">
-          {readingBooks.length} lendo · {completedBooks.length} concluídos · {wantBooks.length}{" "}
-          quero ler
-          {pausedBooks.length > 0 ? ` · ${pausedBooks.length} pausados` : ""}
-        </p>
-        <div className="mt-3 space-y-2">
-          <QuickWantToRead />
-          <div className="flex gap-2">
-            <button
-              onClick={() => setModal({ type: "addBook" })}
-              className="flex-1 rounded-lg border border-border py-2 text-xs font-semibold"
-            >
-              Adicionar livro
-            </button>
-            <button
-              onClick={() => setModal({ type: "library" })}
-              className="flex-1 rounded-lg border border-border py-2 text-xs font-semibold"
-            >
-              Ver biblioteca
-            </button>
-          </div>
+      <div className="divide-y divide-border border-y border-border">
+        <div className="flex items-center gap-3 py-3">
+          <Library className="h-5 w-5 text-muted-foreground" />
+          <button
+            onClick={() => setModal({ type: "library" })}
+            className="min-w-0 flex-1 text-left"
+          >
+            <p className="text-sm font-semibold">Biblioteca</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {readingBooks.length} lendo · {completedBooks.length} concluídos · {wantBooks.length}{" "}
+              quero ler{pausedBooks.length ? ` · ${pausedBooks.length} pausados` : ""}
+            </p>
+          </button>
+          <button
+            aria-label="Adicionar livro"
+            onClick={() => setModal({ type: "addBook" })}
+            className="grid h-9 w-9 place-items-center rounded-lg border border-border"
+          >
+            <Plus className="h-4 w-4 text-primary" />
+          </button>
         </div>
-      </Card>
-
-      <ReadingStats />
+        <details className="group py-3">
+          <summary className="flex cursor-pointer list-none items-center gap-3">
+            <BarChart3 className="h-5 w-5 text-muted-foreground" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold">Sua leitura</p>
+              <p className="text-xs text-muted-foreground">Ritmo, sessões e livros concluídos</p>
+            </div>
+            <ChevronDown className="h-4 w-4 text-muted-foreground group-open:rotate-180" />
+          </summary>
+          <div className="mt-3">
+            <ReadingStats />
+          </div>
+        </details>
+        <details className="group py-3">
+          <summary className="flex cursor-pointer list-none items-center gap-3">
+            <CalendarClock className="h-5 w-5 text-muted-foreground" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold">Rotina de leitura</p>
+              <p className="text-xs text-muted-foreground">Dias, horário e meta diária</p>
+            </div>
+            <ChevronDown className="h-4 w-4 text-muted-foreground group-open:rotate-180" />
+          </summary>
+          {selectedBook && (
+            <button
+              onClick={() => setModal({ type: "routine", book: selectedBook })}
+              className="mt-3 ml-8 text-xs font-semibold text-primary"
+            >
+              Configurar rotina
+            </button>
+          )}
+        </details>
+      </div>
 
       {resurfaceCandidate && (
         <ReadingResurfaceCard
@@ -241,6 +272,14 @@ export function LeituraModule() {
       )}
       {modal?.type === "notebook" && (
         <ReadingNotebook onClose={() => setModal(null)} initialBookId={modal.bookId} />
+      )}
+      {modal?.type === "note" && (
+        <ReadingNoteEditor
+          book={modal.book}
+          type="note"
+          onClose={() => setModal(null)}
+          onSaved={() => setModal(null)}
+        />
       )}
     </div>
   );

@@ -57,7 +57,12 @@ export function ContinueReadingCard({
         <div className="min-w-0 flex-1">
           <p className="truncate font-bold">{book.title}</p>
           <p className="truncate text-xs text-muted-foreground">{book.authors.join(", ")}</p>
-          <p className="mt-2 text-sm font-semibold">{progress.label}</p>
+          <p className="mt-2 text-sm font-semibold">
+            {progress.label}
+            {book.totalChapters
+              ? ` · Capítulo ${book.currentChapter ?? 0} de ${book.totalChapters}`
+              : ""}
+          </p>
           {progress.total !== undefined && (
             <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface-2">
               <div className="h-full bg-primary" style={{ width: `${progress.pct}%` }} />

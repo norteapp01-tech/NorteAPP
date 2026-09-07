@@ -36,6 +36,8 @@ export type Book = {
   status: BookStatus;
   totalPages?: number;
   currentPage?: number;
+  totalChapters?: number;
+  currentChapter?: number;
   currentPercentage?: number;
   totalSeconds?: number;
   currentSeconds?: number;
@@ -490,6 +492,8 @@ function mapBook(r: Row): Book {
     status: r.status as BookStatus,
     totalPages: (r.total_pages as number) ?? undefined,
     currentPage: (r.current_page as number) ?? undefined,
+    totalChapters: (r.total_chapters as number) ?? undefined,
+    currentChapter: (r.current_chapter as number) ?? undefined,
     currentPercentage: (r.current_percentage as number) ?? undefined,
     totalSeconds: (r.total_seconds as number) ?? undefined,
     currentSeconds: (r.current_seconds as number) ?? undefined,
@@ -742,6 +746,7 @@ export async function addBookManual(input: {
   progressMode?: ProgressMode;
   coverImage?: string;
   totalPages?: number;
+  totalChapters?: number;
   totalSeconds?: number;
 }): Promise<string> {
   const userId = await ensureSession();
@@ -759,6 +764,8 @@ export async function addBookManual(input: {
         progress_mode: mode,
         status: input.status,
         total_pages: mode === "pages" ? input.totalPages : undefined,
+        total_chapters: input.totalChapters,
+        current_chapter: input.totalChapters ? 0 : undefined,
         total_seconds: mode === "time" ? input.totalSeconds : undefined,
         current_page: mode === "pages" ? 0 : undefined,
         current_percentage: mode === "percentage" ? 0 : undefined,
@@ -808,6 +815,8 @@ export async function updateBook(
       | "format"
       | "progressMode"
       | "totalPages"
+      | "totalChapters"
+      | "currentChapter"
       | "totalSeconds"
       | "rating"
       | "mainTakeaway"
@@ -831,6 +840,8 @@ export async function updateBook(
   if (patch.format !== undefined) dbPatch.format = patch.format;
   if (patch.progressMode !== undefined) dbPatch.progress_mode = patch.progressMode;
   if (patch.totalPages !== undefined) dbPatch.total_pages = patch.totalPages;
+  if (patch.totalChapters !== undefined) dbPatch.total_chapters = patch.totalChapters;
+  if (patch.currentChapter !== undefined) dbPatch.current_chapter = patch.currentChapter;
   if (patch.totalSeconds !== undefined) dbPatch.total_seconds = patch.totalSeconds;
   if (patch.rating !== undefined) dbPatch.rating = patch.rating;
   if (patch.mainTakeaway !== undefined) dbPatch.main_takeaway = patch.mainTakeaway;

@@ -13,6 +13,7 @@ import {
   Check,
   X,
   Dumbbell,
+  BookOpen,
   CalendarClock,
   Layers3,
   Settings2,
@@ -103,6 +104,8 @@ function SubAgenda() {
         <h1 className="mt-1 flex items-center gap-3 text-3xl font-bold">
           {categoria === "academia" ? (
             <Dumbbell className="h-8 w-8 text-primary" strokeWidth={1.8} />
+          ) : categoria === "leitura" ? (
+            <BookOpen className="h-8 w-8 text-primary" strokeWidth={1.8} />
           ) : (
             <span className="text-4xl">{meta.emoji}</span>
           )}

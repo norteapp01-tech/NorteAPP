@@ -1,6 +1,12 @@
 import { useState, type ReactNode } from "react";
 import { Star } from "lucide-react";
-import { updateProgress, completeBook, getBookProgress, type Book } from "@/lib/reading-store";
+import {
+  updateProgress,
+  updateBook,
+  completeBook,
+  getBookProgress,
+  type Book,
+} from "@/lib/reading-store";
 import { Modal } from "@/components/ui/modal";
 
 function modeLabel(book: Book): string {
@@ -20,6 +26,7 @@ function toStoredValue(book: Book, display: number): number {
 export function ReadingProgressUpdater({ book, onClose }: { book: Book; onClose: () => void }) {
   const progress = getBookProgress(book);
   const [value, setValue] = useState(toDisplayValue(book, progress.current));
+  const [chapter, setChapter] = useState(String(book.currentChapter ?? 0));
   const [error, setError] = useState<string | null>(null);
   const [needsConfirm, setNeedsConfirm] = useState(false);
   const [step, setStep] = useState<"edit" | "confirmComplete" | "rating">("edit");
@@ -45,7 +52,13 @@ export function ReadingProgressUpdater({ book, onClose }: { book: Book; onClose:
       setError(null);
       setNeedsConfirm(false);
       if (res.completed) setStep("confirmComplete");
-      else onClose();
+      else {
+        if (book.totalChapters)
+          await updateBook(book.id, {
+            currentChapter: Math.min(book.totalChapters, Math.max(0, parseInt(chapter, 10) || 0)),
+          });
+        onClose();
+      }
     } finally {
       setSaving(false);
     }
@@ -145,6 +158,21 @@ export function ReadingProgressUpdater({ book, onClose }: { book: Book; onClose:
           className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
         />
       </label>
+      {book.totalChapters && (
+        <label className="mt-3 block">
+          <span className="mb-0.5 block text-[10px] uppercase text-muted-foreground">
+            Capítulo atual · de {book.totalChapters}
+          </span>
+          <input
+            type="number"
+            min="0"
+            max={book.totalChapters}
+            value={chapter}
+            onChange={(e) => setChapter(e.target.value)}
+            className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
+          />
+        </label>
+      )}
       {error && <p className="mt-2 text-xs text-danger">{error}</p>}
       {needsConfirm && (
         <div className="mt-3 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs">
