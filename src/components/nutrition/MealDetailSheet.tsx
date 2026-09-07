@@ -4,6 +4,7 @@ import { Modal } from "@/components/ui/modal";
 import {
   useNutritionStore,
   optionsForMeal,
+  assignmentFor,
   logForMealOnDate,
   confirmMealOption,
   confirmMealCustom,
@@ -16,9 +17,10 @@ export function MealDetailSheet({ meal, onClose }: { meal: Meal; onClose: () => 
   const options = optionsForMeal(state.options, meal.id);
   const date = todayISO();
   const currentLog = logForMealOnDate(state.logs, meal.id, date);
+  const planned = assignmentFor(state.assignments, meal.id, new Date(`${date}T12:00:00`).getDay());
 
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(
-    currentLog?.optionId ?? null,
+    currentLog?.optionId ?? planned?.optionId ?? null,
   );
   const [customMode, setCustomMode] = useState(currentLog?.source === "custom");
   const [customText, setCustomText] = useState(
@@ -103,6 +105,20 @@ export function MealDetailSheet({ meal, onClose }: { meal: Meal; onClose: () => 
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
                     {o.protein ?? 0}g proteína · {o.carbs ?? 0}g carbo · {o.calories ?? 0} kcal
                   </p>
+                )}
+                {o.ingredients && o.ingredients.length > 0 && (
+                  <div className="mt-2 space-y-1 border-t border-border pt-2">
+                    {o.ingredients.map((ingredient, index) => (
+                      <p
+                        key={`${ingredient.name}-${index}`}
+                        className="text-[10px] text-muted-foreground"
+                      >
+                        {ingredient.name}
+                        {ingredient.serving ? ` · ${ingredient.serving}` : ""}
+                        {ingredient.grams ? ` · ${ingredient.grams} g` : ""}
+                      </p>
+                    ))}
+                  </div>
                 )}
               </div>
             </button>

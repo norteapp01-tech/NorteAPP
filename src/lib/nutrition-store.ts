@@ -32,6 +32,15 @@ export type MealOption = {
   carbs?: number;
   fat?: number;
   calories?: number;
+  ingredients?: { name: string; serving?: string; grams?: number }[];
+};
+
+export type MealPlanAssignment = {
+  id: string;
+  mealId: string;
+  weekday: number;
+  optionId?: string;
+  time: string;
 };
 
 export type DailyGoals = {
@@ -63,10 +72,17 @@ type State = {
   options: MealOption[];
   goals: DailyGoals;
   logs: MealLog[];
+  assignments: MealPlanAssignment[];
 };
 
 const DEFAULT_GOALS: DailyGoals = { protein: 160, carbs: 280, fat: 70, calories: 2500 };
-const EMPTY_STATE: State = { meals: [], options: [], goals: DEFAULT_GOALS, logs: [] };
+const EMPTY_STATE: State = {
+  meals: [],
+  options: [],
+  goals: DEFAULT_GOALS,
+  logs: [],
+  assignments: [],
+};
 
 // ---------------------------------------------------------------------------
 // Seletores puros
@@ -81,6 +97,14 @@ export function mealsForWeekday(meals: Meal[], weekday: number): Meal[] {
 
 export function optionsForMeal(options: MealOption[], mealId: string): MealOption[] {
   return options.filter((o) => o.mealId === mealId);
+}
+
+export function assignmentFor(
+  assignments: MealPlanAssignment[],
+  mealId: string,
+  weekday: number,
+): MealPlanAssignment | undefined {
+  return assignments.find((item) => item.mealId === mealId && item.weekday === weekday);
 }
 
 export function logForMealOnDate(
@@ -146,6 +170,19 @@ function mapOption(r: Row): MealOption {
     carbs: (r.carbs as number) ?? undefined,
     fat: (r.fat as number) ?? undefined,
     calories: (r.calories as number) ?? undefined,
+    ingredients: Array.isArray(r.ingredients)
+      ? (r.ingredients as { name: string; serving?: string; grams?: number }[])
+      : [],
+  };
+}
+
+function mapAssignment(r: Row): MealPlanAssignment {
+  return {
+    id: r.id as string,
+    mealId: r.meal_id as string,
+    weekday: r.weekday as number,
+    optionId: (r.option_id as string) ?? undefined,
+    time: r.time as string,
   };
 }
 
@@ -175,15 +212,17 @@ function mapGoals(r: Row): DailyGoals {
 }
 
 async function fetchState(): Promise<State> {
-  const [mealsRes, optionsRes, logsRes, goalsRes] = await Promise.all([
+  const [mealsRes, optionsRes, logsRes, goalsRes, assignmentsRes] = await Promise.all([
     supabase.from("meals").select("*").order("order_index"),
     supabase.from("meal_options").select("*"),
     supabase.from("meal_logs").select("*").order("date", { ascending: false }),
     supabase.from("nutrition_goals").select("*").maybeSingle(),
+    supabase.from("meal_plan_assignments").select("*"),
   ]);
   const mealRows = unwrap(mealsRes);
   const optionRows = unwrap(optionsRes);
   const logRows = unwrap(logsRes);
+  const assignmentRows = unwrap(assignmentsRes);
   if (goalsRes.error) throw new Error(goalsRes.error.message);
 
   return {
@@ -191,6 +230,7 @@ async function fetchState(): Promise<State> {
     options: (optionRows as Row[]).map(mapOption),
     logs: (logRows as Row[]).map(mapLog),
     goals: goalsRes.data ? mapGoals(goalsRes.data as Row) : DEFAULT_GOALS,
+    assignments: (assignmentRows as Row[]).map(mapAssignment),
   };
 }
 
@@ -238,7 +278,7 @@ export async function addMeal(input: {
         time: input.time,
         name: input.name.trim(),
         order_index: count ?? 0,
-        weekdays: input.weekdays?.length ? input.weekdays : [0, 1, 2, 3, 4, 5, 6],
+        weekdays: input.weekdays ?? [0, 1, 2, 3, 4, 5, 6],
       })
       .select()
       .single(),
@@ -267,7 +307,14 @@ export async function removeMeal(id: string) {
 
 export async function addMealOption(
   mealId: string,
-  input: { description: string; protein?: number; carbs?: number; fat?: number; calories?: number },
+  input: {
+    description: string;
+    protein?: number;
+    carbs?: number;
+    fat?: number;
+    calories?: number;
+    ingredients?: { name: string; serving?: string; grams?: number }[];
+  },
 ): Promise<string> {
   const userId = await ensureSession();
   const row = unwrap<{ id: string }>(
@@ -281,6 +328,7 @@ export async function addMealOption(
         carbs: input.carbs,
         fat: input.fat,
         calories: input.calories,
+        ingredients: input.ingredients ?? [],
       })
       .select()
       .single(),
@@ -297,6 +345,7 @@ export async function updateMealOption(
     carbs?: number;
     fat?: number;
     calories?: number;
+    ingredients?: { name: string; serving?: string; grams?: number }[];
   },
 ) {
   const dbPatch: Row = {};
@@ -305,7 +354,34 @@ export async function updateMealOption(
   if (patch.carbs !== undefined) dbPatch.carbs = patch.carbs;
   if (patch.fat !== undefined) dbPatch.fat = patch.fat;
   if (patch.calories !== undefined) dbPatch.calories = patch.calories;
+  if (patch.ingredients !== undefined) dbPatch.ingredients = patch.ingredients;
   unwrap(await supabase.from("meal_options").update(dbPatch).eq("id", id).select().single());
+  await invalidate();
+}
+
+export async function setMealPlanAssignment(input: {
+  mealId: string;
+  weekday: number;
+  optionId?: string;
+  time: string;
+}) {
+  const userId = await ensureSession();
+  unwrap(
+    await supabase
+      .from("meal_plan_assignments")
+      .upsert(
+        {
+          user_id: userId,
+          meal_id: input.mealId,
+          weekday: input.weekday,
+          option_id: input.optionId ?? null,
+          time: input.time,
+        },
+        { onConflict: "user_id,meal_id,weekday" },
+      )
+      .select()
+      .single(),
+  );
   await invalidate();
 }
 

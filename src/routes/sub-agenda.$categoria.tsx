@@ -19,6 +19,7 @@ import {
   Layers3,
   Settings2,
   Route as RouteIcon,
+  Ellipsis,
 } from "lucide-react";
 import { categoryMeta } from "@/lib/mock-data";
 import { useProfile } from "@/lib/profile-store";
@@ -68,6 +69,7 @@ import { FinancasModule } from "@/components/finance/FinancasModule";
 import { FeModule } from "@/components/fe/FeModule";
 import { Modal } from "@/components/ui/modal";
 import { ChartSkeleton } from "@/components/ui/chart-skeleton";
+import { SettingsPanel } from "@/components/settings/SettingsPanel";
 
 // recharts só baixa quando o modal de um exercício realmente abre — Leitura,
 // Alimentação, Finanças, Fé e Trabalho (que também passam por este arquivo)
@@ -92,12 +94,22 @@ export const Route = createFileRoute("/sub-agenda/$categoria")({
 function SubAgenda() {
   const { categoria } = Route.useParams();
   const meta = categoryMeta[categoria] ?? categoryMeta.generico;
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <div className="px-5 pt-12">
-      <Link to="/" className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-        <ChevronLeft className="h-4 w-4" /> Hoje
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link to="/" className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+          <ChevronLeft className="h-4 w-4" /> Hoje
+        </Link>
+        <button
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Abrir configurações"
+          className="grid h-10 w-10 place-items-center rounded-xl border border-border text-muted-foreground"
+        >
+          <Ellipsis className="h-5 w-5" />
+        </button>
+      </div>
       <header className="mt-3">
         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
           Sub-agenda · {meta.label}
@@ -134,6 +146,7 @@ function SubAgenda() {
       {(categoria === "trabalho" || categoria === "generico") && (
         <GenericoModule categoria={categoria} />
       )}
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }
