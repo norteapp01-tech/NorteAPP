@@ -279,6 +279,9 @@ function MomentPicker({
   const initial = mealsForWeekday(state.meals, weekday).map((meal) => meal.id);
   const [selected, setSelected] = useState(initial);
   const [saving, setSaving] = useState(false);
+  const [addingMoment, setAddingMoment] = useState(false);
+  const [momentName, setMomentName] = useState("");
+  const [momentTime, setMomentTime] = useState("21:00");
   const save = async () => {
     setSaving(true);
     const ids = [...selected];
@@ -329,6 +332,43 @@ function MomentPicker({
             </button>
           );
         })}
+        {addingMoment ? (
+          <div className="rounded-xl border border-dashed border-primary/40 p-3">
+            <p className="text-xs font-semibold">Novo momento</p>
+            <div className="mt-2 grid grid-cols-[1fr_auto] gap-2">
+              <input
+                autoFocus
+                value={momentName}
+                onChange={(event) => setMomentName(event.target.value)}
+                placeholder="Ex: Ceia, pós-treino…"
+                className="rounded-lg border border-border bg-surface-2 p-2.5 text-xs outline-none focus:border-primary"
+              />
+              <input
+                type="time"
+                value={momentTime}
+                onChange={(event) => setMomentTime(event.target.value)}
+                className="rounded-lg border border-border bg-surface-2 p-2.5 text-xs outline-none focus:border-primary"
+              />
+            </div>
+            <button
+              disabled={!momentName.trim()}
+              onClick={async () => {
+                await addMeal({ name: momentName.trim(), time: momentTime, weekdays: [weekday] });
+                onClose();
+              }}
+              className="mt-2 w-full rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-40"
+            >
+              Criar e adicionar ao dia
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setAddingMoment(true)}
+            className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border p-3 text-xs font-semibold text-primary"
+          >
+            <Plus className="h-4 w-4" /> Adicionar momento
+          </button>
+        )}
         <button
           disabled={saving}
           onClick={() => void save()}
@@ -356,19 +396,15 @@ function OptionPicker({
 }) {
   const [selected, setSelected] = useState(assignment?.optionId ?? "");
   const [time, setTime] = useState(assignment?.time ?? meal.time);
-  const [repeatDays, setRepeatDays] = useState<number[]>([weekday]);
   const [adding, setAdding] = useState(false);
   const [description, setDescription] = useState("");
   const [ingredients, setIngredients] = useState<
-    { name: string; serving: string; grams: string }[]
+    { name: string; quantity: string; unit: "g" | "ml" | "un" }[]
   >([]);
   const [macros, setMacros] = useState({ protein: "", carbs: "", fat: "", calories: "" });
   const save = async () => {
     if (!selected) return;
-    await updateMeal(meal.id, { weekdays: [...new Set([...meal.weekdays, ...repeatDays])] });
-    for (const day of repeatDays) {
-      await setMealPlanAssignment({ mealId: meal.id, weekday: day, optionId: selected, time });
-    }
+    await setMealPlanAssignment({ mealId: meal.id, weekday, optionId: selected, time });
     onClose();
   };
   const create = async () => {
@@ -383,8 +419,8 @@ function OptionPicker({
         .filter((item) => item.name.trim())
         .map((item) => ({
           name: item.name.trim(),
-          serving: item.serving || undefined,
-          grams: item.grams ? Number(item.grams) : undefined,
+          quantity: item.quantity ? Number(item.quantity) : undefined,
+          unit: item.unit,
         })),
     });
     setSelected(id);
@@ -393,18 +429,19 @@ function OptionPicker({
   return (
     <Modal onClose={onClose} title={meal.name}>
       <div className="space-y-3">
-        {options.map((option) => (
-          <button
-            key={option.id}
-            onClick={() => setSelected(option.id)}
-            className={`w-full rounded-xl border p-3 text-left ${selected === option.id ? "border-primary/50 bg-primary/10" : "border-border bg-surface-2"}`}
-          >
-            <p className="text-sm font-semibold">{option.description}</p>
-            <p className="mt-1 text-[10px] text-muted-foreground">
-              {option.calories ? `${option.calories} kcal` : "Macros opcionais"}
-            </p>
-          </button>
-        ))}
+        {!adding &&
+          options.map((option) => (
+            <button
+              key={option.id}
+              onClick={() => setSelected(option.id)}
+              className={`w-full rounded-xl border p-3 text-left ${selected === option.id ? "border-primary/50 bg-primary/10" : "border-border bg-surface-2"}`}
+            >
+              <p className="text-sm font-semibold">{option.description}</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                {option.calories ? `${option.calories} kcal` : "Macros opcionais"}
+              </p>
+            </button>
+          ))}
         {!adding ? (
           <button
             onClick={() => setAdding(true)}
@@ -414,6 +451,7 @@ function OptionPicker({
           </button>
         ) : (
           <div className="rounded-xl border border-dashed border-border p-3">
+            <p className="mb-2 text-xs font-semibold">Nova opção de {meal.name.toLowerCase()}</p>
             <input
               autoFocus
               value={description}
@@ -421,9 +459,16 @@ function OptionPicker({
               placeholder="Nome ou descrição"
               className="w-full rounded-lg border border-border bg-surface-2 p-2.5 text-sm"
             />
-            <p className="mt-3 text-[10px] uppercase text-muted-foreground">Itens opcionais</p>
+            <div className="mt-4 flex items-end justify-between">
+              <div>
+                <p className="text-xs font-semibold">Itens da refeição</p>
+                <p className="text-[10px] text-muted-foreground">
+                  Informe quantidade e unidade se quiser.
+                </p>
+              </div>
+            </div>
             {ingredients.map((item, index) => (
-              <div key={index} className="mt-2 grid grid-cols-[1fr_1fr_4rem] gap-1.5">
+              <div key={index} className="mt-2 grid grid-cols-[1fr_5rem_4.5rem] gap-1.5">
                 <input
                   value={item.name}
                   onChange={(e) =>
@@ -437,37 +482,42 @@ function OptionPicker({
                   className="rounded-md border border-border bg-surface-2 p-2 text-xs"
                 />
                 <input
-                  value={item.serving}
-                  onChange={(e) =>
-                    setIngredients(
-                      ingredients.map((row, i) =>
-                        i === index ? { ...row, serving: e.target.value } : row,
-                      ),
-                    )
-                  }
-                  placeholder="2 unidades"
-                  className="rounded-md border border-border bg-surface-2 p-2 text-xs"
-                />
-                <input
                   type="number"
-                  value={item.grams}
+                  value={item.quantity}
                   onChange={(e) =>
                     setIngredients(
                       ingredients.map((row, i) =>
-                        i === index ? { ...row, grams: e.target.value } : row,
+                        i === index ? { ...row, quantity: e.target.value } : row,
                       ),
                     )
                   }
-                  placeholder="g"
+                  placeholder="Qtd."
                   className="rounded-md border border-border bg-surface-2 p-2 text-xs"
                 />
+                <select
+                  value={item.unit}
+                  onChange={(e) =>
+                    setIngredients(
+                      ingredients.map((row, i) =>
+                        i === index ? { ...row, unit: e.target.value as "g" | "ml" | "un" } : row,
+                      ),
+                    )
+                  }
+                  className="rounded-md border border-border bg-surface-2 p-2 text-xs"
+                >
+                  <option value="g">g</option>
+                  <option value="ml">ml</option>
+                  <option value="un">unidade</option>
+                </select>
               </div>
             ))}
             <button
-              onClick={() => setIngredients([...ingredients, { name: "", serving: "", grams: "" }])}
-              className="mt-2 text-[11px] text-primary"
+              onClick={() =>
+                setIngredients([...ingredients, { name: "", quantity: "", unit: "g" }])
+              }
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/40 py-2.5 text-xs font-semibold text-primary"
             >
-              + Adicionar item
+              <Plus className="h-4 w-4" /> Adicionar item
             </button>
             <div className="mt-3 grid grid-cols-4 gap-1.5">
               {Object.keys(macros).map((key) => (
@@ -497,56 +547,26 @@ function OptionPicker({
             </button>
           </div>
         )}
-        <label className="block text-[10px] uppercase text-muted-foreground">
-          Horário
-          <input
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            className="mt-1 block w-full rounded-lg border border-border bg-surface-2 p-2.5 text-sm text-foreground"
-          />
-        </label>
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-[10px] uppercase text-muted-foreground">
-              Repetir em outros dias
-            </span>
+        {!adding && (
+          <>
+            <label className="block text-[10px] uppercase text-muted-foreground">
+              Horário neste dia
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="mt-1 block w-full rounded-lg border border-border bg-surface-2 p-2.5 text-sm text-foreground"
+              />
+            </label>
             <button
-              onClick={() =>
-                setRepeatDays(repeatDays.length === 7 ? [weekday] : [0, 1, 2, 3, 4, 5, 6])
-              }
-              className="text-[10px] font-semibold text-primary"
+              disabled={!selected}
+              onClick={() => void save()}
+              className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
             >
-              {repeatDays.length === 7 ? "Limpar" : "Selecionar todos"}
+              Aplicar neste dia
             </button>
-          </div>
-          <div className="grid grid-cols-7 gap-1.5">
-            {week.map(({ day, label }) => {
-              const active = repeatDays.includes(day);
-              return (
-                <button
-                  key={day}
-                  onClick={() =>
-                    day !== weekday &&
-                    setRepeatDays(
-                      active ? repeatDays.filter((item) => item !== day) : [...repeatDays, day],
-                    )
-                  }
-                  className={`h-8 rounded-lg text-[9px] font-bold ${active ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
-                >
-                  {label.slice(0, 1)}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <button
-          disabled={!selected}
-          onClick={() => void save()}
-          className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
-        >
-          Aplicar neste dia
-        </button>
+          </>
+        )}
       </div>
     </Modal>
   );

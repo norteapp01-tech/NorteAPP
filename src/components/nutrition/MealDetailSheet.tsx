@@ -114,8 +114,9 @@ export function MealDetailSheet({ meal, onClose }: { meal: Meal; onClose: () => 
                         className="text-[10px] text-muted-foreground"
                       >
                         {ingredient.name}
-                        {ingredient.serving ? ` · ${ingredient.serving}` : ""}
-                        {ingredient.grams ? ` · ${ingredient.grams} g` : ""}
+                        {ingredient.quantity
+                          ? ` · ${ingredient.quantity} ${ingredient.unit ?? "g"}`
+                          : ""}
                       </p>
                     ))}
                   </div>

@@ -32,7 +32,7 @@ export type MealOption = {
   carbs?: number;
   fat?: number;
   calories?: number;
-  ingredients?: { name: string; serving?: string; grams?: number }[];
+  ingredients?: { name: string; quantity?: number; unit?: "g" | "ml" | "un" }[];
 };
 
 export type MealPlanAssignment = {
@@ -171,7 +171,7 @@ function mapOption(r: Row): MealOption {
     fat: (r.fat as number) ?? undefined,
     calories: (r.calories as number) ?? undefined,
     ingredients: Array.isArray(r.ingredients)
-      ? (r.ingredients as { name: string; serving?: string; grams?: number }[])
+      ? (r.ingredients as { name: string; quantity?: number; unit?: "g" | "ml" | "un" }[])
       : [],
   };
 }
@@ -313,7 +313,7 @@ export async function addMealOption(
     carbs?: number;
     fat?: number;
     calories?: number;
-    ingredients?: { name: string; serving?: string; grams?: number }[];
+    ingredients?: { name: string; quantity?: number; unit?: "g" | "ml" | "un" }[];
   },
 ): Promise<string> {
   const userId = await ensureSession();
@@ -345,7 +345,7 @@ export async function updateMealOption(
     carbs?: number;
     fat?: number;
     calories?: number;
-    ingredients?: { name: string; serving?: string; grams?: number }[];
+    ingredients?: { name: string; quantity?: number; unit?: "g" | "ml" | "un" }[];
   },
 ) {
   const dbPatch: Row = {};
