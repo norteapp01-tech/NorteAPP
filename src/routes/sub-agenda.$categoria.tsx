@@ -20,6 +20,7 @@ import {
   Settings2,
   Route as RouteIcon,
   Ellipsis,
+  CircleDollarSign,
 } from "lucide-react";
 import { categoryMeta } from "@/lib/mock-data";
 import { useProfile } from "@/lib/profile-store";
@@ -121,6 +122,8 @@ function SubAgenda() {
             <BookOpen className="h-8 w-8 text-primary" strokeWidth={1.8} />
           ) : categoria === "alimentacao" ? (
             <Salad className="h-8 w-8 text-primary" strokeWidth={1.8} />
+          ) : categoria === "financas" ? (
+            <CircleDollarSign className="h-8 w-8 text-primary" strokeWidth={1.8} />
           ) : (
             <span className="text-4xl">{meta.emoji}</span>
           )}

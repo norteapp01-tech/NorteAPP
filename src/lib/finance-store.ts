@@ -39,6 +39,7 @@ export type FinancialGoal = {
   savedAmount: number;
   deadline?: string;
   imageUrl?: string;
+  planId?: string;
   createdAt: string;
 };
 export type GoalContribution = {
@@ -364,6 +365,7 @@ function mapFinancialGoal(r: Row): FinancialGoal {
     savedAmount: (r.saved_amount as number) ?? 0,
     deadline: (r.deadline as string) ?? undefined,
     imageUrl: (r.image_url as string) ?? undefined,
+    planId: (r.plan_id as string) ?? undefined,
     createdAt: r.created_at as string,
   };
 }
@@ -567,13 +569,14 @@ export async function addFinancialGoal(input: {
 
 export async function updateFinancialGoal(
   id: string,
-  patch: Partial<Pick<FinancialGoal, "name" | "targetAmount" | "deadline" | "imageUrl">>,
+  patch: Partial<Pick<FinancialGoal, "name" | "targetAmount" | "deadline" | "imageUrl" | "planId">>,
 ) {
   const dbPatch: Row = {};
   if (patch.name !== undefined) dbPatch.name = patch.name;
   if (patch.targetAmount !== undefined) dbPatch.target_amount = patch.targetAmount;
   if (patch.deadline !== undefined) dbPatch.deadline = patch.deadline;
   if (patch.imageUrl !== undefined) dbPatch.image_url = patch.imageUrl;
+  if (patch.planId !== undefined) dbPatch.plan_id = patch.planId;
   unwrap(await supabase.from("financial_goals").update(dbPatch).eq("id", id).select().single());
   await invalidate();
 }

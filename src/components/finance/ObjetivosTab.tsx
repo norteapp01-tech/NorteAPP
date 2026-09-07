@@ -1,5 +1,6 @@
 import { useState, type ChangeEvent } from "react";
 import { Plus, Trash2, Image as ImageIcon } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { Modal } from "@/components/ui/modal";
 import {
   useFinanceStore,
@@ -12,6 +13,7 @@ import {
   formatBRL,
   type FinancialGoal,
 } from "@/lib/finance-store";
+import { createGoal } from "@/lib/goals-store";
 
 export function ObjetivosTab() {
   const goals = useFinanceStore((s) => s.goals);
@@ -78,11 +80,13 @@ function GoalCard({ goal, onClick }: { goal: FinancialGoal; onClick: () => void 
 }
 
 function GoalDetailSheet({ goalId, onClose }: { goalId: string; onClose: () => void }) {
+  const navigate = useNavigate();
   const state = useFinanceStore((s) => s);
   const goal = state.goals.find((g) => g.id === goalId);
   const [amount, setAmount] = useState("");
   const [editing, setEditing] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [creatingPlan, setCreatingPlan] = useState(false);
 
   if (!goal) return null;
   const pct =
@@ -132,6 +136,49 @@ function GoalDetailSheet({ goalId, onClose }: { goalId: string; onClose: () => v
             className="shrink-0 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
           >
             + Guardar
+          </button>
+        </div>
+
+        <div className="rounded-xl border border-border bg-surface-2 p-3">
+          <p className="text-xs font-semibold">Planejamento da conquista</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+            Opcional: divida este objetivo em etapas e acompanhe o cronograma na aba Plano.
+          </p>
+          <button
+            disabled={creatingPlan}
+            onClick={async () => {
+              if (goal.planId) {
+                onClose();
+                navigate({ to: "/objetivo/$id", params: { id: goal.planId } });
+                return;
+              }
+              setCreatingPlan(true);
+              try {
+                const created = await createGoal({
+                  title: goal.name,
+                  why: `Conquistar ${goal.name}`,
+                  finalOutcome: `Ter ${formatBRL(goal.targetAmount)} destinados a este objetivo`,
+                  trackingType: "etapas",
+                  kind: "projeto",
+                  category: "financas",
+                  lifeArea: "financas",
+                  deadlineLabel: goal.deadline
+                    ? `Até ${goal.deadline.split("-").reverse().join("/")}`
+                    : "Sem prazo definido",
+                  deadlineISO: goal.deadline,
+                  metric: { target: goal.targetAmount, unit: "R$" },
+                  steps: [{ title: "Definir o primeiro marco financeiro" }],
+                });
+                await updateFinancialGoal(goal.id, { planId: created.id });
+                onClose();
+                navigate({ to: "/objetivo/$id", params: { id: created.id } });
+              } finally {
+                setCreatingPlan(false);
+              }
+            }}
+            className="mt-3 w-full rounded-lg border border-primary/50 py-2 text-xs font-semibold text-primary disabled:opacity-50"
+          >
+            {goal.planId ? "Abrir planejamento" : creatingPlan ? "Criando…" : "Criar planejamento"}
           </button>
         </div>
 

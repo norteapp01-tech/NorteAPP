@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
-import { useFinanceStore, formatBRL, type Transaction } from "@/lib/finance-store";
+import { useFinanceStore, formatBRL, monthOf, type Transaction } from "@/lib/finance-store";
 import { todayISO } from "@/lib/goals-store";
 import { nowDate } from "@/lib/test-clock";
 
@@ -17,7 +17,13 @@ function dayLabel(date: string): string {
   return `${d}/${m}/${y}`;
 }
 
-export function MovimentacoesTab({ initialQuery = "" }: { initialQuery?: string }) {
+export function MovimentacoesTab({
+  month,
+  initialQuery = "",
+}: {
+  month: string;
+  initialQuery?: string;
+}) {
   const transactions = useFinanceStore((s) => s.transactions);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState(initialQuery);
@@ -28,6 +34,7 @@ export function MovimentacoesTab({ initialQuery = "" }: { initialQuery?: string 
 
   const normalizedQuery = query.trim().toLowerCase();
   const filtered = transactions
+    .filter((t) => monthOf(t.date) === month)
     .filter((t) => filter === "all" || t.type === filter)
     .filter(
       (t) =>
