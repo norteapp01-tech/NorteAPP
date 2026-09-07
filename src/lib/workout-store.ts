@@ -26,9 +26,11 @@ export type Exercise = {
   repsTarget: number;
   loadTarget: number;
   restSeconds: number;
+  setTargets?: SetTarget[];
   order: number;
 };
 
+export type SetTarget = { reps: number; weight: number; restSeconds: number };
 export type SetLog = { setIndex: number; weight: number; reps: number };
 export type ExerciseLog = { exerciseId: string; sets: SetLog[]; done: boolean };
 export type WorkoutSessionStatus = "em_andamento" | "concluido";
@@ -323,6 +325,12 @@ function mapPlan(r: Row): WorkoutPlan {
 }
 
 function mapExercise(r: Row): Exercise {
+  const legacyTarget = {
+    reps: (r.reps_target as number) ?? 0,
+    weight: (r.load_target as number) ?? 0,
+    restSeconds: (r.rest_seconds as number) ?? 60,
+  };
+  const storedTargets = Array.isArray(r.set_targets) ? (r.set_targets as SetTarget[]) : [];
   return {
     id: r.id as string,
     planId: r.plan_id as string,
@@ -331,6 +339,10 @@ function mapExercise(r: Row): Exercise {
     repsTarget: (r.reps_target as number) ?? 0,
     loadTarget: (r.load_target as number) ?? 0,
     restSeconds: (r.rest_seconds as number) ?? 60,
+    setTargets:
+      storedTargets.length > 0
+        ? storedTargets
+        : Array.from({ length: (r.sets_target as number) ?? 0 }, () => ({ ...legacyTarget })),
     order: (r.order_index as number) ?? 0,
   };
 }
@@ -457,6 +469,7 @@ export async function addExercise(
     repsTarget: number;
     loadTarget: number;
     restSeconds: number;
+    setTargets?: SetTarget[];
   },
 ): Promise<string> {
   const userId = await ensureSession();
@@ -475,6 +488,7 @@ export async function addExercise(
         reps_target: input.repsTarget,
         load_target: input.loadTarget,
         rest_seconds: input.restSeconds,
+        set_targets: input.setTargets ?? null,
         order_index: count ?? 0,
       })
       .select()
@@ -487,7 +501,10 @@ export async function addExercise(
 export async function updateExercise(
   id: string,
   patch: Partial<
-    Pick<Exercise, "name" | "setsTarget" | "repsTarget" | "loadTarget" | "restSeconds">
+    Pick<
+      Exercise,
+      "name" | "setsTarget" | "repsTarget" | "loadTarget" | "restSeconds" | "setTargets"
+    >
   >,
 ) {
   const dbPatch: Row = {};
@@ -496,6 +513,7 @@ export async function updateExercise(
   if (patch.repsTarget !== undefined) dbPatch.reps_target = patch.repsTarget;
   if (patch.loadTarget !== undefined) dbPatch.load_target = patch.loadTarget;
   if (patch.restSeconds !== undefined) dbPatch.rest_seconds = patch.restSeconds;
+  if (patch.setTargets !== undefined) dbPatch.set_targets = patch.setTargets;
   unwrap(await supabase.from("workout_exercises").update(dbPatch).eq("id", id).select().single());
   await invalidate();
 }

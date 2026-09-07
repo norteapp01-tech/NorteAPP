@@ -12,6 +12,11 @@ import {
   RotateCcw,
   Check,
   X,
+  Dumbbell,
+  CalendarClock,
+  Layers3,
+  Settings2,
+  Route as RouteIcon,
 } from "lucide-react";
 import { categoryMeta } from "@/lib/mock-data";
 import { useProfile } from "@/lib/profile-store";
@@ -53,6 +58,7 @@ import {
   type WorkoutPlan,
   type WorkoutSession,
   type Exercise,
+  type SetTarget,
 } from "@/lib/workout-store";
 import { LeituraModule } from "@/components/reading/LeituraModule";
 import { AlimentacaoModule } from "@/components/nutrition/AlimentacaoModule";
@@ -95,7 +101,11 @@ function SubAgenda() {
           Sub-agenda · {meta.label}
         </p>
         <h1 className="mt-1 flex items-center gap-3 text-3xl font-bold">
-          <span className="text-4xl">{meta.emoji}</span>
+          {categoria === "academia" ? (
+            <Dumbbell className="h-8 w-8 text-primary" strokeWidth={1.8} />
+          ) : (
+            <span className="text-4xl">{meta.emoji}</span>
+          )}
           {meta.label}
         </h1>
       </header>
@@ -103,7 +113,8 @@ function SubAgenda() {
       {categoria !== "leitura" &&
         categoria !== "alimentacao" &&
         categoria !== "financas" &&
-        categoria !== "fe" && (
+        categoria !== "fe" &&
+        categoria !== "academia" && (
           <div className="mt-6">
             <RoutineConfigCard categoria={categoria} />
           </div>
@@ -228,6 +239,10 @@ function RoutineConfigCard({ categoria }: { categoria: string }) {
 type RestState = { secondsLeft: number; total: number; running: boolean };
 
 function AcademiaModule() {
+  const profile = useProfile();
+  const gymRoutines = useGoalsStore((s) =>
+    s.routines.filter((r) => r.category === "academia" && r.active),
+  );
   const plans = useWorkoutStore((s) => s.plans);
   const exercises = useWorkoutStore((s) => s.exercises);
   const sessions = useWorkoutStore((s) => s.sessions);
@@ -242,6 +257,8 @@ function AcademiaModule() {
   const [weightDraft, setWeightDraft] = useState("");
   const [startingSession, setStartingSession] = useState(false);
   const [finishingSession, setFinishingSession] = useState(false);
+  const [activeTab, setActiveTab] = useState<"treino" | "ciclo">("treino");
+  const [showRoutineConfig, setShowRoutineConfig] = useState(false);
 
   useEffect(() => {
     if (!rest || !rest.running || rest.secondsLeft <= 0) return;
@@ -270,20 +287,69 @@ function AcademiaModule() {
       ? Math.round((currentWeight - olderWeight.weight) * 10) / 10
       : undefined;
 
+  const tabs = (
+    <div className="flex gap-1 rounded-2xl border border-border bg-surface p-1">
+      <button
+        onClick={() => setActiveTab("treino")}
+        className={`flex-1 rounded-xl py-2.5 text-xs font-semibold ${activeTab === "treino" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+      >
+        Treino
+      </button>
+      <button
+        onClick={() => setActiveTab("ciclo")}
+        className={`flex-1 rounded-xl py-2.5 text-xs font-semibold ${activeTab === "ciclo" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+      >
+        Ciclo de treino
+      </button>
+    </div>
+  );
+
+  if (activeTab === "ciclo") {
+    return (
+      <div className="mt-6 space-y-5">
+        {tabs}
+        <section className="card-surface p-5">
+          <RouteIcon className="h-7 w-7 text-primary" strokeWidth={1.8} />
+          <h2 className="mt-4 text-lg font-bold">Seu ciclo de treino</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            Organize metas e blocos de evolução sem misturar o treino diário com o planejamento de
+            longo prazo.
+          </p>
+          <div className="mt-5 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+            A estrutura detalhada desta aba será definida na próxima etapa.
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-6 space-y-5">
+      {tabs}
       <Card title="Plano da semana">
+        <div className="-mt-1 mb-3 flex justify-end">
+          <button
+            onClick={() => setShowRoutineConfig(true)}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary"
+          >
+            <CalendarClock className="h-4 w-4" /> Horários
+          </button>
+        </div>
         <div className="grid grid-cols-7 gap-1.5">
           {weekVisualOrder.map((weekday, i) => {
             const plan = plans.find((p) => p.id === weeklyAssignment[weekday]);
+            const routine = gymRoutines.find((r) => r.weekday === weekday);
             return (
               <button
                 key={weekday}
                 onClick={() => setPickerDay(weekday)}
-                className="rounded-lg bg-surface-2 p-2 text-center hover:bg-surface"
+                className={`rounded-lg border p-2 text-center hover:bg-surface ${weekday === new Date().getDay() ? "border-primary bg-primary/5" : "border-transparent bg-surface-2"}`}
               >
                 <p className="text-[10px] text-muted-foreground">{weekVisualLabels[i]}</p>
                 <p className="mt-1 text-lg font-bold">{plan ? plan.letter : "—"}</p>
+                <p className="mt-1 text-[9px] text-muted-foreground">
+                  {routine ? formatTime(routine.time, profile.timeFormat) : "—"}
+                </p>
               </button>
             );
           })}
@@ -403,6 +469,23 @@ function AcademiaModule() {
 
       <PlanManagerCard />
 
+      <details className="group border-b border-border pb-3">
+        <summary className="flex cursor-pointer list-none items-center gap-3">
+          <Settings2 className="h-5 w-5 text-muted-foreground" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold">Ajustes da academia</p>
+            <p className="text-xs text-muted-foreground">Descanso, histórico e preferências</p>
+          </div>
+          <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+        </summary>
+        <button
+          onClick={() => setShowRoutineConfig(true)}
+          className="mt-3 ml-8 text-xs font-semibold text-primary"
+        >
+          Configurar horários
+        </button>
+      </details>
+
       <Card title="Peso corporal">
         <div className="flex items-end justify-between">
           <div>
@@ -487,6 +570,11 @@ function AcademiaModule() {
         />
       )}
       {rest && <RestTimerPill rest={rest} setRest={setRest} />}
+      {showRoutineConfig && (
+        <Modal onClose={() => setShowRoutineConfig(false)} title="Horários de treino">
+          <RoutineConfigCard categoria="academia" />
+        </Modal>
+      )}
     </div>
   );
 }
@@ -536,99 +624,105 @@ function PlanManagerCard() {
   const exercises = useWorkoutStore((s) => s.exercises);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showNewPlan, setShowNewPlan] = useState(false);
-  const [newPlan, setNewPlan] = useState({ letter: "", name: "", muscleGroups: "" });
+  const [newPlan, setNewPlan] = useState({ letter: "", name: "" });
 
   return (
-    <Card title="Treinos cadastrados">
-      <div className="space-y-2">
-        {plans.map((p) => (
-          <div key={p.id} className="rounded-lg border border-border bg-surface-2 p-3">
-            <div className="flex w-full items-center gap-3">
-              <button
-                onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
-                className="flex min-w-0 flex-1 items-center gap-3 text-left"
-              >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-sm font-bold text-primary">
-                  {p.letter}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{p.name}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {p.muscleGroups} · {exercisesForPlan(exercises, p.id).length} exercícios
-                  </p>
-                </div>
-                {expandedId === p.id ? (
-                  <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                )}
-              </button>
-              <button
-                onClick={async () => {
-                  await removePlan(p.id);
-                }}
-                className="shrink-0 text-muted-foreground hover:text-danger"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+    <details className="group border-y border-border py-3">
+      <summary className="flex cursor-pointer list-none items-center gap-3">
+        <Layers3 className="h-5 w-5 text-muted-foreground" />
+        <div className="flex-1">
+          <p className="text-sm font-semibold">Treinos cadastrados</p>
+          <p className="text-xs text-muted-foreground">
+            {plans.length} treinos · {exercises.length} exercícios
+          </p>
+        </div>
+        <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="mt-3">
+        <div className="space-y-2">
+          {plans.map((p) => (
+            <div key={p.id} className="rounded-lg border border-border bg-surface-2 p-3">
+              <div className="flex w-full items-center gap-3">
+                <button
+                  onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-sm font-bold text-primary">
+                    {p.letter}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{p.name}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {exercisesForPlan(exercises, p.id).length} exercícios
+                    </p>
+                  </div>
+                  {expandedId === p.id ? (
+                    <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  )}
+                </button>
+                <button
+                  onClick={async () => {
+                    await removePlan(p.id);
+                  }}
+                  className="shrink-0 text-muted-foreground hover:text-danger"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {expandedId === p.id && <PlanExerciseEditor planId={p.id} />}
             </div>
-            {expandedId === p.id && <PlanExerciseEditor planId={p.id} />}
+          ))}
+          {plans.length === 0 && (
+            <p className="text-sm text-muted-foreground">Nenhum treino cadastrado ainda.</p>
+          )}
+        </div>
+        {!showNewPlan ? (
+          <button
+            onClick={() => setShowNewPlan(true)}
+            className="mt-3 flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border py-2.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary"
+          >
+            <Plus className="h-3 w-3" /> novo treino
+          </button>
+        ) : (
+          <div className="mt-3 space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+            <div className="grid grid-cols-[64px_1fr] gap-2">
+              <input
+                autoFocus
+                value={newPlan.letter}
+                onChange={(e) =>
+                  setNewPlan({ ...newPlan, letter: e.target.value.toUpperCase().slice(0, 2) })
+                }
+                placeholder="D"
+                className="rounded-lg border border-border bg-surface px-2 py-2 text-center text-sm font-bold outline-none focus:border-primary"
+              />
+              <input
+                value={newPlan.name}
+                onChange={(e) => setNewPlan({ ...newPlan, name: e.target.value })}
+                placeholder="Ex: Ombro + Abdômen"
+                className="rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+              />
+            </div>
+            <button
+              onClick={async () => {
+                if (!newPlan.letter.trim() || !newPlan.name.trim()) return;
+                await createPlan({
+                  letter: newPlan.letter.trim(),
+                  name: newPlan.name.trim(),
+                  muscleGroups: "",
+                });
+                setNewPlan({ letter: "", name: "" });
+                setShowNewPlan(false);
+              }}
+              className="w-full rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground"
+            >
+              Criar treino
+            </button>
           </div>
-        ))}
-        {plans.length === 0 && (
-          <p className="text-sm text-muted-foreground">Nenhum treino cadastrado ainda.</p>
         )}
       </div>
-      {!showNewPlan ? (
-        <button
-          onClick={() => setShowNewPlan(true)}
-          className="mt-3 flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border py-2.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary"
-        >
-          <Plus className="h-3 w-3" /> novo treino
-        </button>
-      ) : (
-        <div className="mt-3 space-y-2 rounded-xl border border-border bg-surface-2 p-3">
-          <div className="grid grid-cols-[64px_1fr] gap-2">
-            <input
-              autoFocus
-              value={newPlan.letter}
-              onChange={(e) =>
-                setNewPlan({ ...newPlan, letter: e.target.value.toUpperCase().slice(0, 2) })
-              }
-              placeholder="D"
-              className="rounded-lg border border-border bg-surface px-2 py-2 text-center text-sm font-bold outline-none focus:border-primary"
-            />
-            <input
-              value={newPlan.name}
-              onChange={(e) => setNewPlan({ ...newPlan, name: e.target.value })}
-              placeholder="Ex: Ombro + Abdômen"
-              className="rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
-            />
-          </div>
-          <input
-            value={newPlan.muscleGroups}
-            onChange={(e) => setNewPlan({ ...newPlan, muscleGroups: e.target.value })}
-            placeholder="Grupos musculares"
-            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
-          />
-          <button
-            onClick={async () => {
-              if (!newPlan.letter.trim() || !newPlan.name.trim()) return;
-              await createPlan({
-                letter: newPlan.letter.trim(),
-                name: newPlan.name.trim(),
-                muscleGroups: newPlan.muscleGroups.trim(),
-              });
-              setNewPlan({ letter: "", name: "", muscleGroups: "" });
-              setShowNewPlan(false);
-            }}
-            className="w-full rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground"
-          >
-            Criar treino
-          </button>
-        </div>
-      )}
-    </Card>
+    </details>
   );
 }
 
@@ -638,9 +732,11 @@ function PlanExerciseEditor({ planId }: { planId: string }) {
   const [form, setForm] = useState({
     name: "",
     setsTarget: "4",
-    repsTarget: "10",
-    loadTarget: "20",
-    restSeconds: "90",
+    setTargets: Array.from({ length: 4 }, () => ({
+      reps: 10,
+      weight: 20,
+      restSeconds: 90,
+    })) as SetTarget[],
   });
 
   return (
@@ -697,33 +793,52 @@ function PlanExerciseEditor({ planId }: { planId: string }) {
             placeholder="Nome do exercício"
             className="w-full rounded-md border border-border bg-surface-2 px-2 py-1.5 text-xs outline-none focus:border-primary"
           />
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-1 gap-1.5">
             <NumField
               label="séries"
               value={form.setsTarget}
-              onChange={(v) => setForm({ ...form, setsTarget: v })}
-            />
-            <NumField
-              label="reps"
-              value={form.repsTarget}
-              onChange={(v) => setForm({ ...form, repsTarget: v })}
-            />
-            <NumField
-              label="kg"
-              value={form.loadTarget}
-              onChange={(v) => setForm({ ...form, loadTarget: v })}
+              onChange={(v) => {
+                const count = Math.max(1, Math.min(12, parseInt(v, 10) || 1));
+                setForm({
+                  ...form,
+                  setsTarget: v,
+                  setTargets: Array.from(
+                    { length: count },
+                    (_, i) =>
+                      form.setTargets[i] ??
+                      form.setTargets.at(-1) ?? { reps: 10, weight: 20, restSeconds: 90 },
+                  ),
+                });
+              }}
             />
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] text-muted-foreground">descanso</span>
-            {["60", "90", "120", "180"].map((s) => (
-              <button
-                key={s}
-                onClick={() => setForm({ ...form, restSeconds: s })}
-                className={`rounded-full px-2 py-1 text-[10px] font-semibold ${form.restSeconds === s ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
-              >
-                {s}s
-              </button>
+          <div className="space-y-1.5">
+            <div className="grid grid-cols-[44px_1fr_1fr_1fr] gap-1 text-[9px] uppercase text-muted-foreground">
+              <span></span>
+              <span>kg</span>
+              <span>reps</span>
+              <span>desc.</span>
+            </div>
+            {form.setTargets.map((target, index) => (
+              <div key={index} className="grid grid-cols-[44px_1fr_1fr_1fr] items-center gap-1">
+                <span className="text-[10px] text-muted-foreground">Série {index + 1}</span>
+                {(["weight", "reps", "restSeconds"] as const).map((field) => (
+                  <input
+                    key={field}
+                    type="number"
+                    value={target[field]}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        setTargets: form.setTargets.map((item, i) =>
+                          i === index ? { ...item, [field]: Number(e.target.value) } : item,
+                        ),
+                      })
+                    }
+                    className="min-w-0 rounded-md border border-border bg-surface-2 px-1.5 py-1.5 text-xs outline-none focus:border-primary"
+                  />
+                ))}
+              </div>
             ))}
           </div>
           <button
@@ -732,16 +847,19 @@ function PlanExerciseEditor({ planId }: { planId: string }) {
               await addExercise(planId, {
                 name: form.name.trim(),
                 setsTarget: parseInt(form.setsTarget, 10) || 1,
-                repsTarget: parseInt(form.repsTarget, 10) || 1,
-                loadTarget: parseFloat(form.loadTarget) || 0,
-                restSeconds: parseInt(form.restSeconds, 10) || 60,
+                repsTarget: form.setTargets[0]?.reps ?? 1,
+                loadTarget: form.setTargets[0]?.weight ?? 0,
+                restSeconds: form.setTargets[0]?.restSeconds ?? 60,
+                setTargets: form.setTargets,
               });
               setForm({
                 name: "",
                 setsTarget: "4",
-                repsTarget: "10",
-                loadTarget: "20",
-                restSeconds: "90",
+                setTargets: Array.from({ length: 4 }, () => ({
+                  reps: 10,
+                  weight: 20,
+                  restSeconds: 90,
+                })),
               });
               setShowAdd(false);
             }}
@@ -797,7 +915,10 @@ function ExerciseModal({
     {},
   );
   const draftFor = (idx: number) =>
-    draftValues[idx] ?? { weight: String(exercise.loadTarget), reps: String(exercise.repsTarget) };
+    draftValues[idx] ?? {
+      weight: String(exercise.setTargets?.[idx]?.weight ?? exercise.loadTarget),
+      reps: String(exercise.setTargets?.[idx]?.reps ?? exercise.repsTarget),
+    };
   const setDraftFor = (idx: number, patch: Partial<{ weight: string; reps: string }>) =>
     setDraftValues((d) => ({ ...d, [idx]: { ...draftFor(idx), ...patch } }));
   const registerPlanned = async (idx: number) => {
@@ -805,11 +926,12 @@ function ExerciseModal({
     const w = parseFloat(d.weight) || 0;
     const r = parseInt(d.reps, 10) || 0;
     await logSet(liveSession.id, exercise.id, w, r);
-    onLogged(exercise.restSeconds);
+    onLogged(exercise.setTargets?.[idx]?.restSeconds ?? exercise.restSeconds);
   };
 
   const [extraWeight, setExtraWeight] = useState(String(exercise.loadTarget));
   const [extraReps, setExtraReps] = useState(String(exercise.repsTarget));
+  const [showExtraSet, setShowExtraSet] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const series = exerciseWeightSeries(sessions, exercise.planId, exercise.id);
 
@@ -818,6 +940,7 @@ function ExerciseModal({
     const r = parseInt(extraReps, 10) || 0;
     await logSet(liveSession.id, exercise.id, w, r);
     onLogged(exercise.restSeconds);
+    setShowExtraSet(false);
   };
 
   return (
@@ -834,23 +957,6 @@ function ExerciseModal({
               key={s.setIndex}
               className="flex items-center gap-2 rounded-lg border border-dashed border-success/40 bg-success/5 p-2 opacity-90"
             >
-              {isLast ? (
-                <button
-                  onClick={() => void removeLastSet(liveSession.id, exercise.id)}
-                  aria-label="Desfazer última série"
-                  title="Desfazer última série"
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground"
-                >
-                  <Check className="h-3 w-3" strokeWidth={3} />
-                </button>
-              ) : (
-                <span
-                  aria-label="Série concluída"
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground"
-                >
-                  <Check className="h-3 w-3" strokeWidth={3} />
-                </span>
-              )}
               <span className="w-12 shrink-0 text-[11px] text-muted-foreground">
                 Série {s.setIndex + 1}
               </span>
@@ -876,6 +982,23 @@ function ExerciseModal({
                 className="w-14 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
               />
               <span className="text-[10px] text-muted-foreground">reps</span>
+              {isLast ? (
+                <button
+                  onClick={() => void removeLastSet(liveSession.id, exercise.id)}
+                  aria-label="Desfazer última série"
+                  title="Desfazer última série"
+                  className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground"
+                >
+                  <Check className="h-3 w-3" strokeWidth={3} />
+                </button>
+              ) : (
+                <span
+                  aria-label="Série concluída"
+                  className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground"
+                >
+                  <Check className="h-3 w-3" strokeWidth={3} />
+                </span>
+              )}
             </div>
           );
         })}
@@ -890,12 +1013,6 @@ function ExerciseModal({
                 key={idx}
                 className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 p-2"
               >
-                <button
-                  onClick={() => registerPlanned(idx)}
-                  aria-label="Concluir série"
-                  title="Concluir série"
-                  className="h-5 w-5 shrink-0 rounded-full border-2 border-muted-foreground/40"
-                />
                 <span className="w-12 shrink-0 text-[11px] text-muted-foreground">
                   Série {idx + 1}
                 </span>
@@ -913,20 +1030,29 @@ function ExerciseModal({
                   className="w-14 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
                 />
                 <span className="text-[10px] text-muted-foreground">reps</span>
+                <button
+                  onClick={() => registerPlanned(idx)}
+                  aria-label="Concluir série"
+                  title="Concluir série"
+                  className="ml-auto h-5 w-5 shrink-0 rounded-full border-2 border-muted-foreground/40"
+                />
               </div>
             );
           })}
         </div>
       )}
 
-      {plannedRemaining === 0 && (
+      {plannedRemaining === 0 && !showExtraSet && (
+        <button
+          onClick={() => setShowExtraSet(true)}
+          className="mt-3 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-border py-2 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary"
+        >
+          <Plus className="h-3.5 w-3.5" /> Adicionar série
+        </button>
+      )}
+
+      {plannedRemaining === 0 && showExtraSet && (
         <div className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-surface-2 p-2">
-          <button
-            onClick={addExtraSet}
-            aria-label="Concluir série extra"
-            title="Concluir série extra"
-            className="h-5 w-5 shrink-0 rounded-full border-2 border-muted-foreground/40"
-          />
           <span className="w-12 shrink-0 text-[11px] text-muted-foreground">
             Série {registeredCount + 1}
           </span>
@@ -944,6 +1070,12 @@ function ExerciseModal({
             className="w-14 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
           />
           <span className="text-[10px] text-muted-foreground">reps</span>
+          <button
+            onClick={addExtraSet}
+            aria-label="Concluir série extra"
+            title="Concluir série extra"
+            className="ml-auto h-5 w-5 shrink-0 rounded-full border-2 border-muted-foreground/40"
+          />
         </div>
       )}
 
