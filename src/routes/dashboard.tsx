@@ -14,10 +14,11 @@ import {
   type Range,
 } from "@/lib/goals-store";
 import { TrendingUp, TrendingDown, Trophy, Sparkles, ChevronRight, Flame } from "lucide-react";
+import { MirrorDashboard } from "@/components/MirrorDashboard";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Espelho de hábitos — Norte" }] }),
-  component: Dashboard,
+  component: MirrorDashboard,
 });
 
 function Dashboard() {
