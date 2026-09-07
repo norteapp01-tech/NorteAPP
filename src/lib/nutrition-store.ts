@@ -21,6 +21,7 @@ export type Meal = {
   time: string; // HH:MM
   name: string;
   order: number;
+  weekdays: number[]; // 0=domingo .. 6=sábado
 };
 
 export type MealOption = {
@@ -72,6 +73,10 @@ const EMPTY_STATE: State = { meals: [], options: [], goals: DEFAULT_GOALS, logs:
 // ---------------------------------------------------------------------------
 export function mealsSorted(meals: Meal[]): Meal[] {
   return [...meals].sort((a, b) => a.time.localeCompare(b.time));
+}
+
+export function mealsForWeekday(meals: Meal[], weekday: number): Meal[] {
+  return mealsSorted(meals).filter((meal) => meal.weekdays.includes(weekday));
 }
 
 export function optionsForMeal(options: MealOption[], mealId: string): MealOption[] {
@@ -128,6 +133,7 @@ function mapMeal(r: Row): Meal {
     time: r.time as string,
     name: r.name as string,
     order: (r.order_index as number) ?? 0,
+    weekdays: Array.isArray(r.weekdays) ? (r.weekdays as number[]) : [0, 1, 2, 3, 4, 5, 6],
   };
 }
 
@@ -217,7 +223,11 @@ export async function setDailyGoals(goals: DailyGoals) {
 // ---------------------------------------------------------------------------
 // Ações — refeições e opções (a dieta / o plano)
 // ---------------------------------------------------------------------------
-export async function addMeal(input: { time: string; name: string }): Promise<string> {
+export async function addMeal(input: {
+  time: string;
+  name: string;
+  weekdays?: number[];
+}): Promise<string> {
   const userId = await ensureSession();
   const { count } = await supabase.from("meals").select("id", { count: "exact", head: true });
   const row = unwrap<{ id: string }>(
@@ -228,6 +238,7 @@ export async function addMeal(input: { time: string; name: string }): Promise<st
         time: input.time,
         name: input.name.trim(),
         order_index: count ?? 0,
+        weekdays: input.weekdays?.length ? input.weekdays : [0, 1, 2, 3, 4, 5, 6],
       })
       .select()
       .single(),
@@ -236,10 +247,14 @@ export async function addMeal(input: { time: string; name: string }): Promise<st
   return row.id;
 }
 
-export async function updateMeal(id: string, patch: { time?: string; name?: string }) {
+export async function updateMeal(
+  id: string,
+  patch: { time?: string; name?: string; weekdays?: number[] },
+) {
   const dbPatch: Row = {};
   if (patch.time !== undefined) dbPatch.time = patch.time;
   if (patch.name !== undefined) dbPatch.name = patch.name.trim();
+  if (patch.weekdays !== undefined) dbPatch.weekdays = patch.weekdays;
   unwrap(await supabase.from("meals").update(dbPatch).eq("id", id).select().single());
   await invalidate();
 }

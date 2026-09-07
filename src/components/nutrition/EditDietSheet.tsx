@@ -38,7 +38,7 @@ export function EditDietSheet({ onClose }: { onClose: () => void }) {
         {activeMeal?.name}
       </span>
     ) : (
-      "Editar dieta"
+      "Plano alimentar"
     );
 
   return (
@@ -77,6 +77,7 @@ function DietRoot({
   const [addingMeal, setAddingMeal] = useState(false);
   const [newTime, setNewTime] = useState("12:00");
   const [newName, setNewName] = useState("");
+  const [newWeekdays, setNewWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
 
   const saveGoals = async () => {
     await setDailyGoals({
@@ -90,7 +91,7 @@ function DietRoot({
 
   const saveNewMeal = async () => {
     if (!newName.trim()) return;
-    await addMeal({ time: newTime, name: newName.trim() });
+    await addMeal({ time: newTime, name: newName.trim(), weekdays: newWeekdays });
     setNewName("");
     setAddingMeal(false);
   };
@@ -179,21 +180,28 @@ function DietRoot({
             <Plus className="h-3.5 w-3.5" /> adicionar refeição
           </button>
         ) : (
-          <div className="mt-2 flex items-center gap-2 rounded-lg border border-dashed border-border p-2.5">
-            <input
-              type="time"
-              value={newTime}
-              onChange={(e) => setNewTime(e.target.value)}
-              className="w-24 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-xs outline-none focus:border-primary"
-            />
-            <input
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Nome da refeição"
-              className="flex-1 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-xs outline-none focus:border-primary"
-            />
-            <button onClick={saveNewMeal} className="text-primary">
-              <Plus className="h-4 w-4" />
+          <div className="mt-2 rounded-lg border border-dashed border-border p-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="time"
+                value={newTime}
+                onChange={(e) => setNewTime(e.target.value)}
+                className="w-24 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-xs outline-none focus:border-primary"
+              />
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Nome da refeição"
+                className="flex-1 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-xs outline-none focus:border-primary"
+              />
+            </div>
+            <WeekdayPicker value={newWeekdays} onChange={setNewWeekdays} />
+            <button
+              onClick={saveNewMeal}
+              disabled={!newName.trim() || newWeekdays.length === 0}
+              className="mt-3 w-full rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-40"
+            >
+              Adicionar ao plano
             </button>
           </div>
         )}
@@ -227,11 +235,12 @@ function GoalField({
 function MealOptionsEditor({ meal, options }: { meal: Meal; options: MealOption[] }) {
   const [time, setTime] = useState(meal.time);
   const [name, setName] = useState(meal.name);
+  const [weekdays, setWeekdays] = useState(meal.weekdays);
   const [addingOption, setAddingOption] = useState(false);
   const [editingOptionId, setEditingOptionId] = useState<string | null>(null);
 
   const saveMealFields = async () => {
-    await updateMeal(meal.id, { time, name });
+    await updateMeal(meal.id, { time, name, weekdays });
   };
 
   return (
@@ -257,6 +266,13 @@ function MealOptionsEditor({ meal, options }: { meal: Meal; options: MealOption[
           />
         </label>
       </div>
+      <WeekdayPicker
+        value={weekdays}
+        onChange={(next) => {
+          setWeekdays(next);
+          void updateMeal(meal.id, { weekdays: next });
+        }}
+      />
 
       <div>
         <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -320,6 +336,52 @@ function MealOptionsEditor({ meal, options }: { meal: Meal; options: MealOption[
             />
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+const weekdayInitials = ["D", "S", "T", "Q", "Q", "S", "S"];
+
+function WeekdayPicker({
+  value,
+  onChange,
+}: {
+  value: number[];
+  onChange: (days: number[]) => void;
+}) {
+  const allSelected = value.length === 7;
+  return (
+    <div className="mt-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
+          Repetir em
+        </span>
+        <button
+          type="button"
+          onClick={() => onChange(allSelected ? [] : [0, 1, 2, 3, 4, 5, 6])}
+          className="text-[10px] font-semibold text-primary"
+        >
+          {allSelected ? "Limpar" : "Selecionar todos"}
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-1.5">
+        {weekdayInitials.map((label, day) => {
+          const active = value.includes(day);
+          return (
+            <button
+              key={day}
+              type="button"
+              aria-pressed={active}
+              onClick={() =>
+                onChange(active ? value.filter((item) => item !== day) : [...value, day])
+              }
+              className={`h-8 rounded-lg text-[10px] font-bold ${active ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

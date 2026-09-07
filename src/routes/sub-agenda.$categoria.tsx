@@ -14,6 +14,7 @@ import {
   X,
   Dumbbell,
   BookOpen,
+  Salad,
   CalendarClock,
   Layers3,
   Settings2,
@@ -106,6 +107,8 @@ function SubAgenda() {
             <Dumbbell className="h-8 w-8 text-primary" strokeWidth={1.8} />
           ) : categoria === "leitura" ? (
             <BookOpen className="h-8 w-8 text-primary" strokeWidth={1.8} />
+          ) : categoria === "alimentacao" ? (
+            <Salad className="h-8 w-8 text-primary" strokeWidth={1.8} />
           ) : (
             <span className="text-4xl">{meta.emoji}</span>
           )}
