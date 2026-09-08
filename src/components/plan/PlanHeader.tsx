@@ -1,4 +1,5 @@
-import { ChevronLeft, MoreVertical, Info, Link2 } from "lucide-react";
+import { ChevronLeft, Info, Link2 } from "lucide-react";
+import { AppMenuButton } from "@/components/ui/app-design-system";
 import { CategoryIcon } from "@/components/plan/CategoryIcon";
 import { GreenProgressBar } from "@/components/plan/GreenProgressBar";
 import {
@@ -57,12 +58,7 @@ export function PlanHeader({
         </p>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
-              aria-label="Mais opções do planejamento"
-              className="-mr-2 flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-surface hover:text-foreground"
-            >
-              <MoreVertical className="h-5 w-5" />
-            </button>
+            <AppMenuButton aria-label="Mais opções do planejamento" className="-mr-2" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem disabled={!hasDetails} onSelect={onShowDetails} className="gap-2">

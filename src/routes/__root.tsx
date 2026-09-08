@@ -135,7 +135,7 @@ function BottomNav() {
               <Link
                 key={item.to}
                 to={item.to}
-                className="-mt-7 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_8px_28px_-8px_oklch(0.82_0.18_145/0.55)] transition-transform active:scale-95"
+                className="interactive-press -mt-7 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_8px_28px_-8px_oklch(0.82_0.18_145/0.55)]"
               >
                 <Icon className="h-6 w-6" strokeWidth={2.5} />
               </Link>
@@ -145,7 +145,7 @@ function BottomNav() {
             <Link
               key={item.to}
               to={item.to}
-              className={`flex min-w-16 flex-col items-center gap-1 rounded-xl px-2 py-1.5 text-[11px] transition-colors ${active ? "text-primary" : "text-muted-foreground"}`}
+              className={`interactive-press flex min-w-16 flex-col items-center gap-1 rounded-xl px-2 py-1.5 text-[11px] ${active ? "text-primary" : "text-muted-foreground"}`}
             >
               <Icon className="h-5 w-5" />
               <span className="font-medium">{item.label}</span>
@@ -159,11 +159,14 @@ function BottomNav() {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
     <QueryClientProvider client={queryClient}>
       <div className="mx-auto min-h-screen max-w-md bg-background pb-28">
         <AuthGate>
-          <Outlet />
+          <div key={pathname} className="page-enter">
+            <Outlet />
+          </div>
           <BottomNav />
         </AuthGate>
       </div>

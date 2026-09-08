@@ -114,10 +114,10 @@ function renderGoalDetail() {
 describe("GoalDetail — abas: só Planejamento e Evolução", () => {
   it("a barra de abas tem exatamente Planejamento e Evolução, sem Execuções separada", () => {
     renderGoalDetail();
-    expect(screen.getByRole("button", { name: "Planejamento" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Evolução" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Execuções/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Visão" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Planejamento" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Evolução" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /^Execuções/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Visão" })).not.toBeInTheDocument();
   });
 
   it("não existe mais o card 'Números' na aba principal — os números moraram pra Evolução", () => {

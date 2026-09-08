@@ -19,7 +19,6 @@ import {
   Layers3,
   Settings2,
   Route as RouteIcon,
-  Ellipsis,
   CircleDollarSign,
   HandHeart,
 } from "lucide-react";
@@ -72,6 +71,8 @@ import { FeModule } from "@/components/fe/FeModule";
 import { Modal } from "@/components/ui/modal";
 import { ChartSkeleton } from "@/components/ui/chart-skeleton";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
+import { CategoryIcon } from "@/components/plan/CategoryIcon";
+import { AppMenuButton, UnderlineTabs, WeekdaySelector } from "@/components/ui/app-design-system";
 
 // recharts só baixa quando o modal de um exercício realmente abre — Leitura,
 // Alimentação, Finanças, Fé e Trabalho (que também passam por este arquivo)
@@ -81,12 +82,7 @@ const ExerciseEvolutionChart = lazy(() =>
     default: m.ExerciseEvolutionChart,
   })),
 );
-import {
-  Card,
-  weekdayLabels,
-  weekVisualLabels,
-  weekVisualOrder,
-} from "@/components/sub-agenda-shared";
+import { Card, weekdayLabels } from "@/components/sub-agenda-shared";
 
 export const Route = createFileRoute("/sub-agenda/$categoria")({
   head: () => ({ meta: [{ title: `Sub-agenda — Norte` }] }),
@@ -104,13 +100,7 @@ function SubAgenda() {
         <Link to="/" className="inline-flex items-center gap-1 text-xs text-muted-foreground">
           <ChevronLeft className="h-4 w-4" /> Hoje
         </Link>
-        <button
-          onClick={() => setSettingsOpen(true)}
-          aria-label="Abrir configurações"
-          className="grid h-10 w-10 place-items-center rounded-xl border border-border text-muted-foreground"
-        >
-          <Ellipsis className="h-5 w-5" />
-        </button>
+        <AppMenuButton onClick={() => setSettingsOpen(true)} aria-label="Abrir configurações" />
       </div>
       <header className="mt-3">
         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -128,7 +118,7 @@ function SubAgenda() {
           ) : categoria === "fe" ? (
             <HandHeart className="h-8 w-8 text-primary" strokeWidth={1.8} />
           ) : (
-            <span className="text-4xl">{meta.emoji}</span>
+            <CategoryIcon category={categoria} className="h-8 w-8 text-primary" />
           )}
           {meta.label}
         </h1>
@@ -313,20 +303,16 @@ function AcademiaModule() {
       : undefined;
 
   const tabs = (
-    <div className="flex gap-1 rounded-2xl border border-border bg-surface p-1">
-      <button
-        onClick={() => setActiveTab("treino")}
-        className={`flex-1 rounded-xl py-2.5 text-xs font-semibold ${activeTab === "treino" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-      >
-        Treino
-      </button>
-      <button
-        onClick={() => setActiveTab("ciclo")}
-        className={`flex-1 rounded-xl py-2.5 text-xs font-semibold ${activeTab === "ciclo" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-      >
-        Ciclo de treino
-      </button>
-    </div>
+    <UnderlineTabs
+      items={
+        [
+          { key: "treino", label: "Treino" },
+          { key: "ciclo", label: "Ciclo de treino" },
+        ] as const
+      }
+      value={activeTab}
+      onChange={setActiveTab}
+    />
   );
 
   if (activeTab === "ciclo") {
@@ -360,25 +346,16 @@ function AcademiaModule() {
             <CalendarClock className="h-4 w-4" /> Horários
           </button>
         </div>
-        <div className="grid grid-cols-7 gap-1.5">
-          {weekVisualOrder.map((weekday, i) => {
-            const plan = plans.find((p) => p.id === weeklyAssignment[weekday]);
+        <WeekdaySelector
+          onSelect={setPickerDay}
+          primary={(weekday) =>
+            plans.find((p) => p.id === weeklyAssignment[weekday])?.letter ?? "—"
+          }
+          secondary={(weekday) => {
             const routine = gymRoutines.find((r) => r.weekday === weekday);
-            return (
-              <button
-                key={weekday}
-                onClick={() => setPickerDay(weekday)}
-                className={`rounded-lg border p-2 text-center hover:bg-surface ${weekday === new Date().getDay() ? "border-primary bg-primary/5" : "border-transparent bg-surface-2"}`}
-              >
-                <p className="text-[10px] text-muted-foreground">{weekVisualLabels[i]}</p>
-                <p className="mt-1 text-lg font-bold">{plan ? plan.letter : "—"}</p>
-                <p className="mt-1 text-[9px] text-muted-foreground">
-                  {routine ? formatTime(routine.time, profile.timeFormat) : "—"}
-                </p>
-              </button>
-            );
-          })}
-        </div>
+            return routine ? formatTime(routine.time, profile.timeFormat) : "—";
+          }}
+        />
       </Card>
 
       <Card
@@ -449,7 +426,7 @@ function AcademiaModule() {
                         </p>
                       </div>
                       {log?.done ? (
-                        <Check className="h-4 w-4 shrink-0 text-success" />
+                        <Check className="check-enter h-4 w-4 shrink-0 text-success" />
                       ) : (
                         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                       )}
@@ -481,7 +458,7 @@ function AcademiaModule() {
 
         {todayPlan && todaySession && todaySession.status === "concluido" && (
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Check className="h-4 w-4 shrink-0 text-success" /> Treino concluído hoje —{" "}
+            <Check className="check-enter h-4 w-4 shrink-0 text-success" /> Treino concluído hoje —{" "}
             <button
               onClick={() => setSummarySessionId(todaySession.id)}
               className="-my-2 rounded px-1 py-2 font-medium text-[oklch(0.88_0.16_145)] decoration-2 underline decoration-dotted underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success"
@@ -1014,14 +991,14 @@ function ExerciseModal({
                   title="Desfazer última série"
                   className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground"
                 >
-                  <Check className="h-3 w-3" strokeWidth={3} />
+                  <Check className="check-enter h-3 w-3" strokeWidth={3} />
                 </button>
               ) : (
                 <span
                   aria-label="Série concluída"
                   className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground"
                 >
-                  <Check className="h-3 w-3" strokeWidth={3} />
+                  <Check className="check-enter h-3 w-3" strokeWidth={3} />
                 </span>
               )}
             </div>

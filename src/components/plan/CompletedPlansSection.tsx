@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronRight, ChevronUp, Trophy } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { categoryMeta } from "@/lib/mock-data";
+import { CategoryIcon } from "./CategoryIcon";
 import {
   isGoalComplete,
   goalCompletionDate,
@@ -57,7 +57,6 @@ export function CompletedPlansSection({
       {open && completed.length > 0 && (
         <div className="space-y-2.5 border-t border-border p-3">
           {completed.map((g) => {
-            const cat = categoryMeta[g.category] ?? categoryMeta.generico;
             const gSteps = stepsForGoal(steps, g.id);
             const gExecs = executionsForGoal(executions, g.id);
             const completionDate = goalCompletionDate(g, steps, executions);
@@ -71,7 +70,8 @@ export function CompletedPlansSection({
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-[10px] uppercase tracking-wider text-muted-foreground">
-                      {cat.emoji} {g.lifeArea}
+                      <CategoryIcon category={g.category} className="inline h-3.5 w-3.5" />{" "}
+                      {g.lifeArea}
                     </p>
                     <p className="mt-1 font-semibold leading-snug">{g.title}</p>
                     <p className="text-[11px] text-muted-foreground">

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { nowDate } from "@/lib/test-clock";
-import { Check, Ellipsis, EllipsisVertical, X, Sparkles, CalendarClock } from "lucide-react";
+import { Check, X, Sparkles, CalendarClock } from "lucide-react";
+import { AppMenuButton } from "@/components/ui/app-design-system";
 import { categoryMeta } from "@/lib/mock-data";
 import { useProfile, greeting, updateProfile } from "@/lib/profile-store";
 import { formatTime } from "@/lib/format-utils";
@@ -104,13 +105,11 @@ export function TodayScreen() {
               : "Hoje é dia de seguir o plano."}
           </p>
         </div>
-        <button
+        <AppMenuButton
           onClick={() => setSettingsOpen(true)}
           aria-label="Configurações"
-          className="absolute -right-2 -top-2 flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-surface"
-        >
-          <Ellipsis className="h-5 w-5" />
-        </button>
+          className="absolute -right-2 -top-2"
+        />
         <div className="absolute right-0 bottom-0 flex w-28 flex-col items-end gap-1">
           <span className="text-xs font-medium text-muted-foreground">
             {done} de {total} concluídas
@@ -212,7 +211,7 @@ export function TodayScreen() {
                   aria-label={doneNow ? "Reabrir tarefa" : "Concluir tarefa"}
                   className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors ${doneNow ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground bg-transparent"}`}
                 >
-                  {doneNow && <Check className="h-4 w-4" strokeWidth={3} />}
+                  {doneNow && <Check className="check-enter h-4 w-4" strokeWidth={3} />}
                 </button>
                 <div className="min-w-0 flex-1">
                   <button
@@ -236,13 +235,11 @@ export function TodayScreen() {
                     {missed && !doneNow && <span className="text-danger">· atrasada</span>}
                   </div>
                 </div>
-                <button
+                <AppMenuButton
                   onClick={() => setSkipping(t)}
                   aria-label="Mais ações"
-                  className="-m-2 flex h-11 w-11 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
-                >
-                  <EllipsisVertical className="h-4 w-4" />
-                </button>
+                  className="-m-2"
+                />
               </div>
             </li>
           );

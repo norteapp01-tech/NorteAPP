@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronRight, Search, ArrowRight } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
-import { categoryMeta } from "@/lib/mock-data";
+import { CategoryIcon } from "./CategoryIcon";
 import {
   useGoalsStore,
   isGoalComplete,
@@ -59,7 +59,6 @@ export function PlanItemPicker({
       )}
       <div className="space-y-2">
         {activeGoals.map((g) => {
-          const cat = categoryMeta[g.category] ?? categoryMeta.generico;
           const gSteps = stepsForGoal(steps, g.id).filter((s) => !s.done);
           const orphanExecs = executionsForGoal(executions, g.id).filter(
             (e) => !e.stepId && e.status !== "concluida",
@@ -79,7 +78,7 @@ export function PlanItemPicker({
                 }}
                 className="flex w-full items-center gap-2 p-3 text-left hover:bg-surface-2"
               >
-                <span className="text-base">{cat.emoji}</span>
+                <CategoryIcon category={g.category} className="h-5 w-5 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold">{g.title}</span>
                 {!hasChildren ? (
                   <ArrowRight className="h-4 w-4 shrink-0 text-primary" />

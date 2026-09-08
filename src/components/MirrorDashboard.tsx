@@ -9,7 +9,6 @@ import {
   ChevronRight,
   CircleDollarSign,
   Dumbbell,
-  Ellipsis,
   Flame,
   HandHeart,
   Salad,
@@ -17,6 +16,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
+import { AppMenuButton, UnderlineTabs } from "@/components/ui/app-design-system";
 import { categoryMeta } from "@/lib/mock-data";
 import {
   achievementsEarned,
@@ -77,25 +77,22 @@ export function MirrorDashboard() {
             Um reflexo honesto da sua {range === "dia" ? "rotina" : range}.
           </p>
         </div>
-        <button
-          aria-label="Mais opções"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-muted-foreground"
-        >
-          <Ellipsis className="h-5 w-5" />
-        </button>
+        <AppMenuButton />
       </header>
 
-      <div className="mt-6 flex gap-1 rounded-2xl border border-border bg-surface p-1">
-        {(["dia", "semana", "mes", "ano"] as Range[]).map((r) => (
-          <button
-            key={r}
-            onClick={() => setRange(r)}
-            className={`flex-1 rounded-xl py-2.5 text-xs font-semibold ${range === r ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-          >
-            {r === "dia" ? "Dia" : r === "semana" ? "Semana" : r === "mes" ? "Mês" : "Ano"}
-          </button>
-        ))}
-      </div>
+      <UnderlineTabs
+        className="mt-6"
+        items={
+          [
+            { key: "dia", label: "Dia" },
+            { key: "semana", label: "Semana" },
+            { key: "mes", label: "Mês" },
+            { key: "ano", label: "Ano" },
+          ] as const
+        }
+        value={range}
+        onChange={setRange}
+      />
 
       <section className="card-surface mt-4 p-5">
         <p className="text-[11px] font-semibold uppercase tracking-[.16em] text-muted-foreground">

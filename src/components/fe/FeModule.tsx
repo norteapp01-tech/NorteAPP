@@ -2,6 +2,7 @@ import { useState } from "react";
 import { HojeTab } from "./HojeTab";
 import { OracaoTab } from "./OracaoTab";
 import { CadernoTab } from "./CadernoTab";
+import { UnderlineTabs } from "@/components/ui/app-design-system";
 
 type Tab = "presenca" | "oracoes" | "caderno";
 const tabs: { key: Tab; label: string }[] = [
@@ -17,17 +18,7 @@ export function FeModule() {
       <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
         Um espaço para lembrar, buscar e agradecer.
       </p>
-      <div className="mt-4 grid grid-cols-3 rounded-2xl border border-border bg-surface p-1">
-        {tabs.map((item) => (
-          <button
-            key={item.key}
-            onClick={() => setTab(item.key)}
-            className={`rounded-xl py-2.5 text-xs font-semibold transition-colors ${tab === item.key ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+      <UnderlineTabs items={tabs} value={tab} onChange={setTab} className="mt-4" />
       <div className="mt-6 pb-12">
         {tab === "presenca" && (
           <HojeTab

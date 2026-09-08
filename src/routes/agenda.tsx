@@ -44,6 +44,7 @@ import {
 import type { TimeFormat, WeekStart } from "@/lib/profile-store";
 import { nowDate } from "@/lib/test-clock";
 import { Modal } from "@/components/ui/modal";
+import { CategoryIcon } from "@/components/plan/CategoryIcon";
 import {
   ScheduleFields,
   scheduleTimesValid,
@@ -221,7 +222,7 @@ function EventCard({ e, timeFormat }: { e: Execution; timeFormat: TimeFormat }) 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              {cat.emoji} {cat.label}
+              <CategoryIcon category={e.category} className="inline h-3 w-3" /> {cat.label}
             </span>
             {e.rigid && (
               <span className="flex items-center gap-1 rounded-full bg-danger/15 px-1.5 py-0.5 text-[10px] font-semibold text-danger">
@@ -325,14 +326,13 @@ function GoalPicker({ onPick, onClose }: { onPick: (id: string) => void; onClose
           </p>
         )}
         {activeGoals.map((g) => {
-          const c = categoryMeta[g.category] ?? categoryMeta.generico;
           return (
             <button
               key={g.id}
               onClick={() => onPick(g.id)}
               className="card-surface flex w-full items-center gap-3 p-3 text-left hover:border-primary/40"
             >
-              <span className="text-lg">{c.emoji}</span>
+              <CategoryIcon category={g.category} className="h-5 w-5 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold">{g.title}</p>
                 <p className="text-[11px] text-muted-foreground">

@@ -6,6 +6,7 @@ import { MovimentacoesTab } from "./MovimentacoesTab";
 import { ObjetivosTab } from "./ObjetivosTab";
 import { PlanejamentoTab } from "./PlanejamentoTab";
 import { QuickAddSheet } from "./QuickAddSheet";
+import { UnderlineTabs } from "@/components/ui/app-design-system";
 
 type Tab = "resumo" | "movimentacoes" | "planejamento" | "objetivos";
 const tabs: { key: Tab; label: string }[] = [
@@ -54,17 +55,7 @@ export function FinancasModule() {
         </button>
       </div>
 
-      <div className="mt-3 flex gap-1.5 overflow-x-auto">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${tab === t.key ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <UnderlineTabs items={tabs} value={tab} onChange={setTab} className="mt-3" />
 
       <div className="mt-5 pb-24">
         {tab === "resumo" && (

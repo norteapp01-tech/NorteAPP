@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState } from "react";
-import { MapPinned, TrendingUp, MoreVertical } from "lucide-react";
+import { MapPinned, TrendingUp } from "lucide-react";
+import { AppMenuButton } from "@/components/ui/app-design-system";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,12 +29,7 @@ export function PlanMenuSheet({ goals }: { goals: Goal[] }) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
-            aria-label="Mais opções do planejamento"
-            className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-surface hover:text-foreground"
-          >
-            <MoreVertical className="h-5 w-5" />
-          </button>
+          <AppMenuButton aria-label="Mais opções do planejamento" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => setPanel("areas")} className="gap-2">

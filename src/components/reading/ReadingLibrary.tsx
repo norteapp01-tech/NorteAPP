@@ -8,6 +8,7 @@ import {
 } from "@/lib/reading-store";
 import { BookCover } from "./BookCover";
 import { Modal } from "@/components/ui/modal";
+import { UnderlineTabs } from "@/components/ui/app-design-system";
 
 const tabs: { key: BookStatus; label: string }[] = [
   { key: "reading", label: "Lendo agora" },
@@ -31,17 +32,7 @@ export function ReadingLibrary({
 
   return (
     <Modal onClose={onClose} title="Sua biblioteca">
-      <div className="flex gap-1.5 overflow-x-auto">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${tab === t.key ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <UnderlineTabs items={tabs} value={tab} onChange={setTab} />
 
       <div className="mt-3 space-y-2">
         {list.length === 0 && (

@@ -9,10 +9,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-/** Ícone outline (lucide) por categoria — só para as duas telas de planejamento
- * redesenhadas (a spec pede ícones exclusivamente outline, sem emoji, nesses
- * lugares). Não substitui `categoryMeta.emoji`, que continua servindo o resto
- * do app (badges de tarefa, sub-agendas etc.) fora do escopo desta mudança. */
+/** Ícone outline oficial por categoria, usado em toda a interface. */
 const categoryIconMap: Record<string, LucideIcon> = {
   academia: Dumbbell,
   leitura: BookOpen,

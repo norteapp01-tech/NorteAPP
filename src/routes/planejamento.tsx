@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { categoryMeta } from "@/lib/mock-data";
+import { CategoryIcon } from "@/components/plan/CategoryIcon";
 import {
   useGoalsStore,
   focusGoal,
@@ -112,9 +112,7 @@ function PlanScreen() {
                 <span className="font-mono text-xs font-bold text-muted-foreground">
                   {formatTime(t.startTime, profile.timeFormat)}
                 </span>
-                <span className="text-lg">
-                  {(categoryMeta[t.category] ?? categoryMeta.generico).emoji}
-                </span>
+                <CategoryIcon category={t.category} className="h-5 w-5 text-muted-foreground" />
                 <p
                   className={`flex-1 text-sm ${t.status === "concluida" ? "line-through opacity-60" : ""}`}
                 >

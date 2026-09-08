@@ -83,7 +83,7 @@ export function StageAccordion({
           aria-label={step.done ? "Reabrir etapa" : "Concluir etapa"}
           className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border disabled:opacity-60 ${step.done ? "border-primary bg-primary text-primary-foreground" : "border-border bg-surface-2"}`}
         >
-          {step.done && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+          {step.done && <Check className="check-enter h-3.5 w-3.5" strokeWidth={3} />}
         </button>
         <button className="min-w-0 flex-1 text-left" onClick={onToggle}>
           <p

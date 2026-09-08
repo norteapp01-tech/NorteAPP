@@ -66,8 +66,14 @@
 }
 
 @layer base {
-  * { border-color: var(--color-border); }
-  html, body, #root { height: 100%; }
+  * {
+    border-color: var(--color-border);
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
@@ -98,5 +104,59 @@
   -ms-overflow-style: none;
   &::-webkit-scrollbar {
     display: none;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .interactive-press {
+    transition-property: transform, opacity, color, background-color, border-color;
+    transition-duration: 160ms;
+    transition-timing-function: ease-out;
+  }
+
+  .interactive-press:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  button.card-surface,
+  a.card-surface {
+    transition:
+      transform 160ms ease-out,
+      opacity 160ms ease-out,
+      border-color 160ms ease-out;
+  }
+
+  button.card-surface:active,
+  a.card-surface:active {
+    transform: scale(0.99);
+  }
+
+  .page-enter {
+    animation: page-enter 180ms ease-out both;
+  }
+
+  .check-enter {
+    animation: check-enter 180ms ease-out both;
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes check-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }

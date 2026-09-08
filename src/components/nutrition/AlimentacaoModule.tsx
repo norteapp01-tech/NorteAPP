@@ -22,19 +22,13 @@ import {
 import { MacroSummary } from "./MacroSummary";
 import { MealDetailSheet } from "./MealDetailSheet";
 import { Modal } from "@/components/ui/modal";
+import { UnderlineTabs, WeekdaySelector } from "@/components/ui/app-design-system";
+import { officialWeek } from "@/components/ui/app-design-system-data";
 
 const todayLabel = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long" }).format(
   nowDate(),
 );
-const week = [
-  { day: 1, label: "Seg" },
-  { day: 2, label: "Ter" },
-  { day: 3, label: "Qua" },
-  { day: 4, label: "Qui" },
-  { day: 5, label: "Sex" },
-  { day: 6, label: "Sáb" },
-  { day: 0, label: "Dom" },
-];
+const week = officialWeek;
 const commonMoments = [
   ["Café da manhã", "08:00"],
   ["Almoço", "12:30"],
@@ -56,14 +50,16 @@ export function AlimentacaoModule() {
 
   return (
     <div className="mt-6 space-y-5">
-      <div className="grid grid-cols-2 rounded-xl border border-border bg-surface p-1">
-        <Tab active={tab === "today"} onClick={() => setTab("today")}>
-          Hoje
-        </Tab>
-        <Tab active={tab === "plan"} onClick={() => setTab("plan")}>
-          Plano alimentar
-        </Tab>
-      </div>
+      <UnderlineTabs
+        items={
+          [
+            { key: "today", label: "Hoje" },
+            { key: "plan", label: "Plano alimentar" },
+          ] as const
+        }
+        value={tab}
+        onChange={setTab}
+      />
       {tab === "today" ? (
         <TodayTab state={state} totals={totals} onOpenMeal={setOpenMeal} />
       ) : (
@@ -71,25 +67,6 @@ export function AlimentacaoModule() {
       )}
       {openMeal && <MealDetailSheet meal={openMeal} onClose={() => setOpenMeal(null)} />}
     </div>
-  );
-}
-
-function Tab({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded-lg py-2.5 text-xs font-semibold ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -173,28 +150,12 @@ function PlanTab({ state }: { state: ReturnType<typeof useNutritionStore> }) {
             <Settings2 className="h-3.5 w-3.5" /> Metas
           </button>
         </div>
-        <div className="mt-3 grid grid-cols-7 gap-1.5">
-          {week.map(({ day, label }) => {
-            const count = mealsForWeekday(state.meals, day).length;
-            const active = day === selectedDay;
-            return (
-              <button
-                key={day}
-                onClick={() => setSelectedDay(day)}
-                className={`relative rounded-xl border py-2.5 text-center ${active ? "border-primary bg-primary/10" : "border-border bg-surface"}`}
-              >
-                <span
-                  className={`block text-[9px] ${active ? "text-primary" : "text-muted-foreground"}`}
-                >
-                  {label}
-                </span>
-                <span className="mt-1 block text-xs font-bold">{count || "—"}</span>
-                {day === nowDate().getDay() && (
-                  <span className="absolute -bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-primary" />
-                )}
-              </button>
-            );
-          })}
+        <div className="mt-3">
+          <WeekdaySelector
+            selectedDay={selectedDay}
+            onSelect={setSelectedDay}
+            primary={(day) => mealsForWeekday(state.meals, day).length || "—"}
+          />
         </div>
       </section>
       <section>
@@ -325,7 +286,7 @@ function MomentPicker({
               <span
                 className={`grid h-5 w-5 place-items-center rounded-md border ${active ? "border-primary bg-primary" : "border-muted-foreground"}`}
               >
-                {active && <Check className="h-3 w-3 text-primary-foreground" />}
+                {active && <Check className="check-enter h-3 w-3 text-primary-foreground" />}
               </span>
               <span className="flex-1 text-sm font-semibold">{meal.name}</span>
               <span className="font-mono text-xs text-muted-foreground">{meal.time}</span>
