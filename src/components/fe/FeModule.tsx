@@ -1,54 +1,43 @@
 import { useState } from "react";
-import { contextualMessage } from "@/lib/verse-of-day";
-import { nowDate } from "@/lib/test-clock";
 import { HojeTab } from "./HojeTab";
-import { JornadaTab } from "./JornadaTab";
 import { OracaoTab } from "./OracaoTab";
 import { CadernoTab } from "./CadernoTab";
-import { LogReadingSheet } from "./LogReadingSheet";
 
-type Tab = "hoje" | "jornada" | "oracao" | "caderno";
+type Tab = "presenca" | "oracoes" | "caderno";
 const tabs: { key: Tab; label: string }[] = [
-  { key: "hoje", label: "Hoje" },
-  { key: "jornada", label: "Jornada" },
-  { key: "oracao", label: "Oração" },
+  { key: "presenca", label: "Presença" },
+  { key: "oracoes", label: "Orações" },
   { key: "caderno", label: "Caderno" },
 ];
 
-const todayFormatted = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long" }).format(
-  nowDate(),
-);
-
 export function FeModule() {
-  const [tab, setTab] = useState<Tab>("hoje");
-  const [logReadingOpen, setLogReadingOpen] = useState(false);
-
+  const [tab, setTab] = useState<Tab>("presenca");
   return (
     <div className="mt-6">
-      <p className="text-sm text-muted-foreground">
-        {todayFormatted} · {contextualMessage()}
+      <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+        Um espaço para lembrar, buscar e agradecer.
       </p>
-
-      <div className="mt-3 flex gap-1.5 overflow-x-auto">
-        {tabs.map((t) => (
+      <div className="mt-4 grid grid-cols-3 rounded-2xl border border-border bg-surface p-1">
+        {tabs.map((item) => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${tab === t.key ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
+            key={item.key}
+            onClick={() => setTab(item.key)}
+            className={`rounded-xl py-2.5 text-xs font-semibold transition-colors ${tab === item.key ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
           >
-            {t.label}
+            {item.label}
           </button>
         ))}
       </div>
-
-      <div className="mt-5 pb-10">
-        {tab === "hoje" && <HojeTab onOpenLogReading={() => setLogReadingOpen(true)} />}
-        {tab === "jornada" && <JornadaTab onOpenLogReading={() => setLogReadingOpen(true)} />}
-        {tab === "oracao" && <OracaoTab />}
+      <div className="mt-6 pb-12">
+        {tab === "presenca" && (
+          <HojeTab
+            onOpenPrayer={() => setTab("oracoes")}
+            onOpenNotebook={() => setTab("caderno")}
+          />
+        )}
+        {tab === "oracoes" && <OracaoTab />}
         {tab === "caderno" && <CadernoTab />}
       </div>
-
-      {logReadingOpen && <LogReadingSheet onClose={() => setLogReadingOpen(false)} />}
     </div>
   );
 }

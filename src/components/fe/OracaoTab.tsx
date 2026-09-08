@@ -1,167 +1,208 @@
 import { useState } from "react";
-import { Plus, HandHeart } from "lucide-react";
-import {
-  useFeStore,
-  addPrayerSubject,
-  addNotebookEntry,
-  type PrayerSubjectStatus,
-} from "@/lib/fe-store";
-import { Card } from "@/components/sub-agenda-shared";
-import { PrayNowFlow } from "./PrayNowFlow";
+import { CheckCircle2, ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { addPrayerSubject, useFeStore } from "@/lib/fe-store";
+import { Modal } from "@/components/ui/modal";
 import { PrayerSubjectDetail } from "./PrayerSubjectDetail";
-import { PurposeSetup } from "./PurposeSetup";
-
-const statusLabel: Record<PrayerSubjectStatus, string> = {
-  em_oracao: "Em oração",
-  quero_agradecer: "Quero agradecer",
-  encerrada: "Encerrada",
-};
 
 export function OracaoTab() {
-  const state = useFeStore((s) => s);
-  const [praying, setPraying] = useState(false);
-  const [openSubjectId, setOpenSubjectId] = useState<string | null>(null);
-  const [addingSubject, setAddingSubject] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newDescription, setNewDescription] = useState("");
-  const [creatingPurpose, setCreatingPurpose] = useState(false);
-  const [gratitude, setGratitude] = useState("");
-
-  const active = state.prayerSubjects.filter((p) => p.status !== "encerrada");
-  const purposes = state.purposes.filter((p) => !p.archived);
-
-  const saveSubject = async () => {
-    if (!newTitle.trim()) return;
-    await addPrayerSubject({ title: newTitle, description: newDescription });
-    setNewTitle("");
-    setNewDescription("");
-    setAddingSubject(false);
-  };
-
-  const saveGratitude = async () => {
-    if (!gratitude.trim()) return;
-    const content = gratitude;
-    setGratitude("");
-    await addNotebookEntry({ type: "gratidao", content });
-  };
+  const subjects = useFeStore((state) => state.prayerSubjects);
+  const active = subjects.filter((subject) => subject.status === "em_oracao");
+  const answered = subjects.filter((subject) => subject.status === "quero_agradecer");
+  const archived = subjects.filter((subject) => subject.status === "encerrada");
+  const [adding, setAdding] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [showAnswered, setShowAnswered] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   return (
-    <div className="space-y-5">
-      <Card title="Em oração">
-        {active.length === 0 && !addingSubject && (
-          <p className="text-sm text-muted-foreground">
-            Guarde aqui pessoas e situações que você quer lembrar em oração.
-          </p>
-        )}
-        <ul className="space-y-2">
-          {active.map((p) => (
-            <li key={p.id}>
-              <button
-                onClick={() => setOpenSubjectId(p.id)}
-                className="w-full rounded-lg bg-surface-2 p-3 text-left"
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-bold uppercase tracking-wide">{p.title}</p>
-                  <span className="text-[10px] text-muted-foreground">{statusLabel[p.status]}</span>
-                </div>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">{p.description}</p>
-              </button>
-            </li>
-          ))}
-        </ul>
-
-        {!addingSubject ? (
+    <div className="space-y-6">
+      <section>
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Seus alvos
+            </p>
+            <h2 className="mt-1 text-xl font-bold">O que você tem colocado em oração?</h2>
+          </div>
           <button
-            onClick={() => setAddingSubject(true)}
-            className="mt-2 flex items-center gap-1.5 text-xs text-primary"
+            onClick={() => setAdding(true)}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground"
           >
-            <Plus className="h-3.5 w-3.5" /> adicionar assunto
+            <Plus className="h-5 w-5" />
+          </button>
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-bold">Em oração</h3>
+          <span className="text-xs text-muted-foreground">{active.length}</span>
+        </div>
+        {active.length === 0 ? (
+          <button
+            onClick={() => setAdding(true)}
+            className="w-full rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground"
+          >
+            Adicione seu primeiro alvo de oração
           </button>
         ) : (
-          <div className="mt-2 space-y-2 rounded-lg border border-dashed border-border p-3">
-            <input
-              autoFocus
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              placeholder="ex: Família"
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
-            />
-            <textarea
-              value={newDescription}
-              onChange={(e) => setNewDescription(e.target.value)}
-              placeholder="ex: Saúde e proteção da minha família."
-              className="min-h-14 w-full resize-none rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
-            />
-            <div className="flex gap-2">
+          <div className="card-surface divide-y divide-border p-0">
+            {active.map((subject) => (
               <button
-                onClick={saveSubject}
-                disabled={!newTitle.trim()}
-                className="rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-40"
+                key={subject.id}
+                onClick={() => setOpenId(subject.id)}
+                className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
               >
-                Salvar
+                <span className="h-5 w-5 shrink-0 rounded-full border border-primary" />
+                <span className="min-w-0 flex-1">
+                  <strong className="block truncate text-sm">{subject.title}</strong>
+                  <span className="text-[11px] text-muted-foreground">
+                    {subject.category || "Pessoal"} · desde {formatDate(subject.createdAt)}
+                  </span>
+                </span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </button>
-              <button
-                onClick={() => setAddingSubject(false)}
-                className="text-xs text-muted-foreground"
-              >
-                cancelar
-              </button>
-            </div>
+            ))}
           </div>
         )}
+      </section>
 
-        <button
-          onClick={() => setPraying(true)}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
-        >
-          <HandHeart className="h-4 w-4" /> Orar agora
-        </button>
-      </Card>
+      <Drawer
+        title="Respondidas"
+        count={answered.length}
+        open={showAnswered}
+        onToggle={() => setShowAnswered(!showAnswered)}
+        icon={<CheckCircle2 className="h-4 w-4 text-primary" />}
+      >
+        {answered.map((subject) => (
+          <button
+            key={subject.id}
+            onClick={() => setOpenId(subject.id)}
+            className="flex w-full justify-between border-t border-border py-3 text-left text-sm"
+          >
+            <span>{subject.title}</span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </button>
+        ))}
+      </Drawer>
+      <Drawer
+        title="Arquivadas"
+        count={archived.length}
+        open={showArchived}
+        onToggle={() => setShowArchived(!showArchived)}
+      >
+        {archived.map((subject) => (
+          <button
+            key={subject.id}
+            onClick={() => setOpenId(subject.id)}
+            className="flex w-full justify-between border-t border-border py-3 text-left text-sm"
+          >
+            <span>{subject.title}</span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </button>
+        ))}
+      </Drawer>
 
-      <Card title="Meus propósitos">
-        {purposes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Existe algo que você deseja colocar diante de Deus nesta fase?
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {purposes.map((p) => (
-              <li key={p.id} className="rounded-lg bg-surface-2 p-3">
-                <p className="text-sm font-bold">{p.title}</p>
-                <p className="mt-0.5 text-sm italic text-muted-foreground">"{p.intention}"</p>
-              </li>
-            ))}
-          </ul>
-        )}
-        <button
-          onClick={() => setCreatingPurpose(true)}
-          className="mt-2 flex items-center gap-1.5 text-xs text-primary"
-        >
-          <Plus className="h-3.5 w-3.5" /> novo propósito
-        </button>
-      </Card>
-
-      <Card title="Gratidão">
-        <p className="text-sm">Sou grato por...</p>
-        <textarea
-          value={gratitude}
-          onChange={(e) => setGratitude(e.target.value)}
-          className="mt-2 min-h-16 w-full resize-none rounded-lg border border-border bg-surface-2 p-3 text-sm outline-none focus:border-primary"
-        />
-        <button
-          onClick={saveGratitude}
-          disabled={!gratitude.trim()}
-          className="mt-2 rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-40"
-        >
-          Salvar
-        </button>
-      </Card>
-
-      {praying && <PrayNowFlow onClose={() => setPraying(false)} />}
-      {openSubjectId && (
-        <PrayerSubjectDetail subjectId={openSubjectId} onClose={() => setOpenSubjectId(null)} />
-      )}
-      {creatingPurpose && <PurposeSetup onClose={() => setCreatingPurpose(false)} />}
+      {adding && <NewPrayerTarget onClose={() => setAdding(false)} />}
+      {openId && <PrayerSubjectDetail subjectId={openId} onClose={() => setOpenId(null)} />}
     </div>
+  );
+}
+
+function Drawer({
+  title,
+  count,
+  open,
+  onToggle,
+  icon,
+  children,
+}: {
+  title: string;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="border-b border-border">
+      <button onClick={onToggle} className="flex w-full items-center gap-2 py-3 text-left">
+        {icon}
+        <strong className="flex-1 text-sm">{title}</strong>
+        <span className="text-xs text-muted-foreground">{count}</span>
+        <ChevronDown
+          className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && <div>{children}</div>}
+    </section>
+  );
+}
+
+function NewPrayerTarget({ onClose }: { onClose: () => void }) {
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("");
+  const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  return (
+    <Modal title="Novo alvo de oração" onClose={onClose}>
+      <div className="space-y-3">
+        <label className="block">
+          <span className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">
+            Alvo
+          </span>
+          <input
+            autoFocus
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="Ex: Saúde da minha mãe"
+            className="w-full rounded-xl border border-border bg-surface-2 px-3 py-3 text-sm outline-none focus:border-primary"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">
+            Categoria opcional
+          </span>
+          <input
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+            placeholder="Família, trabalho, pessoal…"
+            className="w-full rounded-xl border border-border bg-surface-2 px-3 py-3 text-sm outline-none focus:border-primary"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">
+            Contexto opcional
+          </span>
+          <textarea
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="Algo que você queira lembrar"
+            className="min-h-20 w-full resize-none rounded-xl border border-border bg-surface-2 p-3 text-sm outline-none focus:border-primary"
+          />
+        </label>
+      </div>
+      <button
+        disabled={!title.trim() || saving}
+        onClick={async () => {
+          setSaving(true);
+          try {
+            await addPrayerSubject({ title, category, description });
+            onClose();
+          } finally {
+            setSaving(false);
+          }
+        }}
+        className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+      >
+        {saving ? "Salvando…" : "Guardar alvo"}
+      </button>
+    </Modal>
+  );
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short" }).format(
+    new Date(value),
   );
 }

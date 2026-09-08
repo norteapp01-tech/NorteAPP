@@ -27,6 +27,7 @@ export type PrayerSubject = {
   id: string;
   title: string;
   description: string;
+  category?: string;
   status: PrayerSubjectStatus;
   createdAt: string;
   updatedAt: string;
@@ -64,6 +65,8 @@ export type NotebookEntry = {
   id: string;
   type: NotebookEntryType;
   content: string;
+  title?: string;
+  tags: string[];
   verseReference?: string;
   verseText?: string;
   context?: string;
@@ -224,6 +227,8 @@ export function notebookTimeline(entries: NotebookEntry[], query = ""): Notebook
   return sorted.filter(
     (e) =>
       e.content.toLowerCase().includes(q) ||
+      e.title?.toLowerCase().includes(q) ||
+      e.tags.some((tag) => tag.toLowerCase().includes(q)) ||
       e.verseReference?.toLowerCase().includes(q) ||
       e.verseText?.toLowerCase().includes(q),
   );
@@ -361,6 +366,7 @@ function mapPrayerSubject(r: Row): PrayerSubject {
     id: r.id as string,
     title: r.title as string,
     description: (r.description as string) ?? "",
+    category: (r.category as string) ?? undefined,
     status: r.status as PrayerSubjectStatus,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
@@ -407,6 +413,8 @@ function mapNotebookEntry(r: Row): NotebookEntry {
     id: r.id as string,
     type: r.type as NotebookEntryType,
     content: (r.content as string) ?? "",
+    title: (r.title as string) ?? undefined,
+    tags: (r.tags as string[]) ?? [],
     verseReference: (r.verse_reference as string) ?? undefined,
     verseText: (r.verse_text as string) ?? undefined,
     context: (r.context as string) ?? undefined,
@@ -494,12 +502,18 @@ export function useFeStore<T>(selector: (s: State) => T): T {
 export async function addPrayerSubject(input: {
   title: string;
   description: string;
+  category?: string;
 }): Promise<string> {
   const userId = await ensureSession();
   const row = unwrap<{ id: string }>(
     await supabase
       .from("prayer_subjects")
-      .insert({ user_id: userId, title: input.title.trim(), description: input.description.trim() })
+      .insert({
+        user_id: userId,
+        title: input.title.trim(),
+        description: input.description.trim(),
+        category: input.category?.trim() || null,
+      })
       .select()
       .single(),
   );
@@ -509,11 +523,12 @@ export async function addPrayerSubject(input: {
 
 export async function updatePrayerSubject(
   id: string,
-  patch: { title?: string; description?: string },
+  patch: { title?: string; description?: string; category?: string },
 ) {
   const dbPatch: Row = {};
   if (patch.title !== undefined) dbPatch.title = patch.title.trim();
   if (patch.description !== undefined) dbPatch.description = patch.description.trim();
+  if (patch.category !== undefined) dbPatch.category = patch.category.trim() || null;
   unwrap(await supabase.from("prayer_subjects").update(dbPatch).eq("id", id).select().single());
   await invalidate();
 }
@@ -601,6 +616,8 @@ export async function setReadingFrequency(freq: ReadingFrequency) {
 export async function addNotebookEntry(input: {
   type: NotebookEntryType;
   content: string;
+  title?: string;
+  tags?: string[];
   verseReference?: string;
   verseText?: string;
   context?: string;
@@ -613,6 +630,8 @@ export async function addNotebookEntry(input: {
         user_id: userId,
         type: input.type,
         content: input.content.trim(),
+        title: input.title?.trim() || null,
+        tags: input.tags ?? [],
         verse_reference: input.verseReference,
         verse_text: input.verseText,
         context: input.context?.trim() || null,

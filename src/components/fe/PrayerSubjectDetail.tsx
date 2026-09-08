@@ -11,8 +11,8 @@ import {
 
 const statusOptions: { value: PrayerSubjectStatus; label: string }[] = [
   { value: "em_oracao", label: "Em oração" },
-  { value: "quero_agradecer", label: "Quero agradecer" },
-  { value: "encerrada", label: "Encerrada" },
+  { value: "quero_agradecer", label: "Respondida" },
+  { value: "encerrada", label: "Arquivada" },
 ];
 
 export function PrayerSubjectDetail({
@@ -29,12 +29,13 @@ export function PrayerSubjectDetail({
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(subject?.title ?? "");
   const [description, setDescription] = useState(subject?.description ?? "");
+  const [category, setCategory] = useState(subject?.category ?? "");
   const [noteText, setNoteText] = useState("");
 
   if (!subject) return null;
 
   const saveEdit = async () => {
-    await updatePrayerSubject(subject.id, { title, description });
+    await updatePrayerSubject(subject.id, { title, description, category });
     setEditing(false);
   };
 
@@ -59,6 +60,12 @@ export function PrayerSubjectDetail({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="min-h-16 w-full resize-none rounded-lg border border-border bg-surface-2 p-3 text-sm outline-none focus:border-primary"
+            />
+            <input
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="Categoria opcional"
+              className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
             />
             <button
               onClick={saveEdit}
@@ -88,13 +95,13 @@ export function PrayerSubjectDetail({
 
         <div>
           <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Observações
+            Histórico
           </p>
           <div className="mt-1.5 flex items-center gap-2">
             <input
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Adicionar observação..."
+              placeholder="Registrar uma atualização..."
               className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
             />
             <button

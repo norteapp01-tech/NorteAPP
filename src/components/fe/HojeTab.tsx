@@ -1,156 +1,133 @@
 import { useState } from "react";
-import { HandHeart, BookOpenCheck, PenLine } from "lucide-react";
-import {
-  useGoalsStore,
-  completeExecution,
-  rescheduleExecution,
-  addDays,
-  toISODate,
-} from "@/lib/goals-store";
-import {
-  useFeStore,
-  nextSpiritualMoment,
-  activePurpose,
-  weeklyRhythm,
-  type WeeklyRhythm,
-} from "@/lib/fe-store";
-import { useProfile } from "@/lib/profile-store";
-import { startOfWeekLocal, formatTime } from "@/lib/format-utils";
-import { Card } from "@/components/sub-agenda-shared";
-import { VerseOfDayCard } from "./VerseOfDayCard";
-import { PrayNowFlow } from "./PrayNowFlow";
-import { NotebookEntryEditor } from "./NotebookEntryEditor";
+import { Bookmark, ChevronRight, PenLine, Plus, Sparkles } from "lucide-react";
+import { verseOfDay } from "@/lib/verse-of-day";
+import { getResurfacingCandidate, saveVerseOfDay, useFeStore } from "@/lib/fe-store";
 import { nowDate } from "@/lib/test-clock";
+import { NotebookEntryEditor } from "./NotebookEntryEditor";
 
-const dimensionLabels: { key: keyof WeeklyRhythm; label: string }[] = [
-  { key: "oracao", label: "Oração" },
-  { key: "palavra", label: "Palavra" },
-  { key: "comunhao", label: "Comunhão" },
-  { key: "reflexao", label: "Reflexão" },
-];
-
-function daysElapsedThisWeek(weekStart: "monday" | "sunday"): number {
-  const start = startOfWeekLocal(nowDate(), weekStart);
-  const today = nowDate();
-  const ms = today.setHours(0, 0, 0, 0) - start.setHours(0, 0, 0, 0);
-  return Math.round(ms / 86400000) + 1;
-}
-
-export function HojeTab({ onOpenLogReading }: { onOpenLogReading: () => void }) {
-  const state = useFeStore((s) => s);
-  const executions = useGoalsStore((s) => s.executions);
-  const profile = useProfile();
-  const [praying, setPraying] = useState(false);
-  const [writingReflection, setWritingReflection] = useState(false);
-
-  const next = nextSpiritualMoment(state.spiritualActivities, executions);
-  const purpose = activePurpose(state.purposes);
-  const rhythm = weeklyRhythm(state, executions, profile.weekStart);
-  const elapsed = daysElapsedThisWeek(profile.weekStart);
+export function HojeTab({
+  onOpenPrayer,
+  onOpenNotebook,
+}: {
+  onOpenPrayer: () => void;
+  onOpenNotebook: () => void;
+}) {
+  const state = useFeStore((value) => value);
+  const verse = verseOfDay();
+  const active = state.prayerSubjects
+    .filter((subject) => subject.status === "em_oracao")
+    .slice(0, 2);
+  const memory = getResurfacingCandidate(state.notebookEntries);
+  const [reflecting, setReflecting] = useState(false);
+  const date = new Intl.DateTimeFormat("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(nowDate());
 
   return (
-    <div className="space-y-5">
-      <VerseOfDayCard />
+    <div className="space-y-6">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        {date}
+      </p>
 
-      <Card title="Seu momento">
-        <div className="grid grid-cols-3 gap-2">
-          <MomentButton icon={HandHeart} label="Orar" onClick={() => setPraying(true)} />
-          <MomentButton icon={BookOpenCheck} label="Registrar leitura" onClick={onOpenLogReading} />
-          <MomentButton
-            icon={PenLine}
-            label="Escrever reflexão"
-            onClick={() => setWritingReflection(true)}
-          />
+      <section>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          Palavra para hoje
+        </p>
+        <blockquote className="mt-3 text-xl leading-relaxed tracking-tight">
+          “{verse.text}”
+        </blockquote>
+        <p className="mt-2 text-sm text-muted-foreground">{verse.reference}</p>
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={() => saveVerseOfDay(verse.reference, verse.text)}
+            className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-semibold"
+          >
+            <Bookmark className="h-4 w-4" /> Guardar
+          </button>
+          <button
+            onClick={() => setReflecting(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-semibold"
+          >
+            <PenLine className="h-4 w-4" /> Refletir
+          </button>
         </div>
-      </Card>
+      </section>
 
-      {next && (
-        <Card title="Próximo">
-          <p className="font-mono text-2xl font-bold text-primary">
-            {formatTime(next.execution.startTime, profile.timeFormat)}
-          </p>
-          <p className="mt-1 text-sm font-semibold">{next.execution.title}</p>
-          {next.activity.durationMinutes && (
-            <p className="text-xs text-muted-foreground">{next.activity.durationMinutes} min</p>
-          )}
-          <div className="mt-3 flex items-center gap-3">
-            <button
-              onClick={async () => {
-                await completeExecution(next.execution.id);
-              }}
-              className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
-            >
-              Começar agora
-            </button>
-            <button
-              onClick={async () => {
-                await rescheduleExecution(
-                  next.execution.id,
-                  toISODate(addDays(nowDate(), 1)),
-                  next.execution.startTime ?? "09:00",
-                );
-              }}
-              className="text-xs text-muted-foreground"
-            >
-              reagendar
-            </button>
+      <section>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold">Alvos em oração</h2>
+          <button
+            onClick={onOpenPrayer}
+            className="flex items-center gap-1 text-xs text-muted-foreground"
+          >
+            Ver todos <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        {active.length === 0 ? (
+          <button
+            onClick={onOpenPrayer}
+            className="mt-2 flex w-full items-center gap-3 rounded-xl border border-dashed border-border p-4 text-left"
+          >
+            <Plus className="h-5 w-5 text-primary" />
+            <span>
+              <strong className="block text-sm">Novo alvo de oração</strong>
+              <span className="text-xs text-muted-foreground">
+                Guarde uma pessoa ou situação para acompanhar.
+              </span>
+            </span>
+          </button>
+        ) : (
+          <div className="card-surface mt-2 divide-y divide-border p-0">
+            {active.map((subject) => (
+              <button
+                key={subject.id}
+                onClick={onOpenPrayer}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left"
+              >
+                <span className="h-4 w-4 rounded-full border border-primary" />
+                <span className="min-w-0 flex-1">
+                  <strong className="block truncate text-sm">{subject.title}</strong>
+                  <span className="text-[11px] text-muted-foreground">
+                    {subject.category || "Em oração"}
+                  </span>
+                </span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            ))}
           </div>
-        </Card>
+        )}
+      </section>
+
+      {memory && (
+        <section>
+          <h2 className="text-base font-bold">Lembrança</h2>
+          <button
+            onClick={onOpenNotebook}
+            className="card-surface mt-2 flex w-full items-start gap-3 p-4 text-left"
+          >
+            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <span className="min-w-0 flex-1">
+              <span className="text-[11px] text-muted-foreground">
+                Você registrou há algum tempo
+              </span>
+              <strong className="mt-1 line-clamp-2 block text-sm">
+                {memory.title || memory.content || memory.verseText}
+              </strong>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </button>
+        </section>
       )}
 
-      {purpose && (
-        <Card title="Propósito atual">
-          <p className="text-sm font-bold">{purpose.title}</p>
-          <p className="mt-1 text-sm italic text-muted-foreground">"{purpose.intention}"</p>
-        </Card>
-      )}
-
-      <Card title="Esta semana">
-        <ul className="space-y-2.5">
-          {dimensionLabels.map(({ key, label }) => (
-            <li key={key} className="flex items-center justify-between">
-              <span className="text-sm font-medium">{label}</span>
-              <div className="flex gap-1">
-                {Array.from({ length: elapsed }).map((_, i) => {
-                  const date = toISODate(addDays(nowDate(), i - (elapsed - 1)));
-                  const filled = rhythm[key].includes(date);
-                  return (
-                    <span
-                      key={i}
-                      className={`h-2 w-2 rounded-full ${filled ? "bg-primary" : "bg-surface-2"}`}
-                    />
-                  );
-                })}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </Card>
-
-      {praying && <PrayNowFlow onClose={() => setPraying(false)} />}
-      {writingReflection && (
-        <NotebookEntryEditor type="livre" onClose={() => setWritingReflection(false)} />
+      {reflecting && (
+        <NotebookEntryEditor
+          type="livre"
+          presetVerse={{ reference: verse.reference, text: verse.text }}
+          onClose={() => setReflecting(false)}
+        />
       )}
     </div>
-  );
-}
-
-function MomentButton({
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  icon: typeof HandHeart;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex flex-col items-center gap-1.5 rounded-xl bg-surface-2 py-4"
-    >
-      <Icon className="h-5 w-5 text-primary" />
-      <span className="text-center text-[11px] font-medium leading-tight">{label}</span>
-    </button>
   );
 }

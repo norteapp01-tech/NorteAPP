@@ -1,168 +1,187 @@
-import { useEffect, useRef, useState } from "react";
-import { Plus, Search, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { BookOpen, ChevronRight, Lightbulb, Plus, Search, Sparkles } from "lucide-react";
 import {
-  useFeStore,
   notebookTimeline,
-  getResurfacingCandidate,
-  markResurfaced,
+  useFeStore,
+  type NotebookEntry,
   type NotebookEntryType,
 } from "@/lib/fe-store";
-import { Card } from "@/components/sub-agenda-shared";
-import { NotebookEntryEditor } from "./NotebookEntryEditor";
 import { Modal } from "@/components/ui/modal";
-import { nowMs } from "@/lib/test-clock";
+import { NotebookEntryEditor } from "./NotebookEntryEditor";
 
-const typeMeta: Record<NotebookEntryType, string> = {
-  deus_falou: "Deus falou comigo",
-  oracao: "Oração",
-  gratidao: "Gratidão",
-  versiculo: "Versículo",
-  aprendizado: "Aprendizado",
-  testemunho: "Testemunho",
-  livre: "Reflexão",
+type Filter = "todas" | "estudos" | "experiencias" | "reflexoes";
+const filters: { key: Filter; label: string }[] = [
+  { key: "todas", label: "Todas" },
+  { key: "estudos", label: "Estudos" },
+  { key: "experiencias", label: "Experiências" },
+  { key: "reflexoes", label: "Reflexões" },
+];
+const filterTypes: Record<Exclude<Filter, "todas">, NotebookEntryType[]> = {
+  estudos: ["aprendizado", "versiculo"],
+  experiencias: ["testemunho", "deus_falou", "gratidao"],
+  reflexoes: ["livre"],
 };
-
-const typeOptions: NotebookEntryType[] = [
-  "deus_falou",
-  "oracao",
-  "gratidao",
-  "versiculo",
-  "aprendizado",
-  "testemunho",
-  "livre",
+const choices: {
+  type: NotebookEntryType;
+  title: string;
+  description: string;
+  icon: typeof BookOpen;
+}[] = [
+  {
+    type: "aprendizado",
+    title: "Estudo bíblico",
+    description: "Passagem, entendimento e aplicação",
+    icon: BookOpen,
+  },
+  {
+    type: "testemunho",
+    title: "Experiência",
+    description: "Algo que você viveu e quer recordar",
+    icon: Sparkles,
+  },
+  {
+    type: "livre",
+    title: "Reflexão",
+    description: "Um pensamento ou aprendizado pessoal",
+    icon: Lightbulb,
+  },
+  {
+    type: "versiculo",
+    title: "Versículo",
+    description: "Uma palavra que você quer guardar",
+    icon: BookOpen,
+  },
 ];
 
-function dayLabel(iso: string): string {
-  const today = new Date(nowMs()).toISOString().slice(0, 10);
-  const yesterday = new Date(nowMs() - 86400000).toISOString().slice(0, 10);
-  if (iso === today) return "Hoje";
-  if (iso === yesterday) return "Ontem";
-  const [, m, d] = iso.split("-");
-  const months = [
-    "JAN",
-    "FEV",
-    "MAR",
-    "ABR",
-    "MAI",
-    "JUN",
-    "JUL",
-    "AGO",
-    "SET",
-    "OUT",
-    "NOV",
-    "DEZ",
-  ];
-  return `${d} ${months[parseInt(m, 10) - 1]}`;
-}
-
 export function CadernoTab() {
-  const state = useFeStore((s) => s);
+  const entries = useFeStore((state) => state.notebookEntries);
   const [query, setQuery] = useState("");
-  const [pickingType, setPickingType] = useState(false);
+  const [filter, setFilter] = useState<Filter>("todas");
+  const [picking, setPicking] = useState(false);
   const [editingType, setEditingType] = useState<NotebookEntryType | null>(null);
-
-  const candidate = getResurfacingCandidate(state.notebookEntries);
-  const markedRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (candidate && markedRef.current !== candidate.id) {
-      markedRef.current = candidate.id;
-      markResurfaced(candidate.id);
-    }
-  }, [candidate]);
-
-  const results = notebookTimeline(state.notebookEntries, query);
-  const groups = new Map<string, typeof results>();
-  for (const e of results) {
-    const day = e.createdAt.slice(0, 10);
-    if (!groups.has(day)) groups.set(day, []);
-    groups.get(day)!.push(e);
-  }
-  const orderedDays = [...groups.keys()].sort((a, b) => b.localeCompare(a));
-
+  const searched = notebookTimeline(entries, query);
+  const visible =
+    filter === "todas"
+      ? searched
+      : searched.filter((entry) => filterTypes[filter].includes(entry.type));
   return (
     <div className="space-y-5">
-      {candidate && (
-        <Card title="Memórias">
-          <div className="flex items-start gap-2">
-            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            <div>
-              <p className="text-xs text-muted-foreground">Há algum tempo você registrou:</p>
-              <p className="mt-1 text-sm italic">"{candidate.content || candidate.verseText}"</p>
-            </div>
+      <section>
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Seu caderno
+            </p>
+            <h2 className="mt-1 text-xl font-bold">O que você não quer esquecer?</h2>
           </div>
-        </Card>
-      )}
-
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2">
+          <button
+            onClick={() => setPicking(true)}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground"
+          >
+            <Plus className="h-5 w-5" />
+          </button>
+        </div>
+      </section>
+      <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2.5">
         <Search className="h-4 w-4 text-muted-foreground" />
         <input
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar no caderno..."
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Buscar palavra, passagem ou tema…"
           className="w-full bg-transparent text-sm outline-none"
         />
       </div>
-
-      <button
-        onClick={() => setPickingType(true)}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm font-semibold text-primary"
-      >
-        <Plus className="h-4 w-4" /> Novo registro
-      </button>
-
-      {orderedDays.length === 0 && (
-        <p className="py-6 text-center text-sm text-muted-foreground">
-          Um espaço para guardar aquilo que você não quer esquecer.
-        </p>
-      )}
-
-      {orderedDays.map((day) => (
-        <div key={day}>
-          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            {dayLabel(day)}
+      <div className="flex gap-1 overflow-x-auto">
+        {filters.map((item) => (
+          <button
+            key={item.key}
+            onClick={() => setFilter(item.key)}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${filter === item.key ? "bg-primary/15 text-primary" : "text-muted-foreground"}`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      {visible.length === 0 ? (
+        <div className="py-8 text-center">
+          <BookOpen className="mx-auto h-6 w-6 text-primary" />
+          <p className="mt-3 text-sm font-semibold">Seu caderno começa aqui</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Registre um estudo, uma experiência ou uma reflexão.
           </p>
-          <div className="card-surface p-4">
-            <ul className="divide-y divide-border">
-              {groups.get(day)!.map((e) => (
-                <li key={e.id} className="py-2.5 first:pt-0 last:pb-0">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                    {typeMeta[e.type]}
-                  </p>
-                  {e.verseReference && (
-                    <p className="mt-0.5 text-sm font-semibold">{e.verseReference}</p>
-                  )}
-                  {(e.content || e.verseText) && (
-                    <p className="mt-0.5 text-sm">"{e.content || e.verseText}"</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
-      ))}
-
-      {pickingType && (
-        <Modal onClose={() => setPickingType(false)} title="Novo registro">
+      ) : (
+        <div className="space-y-2">
+          {visible.map((entry) => (
+            <EntryCard key={entry.id} entry={entry} />
+          ))}
+        </div>
+      )}
+      {picking && (
+        <Modal title="O que você quer registrar?" onClose={() => setPicking(false)}>
           <div className="space-y-2">
-            {typeOptions.map((t) => (
+            {choices.map(({ type, title, description, icon: Icon }) => (
               <button
-                key={t}
+                key={type}
                 onClick={() => {
-                  setPickingType(false);
-                  setEditingType(t);
+                  setPicking(false);
+                  setEditingType(type);
                 }}
-                className="w-full rounded-lg bg-surface-2 p-3 text-left text-sm font-semibold hover:border-primary/40"
+                className="flex w-full items-center gap-3 rounded-xl border border-border p-3 text-left"
               >
-                {typeMeta[t]}
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10">
+                  <Icon className="h-5 w-5 text-primary" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <strong className="block text-sm">{title}</strong>
+                  <span className="text-[11px] text-muted-foreground">{description}</span>
+                </span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </button>
             ))}
           </div>
         </Modal>
       )}
-
       {editingType && (
         <NotebookEntryEditor type={editingType} onClose={() => setEditingType(null)} />
       )}
     </div>
+  );
+}
+
+function EntryCard({ entry }: { entry: NotebookEntry }) {
+  const label =
+    entry.type === "aprendizado"
+      ? "Estudo"
+      : entry.type === "testemunho" || entry.type === "deus_falou"
+        ? "Experiência"
+        : entry.type === "versiculo"
+          ? "Versículo"
+          : entry.type === "gratidao"
+            ? "Gratidão"
+            : "Reflexão";
+  return (
+    <article className="card-surface p-4">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
+          {label}
+        </span>
+        <time className="text-[10px] text-muted-foreground">
+          {new Date(entry.createdAt).toLocaleDateString("pt-BR")}
+        </time>
+      </div>
+      {entry.title && <h3 className="mt-2 text-sm font-bold">{entry.title}</h3>}
+      {entry.verseReference && (
+        <p className="mt-1 text-xs font-semibold text-muted-foreground">{entry.verseReference}</p>
+      )}
+      <p className="mt-1 line-clamp-3 text-sm leading-relaxed">
+        {entry.content || entry.verseText}
+      </p>
+      {entry.tags.length > 0 && (
+        <p className="mt-2 truncate text-[10px] text-muted-foreground">
+          {entry.tags.map((tag) => `#${tag}`).join("  ")}
+        </p>
+      )}
+    </article>
   );
 }
