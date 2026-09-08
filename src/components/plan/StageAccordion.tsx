@@ -46,6 +46,8 @@ export function StageAccordion({
   const [toggling, setToggling] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState("");
 
   const doneCount = executions.filter((e) => e.status === "concluida").length;
   const pendingExecs = executions.filter(
@@ -115,14 +117,30 @@ export function StageAccordion({
           ) : (
             <div className="flex items-center gap-1">
               <button
-                onClick={() => removeStep(step.id)}
-                className="rounded-md bg-danger px-1.5 py-1 text-[10px] font-semibold text-white"
+                disabled={removing}
+                onClick={async () => {
+                  if (removing) return;
+                  setRemoving(true);
+                  setRemoveError("");
+                  try {
+                    await removeStep(step.id);
+                  } catch (err) {
+                    setRemoveError(
+                      err instanceof Error
+                        ? err.message
+                        : "Não foi possível excluir. Tente de novo.",
+                    );
+                    setRemoving(false);
+                  }
+                }}
+                className="rounded-md bg-danger px-1.5 py-1 text-[10px] font-semibold text-white disabled:opacity-50"
               >
-                excluir
+                {removing ? "excluindo…" : "excluir"}
               </button>
               <button
+                disabled={removing}
                 onClick={() => setConfirmRemove(false)}
-                className="text-[10px] text-muted-foreground"
+                className="text-[10px] text-muted-foreground disabled:opacity-50"
               >
                 cancelar
               </button>
@@ -137,6 +155,8 @@ export function StageAccordion({
           </button>
         </div>
       </div>
+
+      {removeError && <p className="mt-1.5 text-[11px] text-danger">{removeError}</p>}
 
       {pendingConfirm && (
         <div className="mt-2.5 rounded-lg border border-warning/30 bg-warning/10 p-2.5">

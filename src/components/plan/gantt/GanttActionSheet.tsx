@@ -52,6 +52,7 @@ export function GanttActionSheet({
   });
   const [scheduleError, setScheduleError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [basicsError, setBasicsError] = useState("");
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   const scheduled = isScheduled(e);
@@ -60,8 +61,31 @@ export function GanttActionSheet({
   const saveTitleAndDue = async () => {
     if (!title.trim() || !dueDate) return;
     setBusy(true);
+    setBasicsError("");
     try {
       await patchExecution(e.id, { title: title.trim(), dueDate });
+    } catch (err) {
+      setTitle(e.title);
+      setBasicsError(
+        err instanceof Error ? err.message : "Não foi possível salvar. Tente de novo.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveDueDate = async (v: string) => {
+    const previous = dueDate;
+    setDueDate(v);
+    setBusy(true);
+    setBasicsError("");
+    try {
+      await patchExecution(e.id, { dueDate: v });
+    } catch (err) {
+      setDueDate(previous);
+      setBasicsError(
+        err instanceof Error ? err.message : "Não foi possível salvar o prazo. Tente de novo.",
+      );
     } finally {
       setBusy(false);
     }
@@ -143,12 +167,10 @@ export function GanttActionSheet({
           </span>
           <DateField
             value={dueDate}
-            onChange={(v) => {
-              setDueDate(v);
-              patchExecution(e.id, { dueDate: v });
-            }}
+            onChange={saveDueDate}
             className="flex w-full items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2.5 text-left text-sm outline-none focus:border-primary"
           />
+          {basicsError && <p className="mt-1.5 text-[11px] text-danger">{basicsError}</p>}
         </label>
 
         <div>

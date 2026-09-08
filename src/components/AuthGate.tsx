@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { RefreshCcw, WifiOff, AlertTriangle } from "lucide-react";
-import { supabase, ensureSession, hasLinkedAccount } from "@/lib/supabase/client";
+import { supabase, ensureSession, hasLinkedAccount, primeSession } from "@/lib/supabase/client";
 
 type Status = "checking" | "ready" | "needs-login" | "connection-error";
 
@@ -28,6 +28,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         const { data } = await supabase.auth.getSession();
         if (cancelled) return;
         if (data.session) {
+          primeSession(data.session.user.id);
           setStatus("ready");
           return;
         }

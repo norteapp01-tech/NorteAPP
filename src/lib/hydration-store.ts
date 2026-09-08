@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase, useSupabaseUserId, ensureSession } from "./supabase/client";
 import { queryClient } from "./query-client";
-import { toISODate, todayISO } from "./goals-store";
-import { nowDate } from "./test-clock";
+import { todayISO } from "./goals-store";
 
 // ---------------------------------------------------------------------------
 // Hidratação — registros reais por dia/horário, meta lida do perfil
@@ -34,11 +33,20 @@ async function fetchTodayLogs(): Promise<HydrationLog[]> {
   return (data as Row[]).map(mapLog);
 }
 
-const QUERY_KEY = ["hydration-today", toISODate(nowDate())] as const;
+// Computada a cada chamada (nunca congelada em uma constante de módulo) —
+// se a sessão atravessar a meia-noite, a chave já reflete o dia novo sozinha,
+// em vez de continuar servindo o cache do dia anterior indefinidamente.
+function hydrationQueryKey() {
+  return ["hydration-today", todayISO()] as const;
+}
 
 export function useTodayHydration(): HydrationLog[] {
   const userId = useSupabaseUserId();
-  const { data } = useQuery({ queryKey: QUERY_KEY, queryFn: fetchTodayLogs, enabled: !!userId });
+  const { data } = useQuery({
+    queryKey: hydrationQueryKey(),
+    queryFn: fetchTodayLogs,
+    enabled: !!userId,
+  });
   return data ?? [];
 }
 
@@ -52,7 +60,7 @@ export async function addWater(amountMl: number) {
     .from("hydration_logs")
     .insert({ user_id: userId, date: todayISO(), amount_ml: amountMl });
   if (error) throw new Error(error.message);
-  await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+  await queryClient.invalidateQueries({ queryKey: hydrationQueryKey() });
 }
 
 /** Apaga o último registro de hoje — corrige toque acidental sem mexer no resto do histórico. */
@@ -61,5 +69,5 @@ export async function undoLastLog(logs: HydrationLog[]) {
   if (!last) return;
   const { error } = await supabase.from("hydration_logs").delete().eq("id", last.id);
   if (error) throw new Error(error.message);
-  await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+  await queryClient.invalidateQueries({ queryKey: hydrationQueryKey() });
 }

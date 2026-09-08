@@ -45,16 +45,27 @@ export function RemindersCard({ compact = false }: { compact?: boolean }) {
 
   useEffect(() => {
     if (highlighted.length <= 1 || paused || prefersReducedMotion()) return;
+    let fadeTimeout: ReturnType<typeof setTimeout> | null = null;
     const id = setInterval(() => {
       setVisible(false);
-      setTimeout(() => {
+      fadeTimeout = setTimeout(() => {
         setIndex((i) => (i + 1) % highlighted.length);
         setVisible(true);
       }, 200);
     }, ROTATE_MS);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      if (fadeTimeout) clearTimeout(fadeTimeout);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature, paused]);
+
+  // Limpa o timer de retomar rotação se o card sair da tela antes dos 6s.
+  useEffect(() => {
+    return () => {
+      if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    };
+  }, []);
 
   const pauseThenResume = () => {
     setPaused(true);

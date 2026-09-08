@@ -22,6 +22,14 @@ export const supabase = createClient(url, anonKey, {
 
 let bootstrapped: Promise<string> | null = null;
 
+/** Preenche o cache de `ensureSession()` quando quem chama já resolveu a sessão
+ * (ex.: `AuthGate` no warm-start) — evita que cada `useSupabaseUserId()` filho
+ * dispare seu próprio `getSession()` redundante e enxergue `userId` undefined
+ * por um instante a mais do que o necessário. */
+export function primeSession(userId: string) {
+  if (!bootstrapped) bootstrapped = Promise.resolve(userId);
+}
+
 /** Garante uma sessão anônima ativa e devolve o user_id — chamar uma vez no boot do app.
  * Se falhar (rede indisponível, Supabase fora do ar), a próxima chamada tenta de novo —
  * sem isso, uma falha transitória "grudava" pra sempre e nenhum "tentar novamente"
@@ -52,11 +60,24 @@ export function useSupabaseUserId(): string | undefined {
   const [userId, setUserId] = useState<string | undefined>(undefined);
   useEffect(() => {
     let cancelled = false;
-    ensureSession().then((id) => {
-      if (!cancelled) setUserId(id);
-    });
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const attempt = () => {
+      ensureSession().then(
+        (id) => {
+          if (!cancelled) setUserId(id);
+        },
+        () => {
+          // ensureSession() já zera o cache interno em caso de erro (ver comentário
+          // acima) — sem este retry, uma falha transitória de rede deixava este hook
+          // parado em `undefined` para sempre, mesmo depois da rede voltar.
+          if (!cancelled) retryTimer = setTimeout(attempt, 3000);
+        },
+      );
+    };
+    attempt();
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, []);
   return userId;

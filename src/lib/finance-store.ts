@@ -395,33 +395,29 @@ function mapCheckIn(r: Row): CheckIn {
   };
 }
 
+// savings_goals_monthly, category_limits, financial_intentions e check_ins não têm
+// nenhum consumidor de UI hoje (setSavingsGoal/addCategoryLimit/updateCategoryLimit/
+// removeCategoryLimit/setIntention/answerCheckIn e o próprio CheckInCard não são
+// importados em lugar nenhum) — buscá-los a cada load/invalidate era 4 round-trips
+// ao Supabase sem efeito observável nenhum.
 async function fetchState(): Promise<State> {
-  const [txRes, savingsRes, limitsRes, goalsRes, contribRes, intentionsRes, checkInsRes] =
-    await Promise.all([
-      supabase.from("transactions").select("*").order("date", { ascending: false }),
-      supabase.from("savings_goals_monthly").select("*"),
-      supabase.from("category_limits").select("*"),
-      supabase.from("financial_goals").select("*").order("created_at", { ascending: false }),
-      supabase.from("goal_contributions").select("*").order("date", { ascending: false }),
-      supabase.from("financial_intentions").select("*").order("created_at", { ascending: false }),
-      supabase.from("check_ins").select("*"),
-    ]);
+  const [txRes, goalsRes, contribRes] = await Promise.all([
+    supabase.from("transactions").select("*").order("date", { ascending: false }),
+    supabase.from("financial_goals").select("*").order("created_at", { ascending: false }),
+    supabase.from("goal_contributions").select("*").order("date", { ascending: false }),
+  ]);
   const txRows = unwrap(txRes);
-  const savingsRows = unwrap(savingsRes);
-  const limitRows = unwrap(limitsRes);
   const goalRows = unwrap(goalsRes);
   const contribRows = unwrap(contribRes);
-  const intentionRows = unwrap(intentionsRes);
-  const checkInRows = unwrap(checkInsRes);
 
   return {
     transactions: (txRows as Row[]).map(mapTransaction),
-    savingsGoals: (savingsRows as Row[]).map(mapSavingsGoal),
-    categoryLimits: (limitRows as Row[]).map(mapCategoryLimit),
+    savingsGoals: [],
+    categoryLimits: [],
     goals: (goalRows as Row[]).map(mapFinancialGoal),
     contributions: (contribRows as Row[]).map(mapContribution),
-    intentions: (intentionRows as Row[]).map(mapIntention),
-    checkIns: (checkInRows as Row[]).map(mapCheckIn),
+    intentions: [],
+    checkIns: [],
   };
 }
 

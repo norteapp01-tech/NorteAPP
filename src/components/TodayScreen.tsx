@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { nowDate } from "@/lib/test-clock";
 import { Check, X, Sparkles, CalendarClock } from "lucide-react";
@@ -63,15 +63,22 @@ export function TodayScreen() {
   const [reorganizing, setReorganizing] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const tasks = todayExecutions(executions).filter((t) => t.status !== "cancelada");
+  // Memoizado: essas funções varrem todo o dataset (todo o goalPace/insights
+  // roda um loop sobre todos os goals) — sem isso, abrir qualquer modal desta
+  // tela (settings, foco, confronto) recomputava tudo de novo sem necessidade,
+  // já que só o estado local mudava, não os dados.
+  const tasks = useMemo(
+    () => todayExecutions(executions).filter((t) => t.status !== "cancelada"),
+    [executions],
+  );
   const done = tasks.filter((t) => t.status === "concluida").length;
   const total = tasks.length;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  const displayTasks = orderedTodayTasks(tasks);
+  const displayTasks = useMemo(() => orderedTodayTasks(tasks), [tasks]);
   const nextTaskId = displayTasks.find((t) => t.status !== "concluida")?.id;
 
   const pendingTasks = tasks.filter((t) => t.status === "planejada");
-  const insight = insightsComputed(state)[0];
+  const insight = useMemo(() => insightsComputed(state)[0], [state]);
 
   const pickMood = async (m: EnergyMood) => {
     if (savingMood || m === todayMood) return;

@@ -705,6 +705,7 @@ export async function addBookFromSearch(
     status: "reading" | "want_to_read";
     progressMode?: ProgressMode;
     totalPages?: number;
+    totalChapters?: number;
     totalSeconds?: number;
   },
 ): Promise<string> {
@@ -725,6 +726,8 @@ export async function addBookFromSearch(
         progress_mode: mode,
         status: opts.status,
         total_pages: mode === "pages" ? (opts.totalPages ?? result.pageCount) : undefined,
+        total_chapters: opts.totalChapters,
+        current_chapter: opts.totalChapters ? 0 : undefined,
         total_seconds: mode === "time" ? opts.totalSeconds : undefined,
         current_page: mode === "pages" ? 0 : undefined,
         current_percentage: mode === "percentage" ? 0 : undefined,
@@ -898,12 +901,21 @@ export async function completeBook(
   bookId: string,
   extra?: { rating?: number; mainTakeaway?: string; personalReflection?: string },
 ) {
+  // Também é chamada pra editar avaliação/reflexão de um livro JÁ concluído
+  // (ex.: ReflectionEditor) — sem isso, cada edição reescrevia `completed_at`
+  // pra "agora", movendo o livro pro mês errado nas estatísticas mensais.
+  const { data: current } = await supabase
+    .from("reading_books")
+    .select("status, completed_at")
+    .eq("id", bookId)
+    .single();
+  const alreadyCompleted = current?.status === "completed" && !!current?.completed_at;
   unwrap(
     await supabase
       .from("reading_books")
       .update({
         status: "completed",
-        completed_at: nowDate().toISOString(),
+        completed_at: alreadyCompleted ? current!.completed_at : nowDate().toISOString(),
         rating: extra?.rating,
         main_takeaway: extra?.mainTakeaway,
         personal_reflection: extra?.personalReflection,

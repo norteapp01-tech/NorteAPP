@@ -25,8 +25,6 @@ export const Route = createFileRoute("/planejamento")({
 
 type Layer = "hoje" | "semana" | "mes" | "quarter" | "semestre" | "ano";
 
-const sundayMode = nowDate().getDay() === 0;
-
 const layerLabel: Record<Layer, string> = {
   hoje: "Hoje",
   semana: "Semana",
@@ -187,6 +185,10 @@ function WeekLayer({
   goals: Goal[];
   executions: Execution[];
 }) {
+  // Calculado por render (não em escopo de módulo): esse arquivo é avaliado uma
+  // única vez por processo no SSR, então uma constante de módulo aqui ficaria
+  // presa ao dia do boot do servidor pra sempre, em vez de virar em cada domingo real.
+  const sundayMode = nowDate().getDay() === 0;
   return (
     <>
       {sundayMode && (

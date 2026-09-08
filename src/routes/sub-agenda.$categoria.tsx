@@ -270,6 +270,7 @@ function AcademiaModule() {
   const [rest, setRest] = useState<RestState | null>(null);
   const [showWeightInput, setShowWeightInput] = useState(false);
   const [weightDraft, setWeightDraft] = useState("");
+  const [savingWeight, setSavingWeight] = useState(false);
   const [startingSession, setStartingSession] = useState(false);
   const [finishingSession, setFinishingSession] = useState(false);
   const [activeTab, setActiveTab] = useState<"treino" | "ciclo">("treino");
@@ -530,12 +531,19 @@ function AcademiaModule() {
                 className="w-20 rounded-lg border border-border bg-surface px-2 py-2 text-sm outline-none focus:border-primary"
               />
               <button
+                disabled={savingWeight}
                 onClick={async () => {
+                  if (savingWeight) return;
                   const w = parseFloat(weightDraft);
-                  setShowWeightInput(false);
-                  if (w > 0) await addBodyWeight(w);
+                  setSavingWeight(true);
+                  try {
+                    if (w > 0) await addBodyWeight(w);
+                    setShowWeightInput(false);
+                  } finally {
+                    setSavingWeight(false);
+                  }
                 }}
-                className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
+                className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
               >
                 ok
               </button>
@@ -627,6 +635,7 @@ function PlanManagerCard() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showNewPlan, setShowNewPlan] = useState(false);
   const [newPlan, setNewPlan] = useState({ letter: "", name: "" });
+  const [creatingPlan, setCreatingPlan] = useState(false);
 
   return (
     <details className="group border-y border-border py-3">
@@ -707,17 +716,23 @@ function PlanManagerCard() {
               />
             </div>
             <button
+              disabled={creatingPlan}
               onClick={async () => {
-                if (!newPlan.letter.trim() || !newPlan.name.trim()) return;
-                await createPlan({
-                  letter: newPlan.letter.trim(),
-                  name: newPlan.name.trim(),
-                  muscleGroups: "",
-                });
-                setNewPlan({ letter: "", name: "" });
-                setShowNewPlan(false);
+                if (creatingPlan || !newPlan.letter.trim() || !newPlan.name.trim()) return;
+                setCreatingPlan(true);
+                try {
+                  await createPlan({
+                    letter: newPlan.letter.trim(),
+                    name: newPlan.name.trim(),
+                    muscleGroups: "",
+                  });
+                  setNewPlan({ letter: "", name: "" });
+                  setShowNewPlan(false);
+                } finally {
+                  setCreatingPlan(false);
+                }
               }}
-              className="w-full rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground"
+              className="w-full rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
             >
               Criar treino
             </button>
@@ -731,6 +746,7 @@ function PlanManagerCard() {
 function PlanExerciseEditor({ planId }: { planId: string }) {
   const exercises = useWorkoutStore((s) => exercisesForPlan(s.exercises, planId));
   const [showAdd, setShowAdd] = useState(false);
+  const [addingExercise, setAddingExercise] = useState(false);
   const [form, setForm] = useState({
     name: "",
     setsTarget: "4",
@@ -844,28 +860,34 @@ function PlanExerciseEditor({ planId }: { planId: string }) {
             ))}
           </div>
           <button
+            disabled={addingExercise}
             onClick={async () => {
-              if (!form.name.trim()) return;
-              await addExercise(planId, {
-                name: form.name.trim(),
-                setsTarget: parseInt(form.setsTarget, 10) || 1,
-                repsTarget: form.setTargets[0]?.reps ?? 1,
-                loadTarget: form.setTargets[0]?.weight ?? 0,
-                restSeconds: form.setTargets[0]?.restSeconds ?? 60,
-                setTargets: form.setTargets,
-              });
-              setForm({
-                name: "",
-                setsTarget: "4",
-                setTargets: Array.from({ length: 4 }, () => ({
-                  reps: 10,
-                  weight: 20,
-                  restSeconds: 90,
-                })),
-              });
-              setShowAdd(false);
+              if (addingExercise || !form.name.trim()) return;
+              setAddingExercise(true);
+              try {
+                await addExercise(planId, {
+                  name: form.name.trim(),
+                  setsTarget: parseInt(form.setsTarget, 10) || 1,
+                  repsTarget: form.setTargets[0]?.reps ?? 1,
+                  loadTarget: form.setTargets[0]?.weight ?? 0,
+                  restSeconds: form.setTargets[0]?.restSeconds ?? 60,
+                  setTargets: form.setTargets,
+                });
+                setForm({
+                  name: "",
+                  setsTarget: "4",
+                  setTargets: Array.from({ length: 4 }, () => ({
+                    reps: 10,
+                    weight: 20,
+                    restSeconds: 90,
+                  })),
+                });
+                setShowAdd(false);
+              } finally {
+                setAddingExercise(false);
+              }
             }}
-            className="w-full rounded-md bg-primary py-1.5 text-[11px] font-semibold text-primary-foreground"
+            className="w-full rounded-md bg-primary py-1.5 text-[11px] font-semibold text-primary-foreground disabled:opacity-60"
           >
             Adicionar
           </button>

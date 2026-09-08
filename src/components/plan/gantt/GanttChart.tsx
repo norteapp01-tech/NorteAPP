@@ -91,7 +91,7 @@ export function GanttChart({
   const planNext = nextPlanAction(goal, steps, executions);
   const highlightId = planNext.kind === "action" ? planNext.execution.id : null;
 
-  const scheduled = executions.filter(hasPlannedRange);
+  const scheduled = useMemo(() => executions.filter(hasPlannedRange), [executions]);
   const todayOffsetDays = daysBetweenISO(window_.startISO, today);
   const todayVisible = todayOffsetDays >= 0 && todayOffsetDays < window_.totalDays;
   const deadlineOffsetDays = goal.deadlineISO
@@ -103,11 +103,34 @@ export function GanttChart({
     deadlineOffsetDays < window_.totalDays;
   const deadlineOutOfView = deadlineOffsetDays !== null && !deadlineVisible;
 
-  const toSchedule = executions
-    .filter((e) => e.status !== "concluida" && e.status !== "cancelada" && !isScheduled(e))
-    .sort((a, b) =>
-      (a.plannedStartDate ?? a.dueDate).localeCompare(b.plannedStartDate ?? b.dueDate),
-    );
+  const toSchedule = useMemo(
+    () =>
+      executions
+        .filter((e) => e.status !== "concluida" && e.status !== "cancelada" && !isScheduled(e))
+        .sort((a, b) =>
+          (a.plannedStartDate ?? a.dueDate).localeCompare(b.plannedStartDate ?? b.dueDate),
+        ),
+    [executions],
+  );
+
+  // Precisa vir antes do `return` condicional abaixo — hooks não podem ser
+  // chamados condicionalmente. Recalcula só quando as etapas ou as ações com
+  // período realmente mudam, não a cada abertura/fechamento de sheet.
+  const corridors = useMemo(
+    () =>
+      ordered.map((step, i) => {
+        const stepExecs = scheduled
+          .filter((e) => e.stepId === step.id)
+          .sort((a, b) => {
+            const byStart = a.plannedStartDate!.localeCompare(b.plannedStartDate!);
+            return byStart !== 0 ? byStart : a.plannedEndDate!.localeCompare(b.plannedEndDate!);
+          });
+        const laneOf = Object.fromEntries(stepExecs.map((execution, lane) => [execution.id, lane]));
+        const laneCount = Math.max(1, stepExecs.length);
+        return { step, index: i, stepExecs, laneOf, laneCount };
+      }),
+    [ordered, scheduled],
+  );
 
   if (ordered.length === 0) {
     return (
@@ -121,18 +144,6 @@ export function GanttChart({
       </div>
     );
   }
-
-  const corridors = ordered.map((step, i) => {
-    const stepExecs = scheduled
-      .filter((e) => e.stepId === step.id)
-      .sort((a, b) => {
-        const byStart = a.plannedStartDate!.localeCompare(b.plannedStartDate!);
-        return byStart !== 0 ? byStart : a.plannedEndDate!.localeCompare(b.plannedEndDate!);
-      });
-    const laneOf = Object.fromEntries(stepExecs.map((execution, lane) => [execution.id, lane]));
-    const laneCount = Math.max(1, stepExecs.length);
-    return { step, index: i, stepExecs, laneOf, laneCount };
-  });
 
   const handleEmptySpaceClick = (step: Step) => (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();

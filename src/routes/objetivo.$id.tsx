@@ -250,13 +250,21 @@ export function GoalDetail() {
       {showCreateStage && (
         <CreateStageSheet goal={goal} onClose={() => setShowCreateStage(false)} />
       )}
-      {createActionStepId && (
-        <CreateActionSheet
-          step={steps.find((s) => s.id === createActionStepId)!}
-          goal={goal}
-          onClose={() => setCreateActionStepId(null)}
-        />
-      )}
+      {createActionStepId &&
+        (() => {
+          // A etapa pode ter sido excluída (em outra aba/sessão) enquanto o
+          // sheet estava prestes a abrir — fecha em vez de derrubar a página
+          // com um `undefined` inesperado.
+          const stepForCreate = steps.find((s) => s.id === createActionStepId);
+          if (!stepForCreate) return null;
+          return (
+            <CreateActionSheet
+              step={stepForCreate}
+              goal={goal}
+              onClose={() => setCreateActionStepId(null)}
+            />
+          );
+        })()}
       {showDetails && <PlanDetailsModal goal={goal} onClose={() => setShowDetails(false)} />}
     </div>
   );
@@ -327,13 +335,30 @@ function StalledPlanAlert({ onDefineNext }: { onDefineNext: () => void }) {
 function ExecutionPicker({ goalId, onClose }: { goalId: string; onClose: () => void }) {
   const executions = useGoalsStore((s) => s.executions);
   const profile = useProfile();
+  const [linkingId, setLinkingId] = useState<string | null>(null);
+  const [error, setError] = useState("");
   const available = executions.filter((e) => e.goalId !== goalId && e.status === "planejada");
+
+  const link = async (executionId: string) => {
+    if (linkingId) return;
+    setLinkingId(executionId);
+    setError("");
+    try {
+      await linkExecutionToGoal(executionId, goalId);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível vincular. Tente de novo.");
+      setLinkingId(null);
+    }
+  };
+
   return (
     <Modal onClose={onClose} title="Vincular ação">
       <p className="text-xs text-muted-foreground">
         Toque para vincular. Ela passa a contar como avanço deste planejamento (sem etapa — aparece
         em "Ações sem etapa").
       </p>
+      {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
       <div className="mt-4 space-y-2">
         {available.length === 0 && (
           <p className="p-4 text-center text-sm text-muted-foreground">Nenhuma ação disponível.</p>
@@ -342,11 +367,9 @@ function ExecutionPicker({ goalId, onClose }: { goalId: string; onClose: () => v
           return (
             <button
               key={e.id}
-              onClick={async () => {
-                await linkExecutionToGoal(e.id, goalId);
-                onClose();
-              }}
-              className="card-surface flex w-full items-center gap-3 p-3 text-left hover:border-primary/40"
+              disabled={!!linkingId}
+              onClick={() => link(e.id)}
+              className="card-surface flex w-full items-center gap-3 p-3 text-left hover:border-primary/40 disabled:opacity-50"
             >
               <CategoryIcon
                 category={e.category}

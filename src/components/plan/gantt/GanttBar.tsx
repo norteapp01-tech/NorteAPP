@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, GripVertical, MoreHorizontal } from "lucide-react";
 import {
   addDays,
@@ -59,6 +59,7 @@ export function GanttBar({
   const [liveDeltaDays, setLiveDeltaDays] = useState(0);
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef<{
+    pointerId: number;
     mode: DragMode;
     startX: number;
     startY: number;
@@ -89,9 +90,11 @@ export function GanttBar({
 
   const onPointerDown = (mode: DragMode) => (e: React.PointerEvent) => {
     if (done) return; // concluída não se move
+    if (dragRef.current) return; // já tem um toque ativo nesta barra — ignora um segundo dedo
     e.stopPropagation();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     dragRef.current = {
+      pointerId: e.pointerId,
       mode,
       startX: e.clientX,
       startY: e.clientY,
@@ -103,7 +106,7 @@ export function GanttBar({
 
   const onPointerMove = (e: React.PointerEvent) => {
     const drag = dragRef.current;
-    if (!drag) return;
+    if (!drag || e.pointerId !== drag.pointerId) return;
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
     if (!drag.committed) {
@@ -124,9 +127,9 @@ export function GanttBar({
 
   const finishDrag = async (e: React.PointerEvent) => {
     const drag = dragRef.current;
+    if (!drag || e.pointerId !== drag.pointerId) return;
     dragRef.current = null;
     (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
-    if (!drag) return;
     if (!drag.committed) {
       // não cruzou o limiar — foi um toque, não um arrasto.
       onOpenDetails();
@@ -158,10 +161,13 @@ export function GanttBar({
     setOptimisticRange({ start: newStart, end: newEnd });
     navigator.vibrate?.(10);
     try {
-      if (goalDeadlineISO && newEnd > goalDeadlineISO) {
-        await updateGoalDeadline(goalId, newEnd);
-      }
-      await setPlannedRange(execution.id, newStart, newEnd);
+      // As duas escritas mexem em linhas diferentes (goals.deadline_date vs.
+      // executions.planned_*) — sem dependência entre si, então rodam em
+      // paralelo em vez de esperar uma pra só então disparar a outra.
+      const writes = [setPlannedRange(execution.id, newStart, newEnd)];
+      if (goalDeadlineISO && newEnd > goalDeadlineISO)
+        writes.push(updateGoalDeadline(goalId, newEnd));
+      await Promise.all(writes);
     } catch (err) {
       setOptimisticRange(null);
       onError(err instanceof Error ? err.message : "Não foi possível mover. Tente de novo.");
@@ -194,7 +200,9 @@ export function GanttBar({
       ? "border-primary bg-primary/10 text-primary"
       : "border-border bg-surface-2/95 text-foreground";
 
-  const reduceMotion = prefersReducedMotion();
+  // Calculado uma vez por montagem, não a cada pointermove do arrasto (o
+  // valor não muda durante uma sessão — recomputar a cada render é custo à toa).
+  const reduceMotion = useMemo(() => prefersReducedMotion(), []);
 
   return (
     <div

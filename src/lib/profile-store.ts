@@ -123,7 +123,10 @@ export async function updateProfile(patch: {
     .from("profiles")
     .upsert({ user_id: userId, ...dbPatch }, { onConflict: "user_id" });
   if (error) throw new Error(error.message);
-  await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+  // `refetchType: "all"` — mesmo motivo documentado em goals-store.ts: sem
+  // isso, um updateProfile disparado por uma tela sem useProfile() montado
+  // deixaria a query marcada como stale mas sem refetch de verdade.
+  await queryClient.invalidateQueries({ queryKey: QUERY_KEY, refetchType: "all" });
 }
 
 /** Idade sempre derivada — nunca um campo próprio. */

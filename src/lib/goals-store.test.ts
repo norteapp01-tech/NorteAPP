@@ -137,13 +137,21 @@ function makeExecution(overrides: Partial<Execution>): Execution {
 }
 
 describe("agendaByDate — prazo não é agenda", () => {
+  // isScheduled() considera "agendada" só quando a data da agenda ainda não
+  // passou (>= hoje) — fixamos o relógio de teste pra não depender da data
+  // real em que o teste roda (a execução tinha `agendaDate` num valor fixo
+  // que silenciosamente virava passado com o tempo real avançando).
+  afterEach(() => setTestClockOverride(null));
+
   it("execução só com dueDate não aparece na agenda", () => {
+    setTestClockOverride(new Date("2026-09-01T12:00:00.000Z").getTime());
     const e = makeExecution({ dueDate: "2026-09-08" });
     expect(isScheduled(e)).toBe(false);
     expect(agendaByDate([e])).toEqual({});
   });
 
   it("depois de agendar (agendaDate/startTime), aparece na data agendada", () => {
+    setTestClockOverride(new Date("2026-09-01T12:00:00.000Z").getTime());
     const e = makeExecution({
       dueDate: "2026-09-08",
       agendaDate: "2026-09-07",
@@ -673,6 +681,13 @@ describe("formatDateShortBR", () => {
 });
 
 describe("nextPlanAction — 'Próximo passo' do detalhe do plano (pool = qualquer etapa aberta)", () => {
+  // Fixa "hoje" antes de todas as datas usadas neste bloco — isScheduled()
+  // só considera uma ação agendada quando agendaDate >= hoje, então sem isso
+  // esses testes silenciosamente quebrariam assim que o relógio real
+  // ultrapassasse as datas fixas usadas aqui embaixo.
+  beforeEach(() => setTestClockOverride(new Date("2026-09-01T12:00:00.000Z").getTime()));
+  afterEach(() => setTestClockOverride(null));
+
   it("ação agendada mais próxima vence uma não-agendada, mesmo em etapas diferentes", () => {
     const goal = makeGoal();
     const steps = [

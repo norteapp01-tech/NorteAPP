@@ -27,7 +27,11 @@ export function ReadingPlanSetup({
   const [amount, setAmount] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const canSave = type === "deadline" ? deadline.trim().length > 0 : parseFloat(amount) > 0;
+  // Sem total de páginas, um plano por prazo não tem como calcular quantas
+  // páginas/dia — silenciosamente virava "0 páginas por dia".
+  const needsTotalPages = book.progressMode === "pages" && !book.totalPages;
+  const canSave =
+    type === "deadline" ? deadline.trim().length > 0 && !needsTotalPages : parseFloat(amount) > 0;
 
   const save = async () => {
     if (!canSave || saving) return;
@@ -79,6 +83,11 @@ export function ReadingPlanSetup({
             onChange={(e) => setDeadline(e.target.value)}
             className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
           />
+          {needsTotalPages && (
+            <p className="mt-1.5 text-[11px] text-danger">
+              Defina o total de páginas do livro pra calcular o ritmo diário do prazo.
+            </p>
+          )}
         </label>
       ) : (
         <label className="mt-3 block">

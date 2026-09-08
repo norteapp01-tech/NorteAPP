@@ -399,14 +399,24 @@ function ReflectionEditor({ book, onDone }: { book: Book; onDone: () => void }) 
   const [rating, setRating] = useState(book.rating ?? 0);
   const [takeaway, setTakeaway] = useState(book.mainTakeaway ?? "");
   const [reflection, setReflection] = useState(book.personalReflection ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const save = () => {
-    completeBook(book.id, {
-      rating: rating || undefined,
-      mainTakeaway: takeaway.trim() || undefined,
-      personalReflection: reflection.trim() || undefined,
-    });
-    onDone();
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      await completeBook(book.id, {
+        rating: rating || undefined,
+        mainTakeaway: takeaway.trim() || undefined,
+        personalReflection: reflection.trim() || undefined,
+      });
+      onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar. Tente de novo.");
+      setSaving(false);
+    }
   };
 
   return (
@@ -440,11 +450,13 @@ function ReflectionEditor({ book, onDone }: { book: Book; onDone: () => void }) 
           className="min-h-16 w-full resize-none rounded-lg border border-border bg-surface-2 p-2 text-sm outline-none focus:border-primary"
         />
       </label>
+      {error && <p className="text-xs text-danger">{error}</p>}
       <button
         onClick={save}
-        className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground"
+        disabled={saving}
+        className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-40"
       >
-        Salvar
+        {saving ? "Salvando…" : "Salvar"}
       </button>
     </div>
   );

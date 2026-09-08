@@ -67,13 +67,14 @@ export type MealLog = {
 
 export type MealStatus = "pending" | "as_planned" | "adjusted";
 
-type State = {
+export type NutritionState = {
   meals: Meal[];
   options: MealOption[];
   goals: DailyGoals;
   logs: MealLog[];
   assignments: MealPlanAssignment[];
 };
+type State = NutritionState;
 
 const DEFAULT_GOALS: DailyGoals = { protein: 160, carbs: 280, fat: 70, calories: 2500 };
 const EMPTY_STATE: State = {

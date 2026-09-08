@@ -1,3 +1,5 @@
+import { UnderlineTabs } from "@/components/ui/app-design-system";
+
 export type PlanTab = "planejamento" | "cronograma" | "evolucao";
 
 const tabLabel: Record<PlanTab, string> = {
@@ -12,4 +14,3 @@ export function PlanTabs({ tab, onChange }: { tab: PlanTab; onChange: (t: PlanTa
   const items = (Object.keys(tabLabel) as PlanTab[]).map((key) => ({ key, label: tabLabel[key] }));
   return <UnderlineTabs items={items} value={tab} onChange={onChange} />;
 }
-import { UnderlineTabs } from "@/components/ui/app-design-system";

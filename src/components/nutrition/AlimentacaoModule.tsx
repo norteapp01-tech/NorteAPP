@@ -18,6 +18,7 @@ import {
   type Meal,
   type MealOption,
   type MealStatus,
+  type NutritionState,
 } from "@/lib/nutrition-store";
 import { MacroSummary } from "./MacroSummary";
 import { MealDetailSheet } from "./MealDetailSheet";
@@ -75,7 +76,7 @@ function TodayTab({
   totals,
   onOpenMeal,
 }: {
-  state: ReturnType<typeof useNutritionStore>;
+  state: NutritionState;
   totals: ReturnType<typeof dailyTotals>;
   onOpenMeal: (meal: Meal) => void;
 }) {
@@ -129,7 +130,7 @@ function TodayTab({
   );
 }
 
-function PlanTab({ state }: { state: ReturnType<typeof useNutritionStore> }) {
+function PlanTab({ state }: { state: NutritionState }) {
   const [selectedDay, setSelectedDay] = useState(nowDate().getDay());
   const [momentsOpen, setMomentsOpen] = useState(false);
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
@@ -233,7 +234,7 @@ function MomentPicker({
   weekday,
   onClose,
 }: {
-  state: ReturnType<typeof useNutritionStore>;
+  state: NutritionState;
   weekday: number;
   onClose: () => void;
 }) {
@@ -245,18 +246,25 @@ function MomentPicker({
   const [momentTime, setMomentTime] = useState("21:00");
   const save = async () => {
     setSaving(true);
-    const ids = [...selected];
     for (const [name, time] of commonMoments) {
       if (state.meals.some((meal) => meal.name.toLowerCase() === name.toLowerCase())) continue;
       if (!selected.includes(`new:${name}`)) continue;
-      ids.push(await addMeal({ name, time, weekdays: [weekday] }));
+      await addMeal({ name, time, weekdays: [weekday] });
     }
-    for (const meal of state.meals) {
+    // Só grava as refeições cujo conjunto de dias realmente mudou — evita um
+    // UPDATE (e um refetch completo) por refeição a cada save, mesmo pras que
+    // nem foram tocadas. As mudanças reais rodam em paralelo, já que cada
+    // uma mexe numa linha diferente.
+    const writes = state.meals.flatMap((meal) => {
       const nextDays = selected.includes(meal.id)
         ? [...new Set([...meal.weekdays, weekday])]
         : meal.weekdays.filter((day) => day !== weekday);
-      await updateMeal(meal.id, { weekdays: nextDays });
-    }
+      const changed =
+        nextDays.length !== meal.weekdays.length ||
+        nextDays.some((day) => !meal.weekdays.includes(day));
+      return changed ? [updateMeal(meal.id, { weekdays: nextDays })] : [];
+    });
+    await Promise.all(writes);
     setSaving(false);
     onClose();
   };

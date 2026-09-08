@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
   Check,
@@ -465,6 +465,23 @@ function PlanejamentoFlow({
     stepsList: [] as { id: string; title: string; targetDate: string }[],
     firstExecution: { title: "", dueDate: "" },
   });
+  // Em navegação direta (deep link), `presetGoal` ainda não resolveu no primeiro
+  // render — sem isso, o pré-preenchimento de "Planejamento da conquista" ficava
+  // em branco pra sempre nesse caso. Só aplica uma vez, e só nos campos que o
+  // usuário ainda não tiver mexido.
+  const presetAppliedRef = useRef(!!presetGoal);
+  useEffect(() => {
+    if (presetAppliedRef.current || !presetGoal) return;
+    presetAppliedRef.current = true;
+    setForm((f) => ({
+      ...f,
+      title: f.title || presetGoal.name,
+      why: f.why || `Construir o caminho financeiro para ${presetGoal.name}`,
+      lifeArea: f.lifeArea || "Finanças",
+      preset: f.preset || ((presetGoal.deadline ? "personalizado" : "") as PresetDeadline | ""),
+      customISO: f.customISO || (presetGoal.deadline ?? ""),
+    }));
+  }, [presetGoal]);
   const [stepDraft, setStepDraft] = useState("");
   const [stepDraftDate, setStepDraftDate] = useState("");
   const [saving, setSaving] = useState(false);

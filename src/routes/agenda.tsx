@@ -631,6 +631,8 @@ function AgendaEventBlock({
   const finishDrag = async (e: ReactPointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
     const changed = drag.current?.moved;
+    const origStart = drag.current?.start;
+    const origEnd = drag.current?.end;
     drag.current = null;
     if (!changed) {
       setMenuOpen(true);
@@ -645,6 +647,15 @@ function AgendaEventBlock({
         minutesToTime(preview.current.start),
         minutesToTime(preview.current.end),
       );
+    } catch {
+      // Gesto interrompido (ex.: gesto do sistema cancelando o toque) ou
+      // falha de rede — desfaz a posição visual pra não deixar o bloco
+      // mostrando um horário que nunca foi salvo de verdade.
+      if (origStart !== undefined && origEnd !== undefined) {
+        setStart(origStart);
+        setEnd(origEnd);
+        preview.current = { start: origStart, end: origEnd };
+      }
     } finally {
       setSaving(false);
     }
@@ -659,6 +670,7 @@ function AgendaEventBlock({
         onPointerDown={(e) => beginDrag("move", e)}
         onPointerMove={moveDrag}
         onPointerUp={finishDrag}
+        onPointerCancel={finishDrag}
         className={`absolute right-1 left-0 z-10 touch-none select-none rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-left shadow-sm ${saving ? "opacity-60" : "cursor-grab active:cursor-grabbing"}`}
         style={{ top, height }}
         role="button"
@@ -674,6 +686,7 @@ function AgendaEventBlock({
           onPointerDown={(e) => beginDrag("resize", e)}
           onPointerMove={moveDrag}
           onPointerUp={finishDrag}
+          onPointerCancel={finishDrag}
           className="absolute right-0 bottom-0 left-0 flex h-4 touch-none items-end justify-center pb-1"
           aria-label="Ajustar duração"
         >

@@ -87,6 +87,7 @@ function GoalDetailSheet({ goalId, onClose }: { goalId: string; onClose: () => v
   const [editing, setEditing] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [creatingPlan, setCreatingPlan] = useState(false);
+  const [contributing, setContributing] = useState(false);
 
   if (!goal) return null;
   const pct =
@@ -127,13 +128,20 @@ function GoalDetailSheet({ goalId, onClose }: { goalId: string; onClose: () => v
             className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
           />
           <button
+            disabled={contributing}
             onClick={async () => {
+              if (contributing) return;
               const value = parseFloat(amount);
               if (!value || value <= 0) return;
+              setContributing(true);
               setAmount("");
-              await contributeToGoal(goalId, value);
+              try {
+                await contributeToGoal(goalId, value);
+              } finally {
+                setContributing(false);
+              }
             }}
-            className="shrink-0 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
+            className="shrink-0 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
           >
             + Guardar
           </button>
