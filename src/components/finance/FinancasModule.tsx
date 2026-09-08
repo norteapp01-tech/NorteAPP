@@ -4,12 +4,14 @@ import { currentMonth, monthLabel, addMonths } from "@/lib/finance-store";
 import { ResumoTab } from "./ResumoTab";
 import { MovimentacoesTab } from "./MovimentacoesTab";
 import { ObjetivosTab } from "./ObjetivosTab";
+import { PlanejamentoTab } from "./PlanejamentoTab";
 import { QuickAddSheet } from "./QuickAddSheet";
 
-type Tab = "resumo" | "movimentacoes" | "objetivos";
+type Tab = "resumo" | "movimentacoes" | "planejamento" | "objetivos";
 const tabs: { key: Tab; label: string }[] = [
   { key: "resumo", label: "Visão" },
   { key: "movimentacoes", label: "Movimentações" },
+  { key: "planejamento", label: "Planejamento" },
   { key: "objetivos", label: "Objetivos" },
 ];
 
@@ -73,6 +75,7 @@ export function FinancasModule() {
           />
         )}
         {tab === "movimentacoes" && <MovimentacoesTab month={month} initialQuery={movQuery} />}
+        {tab === "planejamento" && <PlanejamentoTab />}
         {tab === "objetivos" && <ObjetivosTab />}
       </div>
 

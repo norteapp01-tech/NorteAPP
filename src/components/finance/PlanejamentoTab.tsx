@@ -1,223 +1,151 @@
-import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ArrowRight, CalendarRange, Plus, Target } from "lucide-react";
+import { useFinanceStore, formatBRL, type FinancialGoal } from "@/lib/finance-store";
 import {
-  useFinanceStore,
-  limitsWithProgress,
-  biggestFlexibleCategory,
-  setSavingsGoal,
-  addCategoryLimit,
-  updateCategoryLimit,
-  removeCategoryLimit,
-  setIntention,
-  formatBRL,
-  FINANCE_CATEGORIES,
-} from "@/lib/finance-store";
-import { Card } from "@/components/sub-agenda-shared";
+  useGoalsStore,
+  goalProgress,
+  stepsForGoal,
+  type Goal,
+  type Step,
+  type Execution,
+} from "@/lib/goals-store";
+import { financialPlanRows } from "./financial-planning";
 
-export function PlanejamentoTab({ month }: { month: string }) {
-  const state = useFinanceStore((s) => s);
-  const currentGoal = state.savingsGoals.find((g) => g.month === month)?.targetAmount ?? 0;
-  const limits = limitsWithProgress(state.transactions, state.categoryLimits, month);
-  const activeIntention = state.intentions[0];
-
-  const [editingGoal, setEditingGoal] = useState(false);
-  const [goalValue, setGoalValue] = useState(String(currentGoal || ""));
-  const [addingLimit, setAddingLimit] = useState(false);
-  const [limitCategory, setLimitCategory] = useState(FINANCE_CATEGORIES[0].id);
-  const [limitValue, setLimitValue] = useState("");
-  const [editingLimitId, setEditingLimitId] = useState<string | null>(null);
-  const [editingLimitValue, setEditingLimitValue] = useState("");
-  const [intentionText, setIntentionText] = useState("");
-  const [showIntentionForm, setShowIntentionForm] = useState(false);
-
-  const saveGoal = async () => {
-    await setSavingsGoal(month, parseFloat(goalValue) || 0);
-    setEditingGoal(false);
-  };
-
-  const saveNewLimit = async () => {
-    const value = parseFloat(limitValue);
-    if (!value || value <= 0) return;
-    await addCategoryLimit(limitCategory, value);
-    setLimitValue("");
-    setAddingLimit(false);
-  };
-
-  const orientation = (() => {
-    const flexible = biggestFlexibleCategory(state.transactions, month);
-    return flexible
-      ? `Nas últimas semanas, seu maior gasto flexível foi ${flexible.category.toLowerCase()} (${formatBRL(flexible.amount)}).`
-      : null;
-  })();
+export function PlanejamentoTab() {
+  const plans = useGoalsStore((state) => state.goals);
+  const steps = useGoalsStore((state) => state.steps);
+  const executions = useGoalsStore((state) => state.executions);
+  const objectives = useFinanceStore((state) => state.goals);
+  const rows = financialPlanRows(plans, objectives);
+  const withoutPlan = objectives.filter((objective) => !objective.planId);
 
   return (
-    <div className="space-y-5">
-      <Card title="Meta de guardar este mês">
-        {!editingGoal ? (
-          <div className="flex items-center justify-between">
-            <p className="text-2xl font-bold">{formatBRL(currentGoal)}</p>
-            <button onClick={() => setEditingGoal(true)} className="text-xs text-primary">
-              editar
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              autoFocus
-              value={goalValue}
-              onChange={(e) => setGoalValue(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
+    <div className="space-y-6">
+      <section>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          Planejamento financeiro
+        </p>
+        <h2 className="mt-1 text-xl font-bold">Transforme um objetivo em caminho</h2>
+        <p className="mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
+          Aqui você inicia e acompanha planos financeiros. Etapas, ações e cronograma continuam no
+          mesmo editor da aba Plano.
+        </p>
+      </section>
+
+      {rows.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-sm font-bold">Seus planejamentos</h3>
+          {rows.map(({ plan, objective }) => (
+            <PlanRow
+              key={plan.id}
+              plan={plan}
+              objective={objective}
+              steps={steps}
+              executions={executions}
             />
-            <button
-              onClick={saveGoal}
-              className="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
-            >
-              Salvar
-            </button>
-          </div>
-        )}
-      </Card>
+          ))}
+        </section>
+      )}
 
-      <Card title="Limites por categoria">
-        {limits.length === 0 && !addingLimit && (
-          <p className="text-sm text-muted-foreground">Nenhum limite configurado ainda.</p>
-        )}
-        <ul className="space-y-2">
-          {limits.map((l) => {
-            const pct = l.limit > 0 ? Math.min(100, Math.round((l.spent / l.limit) * 100)) : 0;
-            return (
-              <li key={l.id} className="rounded-lg border border-border bg-surface-2 p-3">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold">{l.category}</span>
-                  <div className="flex items-center gap-2">
-                    {editingLimitId === l.id ? (
-                      <>
-                        <input
-                          type="number"
-                          autoFocus
-                          value={editingLimitValue}
-                          onChange={(e) => setEditingLimitValue(e.target.value)}
-                          className="w-20 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
-                        />
-                        <button
-                          onClick={async () => {
-                            await updateCategoryLimit(
-                              l.id,
-                              parseFloat(editingLimitValue) || l.limit,
-                            );
-                            setEditingLimitId(null);
-                          }}
-                          className="text-primary"
-                        >
-                          ok
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-muted-foreground">
-                          {formatBRL(l.spent)} / {formatBRL(l.limit)}
-                        </span>
-                        <button
-                          onClick={() => {
-                            setEditingLimitId(l.id);
-                            setEditingLimitValue(String(l.limit));
-                          }}
-                          className="text-primary"
-                        >
-                          editar
-                        </button>
-                        <button
-                          onClick={async () => {
-                            await removeCategoryLimit(l.id);
-                          }}
-                          className="text-muted-foreground hover:text-danger"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface">
-                  <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-
-        {!addingLimit ? (
-          <button
-            onClick={() => setAddingLimit(true)}
-            className="mt-2 flex items-center gap-1.5 text-xs text-primary"
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold">Começar um planejamento</h3>
+          {withoutPlan.length > 0 && (
+            <span className="text-[10px] text-muted-foreground">
+              {withoutPlan.length} objetivo{withoutPlan.length === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
+        {withoutPlan.map((objective) => (
+          <Link
+            key={objective.id}
+            to="/criar"
+            search={{ modo: "planejamento", financeGoalId: objective.id }}
+            className="card-surface flex items-center gap-3 p-4"
           >
-            <Plus className="h-3.5 w-3.5" /> adicionar limite
-          </button>
-        ) : (
-          <div className="mt-2 flex items-center gap-2 rounded-lg border border-dashed border-border p-2.5">
-            <select
-              value={limitCategory}
-              onChange={(e) => setLimitCategory(e.target.value)}
-              className="flex-1 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-xs outline-none focus:border-primary"
-            >
-              {FINANCE_CATEGORIES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-            <input
-              type="number"
-              value={limitValue}
-              onChange={(e) => setLimitValue(e.target.value)}
-              placeholder="R$"
-              className="w-20 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-xs outline-none focus:border-primary"
-            />
-            <button onClick={saveNewLimit} className="text-primary">
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-      </Card>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10">
+              <Target className="h-5 w-5 text-primary" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <strong className="block truncate text-sm">{objective.name}</strong>
+              <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                Meta de {formatBRL(objective.targetAmount)}
+              </span>
+            </span>
+            <span className="flex items-center gap-1 text-xs font-semibold text-primary">
+              Planejar <ArrowRight className="h-3.5 w-3.5" />
+            </span>
+          </Link>
+        ))}
+        <Link
+          to="/criar"
+          search={{ modo: "planejamento", financialPreset: true }}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-xs font-semibold text-muted-foreground hover:border-primary/50 hover:text-primary"
+        >
+          <Plus className="h-4 w-4" /> Criar plano financeiro sem objetivo
+        </Link>
+      </section>
 
-      <Card title="Decisão temporária">
-        {activeIntention && !showIntentionForm ? (
-          <div>
-            <p className="text-sm">"{activeIntention.text}"</p>
-            {orientation && <p className="mt-2 text-xs text-muted-foreground">{orientation}</p>}
-            <button
-              onClick={() => setShowIntentionForm(true)}
-              className="mt-2 text-xs text-primary"
-            >
-              criar nova intenção
-            </button>
-          </div>
-        ) : (
-          <div>
-            <textarea
-              autoFocus
-              value={intentionText}
-              onChange={(e) => setIntentionText(e.target.value)}
-              placeholder="ex: quero gastar menos essa semana para guardar dinheiro para minha viagem"
-              className="min-h-16 w-full resize-none rounded-lg border border-border bg-surface-2 p-2.5 text-sm outline-none focus:border-primary"
-            />
-            <button
-              onClick={async () => {
-                if (!intentionText.trim()) return;
-                const text = intentionText;
-                setIntentionText("");
-                setShowIntentionForm(false);
-                await setIntention(text);
-              }}
-              disabled={!intentionText.trim()}
-              className="mt-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-40"
-            >
-              Salvar intenção
-            </button>
-          </div>
-        )}
-      </Card>
+      {rows.length === 0 && withoutPlan.length === 0 && (
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <CalendarRange className="h-5 w-5 text-primary" />
+          <p className="mt-3 text-sm font-semibold">Você ainda não tem um objetivo financeiro</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Crie primeiro um objetivo com valor e prazo. Depois, volte aqui para dividi-lo em
+            etapas.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlanRow({
+  plan,
+  objective,
+  steps,
+  executions,
+}: {
+  plan: Goal;
+  objective?: FinancialGoal;
+  steps: Step[];
+  executions: Execution[];
+}) {
+  const planSteps = stepsForGoal(steps, plan.id);
+  const progress = goalProgress(plan, planSteps, executions);
+  const moneyProgress =
+    objective && objective.targetAmount > 0
+      ? Math.min(100, Math.round((objective.savedAmount / objective.targetAmount) * 100))
+      : null;
+  return (
+    <Link to="/objetivo/$id" params={{ id: plan.id }} className="card-surface block p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">{plan.title}</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {planSteps.length} etapa{planSteps.length === 1 ? "" : "s"} · {plan.deadlineLabel}
+          </p>
+        </div>
+        <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+      </div>
+      <div className="mt-3 space-y-2">
+        <ProgressLine label="Plano" value={progress} />
+        {moneyProgress !== null && <ProgressLine label="Valor guardado" value={moneyProgress} />}
+      </div>
+    </Link>
+  );
+}
+
+function ProgressLine({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <div className="mb-1 flex justify-between text-[10px] text-muted-foreground">
+        <span>{label}</span>
+        <span>{value}%</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
+        <div className="h-full bg-primary" style={{ width: `${value}%` }} />
+      </div>
     </div>
   );
 }

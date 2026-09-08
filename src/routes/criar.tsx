@@ -27,6 +27,7 @@ import { nowDate } from "@/lib/test-clock";
 import { DateField } from "@/components/ui/date-wheel-picker";
 import { PlanItemPicker, type PlanItemSelection } from "@/components/plan/PlanItemPicker";
 import { useProfile } from "@/lib/profile-store";
+import { useFinanceStore, updateFinancialGoal, type FinancialGoal } from "@/lib/finance-store";
 import { formatTime } from "@/lib/format-utils";
 
 type Mode = "escolha" | "agenda" | "planejamento";
@@ -35,11 +36,20 @@ export const Route = createFileRoute("/criar")({
   head: () => ({ meta: [{ title: "Criar — Norte" }] }),
   validateSearch: (
     s: Record<string, unknown>,
-  ): { modo?: Mode; goalId?: string; stepId?: string; executionId?: string } => ({
+  ): {
+    modo?: Mode;
+    goalId?: string;
+    stepId?: string;
+    executionId?: string;
+    financeGoalId?: string;
+    financialPreset?: boolean;
+  } => ({
     modo: s.modo as Mode | undefined,
     goalId: s.goalId as string | undefined,
     stepId: s.stepId as string | undefined,
     executionId: s.executionId as string | undefined,
+    financeGoalId: s.financeGoalId as string | undefined,
+    financialPreset: s.financialPreset === true || s.financialPreset === "true",
   }),
   component: CreateScreen,
 });
@@ -47,6 +57,9 @@ export const Route = createFileRoute("/criar")({
 function CreateScreen() {
   const nav = useNavigate();
   const search = Route.useSearch();
+  const financeGoal = useFinanceStore((state) =>
+    state.goals.find((goal) => goal.id === search.financeGoalId),
+  );
   const [mode, setMode] = useState<Mode>(search.modo ?? "escolha");
 
   return (
@@ -133,7 +146,14 @@ function CreateScreen() {
         />
       )}
       {mode === "planejamento" && (
-        <PlanejamentoFlow onDone={(id) => nav({ to: "/objetivo/$id", params: { id } })} />
+        <PlanejamentoFlow
+          presetGoal={financeGoal}
+          financialPreset={search.financialPreset}
+          onDone={async (id) => {
+            if (financeGoal) await updateFinancialGoal(financeGoal.id, { planId: id });
+            nav({ to: "/objetivo/$id", params: { id } });
+          }}
+        />
       )}
     </div>
   );
@@ -426,14 +446,22 @@ function isoDate(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function PlanejamentoFlow({ onDone }: { onDone: (id: string) => void }) {
+function PlanejamentoFlow({
+  onDone,
+  presetGoal,
+  financialPreset,
+}: {
+  onDone: (id: string) => void | Promise<void>;
+  presetGoal?: FinancialGoal;
+  financialPreset?: boolean;
+}) {
   const [step, setStep] = useState<PlanStep>("identidade");
   const [form, setForm] = useState({
-    title: "",
-    why: "",
-    lifeArea: "",
-    preset: "" as PresetDeadline | "",
-    customISO: "",
+    title: presetGoal?.name ?? "",
+    why: presetGoal ? `Construir o caminho financeiro para ${presetGoal.name}` : "",
+    lifeArea: presetGoal || financialPreset ? "Finanças" : "",
+    preset: (presetGoal?.deadline ? "personalizado" : "") as PresetDeadline | "",
+    customISO: presetGoal?.deadline ?? "",
     stepsList: [] as { id: string; title: string; targetDate: string }[],
     firstExecution: { title: "", dueDate: "" },
   });
