@@ -1,11 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { CategoryIcon } from "@/components/plan/CategoryIcon";
 import {
   useGoalsStore,
   focusGoal,
   isGoalComplete,
-  todayExecutions,
   type Goal,
   type Step,
   type Execution,
@@ -14,20 +12,17 @@ import { CompletedPlansSection } from "@/components/plan/CompletedPlansSection";
 import { FocusPlanCard } from "@/components/plan/FocusPlanCard";
 import { OtherPlansSection } from "@/components/plan/OtherPlansSection";
 import { PlanMenuSheet } from "@/components/plan/PlanMenuSheet";
-import { useProfile } from "@/lib/profile-store";
-import { formatTime } from "@/lib/format-utils";
 import { nowDate } from "@/lib/test-clock";
+import { UnderlineTabs } from "@/components/ui/app-design-system";
 
 export const Route = createFileRoute("/planejamento")({
   head: () => ({ meta: [{ title: "Planejamento — Norte" }] }),
   component: PlanScreen,
 });
 
-type Layer = "hoje" | "semana" | "mes" | "quarter" | "semestre" | "ano";
+type Layer = "mes" | "quarter" | "semestre" | "ano";
 
 const layerLabel: Record<Layer, string> = {
-  hoje: "Hoje",
-  semana: "Semana",
   mes: "Mês",
   quarter: "90 dias",
   semestre: "Semestre",
@@ -58,7 +53,6 @@ function PlanScreen() {
   const goals = useGoalsStore((s) => s.goals);
   const steps = useGoalsStore((s) => s.steps);
   const executions = useGoalsStore((s) => s.executions);
-  const profile = useProfile();
   // Planos 100% concluídos saem das visões ativas (Semana/Mês/90 dias/Semestre/Ano) —
   // ficam só na seção "Planos concluídos", reativo (reabrir uma etapa/execução já basta
   // pra voltar a aparecer aqui, sem reload).
@@ -84,56 +78,15 @@ function PlanScreen() {
         </div>
       </div>
 
-      <div className="mt-6 -mx-5 overflow-x-auto px-5">
-        <div
-          className="flex gap-1 rounded-2xl border border-border bg-surface p-1"
-          style={{ width: "max-content", minWidth: "100%" }}
-        >
-          {(Object.keys(layerLabel) as Layer[]).map((l) => (
-            <button
-              key={l}
-              onClick={() => setLayer(l)}
-              className={`min-h-11 rounded-xl px-4 py-2.5 text-xs font-semibold transition-colors ${layer === l ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-            >
-              {layerLabel[l]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {layer === "hoje" && (
-        <div className="mt-5 space-y-2.5">
-          {todayExecutions(executions)
-            .filter((t) => t.status !== "cancelada")
-            .map((t) => (
-              <div key={t.id} className="card-surface flex items-center gap-3 p-3.5">
-                <span className="font-mono text-xs font-bold text-muted-foreground">
-                  {formatTime(t.startTime, profile.timeFormat)}
-                </span>
-                <CategoryIcon category={t.category} className="h-5 w-5 text-muted-foreground" />
-                <p
-                  className={`flex-1 text-sm ${t.status === "concluida" ? "line-through opacity-60" : ""}`}
-                >
-                  {t.title}
-                </p>
-                {t.goalId && (
-                  <span className="text-[10px] text-muted-foreground">
-                    ← {goals.find((g) => g.id === t.goalId)?.title.slice(0, 18)}
-                  </span>
-                )}
-              </div>
-            ))}
-          {todayExecutions(executions).length === 0 && (
-            <div className="card-surface p-6 text-center text-sm text-muted-foreground">
-              Nada planejado para hoje.
-            </div>
-          )}
-        </div>
-      )}
-
-      {layer === "semana" && (
-        <WeekLayer steps={steps} goals={activeGoals} executions={executions} />
-      )}
+      <UnderlineTabs
+        className="mt-6"
+        items={(Object.keys(layerLabel) as Layer[]).map((key) => ({
+          key,
+          label: layerLabel[key],
+        }))}
+        value={layer}
+        onChange={setLayer}
+      />
       {layer === "mes" && (
         <PlanningHorizonView
           maxDays={31}
@@ -174,37 +127,6 @@ function PlanScreen() {
 
 function EmptyLayer({ text }: { text: string }) {
   return <div className="card-surface p-6 text-center text-sm text-muted-foreground">{text}</div>;
-}
-
-function WeekLayer({
-  steps,
-  goals,
-  executions,
-}: {
-  steps: Step[];
-  goals: Goal[];
-  executions: Execution[];
-}) {
-  // Calculado por render (não em escopo de módulo): esse arquivo é avaliado uma
-  // única vez por processo no SSR, então uma constante de módulo aqui ficaria
-  // presa ao dia do boot do servidor pra sempre, em vez de virar em cada domingo real.
-  const sundayMode = nowDate().getDay() === 0;
-  return (
-    <>
-      {sundayMode && (
-        <div className="mt-5 rounded-2xl border border-primary/30 bg-primary/10 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-            🛋️ Ritual de Domingo ativo
-          </p>
-          <p className="mt-1.5 text-sm text-balance-tight">
-            Revise as execuções da semana e ajuste o que precisar antes de segunda. A agenda dia a
-            dia fica na aba Agenda.
-          </p>
-        </div>
-      )}
-      <PlanningHorizonView maxDays={7} goals={goals} steps={steps} executions={executions} />
-    </>
-  );
 }
 
 /** `maxDays: null` = sem filtro de horizonte (visão "Ano": todos os planos,

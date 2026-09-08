@@ -44,6 +44,8 @@ import {
 import type { TimeFormat, WeekStart } from "@/lib/profile-store";
 import { nowDate } from "@/lib/test-clock";
 import { Modal } from "@/components/ui/modal";
+import { SettingsPanel } from "@/components/settings/SettingsPanel";
+import { AppMenuButton, WeekdaySelector } from "@/components/ui/app-design-system";
 import { CategoryIcon } from "@/components/plan/CategoryIcon";
 import {
   ScheduleFields,
@@ -81,6 +83,7 @@ function AgendaScreen() {
   const [selectedDate, setSelectedDate] = useState<string>(() => localISO(nowDate()));
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const executions = useGoalsStore((s) => s.executions);
   const eventsByDate = useMemo(() => agendaByDate(executions), [executions]);
@@ -96,14 +99,19 @@ function AgendaScreen() {
 
   return (
     <div className="px-5 pt-12">
-      <header className="relative pr-14">
+      <header className="relative min-h-24 pr-14">
         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Agenda</p>
         <h1 className="mt-1 text-3xl font-bold">Seus compromissos</h1>
         <p className="mt-2 text-sm text-muted-foreground">Seu tempo, com clareza.</p>
+        <AppMenuButton
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Abrir configurações"
+          className="absolute -right-2 -top-2"
+        />
         <button
           onClick={() => setCalendarOpen(true)}
           aria-label="Abrir calendário do mês"
-          className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface text-muted-foreground hover:border-primary/40 hover:text-primary"
+          className="interactive-press absolute right-0 top-11 flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-primary"
         >
           <CalendarDays className="h-5 w-5" />
         </button>
@@ -198,6 +206,7 @@ function AgendaScreen() {
           onClose={() => setCalendarOpen(false)}
         />
       )}
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }
@@ -486,25 +495,18 @@ function WeekStrip({
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
-      <div className="grid grid-cols-7 gap-1 px-3 pb-4">
-        {week.map((d) => {
-          const iso = localISO(d);
-          const evts = eventsByDate[iso] ?? [];
-          const isSel = iso === selectedDate;
-          return (
-            <button
-              key={iso}
-              onClick={() => onSelect(iso)}
-              className={`flex min-h-16 flex-col items-center justify-center rounded-2xl px-1 text-center transition-colors ${isSel ? "bg-primary text-primary-foreground" : "hover:bg-surface-2"}`}
-            >
-              <p className="text-[9px] uppercase opacity-75">{weekLabels[d.getDay()]}</p>
-              <p className="mt-1 text-base font-bold">{d.getDate()}</p>
-              <span
-                className={`mt-1 h-1 w-1 rounded-full ${evts.length > 0 ? (isSel ? "bg-primary-foreground" : "bg-primary") : "bg-transparent"}`}
-              />
-            </button>
-          );
-        })}
+      <div className="px-3 pb-4">
+        <WeekdaySelector
+          items={week.map((d, index) => ({ day: index, label: weekLabels[d.getDay()] }))}
+          selectedDay={week.findIndex((d) => localISO(d) === selectedDate)}
+          currentDay={week.findIndex((d) => localISO(d) === localISO(nowDate()))}
+          onSelect={(index) => onSelect(localISO(week[index]))}
+          primary={(index) => week[index].getDate()}
+          secondary={(index) => {
+            const hasEvents = (eventsByDate[localISO(week[index])] ?? []).length > 0;
+            return hasEvents ? <span className="text-primary">●</span> : "—";
+          }}
+        />
       </div>
     </div>
   );

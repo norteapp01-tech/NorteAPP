@@ -153,15 +153,15 @@ describe("agendaByDate — prazo não é agenda", () => {
   it("depois de agendar (agendaDate/startTime), aparece na data agendada", () => {
     setTestClockOverride(new Date("2026-09-01T12:00:00.000Z").getTime());
     const e = makeExecution({
-      dueDate: "2026-09-08",
-      agendaDate: "2026-09-07",
+      dueDate: "2999-09-08",
+      agendaDate: "2999-09-07",
       startTime: "14:00",
       endTime: "15:00",
     });
     expect(isScheduled(e)).toBe(true);
     const map = agendaByDate([e]);
-    expect(Object.keys(map)).toEqual(["2026-09-07"]);
-    expect(map["2026-09-07"][0].id).toBe("e1");
+    expect(Object.keys(map)).toEqual(["2999-09-07"]);
+    expect(map["2999-09-07"][0].id).toBe("e1");
   });
 });
 

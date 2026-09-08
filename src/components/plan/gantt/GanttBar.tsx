@@ -36,7 +36,7 @@ export function GanttBar({
   pxPerDay,
   rowHeight,
   lane,
-  isHighlighted,
+  isTodayActive,
   onOpenDetails,
   onError,
   goalId,
@@ -47,7 +47,7 @@ export function GanttBar({
   pxPerDay: number;
   rowHeight: number;
   lane: number;
-  isHighlighted: boolean;
+  isTodayActive: boolean;
   onOpenDetails: () => void;
   onError: (message: string) => void;
   goalId: string;
@@ -196,8 +196,8 @@ export function GanttBar({
 
   const tone = done
     ? "border-border/80 bg-surface-2/60 text-muted-foreground"
-    : isHighlighted
-      ? "border-primary bg-primary/10 text-primary"
+    : isTodayActive
+      ? "border-primary bg-background/80 text-primary"
       : "border-border bg-surface-2/95 text-foreground";
 
   // Calculado uma vez por montagem, não a cada pointermove do arrasto (o
@@ -215,7 +215,7 @@ export function GanttBar({
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex h-full items-center gap-1.5 overflow-hidden">
-        {isHighlighted && showHandles && (
+        {isTodayActive && showHandles && (
           <GripVertical className="h-4 w-3 shrink-0 text-primary/80" aria-hidden />
         )}
         {done && <Check className="h-3.5 w-3.5 shrink-0 text-primary" strokeWidth={2.5} />}

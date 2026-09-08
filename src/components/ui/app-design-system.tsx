@@ -56,21 +56,24 @@ export function UnderlineTabs<T extends string>({
 }
 
 export function WeekdaySelector({
+  items = officialWeek,
   selectedDay,
+  currentDay = nowDate().getDay(),
   onSelect,
   primary,
   secondary,
 }: {
+  items?: readonly { day: number; label: string }[];
   selectedDay?: number;
+  currentDay?: number;
   onSelect: (day: number) => void;
   primary: (day: number) => ReactNode;
   secondary?: (day: number) => ReactNode;
 }) {
-  const today = nowDate().getDay();
   return (
     <div className="grid grid-cols-7 gap-1.5">
-      {officialWeek.map(({ day, label }) => {
-        const current = day === today;
+      {items.map(({ day, label }) => {
+        const current = day === currentDay;
         const selected = day === selectedDay;
         return (
           <button

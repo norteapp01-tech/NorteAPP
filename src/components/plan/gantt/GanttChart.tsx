@@ -11,7 +11,6 @@ import {
   ganttBuckets,
   hasPlannedRange,
   isScheduled,
-  nextPlanAction,
   stepsForGoal,
   toISODate,
   todayISO,
@@ -87,9 +86,6 @@ export function GanttChart({
   const totalWidth = window_.totalDays * pxPerDay;
   const bucketWidth = (startISO: string, endISO: string) =>
     (daysBetweenISO(startISO, endISO) + 1) * pxPerDay;
-
-  const planNext = nextPlanAction(goal, steps, executions);
-  const highlightId = planNext.kind === "action" ? planNext.execution.id : null;
 
   const scheduled = useMemo(() => executions.filter(hasPlannedRange), [executions]);
   const todayOffsetDays = daysBetweenISO(window_.startISO, today);
@@ -212,7 +208,7 @@ export function GanttChart({
                       pxPerDay={pxPerDay}
                       rowHeight={ROW_HEIGHT}
                       lane={laneOf[e.id]}
-                      isHighlighted={e.id === highlightId}
+                      isTodayActive={e.plannedStartDate! <= today && e.plannedEndDate! >= today}
                       onOpenDetails={() => setOpenExecution(e)}
                       onError={setError}
                       goalId={goal.id}
@@ -229,7 +225,7 @@ export function GanttChart({
                 className="pointer-events-none absolute bottom-0 top-0 z-30 w-px bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.2)]"
                 style={{ left: todayOffsetDays * pxPerDay }}
               >
-                <span className="absolute left-1 top-1 whitespace-nowrap rounded-md bg-primary px-2 py-1 text-[9px] font-bold text-primary-foreground">
+                <span className="absolute left-1/2 top-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-primary px-2 py-1 text-[9px] font-bold text-primary-foreground">
                   HOJE · {new Date(today + "T00:00:00").getDate()}
                 </span>
               </div>
