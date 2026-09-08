@@ -26,6 +26,8 @@ export type Profile = {
    * sempre com todayISO(): um valor de um dia anterior não é o humor de hoje. */
   moodDate: string | null;
   moodValue: string | null;
+  /** Ações futuras escolhidas conscientemente como extras do dia. */
+  moodExtraExecutionIds: string[];
 };
 
 const DEFAULT_PROFILE: Profile = {
@@ -41,6 +43,7 @@ const DEFAULT_PROFILE: Profile = {
   notifyReminders: true,
   moodDate: null,
   moodValue: null,
+  moodExtraExecutionIds: [],
 };
 
 type Row = Record<string, unknown>;
@@ -59,6 +62,9 @@ function mapProfile(r: Row): Profile {
     notifyReminders: (r.notify_reminders as boolean) ?? true,
     moodDate: (r.mood_date as string) ?? null,
     moodValue: (r.mood_value as string) ?? null,
+    moodExtraExecutionIds: Array.isArray(r.mood_extra_execution_ids)
+      ? (r.mood_extra_execution_ids as string[])
+      : [],
   };
 }
 
@@ -103,6 +109,7 @@ export async function updateProfile(patch: {
   notifyReminders?: boolean;
   moodDate?: string | null;
   moodValue?: string | null;
+  moodExtraExecutionIds?: string[];
 }) {
   const userId = await ensureSession();
   const dbPatch: Row = {};
@@ -118,6 +125,8 @@ export async function updateProfile(patch: {
   if (patch.notifyReminders !== undefined) dbPatch.notify_reminders = patch.notifyReminders;
   if (patch.moodDate !== undefined) dbPatch.mood_date = patch.moodDate;
   if (patch.moodValue !== undefined) dbPatch.mood_value = patch.moodValue;
+  if (patch.moodExtraExecutionIds !== undefined)
+    dbPatch.mood_extra_execution_ids = patch.moodExtraExecutionIds;
 
   const { error } = await supabase
     .from("profiles")

@@ -37,15 +37,17 @@ import {
   todayISO,
   formatDateBR,
   scheduleExecution,
+  updateAgendaSession,
+  removeAgendaSession,
   type Execution,
 } from "@/lib/goals-store";
 
 type EnergyMood = "fogo" | "normal" | "cansado" | "doente" | null;
 
 const moodOptions = [
-  { v: "fogo", emoji: "🔥", label: "Fogo" },
-  { v: "normal", emoji: "😐", label: "Normal" },
-  { v: "cansado", emoji: "😴", label: "Cansado" },
+  { v: "fogo", emoji: "🔥", label: "Energia alta" },
+  { v: "normal", emoji: "🙂", label: "Estou bem" },
+  { v: "cansado", emoji: "🪫", label: "Energia baixa" },
   { v: "doente", emoji: "🤒", label: "Doente" },
 ] as const;
 
@@ -62,6 +64,10 @@ export function TodayScreen() {
   const [showEod, setShowEod] = useState(false);
   const [reorganizing, setReorganizing] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [lastAdjustment, setLastAdjustment] = useState<{
+    kind: "move" | "remove";
+    tasks: Execution[];
+  } | null>(null);
 
   // Memoizado: essas funções varrem todo o dataset (todo o goalPace/insights
   // roda um loop sobre todos os goals) — sem isso, abrir qualquer modal desta
@@ -79,12 +85,48 @@ export function TodayScreen() {
 
   const pendingTasks = tasks.filter((t) => t.status === "planejada");
   const insight = useMemo(() => insightsComputed(state)[0], [state]);
+  const extraTasks = useMemo(() => {
+    if (profile.moodDate !== todayISO()) return [];
+    return profile.moodExtraExecutionIds
+      .map((id) => executions.find((execution) => execution.id === id))
+      .filter(
+        (execution): execution is Execution => !!execution && execution.status === "planejada",
+      );
+  }, [executions, profile.moodDate, profile.moodExtraExecutionIds]);
+  const extraCandidates = useMemo(() => {
+    const today = todayISO();
+    const todayIds = new Set(tasks.map((task) => task.id));
+    return executions
+      .filter(
+        (execution) =>
+          execution.status === "planejada" &&
+          !todayIds.has(execution.id) &&
+          ((execution.agendaDate && execution.agendaDate > today) ||
+            (execution.plannedStartDate && execution.plannedStartDate > today) ||
+            execution.dueDate > today),
+      )
+      .sort((a, b) =>
+        (a.agendaDate ?? a.plannedStartDate ?? a.dueDate).localeCompare(
+          b.agendaDate ?? b.plannedStartDate ?? b.dueDate,
+        ),
+      )
+      .slice(0, 6);
+  }, [executions, tasks]);
 
   const pickMood = async (m: EnergyMood) => {
-    if (savingMood || m === todayMood) return;
+    if (savingMood) return;
+    if (m === todayMood) {
+      setMoodPanelFor(m);
+      return;
+    }
     setSavingMood(true);
     try {
-      await updateProfile({ moodDate: todayISO(), moodValue: m });
+      await updateProfile({
+        moodDate: todayISO(),
+        moodValue: m,
+        moodExtraExecutionIds:
+          m === "fogo" && profile.moodDate === todayISO() ? profile.moodExtraExecutionIds : [],
+      });
       setMoodPanelFor(m);
     } finally {
       setSavingMood(false);
@@ -151,45 +193,75 @@ export function TodayScreen() {
       </section>
       {moodPanelFor && (
         <MoodActionPanel
+          key={moodPanelFor}
           mood={moodPanelFor}
-          onFinish={async (action) => {
+          todayTasks={pendingTasks}
+          extraCandidates={extraCandidates}
+          initialExtras={profile.moodExtraExecutionIds}
+          onSaveExtras={async (ids) => {
+            await updateProfile({ moodExtraExecutionIds: ids });
+            setMoodPanelFor(null);
+          }}
+          onMoveTomorrow={async (selected) => {
             const tomorrow = toISODate(addDays(nowDate(), 1));
-            if (action === "adiar-pesados") {
-              await Promise.all(
-                tasks
-                  .filter((t) => t.weight === "pesado" && t.status === "planejada" && !t.rigid)
-                  .map((t) =>
-                    rescheduleExecution(
-                      t.id,
-                      tomorrow,
-                      t.startTime ?? "09:00",
-                      t.endTime,
-                      "adiado — dia cansado",
-                    ),
-                  ),
-              );
-            }
-            if (action === "elevar") {
-              const leitura = tasks.find(
-                (t) => t.category === "leitura" && t.status === "planejada",
-              );
-              if (leitura)
-                await patchExecution(leitura.id, {
-                  how: "16 páginas (dobrado) — modo fogo",
-                  weight: "medio",
-                });
-            }
-            if (action === "remover-flex") {
-              await Promise.all(
-                tasks
-                  .filter((t) => t.status === "planejada" && !t.rigid)
-                  .map((t) => cancelExecution(t.id, "removida — dia sem energia pra flexíveis")),
-              );
-            }
+            await Promise.all(
+              selected.map((task) =>
+                updateAgendaSession(
+                  task.id,
+                  task.agendaSessionId,
+                  tomorrow,
+                  task.startTime ?? "09:00",
+                  task.endTime,
+                ),
+              ),
+            );
+            setLastAdjustment({ kind: "move", tasks: selected });
+            setMoodPanelFor(null);
+          }}
+          onRemoveToday={async (selected) => {
+            await Promise.all(
+              selected.map((task) => removeAgendaSession(task.id, task.agendaSessionId)),
+            );
+            setLastAdjustment({ kind: "remove", tasks: selected });
             setMoodPanelFor(null);
           }}
           onClose={() => setMoodPanelFor(null)}
         />
+      )}
+
+      {lastAdjustment && (
+        <div className="card-surface mt-3 flex items-center gap-3 border-primary/30 px-4 py-3">
+          <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+            Dia ajustado · {lastAdjustment.tasks.length}{" "}
+            {lastAdjustment.kind === "move" ? "movida(s) para amanhã" : "retirada(s) de hoje"}
+          </p>
+          <button
+            className="min-h-11 text-xs font-semibold text-primary"
+            onClick={async () => {
+              await Promise.all(
+                lastAdjustment.tasks.map((task) =>
+                  lastAdjustment.kind === "move"
+                    ? updateAgendaSession(
+                        task.id,
+                        task.agendaSessionId,
+                        todayISO(),
+                        task.startTime ?? "09:00",
+                        task.endTime,
+                      )
+                    : scheduleExecution(
+                        task.id,
+                        todayISO(),
+                        task.startTime ?? "09:00",
+                        task.endTime,
+                      ),
+                ),
+              );
+              setLastAdjustment(null);
+            }}
+          >
+            Desfazer
+          </button>
+        </div>
       )}
 
       <div className="mt-7 flex items-center justify-between">
@@ -261,6 +333,37 @@ export function TodayScreen() {
         )}
       </ul>
 
+      {extraTasks.length > 0 && (
+        <section className="card-surface mt-4 overflow-hidden border-primary/30">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <div>
+              <h2 className="text-sm font-semibold">Extras de hoje</h2>
+              <p className="text-[11px] text-muted-foreground">Se sobrar energia, você adianta.</p>
+            </div>
+            <span className="text-xs font-semibold text-primary">{extraTasks.length}</span>
+          </div>
+          <div className="divide-y divide-border">
+            {extraTasks.map((task) => (
+              <button
+                key={task.id}
+                onClick={() => completeExecution(task.id)}
+                className="interactive-press flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left"
+              >
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-primary text-primary">
+                  <Check className="h-3.5 w-3.5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{task.title}</span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    Prazo {formatDateBR(task.dueDate)}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       <div className="mt-4 flex items-stretch gap-3">
         <RemindersCard compact />
         <HydrationCard className="flex-1" />
@@ -306,69 +409,64 @@ export function TodayScreen() {
   );
 }
 
-/** Painel de ação contextual do humor — reaproveita as mesmas opções/ações de sempre
- * (adiar pesados, elevar metas, remover flexíveis), só deixou de tomar a tela inteira:
- * some assim que o usuário escolhe uma ação ou fecha, a seleção acima continua marcada. */
+/** Ajuste direto do dia: nenhuma tarefa vem pré-selecionada e nenhuma decisão é
+ * tomada pelo sistema. Tocar escolhe; o botão inferior aplica tudo em lote. */
 function MoodActionPanel({
   mood,
-  onFinish,
+  todayTasks,
+  extraCandidates,
+  initialExtras,
+  onSaveExtras,
+  onMoveTomorrow,
+  onRemoveToday,
   onClose,
 }: {
-  mood: EnergyMood;
-  onFinish: (action: string) => void;
+  mood: Exclude<EnergyMood, null>;
+  todayTasks: Execution[];
+  extraCandidates: Execution[];
+  initialExtras: string[];
+  onSaveExtras: (ids: string[]) => Promise<void>;
+  onMoveTomorrow: (tasks: Execution[]) => Promise<void>;
+  onRemoveToday: (tasks: Execution[]) => Promise<void>;
   onClose: () => void;
 }) {
-  const opening: Record<
-    Exclude<EnergyMood, null>,
-    { line: string; prompt: string; options: { label: string; action: string; tone?: string }[] }
-  > = {
-    fogo: {
-      line: "Dia raro. Bora aproveitar.",
-      prompt: "Como quer usar essa energia?",
-      options: [
-        {
-          label: "Elevar as metas de hoje (mais páginas, mais carga)",
-          action: "elevar",
-          tone: "primary",
-        },
-        { label: "Antecipar tarefas de amanhã", action: "antecipar" },
-        { label: "Manter o plano — só executar bem", action: "manter" },
-      ],
-    },
-    normal: {
-      line: "Dia comum. Plano em pé.",
-      prompt: "Alguma coisa mudou desde ontem?",
-      options: [
-        { label: "Nada, seguir o plano", action: "manter", tone: "primary" },
-        { label: "Estou meio disperso — reduz o supérfluo", action: "remover-flex" },
-      ],
-    },
-    cansado: {
-      line: "Ok. Não te forço.",
-      prompt: "O que faço com os pesados?",
-      options: [
-        { label: "Adiar todos os pesados p/ amanhã", action: "adiar-pesados", tone: "primary" },
-        { label: "Manter só os rígidos e cancelar o resto", action: "remover-flex" },
-        { label: "Deixa comigo — sigo o plano", action: "manter" },
-      ],
-    },
-    doente: {
-      line: "Primeiro: descansa. Vamos negociar o dia.",
-      prompt: "Quais tarefas são indispensáveis hoje?",
-      options: [
-        {
-          label: "Só o essencial (rígidas) — resto reagenda",
-          action: "remover-flex",
-          tone: "primary",
-        },
-        { label: "Zerar o dia — cuido de mim", action: "adiar-pesados" },
-        { label: "Consigo o básico, sem os pesados", action: "adiar-pesados" },
-      ],
-    },
-  };
+  const [selected, setSelected] = useState<string[]>(
+    mood === "fogo" ? initialExtras.filter((id) => extraCandidates.some((e) => e.id === id)) : [],
+  );
+  const [busy, setBusy] = useState(false);
+  const choices = mood === "fogo" ? extraCandidates : todayTasks;
+  const chosenTasks = choices.filter((task) => selected.includes(task.id));
+  const toggle = (id: string) =>
+    setSelected((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    );
 
-  if (!mood) return null;
-  const cfg = opening[mood];
+  const title =
+    mood === "fogo"
+      ? "Aproveitar o ritmo"
+      : mood === "normal"
+        ? "Seguir o plano"
+        : mood === "cansado"
+          ? "Revisar o ritmo"
+          : "Reorganizar o dia";
+  const prompt =
+    mood === "fogo"
+      ? "Toque no que você gostaria de adiantar."
+      : mood === "normal"
+        ? "Seu plano continua como está."
+        : mood === "cansado"
+          ? "Selecione somente o que prefere mover de hoje."
+          : "Selecione o que precisa sair de hoje.";
+
+  const run = async (action: () => Promise<void>) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await action();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <section className="card-surface mt-3 space-y-4 border-primary/30 bg-primary/5 p-4">
@@ -377,26 +475,92 @@ function MoodActionPanel({
           <Sparkles className="h-4 w-4 text-primary" />
         </div>
         <div className="flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
-            {cfg.line}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">{cfg.prompt}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">{title}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{prompt}</p>
         </div>
         <button onClick={onClose} aria-label="Fechar" className="text-muted-foreground">
           <X className="h-4 w-4" />
         </button>
       </div>
-      <div className="space-y-2">
-        {cfg.options.map((o) => (
-          <button
-            key={o.label}
-            onClick={() => onFinish(o.action)}
-            className={`w-full rounded-xl px-4 py-3 text-left text-sm transition-colors ${o.tone === "primary" ? "bg-primary text-primary-foreground font-semibold" : "border border-border bg-surface hover:border-primary/40"}`}
-          >
-            {o.label}
+      {mood === "normal" ? (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-2.5">
+          <p className="text-xs text-muted-foreground">
+            {todayTasks.length} tarefa{todayTasks.length === 1 ? "" : "s"} pendente
+            {todayTasks.length === 1 ? "" : "s"}
+          </p>
+          <button onClick={onClose} className="min-h-11 px-2 text-xs font-semibold text-primary">
+            Continuar meu dia
           </button>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <>
+          <div className="max-h-64 space-y-2 overflow-y-auto">
+            {choices.map((task) => {
+              const active = selected.includes(task.id);
+              const when = task.agendaDate ?? task.plannedStartDate ?? task.dueDate;
+              return (
+                <button
+                  key={task.id}
+                  onClick={() => toggle(task.id)}
+                  className={`interactive-press flex min-h-14 w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left ${active ? "border-primary bg-primary/10" : "border-border bg-surface"}`}
+                >
+                  <span
+                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border ${active ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground"}`}
+                  >
+                    {active ? (
+                      <Check className="check-enter h-3.5 w-3.5" />
+                    ) : mood === "fogo" ? (
+                      "+"
+                    ) : (
+                      ""
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{task.title}</span>
+                    <span className="mt-0.5 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
+                      {mood === "fogo" && <span>{formatDateBR(when)}</span>}
+                      {task.dueDate === todayISO() && (
+                        <span className="text-warning">vence hoje</span>
+                      )}
+                      {task.rigid && <span>· compromisso fixo</span>}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+            {choices.length === 0 && (
+              <p className="rounded-xl border border-border bg-surface px-3 py-4 text-center text-xs text-muted-foreground">
+                {mood === "fogo"
+                  ? "Nenhuma ação futura disponível para antecipar."
+                  : "Nenhuma tarefa pendente para revisar."}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2 border-t border-border pt-3">
+            <span className="mr-auto text-[11px] text-muted-foreground">
+              {selected.length} selecionada{selected.length === 1 ? "" : "s"}
+            </span>
+            {mood === "doente" && (
+              <button
+                disabled={selected.length === 0 || busy}
+                onClick={() => run(() => onRemoveToday(chosenTasks))}
+                className="min-h-11 px-2 text-xs font-semibold text-muted-foreground disabled:opacity-40"
+              >
+                Retirar de hoje
+              </button>
+            )}
+            <button
+              disabled={(mood !== "fogo" && selected.length === 0) || busy}
+              onClick={() =>
+                run(() => (mood === "fogo" ? onSaveExtras(selected) : onMoveTomorrow(chosenTasks)))
+              }
+              className="min-h-11 rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-40"
+            >
+              {mood === "fogo" ? "Aplicar extras" : "Mover para amanhã"}
+            </button>
+          </div>
+        </>
+      )}
     </section>
   );
 }
