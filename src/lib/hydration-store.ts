@@ -63,6 +63,18 @@ export async function addWater(amountMl: number) {
   await queryClient.invalidateQueries({ queryKey: hydrationQueryKey() });
 }
 
+/** Corrige a quantidade do registro mais recente de hoje, sem criar outro. */
+export async function correctLastWaterLog(logs: HydrationLog[], amountMl: number) {
+  const last = logs[logs.length - 1];
+  if (!last) throw new Error("Nenhum registro de água encontrado hoje para corrigir.");
+  const { error } = await supabase
+    .from("hydration_logs")
+    .update({ amount_ml: amountMl })
+    .eq("id", last.id);
+  if (error) throw new Error(error.message);
+  await queryClient.invalidateQueries({ queryKey: hydrationQueryKey() });
+}
+
 /** Apaga o último registro de hoje — corrige toque acidental sem mexer no resto do histórico. */
 export async function undoLastLog(logs: HydrationLog[]) {
   const last = logs[logs.length - 1];

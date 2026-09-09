@@ -47,6 +47,18 @@ Data: 9 de setembro de 2026
 - tratamento de falha após a confirmação;
 - orquestrador desacoplado para testes sem banco ou modelo;
 - ambiente inerte para testes unitários do client Supabase.
+- correção real do último registro de água, sem somar um segundo consumo;
+- correção da última transação financeira sem duplicar o lançamento;
+- confirmação conversacional reconhecida sem pedir uma segunda confirmação.
+
+## Resultado do teste real com modelo e Supabase
+
+- A fala informal “bebi mei litro e gastei vintao no busao” foi dividida corretamente em 500 ml de água e R$ 20 em Transporte.
+- O pedido vago para “jogar tudo para amanhã” não produziu ação automática.
+- O plano detalhado preservou título, área, motivo e data e só gerou a ferramenta depois de confirmação.
+- No primeiro ensaio, “errei, foram 300 ml” gerou um novo consumo: falha encontrada e corrigida.
+- No segundo ensaio, a mesma frase chamou `corrigir_ultima_agua`, sem criar outro consumo.
+- Foram criadas três sessões anônimas temporárias no Supabase. Cada uma enxergou somente seu próprio item da Caixa Norte; os itens temporários foram removidos ao final.
 
 ## Limites ainda existentes
 

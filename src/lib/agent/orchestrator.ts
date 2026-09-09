@@ -33,9 +33,14 @@ export async function runAgentTurnWith(
   userMessage: string,
   deps: AgentRunnerDeps,
 ): Promise<ChatTurn> {
+  const previousTurn = history.at(-1);
   // Só a proposta imediatamente anterior pode ser confirmada. Isso impede que
   // um "sim" tardio execute uma ação antiga já cancelada ou abandonada.
-  const pending = history.at(-1)?.pendingActions;
+  const pending = previousTurn?.pendingActions;
+  const confirmsPreviousProposal =
+    isExplicitConfirmation(userMessage) &&
+    previousTurn?.role === "assistant" &&
+    /confirm/i.test(previousTurn.text);
   if (pending?.length) {
     if (isExplicitRejection(userMessage))
       return { role: "assistant", text: "Certo, não alterei nada." };
@@ -95,7 +100,7 @@ export async function runAgentTurnWith(
         continue;
       }
       seenThisRound.add(key);
-      if (requiresConfirmation(action.name)) {
+      if (requiresConfirmation(action.name) && !confirmsPreviousProposal) {
         proposed.push(action);
         messages.push({
           role: "tool",

@@ -8,9 +8,15 @@
  * app já funciona. O servidor só intermedia a chamada ao modelo de IA
  * (chat.functions.ts) — nunca toca no banco.
  */
-import { addWater, fetchTodayLogs as fetchHydrationLogs, todayIntake } from "../hydration-store";
+import {
+  addWater,
+  correctLastWaterLog,
+  fetchTodayLogs as fetchHydrationLogs,
+  todayIntake,
+} from "../hydration-store";
 import {
   addTransaction,
+  correctTransaction,
   fetchState as fetchFinanceState,
   totalsForMonth,
   categoryBreakdown,
@@ -66,6 +72,19 @@ export const AGENT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "corrigir_ultima_agua",
+      description:
+        "Corrige o último registro de água de hoje. Use quando a pessoa disser que a quantidade anterior estava errada; não registre água nova.",
+      parameters: {
+        type: "object",
+        properties: { amountMl: { type: "number", description: "Quantidade correta em ml" } },
+        required: ["amountMl"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "registrar_transacao",
       description:
         "Registra um gasto ou entrada financeira com valor e categoria claros. Ação reversível, execute direto.",
@@ -78,6 +97,23 @@ export const AGENT_TOOLS = [
           category: { type: "string", description: `Uma destas categorias: ${CATEGORY_IDS}` },
         },
         required: ["type", "amount", "description", "category"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "corrigir_ultima_transacao",
+      description:
+        "Corrige a transação financeira mais recente quando a pessoa retifica valor, descrição, categoria ou tipo. Não crie outra transação.",
+      parameters: {
+        type: "object",
+        properties: {
+          type: { type: "string", enum: ["expense", "income"] },
+          amount: { type: "number" },
+          description: { type: "string" },
+          category: { type: "string", description: `Uma destas categorias: ${CATEGORY_IDS}` },
+        },
       },
     },
   },
@@ -300,6 +336,13 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
       return `Registrado. Total de hoje: ${todayIntake(logs)}ml.`;
     }
 
+    case "corrigir_ultima_agua": {
+      const logs = await fetchHydrationLogs();
+      await correctLastWaterLog(logs, args.amountMl as number);
+      const updated = await fetchHydrationLogs();
+      return `Corrigi o último registro para ${args.amountMl}ml. Total de hoje: ${todayIntake(updated)}ml.`;
+    }
+
     case "registrar_transacao": {
       await addTransaction({
         type: args.type as "expense" | "income",
@@ -308,6 +351,21 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
         category: args.category as string,
       });
       return `Registrado: R$${(args.amount as number).toFixed(2)} em ${args.category} (${args.description}). Pode corrigir ou desfazer no app.`;
+    }
+
+    case "corrigir_ultima_transacao": {
+      const state = await fetchFinanceState();
+      const last = [...state.transactions].sort((a, b) =>
+        b.createdAt.localeCompare(a.createdAt),
+      )[0];
+      if (!last) return "Não encontrei uma transação anterior para corrigir.";
+      await correctTransaction(last.id, {
+        type: args.type as "expense" | "income" | undefined,
+        amount: args.amount as number | undefined,
+        description: args.description as string | undefined,
+        category: args.category as string | undefined,
+      });
+      return `Corrigi a última transação. Pode desfazer no app.`;
     }
 
     case "consultar_financas": {

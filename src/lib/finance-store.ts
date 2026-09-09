@@ -474,6 +474,19 @@ export async function removeTransaction(id: string) {
   await invalidate();
 }
 
+export async function correctTransaction(
+  id: string,
+  patch: Partial<Pick<Transaction, "amount" | "description" | "category" | "type">>,
+) {
+  const dbPatch: Row = {};
+  if (patch.amount !== undefined) dbPatch.amount = patch.amount;
+  if (patch.description !== undefined) dbPatch.description = patch.description.trim();
+  if (patch.category !== undefined) dbPatch.category = patch.category;
+  if (patch.type !== undefined) dbPatch.type = patch.type;
+  unwrap(await supabase.from("transactions").update(dbPatch).eq("id", id).select().single());
+  await invalidate();
+}
+
 // ---------------------------------------------------------------------------
 // Ações — planejamento
 // ---------------------------------------------------------------------------

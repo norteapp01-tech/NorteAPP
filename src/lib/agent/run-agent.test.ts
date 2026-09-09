@@ -84,6 +84,30 @@ describe("Agente Norte — três personas e cenários adversariais", () => {
     expect(confirmed.text).toContain("Plano criado");
   });
 
+  it("não pede uma segunda confirmação quando o modelo já havia solicitado a primeira", async () => {
+    const execute = vi.fn(async () => "Plano criado com sucesso.");
+    const history: ChatTurn[] = [
+      { role: "user", text: "Crie um plano de 90 dias" },
+      { role: "assistant", text: "Preparei o plano. Confirma para eu registrar?" },
+    ];
+    const reply = await runAgentTurnWith(history, "confirmo", {
+      step: stepReturning([
+        {
+          name: "criar_plano",
+          args: {
+            title: "Plano de 90 dias",
+            why: "Objetivo informado",
+            lifeArea: "Carreira",
+            deadlineLabel: "em 90 dias",
+          },
+        },
+      ]) as never,
+      execute: execute as never,
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(reply.pendingActions).toBeUndefined();
+  });
+
   it("bloqueia dados perigosos mesmo quando o modelo tenta chamar a ferramenta", async () => {
     const execute = vi.fn();
     const reply = await runAgentTurnWith([], "bebi menos 500 ml", {

@@ -17,6 +17,7 @@ const positive = z.number().finite().positive();
 
 const schemas: Record<string, z.ZodType<Record<string, unknown>>> = {
   registrar_agua: z.object({ amountMl: positive.max(10_000) }),
+  corrigir_ultima_agua: z.object({ amountMl: positive.max(10_000) }),
   registrar_transacao: z.object({
     type: z.enum(["expense", "income"]),
     amount: positive.max(100_000_000),
@@ -33,6 +34,28 @@ const schemas: Record<string, z.ZodType<Record<string, unknown>>> = {
       "Outros",
     ]),
   }),
+  corrigir_ultima_transacao: z
+    .object({
+      type: z.enum(["expense", "income"]).optional(),
+      amount: positive.max(100_000_000).optional(),
+      description: z.string().trim().min(1).max(240).optional(),
+      category: z
+        .enum([
+          "Alimentação",
+          "Transporte",
+          "Lazer",
+          "Compras",
+          "Assinaturas",
+          "Aluguel",
+          "Academia",
+          "Trabalho/Receita",
+          "Outros",
+        ])
+        .optional(),
+    })
+    .refine((value) => Object.values(value).some((item) => item !== undefined), {
+      message: "informe ao menos um campo para corrigir",
+    }),
   consultar_financas: z.object({}),
   consultar_dia: z.object({}),
   criar_lembrete: z.object({ text: z.string().trim().min(1).max(240), date: isoDate }),
