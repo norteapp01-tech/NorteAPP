@@ -17,5 +17,11 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
+    // O client é construído em alguns testes de unidade. Valores deliberadamente
+    // inertes mantêm a suíte local executável sem exigir credenciais reais.
+    env: {
+      VITE_SUPABASE_URL: "https://example.supabase.co",
+      VITE_SUPABASE_ANON_KEY: "test-anon-key",
+    },
   },
 });

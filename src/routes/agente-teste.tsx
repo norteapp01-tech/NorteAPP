@@ -137,6 +137,24 @@ function AgentTestPage() {
                   ))}
                 </div>
               )}
+              {turn.pendingActions && turn.pendingActions.length > 0 && (
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => send("Confirmo")}
+                    disabled={sending}
+                    className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-40"
+                  >
+                    Confirmar
+                  </button>
+                  <button
+                    onClick={() => send("Cancelar")}
+                    disabled={sending}
+                    className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground disabled:opacity-40"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ))}

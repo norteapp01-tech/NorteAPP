@@ -119,7 +119,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "criar_execucao",
       description:
-        "Cria um compromisso ou tarefa simples com prazo (e horário na agenda, se a pessoa disser um horário). Ação reversível, execute direto.",
+        "NÍVEL 3 — prepara um compromisso ou tarefa com prazo; o orquestrador exige confirmação explícita antes de executar.",
       parameters: {
         type: "object",
         properties: {
