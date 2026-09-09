@@ -363,7 +363,7 @@ function mapBodyWeight(r: Row): BodyWeightEntry {
   return { id: r.id as string, date: r.date as string, weight: r.weight as number };
 }
 
-async function fetchState(): Promise<State> {
+export async function fetchState(): Promise<State> {
   const [plansRes, exercisesRes, weeklyRes, sessionsRes, exLogsRes, setLogsRes, weightsRes] =
     await Promise.all([
       supabase.from("workout_plans").select("*").order("order_index"),

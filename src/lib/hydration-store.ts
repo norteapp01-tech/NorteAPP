@@ -21,7 +21,7 @@ function mapLog(r: Row): HydrationLog {
   };
 }
 
-async function fetchTodayLogs(): Promise<HydrationLog[]> {
+export async function fetchTodayLogs(): Promise<HydrationLog[]> {
   const userId = await ensureSession();
   const { data, error } = await supabase
     .from("hydration_logs")

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AgendaRouteImport } from './routes/agenda'
+import { Route as AgenteTesteRouteImport } from './routes/agente-teste'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as CriarRouteImport } from './routes/criar'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -26,6 +27,11 @@ const IndexRoute = IndexRouteImport.update({
 const AgendaRoute = AgendaRouteImport.update({
   id: '/agenda',
   path: '/agenda',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgenteTesteRoute = AgenteTesteRouteImport.update({
+  id: '/agente-teste',
+  path: '/agente-teste',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
@@ -62,6 +68,7 @@ const SubAgendaCategoriaRoute = SubAgendaCategoriaRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
+  '/agente-teste': typeof AgenteTesteRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/criar': typeof CriarRoute
   '/dashboard': typeof DashboardRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
+  '/agente-teste': typeof AgenteTesteRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/criar': typeof CriarRoute
   '/dashboard': typeof DashboardRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
+  '/agente-teste': typeof AgenteTesteRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/criar': typeof CriarRoute
   '/dashboard': typeof DashboardRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/agenda'
+    | '/agente-teste'
     | '/configuracoes'
     | '/criar'
     | '/dashboard'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/agenda'
+    | '/agente-teste'
     | '/configuracoes'
     | '/criar'
     | '/dashboard'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/agenda'
+    | '/agente-teste'
     | '/configuracoes'
     | '/criar'
     | '/dashboard'
@@ -126,6 +138,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgendaRoute: typeof AgendaRoute
+  AgenteTesteRoute: typeof AgenteTesteRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   CriarRoute: typeof CriarRoute
   DashboardRoute: typeof DashboardRoute
@@ -148,6 +161,13 @@ declare module '@tanstack/react-router' {
       path: '/agenda'
       fullPath: '/agenda'
       preLoaderRoute: typeof AgendaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agente-teste': {
+      id: '/agente-teste'
+      path: '/agente-teste'
+      fullPath: '/agente-teste'
+      preLoaderRoute: typeof AgenteTesteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/configuracoes': {
@@ -198,6 +218,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgendaRoute: AgendaRoute,
+  AgenteTesteRoute: AgenteTesteRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,
   CriarRoute: CriarRoute,
   DashboardRoute: DashboardRoute,

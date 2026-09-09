@@ -588,7 +588,7 @@ function mapDailyTarget(r: Row): ReadingDailyTarget {
   };
 }
 
-async function fetchState(): Promise<State> {
+export async function fetchState(): Promise<State> {
   const [
     booksRes,
     sessionsRes,

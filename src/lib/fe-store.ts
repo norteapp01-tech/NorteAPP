@@ -437,7 +437,7 @@ function mapSpiritualActivity(r: Row, links: Row[]): SpiritualActivity {
   };
 }
 
-async function fetchState(): Promise<State> {
+export async function fetchState(): Promise<State> {
   const [
     subjectsRes,
     notesRes,

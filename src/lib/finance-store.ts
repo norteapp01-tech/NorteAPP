@@ -400,7 +400,7 @@ function mapCheckIn(r: Row): CheckIn {
 // removeCategoryLimit/setIntention/answerCheckIn e o próprio CheckInCard não são
 // importados em lugar nenhum) — buscá-los a cada load/invalidate era 4 round-trips
 // ao Supabase sem efeito observável nenhum.
-async function fetchState(): Promise<State> {
+export async function fetchState(): Promise<State> {
   const [txRes, goalsRes, contribRes] = await Promise.all([
     supabase.from("transactions").select("*").order("date", { ascending: false }),
     supabase.from("financial_goals").select("*").order("created_at", { ascending: false }),
