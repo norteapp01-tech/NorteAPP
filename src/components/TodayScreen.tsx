@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { nowDate } from "@/lib/test-clock";
-import { Check, X, Sparkles, CalendarClock } from "lucide-react";
+import { Check, X, Sparkles, CalendarClock, Compass } from "lucide-react";
 import { AppMenuButton } from "@/components/ui/app-design-system";
 import { categoryMeta } from "@/lib/mock-data";
 import { useProfile, greeting, updateProfile } from "@/lib/profile-store";
@@ -51,7 +51,7 @@ const moodOptions = [
   { v: "doente", emoji: "🤒", label: "Doente" },
 ] as const;
 
-export function TodayScreen() {
+export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
   const state = useGoalsStore((s) => s);
   const { executions } = state;
   const profile = useProfile();
@@ -136,6 +136,15 @@ export function TodayScreen() {
   return (
     <div className="px-5 pt-11">
       <header className="relative">
+        {onOpenChat && (
+          <button
+            aria-label="Conversar com o Norte"
+            onClick={onOpenChat}
+            className="absolute right-10 -top-2 flex h-10 w-10 items-center justify-center text-primary"
+          >
+            <Compass size={22} />
+          </button>
+        )}
         <div className="pr-12">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             {nowDate().toLocaleDateString("pt-BR", {

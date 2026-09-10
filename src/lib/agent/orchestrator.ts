@@ -57,16 +57,20 @@ export async function runAgentTurnWith(
       }
       return {
         role: "assistant",
-        text:
-          pending.length === 1
-            ? toolTrace[0].result
-            : `Pronto. Executei ${pending.length} alterações confirmadas.`,
+        text: toolTrace.map((item) => item.result).join("\n"),
         toolTrace,
       };
     }
   }
 
-  const messages: AgentMessage[] = history.map((turn) => ({ role: turn.role, content: turn.text }));
+  const messages: AgentMessage[] = history.map((turn) => ({
+    role: turn.role,
+    content:
+      turn.text +
+      (turn.toolTrace?.length
+        ? `\nResultados reais anteriores: ${JSON.stringify(turn.toolTrace)}`
+        : ""),
+  }));
   messages.push({ role: "user", content: userMessage });
   const toolTrace: { name: string; args: Record<string, unknown>; result: string }[] = [];
 

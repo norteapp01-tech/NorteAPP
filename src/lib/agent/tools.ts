@@ -28,7 +28,8 @@ import {
   fetchState as fetchGoalsState,
   todayExecutions,
   createExecution,
-  toggleExecutionDone,
+  completeExecution,
+  rescheduleExecution,
   createGoal,
   todayISO,
 } from "../goals-store";
@@ -51,11 +52,56 @@ import {
 import { fetchState as fetchReadingState, addNote as addReadingNote } from "../reading-store";
 import { fetchState as fetchFeState, addNotebookEntry } from "../fe-store";
 import { captureToInbox } from "./inbox-store";
+import { fetchState as fetchNutritionState, confirmMealOption } from "../nutrition-store";
 
 const CATEGORY_IDS = FINANCE_CATEGORIES.map((c) => c.id).join(", ");
 
 /** Formato OpenAI de tool (function calling). */
 export const AGENT_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "consultar_rotina",
+      description:
+        "Consulta dados reais de alimentação (momentos e opções com IDs), leitura, fé ou planos. Consulte antes de escolher IDs. Não retorne IDs internos na mensagem ao usuário.",
+      parameters: {
+        type: "object",
+        properties: { area: { type: "string", enum: ["alimentacao", "leitura", "fe", "planos"] } },
+        required: ["area"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "reagendar_execucao",
+      description:
+        "Prepara reagendamento de uma execução existente consultada em consultar_dia. Exige confirmação. Informe início e fim, não ultrapasse prazo do plano.",
+      parameters: {
+        type: "object",
+        properties: {
+          executionId: { type: "string" },
+          date: { type: "string" },
+          startTime: { type: "string" },
+          endTime: { type: "string" },
+        },
+        required: ["executionId", "date", "startTime", "endTime"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "registrar_refeicao",
+      description:
+        "Confirma consumo de uma opção cadastrada. Consulte alimentação primeiro. Nunca invente macros. Exige confirmação antes de contar nas metas.",
+      parameters: {
+        type: "object",
+        properties: { mealId: { type: "string" }, optionId: { type: "string" } },
+        required: ["mealId", "optionId"],
+      },
+    },
+  },
   {
     type: "function" as const,
     function: {
@@ -330,6 +376,46 @@ export const AGENT_TOOLS = [
 /** Executa uma tool call e devolve um resultado (string) pro modelo interpretar. */
 export async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
   switch (name) {
+    case "consultar_rotina": {
+      const state =
+        args.area === "alimentacao"
+          ? await fetchNutritionState()
+          : args.area === "leitura"
+            ? await fetchReadingState()
+            : args.area === "fe"
+              ? await fetchFeState()
+              : await fetchGoalsState();
+      return JSON.stringify(state);
+    }
+    case "registrar_refeicao": {
+      const state = await fetchNutritionState();
+      if (!state.options.some((o) => o.id === args.optionId && o.mealId === args.mealId))
+        throw new Error("Opção não pertence a esta refeição.");
+      await confirmMealOption(args.mealId as string, args.optionId as string);
+      return "Refeição confirmada e contabilizada nas metas de hoje.";
+    }
+    case "reagendar_execucao": {
+      const state = await fetchGoalsState();
+      const item = state.executions.find((e) => e.id === args.executionId);
+      if (!item || item.status !== "planejada")
+        throw new Error("Compromisso indisponível para reagendar. Consulte o dia novamente.");
+      if (String(args.endTime) <= String(args.startTime))
+        throw new Error("O fim precisa ser depois do início.");
+      if (item.dueDate && String(args.date) > item.dueDate)
+        throw new Error(
+          "A nova data ultrapassa o prazo. Revise o planejamento antes de reagendar.",
+        );
+      const goal = state.goals.find((g) => g.id === item.goalId);
+      if (goal?.deadlineISO && String(args.date) > goal.deadlineISO)
+        throw new Error("A nova data ultrapassa o prazo do plano.");
+      await rescheduleExecution(
+        item.id,
+        args.date as string,
+        args.startTime as string,
+        args.endTime as string,
+      );
+      return `Reagendado: ${item.title}, ${args.date}, ${args.startTime}–${args.endTime}.`;
+    }
     case "registrar_agua": {
       await addWater(args.amountMl as number);
       const logs = await fetchHydrationLogs();
@@ -423,7 +509,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
     }
 
     case "concluir_execucao": {
-      await toggleExecutionDone(args.executionId as string);
+      await completeExecution(args.executionId as string);
       return `Marcado como concluído.`;
     }
 

@@ -16,6 +16,14 @@ const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "use um horário HH:M
 const positive = z.number().finite().positive();
 
 const schemas: Record<string, z.ZodType<Record<string, unknown>>> = {
+  consultar_rotina: z.object({ area: z.enum(["alimentacao", "leitura", "fe", "planos"]) }),
+  reagendar_execucao: z.object({
+    executionId: z.string().uuid(),
+    date: isoDate,
+    startTime: hhmm,
+    endTime: hhmm,
+  }),
+  registrar_refeicao: z.object({ mealId: z.string().uuid(), optionId: z.string().uuid() }),
   registrar_agua: z.object({ amountMl: positive.max(10_000) }),
   corrigir_ultima_agua: z.object({ amountMl: positive.max(10_000) }),
   registrar_transacao: z.object({
@@ -106,7 +114,12 @@ const schemas: Record<string, z.ZodType<Record<string, unknown>>> = {
 
 // Estas ações mudam agenda ou planejamento. Mesmo que o modelo tente executá-las,
 // o orquestrador interrompe e exige confirmação explícita da pessoa.
-const confirmationRequired = new Set(["criar_execucao", "criar_plano"]);
+const confirmationRequired = new Set([
+  "criar_execucao",
+  "criar_plano",
+  "reagendar_execucao",
+  "registrar_refeicao",
+]);
 
 export function parseAndValidateToolCall(call: AgentToolCall): PendingAgentAction {
   const schema = schemas[call.function.name];

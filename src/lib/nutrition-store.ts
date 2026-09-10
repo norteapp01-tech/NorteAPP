@@ -212,7 +212,7 @@ function mapGoals(r: Row): DailyGoals {
   };
 }
 
-async function fetchState(): Promise<State> {
+export async function fetchState(): Promise<State> {
   const [mealsRes, optionsRes, logsRes, goalsRes, assignmentsRes] = await Promise.all([
     supabase.from("meals").select("*").order("order_index"),
     supabase.from("meal_options").select("*"),
