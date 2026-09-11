@@ -21,7 +21,7 @@ const schemas: Record<string, z.ZodType<Record<string, unknown>>> = {
     executionId: z.string().uuid(),
     date: isoDate,
     startTime: hhmm,
-    endTime: hhmm,
+    endTime: hhmm.optional(),
   }),
   registrar_refeicao: z.object({ mealId: z.string().uuid(), optionId: z.string().uuid() }),
   registrar_agua: z.object({ amountMl: positive.max(10_000) }),
@@ -66,6 +66,7 @@ const schemas: Record<string, z.ZodType<Record<string, unknown>>> = {
     }),
   consultar_financas: z.object({}),
   consultar_dia: z.object({}),
+  consultar_agenda: z.object({}),
   criar_lembrete: z.object({ text: z.string().trim().min(1).max(240), date: isoDate }),
   criar_execucao: z.object({
     title: z.string().trim().min(1).max(240),
@@ -81,6 +82,16 @@ const schemas: Record<string, z.ZodType<Record<string, unknown>>> = {
     lifeArea: z.enum(["Corpo", "Mente", "Carreira", "Relações", "Arte", "Finanças", "Fé"]),
     deadlineISO: isoDate.optional(),
     deadlineLabel: z.string().trim().min(1).max(80),
+    steps: z
+      .array(
+        z.object({
+          title: z.string().trim().min(1).max(240),
+          targetDate: isoDate.optional(),
+          actions: z.array(z.string().trim().min(1).max(240)).max(8).optional(),
+        }),
+      )
+      .max(12)
+      .optional(),
   }),
   consultar_treino_hoje: z.object({}),
   iniciar_treino: z.object({ planId: z.string().uuid() }),
@@ -114,12 +125,7 @@ const schemas: Record<string, z.ZodType<Record<string, unknown>>> = {
 
 // Estas ações mudam agenda ou planejamento. Mesmo que o modelo tente executá-las,
 // o orquestrador interrompe e exige confirmação explícita da pessoa.
-const confirmationRequired = new Set([
-  "criar_execucao",
-  "criar_plano",
-  "reagendar_execucao",
-  "registrar_refeicao",
-]);
+const confirmationRequired = new Set(["criar_plano", "registrar_refeicao"]);
 
 export function parseAndValidateToolCall(call: AgentToolCall): PendingAgentAction {
   const schema = schemas[call.function.name];
@@ -136,6 +142,32 @@ export function parseAndValidateToolCall(call: AgentToolCall): PendingAgentActio
   if (!result.success) {
     const reason = result.error.issues[0]?.message ?? "dados inválidos";
     throw new Error(`Não executei ${call.function.name}: ${reason}`);
+  }
+  if (call.function.name === "criar_plano") {
+    const plan = result.data;
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    const start = new Date(`${today}T12:00:00Z`).getTime();
+    const days = String(plan.deadlineLabel).match(/\b(\d+)\s*dias?\b/i);
+    if (!plan.deadlineISO && days && Number(days[1]) > 0 && Number(days[1]) <= 3650)
+      plan.deadlineISO = new Date(start + Number(days[1]) * 86400000).toISOString().slice(0, 10);
+    const end = plan.deadlineISO ? new Date(`${plan.deadlineISO}T12:00:00Z`).getTime() : 0;
+    const steps = plan.steps as { title: string; targetDate?: string }[] | undefined;
+    if (steps?.length && end > start)
+      steps.forEach((step, i) => {
+        if (!step.targetDate)
+          step.targetDate = new Date(
+            start + Math.ceil((((end - start) / 86400000) * (i + 1)) / steps.length) * 86400000,
+          )
+            .toISOString()
+            .slice(0, 10);
+        if (step.targetDate > String(plan.deadlineISO))
+          throw new Error("Etapa ultrapassa o prazo do plano. Ajuste a proposta.");
+      });
   }
   return { name: call.function.name, args: result.data };
 }

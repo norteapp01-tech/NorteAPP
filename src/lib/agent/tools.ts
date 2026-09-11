@@ -30,7 +30,9 @@ import {
   createExecution,
   completeExecution,
   rescheduleExecution,
+  updateAgendaSession,
   createGoal,
+  addSubtask,
   todayISO,
 } from "../goals-store";
 import {
@@ -61,6 +63,15 @@ export const AGENT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "consultar_agenda",
+      description:
+        "Consulta compromissos de todas as datas para encontrar um compromisso a reagendar. Use para dentista dia 23, por exemplo. Desambigue apenas se houver vários candidatos.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "consultar_rotina",
       description:
         "Consulta dados reais de alimentação (momentos e opções com IDs), leitura, fé ou planos. Consulte antes de escolher IDs. Não retorne IDs internos na mensagem ao usuário.",
@@ -76,7 +87,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "reagendar_execucao",
       description:
-        "Prepara reagendamento de uma execução existente consultada em consultar_dia. Exige confirmação. Informe início e fim, não ultrapasse prazo do plano.",
+        "Reagenda imediatamente um compromisso identificado a pedido explícito. Consulte consultar_agenda para obter ID. Fim opcional: preserve duração. Não peça confirmação extra.",
       parameters: {
         type: "object",
         properties: {
@@ -85,7 +96,7 @@ export const AGENT_TOOLS = [
           startTime: { type: "string" },
           endTime: { type: "string" },
         },
-        required: ["executionId", "date", "startTime", "endTime"],
+        required: ["executionId", "date", "startTime"],
       },
     },
   },
@@ -201,7 +212,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "criar_execucao",
       description:
-        "NÍVEL 3 — prepara um compromisso ou tarefa com prazo; o orquestrador exige confirmação explícita antes de executar.",
+        "Cria imediatamente compromisso solicitado. Inferir título e categoria: dentista = Dentista/saude. Sem data explícita, hoje. Nunca perguntar título/categoria já inferíveis. Não pedir confirmação.",
       parameters: {
         type: "object",
         properties: {
@@ -233,7 +244,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "criar_plano",
       description:
-        "NÍVEL 3 — só chame depois de confirmar com a pessoa. Cria um plano (objetivo) com título, motivo e prazo.",
+        "Prepare proposta de plano com etapas sugeridas e prazo se informado. Chame sem pedir confirmação em texto: a interface mostra o cronograma para revisar. Para loja, sugira orçamento, pesquisa, estruturação, inauguração; adapte ao contexto. Não pergunte quantas etapas se pode propor uma estrutura.",
       parameters: {
         type: "object",
         properties: {
@@ -245,6 +256,22 @@ export const AGENT_TOOLS = [
           },
           deadlineISO: { type: "string", description: "YYYY-MM-DD, opcional" },
           deadlineLabel: { type: "string", description: "ex.: 'em 90 dias', 'sem prazo'" },
+          steps: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string" },
+                targetDate: { type: "string", description: "YYYY-MM-DD, apenas se prazo definido" },
+                actions: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "Próximas ações práticas dentro desta etapa, proponha 1 a 3.",
+                },
+              },
+              required: ["title"],
+            },
+          },
         },
         required: ["title", "why", "lifeArea", "deadlineLabel"],
       },
@@ -376,6 +403,14 @@ export const AGENT_TOOLS = [
 /** Executa uma tool call e devolve um resultado (string) pro modelo interpretar. */
 export async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
   switch (name) {
+    case "consultar_agenda": {
+      const state = await fetchGoalsState();
+      return JSON.stringify({
+        card: "agenda",
+        title: "Sua agenda",
+        items: state.executions.filter((e) => e.status === "planejada"),
+      });
+    }
     case "consultar_rotina": {
       const state =
         args.area === "alimentacao"
@@ -392,29 +427,57 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
       if (!state.options.some((o) => o.id === args.optionId && o.mealId === args.mealId))
         throw new Error("Opção não pertence a esta refeição.");
       await confirmMealOption(args.mealId as string, args.optionId as string);
-      return "Refeição confirmada e contabilizada nas metas de hoje.";
+      const option = state.options.find((o) => o.id === args.optionId)!;
+      return JSON.stringify({
+        card: "nutrition",
+        ...option,
+        summary: "Refeição registrada.",
+        date: todayISO(),
+      });
     }
     case "reagendar_execucao": {
       const state = await fetchGoalsState();
       const item = state.executions.find((e) => e.id === args.executionId);
       if (!item || item.status !== "planejada")
         throw new Error("Compromisso indisponível para reagendar. Consulte o dia novamente.");
-      if (String(args.endTime) <= String(args.startTime))
+      if (args.endTime && String(args.endTime) <= String(args.startTime))
         throw new Error("O fim precisa ser depois do início.");
-      if (item.dueDate && String(args.date) > item.dueDate)
+      if (item.goalId && item.dueDate && String(args.date) > item.dueDate)
         throw new Error(
           "A nova data ultrapassa o prazo. Revise o planejamento antes de reagendar.",
         );
       const goal = state.goals.find((g) => g.id === item.goalId);
       if (goal?.deadlineISO && String(args.date) > goal.deadlineISO)
         throw new Error("A nova data ultrapassa o prazo do plano.");
-      await rescheduleExecution(
+      if ((item.agendaSessions?.length ?? 0) > 1)
+        throw new Error(
+          "Há várias sessões desta tarefa. Abra a agenda para escolher a ocorrência.",
+        );
+      let endTime = args.endTime as string | undefined;
+      if (!endTime && item.startTime && item.endTime) {
+        const minutes = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+        const end =
+          minutes(String(args.startTime)) + minutes(item.endTime) - minutes(item.startTime);
+        if (end >= 1440)
+          throw new Error("O novo horário atravessa a meia-noite. Informe o fim na agenda.");
+        endTime = `${String(Math.floor(end / 60)).padStart(2, "0")}:${String(end % 60).padStart(2, "0")}`;
+      }
+      await updateAgendaSession(
         item.id,
-        args.date as string,
-        args.startTime as string,
-        args.endTime as string,
+        item.agendaSessions?.[0]?.id,
+        String(args.date),
+        String(args.startTime),
+        endTime,
       );
-      return `Reagendado: ${item.title}, ${args.date}, ${args.startTime}–${args.endTime}.`;
+      return JSON.stringify({
+        card: "appointment",
+        id: item.id,
+        title: item.title,
+        date: args.date,
+        startTime: args.startTime,
+        endTime,
+        summary: "Compromisso reagendado.",
+      });
     }
     case "registrar_agua": {
       await addWater(args.amountMl as number);
@@ -430,13 +493,22 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
     }
 
     case "registrar_transacao": {
-      await addTransaction({
+      const id = await addTransaction({
         type: args.type as "expense" | "income",
         amount: args.amount as number,
         description: args.description as string,
         category: args.category as string,
       });
-      return `Registrado: R$${(args.amount as number).toFixed(2)} em ${args.category} (${args.description}). Pode corrigir ou desfazer no app.`;
+      const state = await fetchFinanceState();
+      const breakdown = categoryBreakdown(state.transactions, currentMonth());
+      return JSON.stringify({
+        card: "finance",
+        id,
+        ...args,
+        date: todayISO(),
+        breakdown,
+        summary: "Movimentação registrada.",
+      });
     }
 
     case "corrigir_ultima_transacao": {
@@ -489,7 +561,13 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
       const remText = rem.length
         ? rem.map((r) => `${r.text} (${r.date})`).join("; ")
         : "nenhum lembrete pendente";
-      return `Hoje: ${execsText}. Lembretes: ${remText}.`;
+      return JSON.stringify({
+        card: "agenda",
+        title: "Seu dia",
+        items: execs,
+        reminders: remText,
+        summary: execs.length ? "Estes são seus compromissos de hoje." : "Nenhum compromisso hoje.",
+      });
     }
 
     case "criar_lembrete": {
@@ -505,7 +583,15 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
         startTime: args.startTime as string | undefined,
         category: (args.category as string) || "generico",
       });
-      return `Criado: "${args.title}" (id ${id}). Pode corrigir ou desfazer no app.`;
+      return JSON.stringify({
+        card: "appointment",
+        id,
+        title: args.title,
+        date: args.agendaDate || args.dueDate,
+        startTime: args.startTime,
+        category: args.category,
+        summary: "Compromisso marcado.",
+      });
     }
 
     case "concluir_execucao": {
@@ -533,8 +619,29 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
         deadlineLabel: (args.deadlineLabel as string) || "sem prazo",
         deadlineISO: args.deadlineISO as string | undefined,
         metric: { target: 1, unit: "etapas" },
+        steps: args.steps as { title: string; targetDate?: string }[] | undefined,
       });
-      return `Plano criado: "${args.title}" (id ${id}). Etapas podem ser adicionadas depois, no app.`;
+      const state = await fetchGoalsState();
+      const steps = state.steps.filter((s) => s.goalId === id).sort((a, b) => a.order - b.order);
+      try {
+        const proposed = args.steps as { actions?: string[] }[] | undefined;
+        for (let i = 0; i < steps.length; i++)
+          for (const action of proposed?.[i]?.actions || []) await addSubtask(steps[i].id, action);
+      } catch {
+        return JSON.stringify({
+          card: "plan",
+          id,
+          ...args,
+          summary:
+            "Plano e etapas salvos. Algumas ações não puderam ser salvas; revise no planejamento.",
+        });
+      }
+      return JSON.stringify({
+        card: "plan",
+        id,
+        ...args,
+        summary: "Plano, etapas e ações criados.",
+      });
     }
 
     case "consultar_treino_hoje": {

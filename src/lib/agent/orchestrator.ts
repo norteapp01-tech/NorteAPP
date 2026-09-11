@@ -57,7 +57,15 @@ export async function runAgentTurnWith(
       }
       return {
         role: "assistant",
-        text: toolTrace.map((item) => item.result).join("\n"),
+        text: toolTrace
+          .map((item) => {
+            try {
+              return JSON.parse(item.result).summary || item.result;
+            } catch {
+              return item.result;
+            }
+          })
+          .join("\n"),
         toolTrace,
       };
     }
@@ -76,6 +84,20 @@ export async function runAgentTurnWith(
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const step = await deps.step({ data: { messages } });
+    if (
+      !step.tool_calls?.length &&
+      /\b(marquei|agendei|reagendei|registrei|salvei|criei|alterei|atualizei|concluí)\b/i.test(
+        step.content || "",
+      ) &&
+      !toolTrace.some((t) => !t.name.startsWith("consultar") && !/^Erro|^Não /i.test(t.result))
+    ) {
+      messages.push({
+        role: "system",
+        content:
+          "Você afirmou uma alteração, mas nenhuma ferramenta de escrita foi executada neste turno. Execute agora a ferramenta apropriada com os dados do pedido; se faltarem dados essenciais, pergunte. Nunca anuncie sucesso sem execução.",
+      });
+      continue;
+    }
     if (!step.tool_calls?.length)
       return {
         role: "assistant",

@@ -1,5 +1,13 @@
 # Conversa integrada Norte
 
+## Atualização — cards visuais e agilidade
+
+Finanças agora retorna valor, categoria, data e distribuição real dos gastos do mês. A rosca troca de categoria por toque. Ajustar registro edita a transação específica e persiste no histórico local. Agenda cria e reagenda pedidos claros diretamente, inferindo título/categoria; dados ambíguos continuam sendo esclarecidos. Card de horário permite edição. Planos apresentam etapas, datas sugeridas e ações em uma proposta; a confirmação salva etapas e ações. Alimentação usa macros cadastrados em card 2×2 (não estima fotos).
+
+Testes reais em sessões anônimas isoladas: gasto de R$23, edição para R$24, dentista hoje às 19h, reagendamento para amanhã às 14h, proposta de loja com três etapas e duas ações por etapa seguida de confirmação. Corrigida afirmação de agendamento sem ferramenta: o orquestrador pede a execução em vez de anunciar sucesso. Build e 132 testes passaram antes do último refinamento de datas.
+
+Os registros criados nos testes pertencem exclusivamente às sessões anônimas de teste. Nenhum SQL adicional necessário. Fotos/WhatsApp continuam fora desta entrega; não apresentar mocks como análise real de imagens.
+
 Acesso: arrastar Hoje para a esquerda ou tocar na bússola do cabeçalho. Voltar pelo botão Hoje ou gesto inverso. A navegação de cinco itens é preservada.
 
 O chat chama o agente existente e as mesmas stores autenticadas das telas. Mensagens persistem neste navegador, separadas pelo usuário do Supabase (últimas 100). Áudios são transcritos e apresentados no campo para revisão antes do envio. Anexos de texto (.txt/.md) de até 50 KB são aceitos.

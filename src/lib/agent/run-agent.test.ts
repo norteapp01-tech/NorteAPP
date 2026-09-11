@@ -36,26 +36,24 @@ describe("Agente Norte — três personas e cenários adversariais", () => {
     expect(reply.toolTrace).toHaveLength(2);
   });
 
-  it("persona perdida não tem sua agenda alterada antes de confirmar", async () => {
+  it("pedido claro de dentista é registrado sem confirmação redundante", async () => {
     const execute = vi.fn(async () => "criado");
-    const proposed = await runAgentTurnWith([], "joga esse negócio pra amanhã sei lá", {
+    const proposed = await runAgentTurnWith([], "marque dentista hoje às 19h", {
       step: stepReturning([
         {
           name: "criar_execucao",
-          args: { title: "Continuar tarefa", dueDate: "2026-09-10" },
+          args: {
+            title: "Dentista",
+            dueDate: "2026-09-11",
+            agendaDate: "2026-09-11",
+            startTime: "19:00",
+          },
         },
       ]) as never,
       execute: execute as never,
     });
-    expect(execute).not.toHaveBeenCalled();
-    expect(proposed.pendingActions).toHaveLength(1);
-
-    const cancelled = await runAgentTurnWith([proposed], "não", {
-      step: vi.fn() as never,
-      execute: execute as never,
-    });
-    expect(cancelled.text).toContain("não alterei");
-    expect(execute).not.toHaveBeenCalled();
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(proposed.pendingActions).toBeUndefined();
   });
 
   it("persona detalhista confirma um plano já preparado", async () => {

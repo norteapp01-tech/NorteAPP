@@ -5,6 +5,7 @@ import { transcribeAudio } from "@/lib/agent/chat.functions";
 import { useSupabaseUserId } from "@/lib/supabase/client";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { AppMenuButton } from "@/components/ui/app-design-system";
+import { AgentCard, parseCard, type CardData } from "./AgentCard";
 
 const labels: Record<string, [string, string]> = {
   criar_plano: ["Planejamento", "/planejamento"],
@@ -226,33 +227,84 @@ export function NorteChat({ onBack }: { onBack: () => void }) {
             )}
             <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{turn.text}</p>
             {turn.toolTrace
-              ?.filter((t) => !t.name.startsWith("consultar") && !/^Erro|^Não /i.test(t.result))
-              .map((t, i) => (
-                <div key={`result-${i}`} className="rounded-2xl border border-border p-4">
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-primary">
-                    {domain(t.name, t.args.area)[0]}
-                  </p>
-                  <p className="text-sm">{t.result.replace(/\(id [^)]+\)/g, "")}</p>
+              ?.filter(
+                (t) =>
+                  !(
+                    parseCard(t.result)?.card === "agenda" &&
+                    turn.toolTrace?.some((other) => parseCard(other.result)?.card === "appointment")
+                  ) &&
+                  (parseCard(t.result) || !t.name.startsWith("consultar")) &&
+                  !/^Erro|^Não /i.test(t.result),
+              )
+              .map((t, i) =>
+                parseCard(t.result) ? (
+                  <AgentCard
+                    key={`result-${i}`}
+                    data={parseCard(t.result)!}
+                    onChange={(updated) =>
+                      setTurns((old) =>
+                        old.map((entry, entryIndex) =>
+                          entryIndex === index
+                            ? {
+                                ...entry,
+                                toolTrace: entry.toolTrace?.map((trace) =>
+                                  trace === t
+                                    ? {
+                                        ...trace,
+                                        args: {
+                                          ...trace.args,
+                                          amount: updated.amount,
+                                          description: updated.description,
+                                        },
+                                        result: JSON.stringify(updated),
+                                      }
+                                    : trace,
+                                ),
+                              }
+                            : entry,
+                        ),
+                      )
+                    }
+                    onPrompt={setDraft}
+                    disabled={busy}
+                  />
+                ) : (
+                  <div key={`result-${i}`} className="rounded-2xl border border-border p-4">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wider text-primary">
+                      {domain(t.name, t.args.area)[0]}
+                    </p>
+                    <p className="text-sm">{t.result.replace(/\(id [^)]+\)/g, "")}</p>
+                  </div>
+                ),
+              )}
+            {turn.pendingActions?.map((action, i) =>
+              action.name === "criar_plano" ? (
+                <AgentCard
+                  key={i}
+                  data={{ ...action.args, card: "plan" } as CardData}
+                  proposed
+                  onPrompt={setDraft}
+                  disabled={busy}
+                />
+              ) : (
+                <div key={i} className="rounded-2xl border border-border p-4">
+                  <p className="mb-3 font-medium">{domain(action.name, action.args.area)[0]}</p>
+                  <dl className="space-y-2">
+                    {Object.entries(action.args)
+                      .filter(([key]) => fieldLabels[key])
+                      .map(([key, value]) => (
+                        <div key={key} className="flex justify-between gap-3 text-sm">
+                          <dt className="text-muted-foreground">{fieldLabels[key]}</dt>
+                          <dd className="max-w-[70%] whitespace-pre-wrap break-words text-right">
+                            {String(value)}
+                          </dd>
+                        </div>
+                      ))}
+                  </dl>
+                  <p className="mt-3 text-xs text-muted-foreground">Ainda não aplicado.</p>
                 </div>
-              ))}
-            {turn.pendingActions?.map((action, i) => (
-              <div key={i} className="rounded-2xl border border-border p-4">
-                <p className="mb-3 font-medium">{domain(action.name, action.args.area)[0]}</p>
-                <dl className="space-y-2">
-                  {Object.entries(action.args)
-                    .filter(([key]) => fieldLabels[key])
-                    .map(([key, value]) => (
-                      <div key={key} className="flex justify-between gap-3 text-sm">
-                        <dt className="text-muted-foreground">{fieldLabels[key]}</dt>
-                        <dd className="max-w-[70%] whitespace-pre-wrap break-words text-right">
-                          {String(value)}
-                        </dd>
-                      </div>
-                    ))}
-                </dl>
-                <p className="mt-3 text-xs text-muted-foreground">Ainda não aplicado.</p>
-              </div>
-            ))}
+              ),
+            )}
             {!!turn.pendingActions?.length && index === turns.length - 1 && (
               <div className="flex gap-2">
                 <button
@@ -275,10 +327,12 @@ export function NorteChat({ onBack }: { onBack: () => void }) {
               <div className="flex flex-wrap gap-2">
                 {[
                   ...new Map(
-                    turn.toolTrace.map((t) => {
-                      const d = domain(t.name, t.args.area);
-                      return [d[1], d];
-                    }),
+                    turn.toolTrace
+                      .filter((t) => !parseCard(t.result))
+                      .map((t) => {
+                        const d = domain(t.name, t.args.area);
+                        return [d[1], d];
+                      }),
                   ).values(),
                 ].map(([label, href]) => (
                   <a
