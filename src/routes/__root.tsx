@@ -8,7 +8,8 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { WelcomeScreen } from "../components/WelcomeScreen";
 import { Home, Plus, BarChart3, CalendarDays, CalendarRange } from "lucide-react";
 
 import appCss from "../styles.css?url";
@@ -160,6 +161,27 @@ function BottomNav() {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    try {
+      setEntered(sessionStorage.getItem("norte-welcome-entered") === "true");
+    } catch {
+      /* Storage may be unavailable in private browsers. */
+    }
+  }, []);
+  if (pathname === "/" && !entered)
+    return (
+      <WelcomeScreen
+        onEnter={() => {
+          try {
+            sessionStorage.setItem("norte-welcome-entered", "true");
+          } catch {
+            /* Keep the in-memory choice. */
+          }
+          setEntered(true);
+        }}
+      />
+    );
   return (
     <QueryClientProvider client={queryClient}>
       <div className="mx-auto min-h-screen max-w-md bg-background pb-28">
