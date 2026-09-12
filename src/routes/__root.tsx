@@ -176,6 +176,26 @@ function RootComponent() {
     setEntered(true);
   }
 
+  /** Uma entrada nova na demo (clicou "Ver o Norte em ação" na vitrine) tem que
+   * começar do zero — nunca puxar conversa de uma tentativa anterior de demo, nem
+   * de qualquer uso real que essa mesma sessão anônima já tenha tido antes. Isso
+   * NÃO roda de novo ao retomar depois do redirect do Google/Apple/e-mail (aquele
+   * caso chega com "?onboarding=account" na URL, não passa por aqui), então a
+   * conversa da demo continua sobrevivendo até a conta ser criada de verdade. */
+  function resetDemoConversation() {
+    try {
+      const stale = Object.keys(localStorage).filter(
+        (key) => key.startsWith("norte-chat:") || key.startsWith("norte-demo-replies:"),
+      );
+      stale.forEach((key) => localStorage.removeItem(key));
+      Object.keys(sessionStorage)
+        .filter((key) => key.startsWith("norte-demo-replies:"))
+        .forEach((key) => sessionStorage.removeItem(key));
+    } catch {
+      /* Sem storage disponível — a demo só não vai lembrar de nada, o que já é o objetivo. */
+    }
+  }
+
   useEffect(() => {
     try {
       if (new URLSearchParams(window.location.search).get("onboarding") === "account") {
@@ -215,6 +235,7 @@ function RootComponent() {
     return (
       <WelcomeScreen
         onEnter={() => {
+          resetDemoConversation();
           try {
             sessionStorage.setItem("norte-onboarding-stage", "demo");
           } catch {
