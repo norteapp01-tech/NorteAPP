@@ -130,7 +130,7 @@ function ExampleCard({ index }: { index: number }) {
   );
 }
 
-export function WelcomeScreen({ onEnter }: { onEnter: () => void }) {
+export function WelcomeScreen({ onEnter, onLogin }: { onEnter: () => void; onLogin: () => void }) {
   const [viewport, api] = useEmblaCarousel({ loop: true, duration: 25 });
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -272,7 +272,7 @@ export function WelcomeScreen({ onEnter }: { onEnter: () => void }) {
         <button className="welcome-cta" onClick={onEnter}>
           Ver o Norte em ação
         </button>
-        <button className="welcome-login" aria-disabled="true" onClick={() => {}}>
+        <button className="welcome-login" onClick={onLogin}>
           Já tenho uma conta
         </button>
       </footer>

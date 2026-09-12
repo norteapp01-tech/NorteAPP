@@ -15,7 +15,8 @@ import { Home, Plus, BarChart3, CalendarDays, CalendarRange } from "lucide-react
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { AuthGate } from "../components/AuthGate";
+import { AuthGate, SignInScreen } from "../components/AuthGate";
+import { hasLinkedAccount } from "../lib/supabase/client";
 
 function NotFoundComponent() {
   return (
@@ -164,17 +165,44 @@ function RootComponent() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [entered, setEntered] = useState(false);
   const [demo, setDemo] = useState(false);
+  const [manualLogin, setManualLogin] = useState(false);
+
+  function markEntered() {
+    try {
+      sessionStorage.setItem("norte-welcome-entered", "true");
+    } catch {
+      /* Keep the in-memory choice. */
+    }
+    setEntered(true);
+  }
+
   useEffect(() => {
     try {
       if (new URLSearchParams(window.location.search).get("onboarding") === "account") {
         sessionStorage.setItem("norte-onboarding-stage", "account");
       }
-      setEntered(sessionStorage.getItem("norte-welcome-entered") === "true");
-      setDemo(Boolean(sessionStorage.getItem("norte-onboarding-stage")));
+      // Quem já tem uma conta real vinculada a este aparelho nunca precisa ver a
+      // vitrine de novo — vai direto pro app de verdade, que já sabe pedir login
+      // sozinho (AuthGate) se a sessão tiver expirado.
+      const returning = hasLinkedAccount();
+      setEntered(returning || sessionStorage.getItem("norte-welcome-entered") === "true");
+      setDemo(!returning && Boolean(sessionStorage.getItem("norte-onboarding-stage")));
     } catch {
       /* Storage may be unavailable in private browsers. */
     }
   }, []);
+
+  if (pathname === "/" && manualLogin)
+    return (
+      <SignInScreen
+        subtitle="Entre com seu e-mail e senha pra continuar de onde parou."
+        onBack={() => setManualLogin(false)}
+        onSuccess={() => {
+          setManualLogin(false);
+          markEntered();
+        }}
+      />
+    );
   if (pathname === "/" && demo)
     return (
       <QueryClientProvider client={queryClient}>
@@ -194,6 +222,7 @@ function RootComponent() {
           }
           setDemo(true);
         }}
+        onLogin={() => setManualLogin(true)}
       />
     );
   return (

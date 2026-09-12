@@ -105,7 +105,15 @@ function ConnectionErrorScreen({ message, onRetry }: { message: string; onRetry:
   );
 }
 
-function SignInScreen({ onSuccess }: { onSuccess: () => void }) {
+export function SignInScreen({
+  onSuccess,
+  subtitle = "Este dispositivo já teve uma conta vinculada. Entre pra recuperar seus dados.",
+  onBack,
+}: {
+  onSuccess: () => void;
+  subtitle?: string;
+  onBack?: () => void;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -120,16 +128,28 @@ function SignInScreen({ onSuccess }: { onSuccess: () => void }) {
       setError("E-mail ou senha incorretos.");
       return;
     }
+    try {
+      localStorage.setItem("norte_has_account", "1");
+    } catch {
+      // localStorage indisponível — segue sem persistir a flag.
+    }
     onSuccess();
   };
 
   return (
     <div className="flex min-h-screen flex-col justify-center px-6">
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="-ml-2 mb-6 flex h-9 w-9 items-center justify-center self-start rounded-full hover:bg-surface"
+          aria-label="Voltar"
+        >
+          ←
+        </button>
+      )}
       <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Norte</p>
       <h1 className="mt-1 text-2xl font-bold">Entrar na sua conta</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Este dispositivo já teve uma conta vinculada. Entre pra recuperar seus dados.
-      </p>
+      <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
 
       <div className="mt-6 space-y-3">
         <label className="block">
