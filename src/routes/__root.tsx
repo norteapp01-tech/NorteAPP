@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { WelcomeScreen } from "../components/WelcomeScreen";
+import { OnboardingFlow } from "../components/OnboardingFlow";
 import { Home, Plus, BarChart3, CalendarDays, CalendarRange } from "lucide-react";
 
 import appCss from "../styles.css?url";
@@ -162,23 +163,36 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [entered, setEntered] = useState(false);
+  const [demo, setDemo] = useState(false);
   useEffect(() => {
     try {
+      if (new URLSearchParams(window.location.search).get("onboarding") === "account") {
+        sessionStorage.setItem("norte-onboarding-stage", "account");
+      }
       setEntered(sessionStorage.getItem("norte-welcome-entered") === "true");
+      setDemo(Boolean(sessionStorage.getItem("norte-onboarding-stage")));
     } catch {
       /* Storage may be unavailable in private browsers. */
     }
   }, []);
+  if (pathname === "/" && demo)
+    return (
+      <QueryClientProvider client={queryClient}>
+        <div className="mx-auto min-h-svh max-w-md bg-background">
+          <OnboardingFlow onBack={() => setDemo(false)} />
+        </div>
+      </QueryClientProvider>
+    );
   if (pathname === "/" && !entered)
     return (
       <WelcomeScreen
         onEnter={() => {
           try {
-            sessionStorage.setItem("norte-welcome-entered", "true");
+            sessionStorage.setItem("norte-onboarding-stage", "demo");
           } catch {
             /* Keep the in-memory choice. */
           }
-          setEntered(true);
+          setDemo(true);
         }}
       />
     );

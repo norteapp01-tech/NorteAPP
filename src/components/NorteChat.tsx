@@ -53,7 +53,15 @@ const fieldLabels: Record<string, string> = {
   bookTitle: "Livro",
 };
 
-export function NorteChat({ onBack }: { onBack: () => void }) {
+export function NorteChat({
+  onBack,
+  demo = false,
+  onDemoComplete,
+}: {
+  onBack: () => void;
+  demo?: boolean;
+  onDemoComplete?: () => void;
+}) {
   const userId = useSupabaseUserId();
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [ready, setReady] = useState(false);
@@ -68,6 +76,7 @@ export function NorteChat({ onBack }: { onBack: () => void }) {
   const mounted = useRef(true);
   const bottom = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
+  const successfulReplies = useRef(0);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -105,6 +114,10 @@ export function NorteChat({ onBack }: { onBack: () => void }) {
 
   async function send(text: string) {
     if (!text.trim() || lock.current || !ready) return;
+    if (demo && Number(sessionStorage.getItem(`norte-demo-replies:${userId}`) || 0) >= 3) {
+      onDemoComplete?.();
+      return;
+    }
     lock.current = true;
     setBusy(true);
     setError("");
@@ -112,7 +125,15 @@ export function NorteChat({ onBack }: { onBack: () => void }) {
     setTurns((old) => [...old, { role: "user", text: text.trim() }]);
     try {
       const reply = await runAgentTurn(turns.slice(-30), text.trim());
-      if (mounted.current) setTurns((old) => [...old, reply]);
+      if (mounted.current) {
+        setTurns((old) => [...old, reply]);
+        if (demo) {
+          successfulReplies.current =
+            Number(sessionStorage.getItem(`norte-demo-replies:${userId}`) || 0) + 1;
+          sessionStorage.setItem(`norte-demo-replies:${userId}`, String(successfulReplies.current));
+          if (successfulReplies.current >= 3) onDemoComplete?.();
+        }
+      }
     } catch {
       if (mounted.current) {
         setError("A conexão foi interrompida. Confira os registros antes de repetir uma ação.");
@@ -182,14 +203,22 @@ export function NorteChat({ onBack }: { onBack: () => void }) {
           onClick={onBack}
           className="flex min-h-11 items-center gap-1 text-sm text-muted-foreground"
         >
-          <ArrowLeft size={18} /> Hoje
+          <ArrowLeft size={18} /> {demo ? "Voltar" : "Hoje"}
         </button>
         <div className="text-center">
           <Compass className="mx-auto mb-1 text-primary" size={27} />
           <h1 className="font-semibold">Norte</h1>
-          <p className="mt-1 text-xs text-muted-foreground">Sua conversa, seu ritmo</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {demo ? "Experimente com uma conversa curta" : "Sua conversa, seu ritmo"}
+          </p>
         </div>
-        <AppMenuButton aria-label="Configurações" onClick={() => setSettings(true)} />
+        {demo ? (
+          <button className="min-h-11 text-xs text-primary" onClick={onDemoComplete}>
+            Criar conta
+          </button>
+        ) : (
+          <AppMenuButton aria-label="Configurações" onClick={() => setSettings(true)} />
+        )}
       </header>
       <div className="flex-1 space-y-6 pb-6" role="log" aria-live="polite">
         {!turns.length && (
@@ -200,7 +229,15 @@ export function NorteChat({ onBack }: { onBack: () => void }) {
               Conte o que aconteceu ou o que quer fazer.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              {["Ver meu dia", "Planejar comigo", "Qual é meu treino?"].map((text) => (
+              {(demo
+                ? [
+                    "Me ajude com minha rotina",
+                    "Quero começar um plano",
+                    "Me ajude com minha alimentação",
+                    "Me ajude a organizar meus treinos",
+                  ]
+                : ["Ver meu dia", "Planejar comigo", "Qual é meu treino?"]
+              ).map((text) => (
                 <button
                   key={text}
                   disabled={busy || !ready}
@@ -359,7 +396,7 @@ export function NorteChat({ onBack }: { onBack: () => void }) {
         )}
         <div ref={bottom} />
       </div>
-      <div className="sticky bottom-24 bg-background py-3">
+      <div className={`sticky ${demo ? "bottom-0" : "bottom-24"} bg-background py-3`}>
         {recording && (
           <p className="mb-2 text-sm text-primary">
             Gravando… Toque em parar para revisar o texto.
