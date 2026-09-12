@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { ChevronLeft, Mic, Send, Square, Wrench } from "lucide-react";
 import { runAgentTurn, type ChatTurn } from "@/lib/agent/run-agent";
 import { transcribeAudio } from "@/lib/agent/chat.functions";
+import { getAccessToken } from "@/lib/supabase/client";
 
 export const Route = createFileRoute("/agente-teste")({
   head: () => ({ meta: [{ title: "Agente Norte — teste" }] }),
@@ -70,7 +71,10 @@ function AgentTestPage() {
         setTranscribing(true);
         try {
           const base64 = await blobToBase64(blob);
-          const { text } = await transcribeAudio({ data: { audioBase64: base64, mimeType } });
+          const accessToken = await getAccessToken();
+          const { text } = await transcribeAudio({
+            data: { audioBase64: base64, mimeType, accessToken },
+          });
           if (text.trim()) await send(text);
           else setError("Não entendi o áudio — pode repetir ou digitar?");
         } catch (err) {

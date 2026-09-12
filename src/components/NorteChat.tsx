@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowUp, Compass, Mic, Paperclip, Square } from "lucide-react";
 import { runAgentTurn, type ChatTurn } from "@/lib/agent/run-agent";
 import { transcribeAudio } from "@/lib/agent/chat.functions";
-import { useSupabaseUserId } from "@/lib/supabase/client";
+import { useSupabaseUserId, getAccessToken } from "@/lib/supabase/client";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { AppMenuButton } from "@/components/ui/app-design-system";
 import { AgentCard, parseCard, type CardData } from "./AgentCard";
@@ -178,7 +178,10 @@ export function NorteChat({
             reader.onload = () => resolve(String(reader.result).split(",")[1]);
             reader.readAsDataURL(blob);
           });
-          const result = await transcribeAudio({ data: { audioBase64, mimeType: rec.mimeType } });
+          const accessToken = await getAccessToken();
+          const result = await transcribeAudio({
+            data: { audioBase64, mimeType: rec.mimeType, accessToken },
+          });
           if (mounted.current) setDraft(result.text);
         } catch {
           if (mounted.current) setError("Não foi possível transcrever. Tente novamente ou digite.");

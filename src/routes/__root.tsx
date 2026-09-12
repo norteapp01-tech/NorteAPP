@@ -246,14 +246,19 @@ function RootComponent() {
         onLogin={() => setManualLogin(true)}
       />
     );
+  // O admin é um painel próprio (desktop-first, sidebar) — nunca herda a casca
+  // de app mobile (largura de 448px, navegação inferior) das telas do Norte.
+  const isAdmin = pathname.startsWith("/admin");
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="mx-auto min-h-screen max-w-md bg-background pb-28">
+      <div
+        className={isAdmin ? "bg-background" : "mx-auto min-h-screen max-w-md bg-background pb-28"}
+      >
         <AuthGate>
-          <div key={pathname} className="page-enter">
+          <div key={pathname} className={isAdmin ? undefined : "page-enter"}>
             <Outlet />
           </div>
-          <BottomNav />
+          {!isAdmin && <BottomNav />}
         </AuthGate>
       </div>
     </QueryClientProvider>

@@ -55,6 +55,15 @@ export function ensureSession(): Promise<string> {
   return bootstrapped;
 }
 
+/** Access token da sessão atual, pra chamadas de servidor que precisam saber
+ * quem está pedindo (ex.: registrar consumo de IA em nome da própria pessoa,
+ * sem service_role). undefined se ainda não há sessão. */
+export async function getAccessToken(): Promise<string | undefined> {
+  await ensureSession();
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token;
+}
+
 /** userId undefined = ainda autenticando; toda query de domínio usa isso em `enabled`. */
 export function useSupabaseUserId(): string | undefined {
   const [userId, setUserId] = useState<string | undefined>(undefined);
