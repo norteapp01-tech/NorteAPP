@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import useEmblaCarousel from "embla-carousel-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Compass, Pause, Play, Utensils } from "lucide-react";
 import "./welcome.css";
+import "./welcome-live.css";
 
 const scenes = [
   {
@@ -130,15 +130,28 @@ function ExampleCard({ index }: { index: number }) {
   );
 }
 
+const subtitles = [
+  "Você conta o objetivo. O Norte traça o caminho.",
+  "Você conta como está. O Norte reorganiza seu dia.",
+  "Você fala o que gastou. O Norte faz o resto.",
+  "Você fala o que comeu. O Norte faz o resto.",
+];
+
+// One clock drives typing, reply, card and scene changes, so pause freezes everything.
 export function WelcomeScreen({ onEnter, onLogin }: { onEnter: () => void; onLogin: () => void }) {
-  const [viewport, api] = useEmblaCarousel({ loop: true, duration: 25 });
   const [active, setActive] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
   const [holding, setHolding] = useState(false);
-  const [focused, setFocused] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [reduced, setReduced] = useState(false);
-  const [restart, setRestart] = useState(0);
+  const progress = useRef(0);
+  const gesture = useRef<{ x: number; y: number } | null>(null);
+  const select = useCallback((index: number) => {
+    progress.current = 0;
+    setElapsed(0);
+    setActive((index + scenes.length) % scenes.length);
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -154,104 +167,125 @@ export function WelcomeScreen({ onEnter, onLogin }: { onEnter: () => void; onLog
     };
   }, []);
   useEffect(() => {
-    if (!api) return;
-    const select = () => setActive(api.selectedScrollSnap());
-    const down = () => setHolding(true);
-    const up = () => {
-      setHolding(false);
-      setRestart((n) => n + 1);
-    };
-    api.on("select", select).on("pointerDown", down).on("pointerUp", up);
-    return () => {
-      api.off("select", select).off("pointerDown", down).off("pointerUp", up);
-    };
-  }, [api]);
-  useEffect(() => {
-    if (!api || paused || holding || focused || hidden || reduced) return;
-    const timer = window.setTimeout(() => api.scrollNext(), 4000);
-    return () => window.clearTimeout(timer);
-  }, [api, active, paused, holding, focused, hidden, reduced, restart]);
+    if (paused || holding || hidden || reduced) return;
+    let previous = performance.now();
+    const timer = window.setInterval(() => {
+      const now = performance.now();
+      progress.current += now - previous;
+      previous = now;
+      if (progress.current >= 5000) {
+        progress.current = 0;
+        setActive((index) => (index + 1) % scenes.length);
+      }
+      setElapsed(progress.current);
+    }, 30);
+    return () => clearInterval(timer);
+  }, [paused, holding, hidden, reduced]);
 
+  const scene = scenes[active];
+  const characters = reduced
+    ? scene.message.length
+    : Math.floor(Math.min(1, elapsed / 1000) * scene.message.length);
+  const replyVisible = reduced || elapsed >= 1250;
+  const cardVisible = reduced || elapsed >= 2250;
   return (
-    <main className="welcome-screen">
+    <main className="welcome-screen welcome-live" data-paused={paused || holding || hidden}>
       <header>
         <div className="welcome-brand">
           <Compass aria-hidden="true" /> NORTE
         </div>
         <h1>
-          Todo rumo começa
+          Você vive. O Norte
           <br />
-          com um Norte.
+          organiza.
         </h1>
-        <p>
-          Você conta o que está acontecendo.
-          <br />O Norte organiza o próximo passo.
+        <p key={active} className="welcome-subtitle">
+          {subtitles[active]}
         </p>
       </header>
       <section
         className="welcome-carousel"
-        aria-label="Conheça o Norte"
+        aria-label="Exemplos do Norte"
         aria-roledescription="carrossel"
-        onFocusCapture={() => setFocused(true)}
-        onBlurCapture={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget)) setFocused(false);
-        }}
       >
         <div
-          ref={viewport}
-          className="welcome-viewport"
+          className="welcome-live-stage"
           tabIndex={0}
-          aria-label="Arraste ou use as setas para trocar de exemplo"
-          onKeyDown={(e) => {
-            if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-              e.preventDefault();
-              if (e.key === "ArrowRight") api?.scrollNext(reduced);
-              else api?.scrollPrev(reduced);
-              setRestart((n) => n + 1);
+          aria-label="Use as setas ou arraste para mudar de exemplo"
+          onKeyDown={(event) => {
+            if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+              event.preventDefault();
+              select(active + (event.key === "ArrowRight" ? 1 : -1));
             }
           }}
+          onPointerDown={(event) => {
+            gesture.current = { x: event.clientX, y: event.clientY };
+            setHolding(true);
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }}
+          onPointerUp={(event) => {
+            const origin = gesture.current;
+            gesture.current = null;
+            setHolding(false);
+            if (
+              origin &&
+              Math.abs(event.clientX - origin.x) > 55 &&
+              Math.abs(event.clientY - origin.y) < 60
+            ) {
+              select(active + (event.clientX < origin.x ? 1 : -1));
+            }
+          }}
+          onPointerCancel={() => {
+            gesture.current = null;
+            setHolding(false);
+          }}
+          onLostPointerCapture={() => {
+            gesture.current = null;
+            setHolding(false);
+          }}
         >
-          <div className="welcome-track">
-            {scenes.map((scene, index) => (
-              <article
-                className="welcome-slide"
-                key={scene.name}
-                aria-hidden={active !== index}
-                aria-label={`${index + 1} de 4: ${scene.name}`}
-                aria-roledescription="slide"
-              >
-                <div className="welcome-demo">
-                  <div className="welcome-chat-brand">
-                    <Compass size={18} /> Norte <span>Exemplo</span>
-                  </div>
-                  <div className="welcome-message">{scene.message}</div>
-                  <div className="welcome-reply">
-                    <div>
-                      <Compass size={14} /> Norte
-                    </div>
-                    <p>{scene.reply}</p>
-                  </div>
-                  <ExampleCard index={index} />
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-        <div className="welcome-caption">
-          <h2>{scenes[active].title}</h2>
-          <p>{scenes[active].description}</p>
+          <div className="welcome-example-label">Exemplo</div>
+          <article key={active} aria-label={scene.name} aria-roledescription="slide">
+            <div className="welcome-user-slot">
+              <div className="welcome-message" aria-label={scene.message}>
+                <span aria-hidden="true">
+                  {scene.message.slice(0, characters)}
+                  {characters < scene.message.length && <span className="welcome-cursor">▏</span>}
+                </span>
+              </div>
+            </div>
+            <div
+              className="welcome-reply"
+              style={{
+                visibility: replyVisible ? "visible" : "hidden",
+                opacity: replyVisible ? 1 : 0,
+              }}
+            >
+              <div>
+                <Compass size={18} /> Norte
+              </div>
+              <p>{scene.reply}</p>
+            </div>
+            <div
+              className="welcome-card-reveal"
+              style={{
+                visibility: cardVisible ? "visible" : "hidden",
+                opacity: cardVisible ? 1 : 0,
+                transform: cardVisible ? "translateY(0)" : "translateY(8px)",
+              }}
+            >
+              <ExampleCard index={active} />
+            </div>
+          </article>
         </div>
         <div className="welcome-controls">
           <div className="welcome-dots">
-            {scenes.map((scene, index) => (
+            {scenes.map((item, index) => (
               <button
-                key={scene.name}
-                aria-label={`Mostrar ${scene.name}`}
+                key={item.name}
+                aria-label={`Mostrar ${item.name}`}
                 aria-current={index === active ? "true" : undefined}
-                onClick={() => {
-                  api?.scrollTo(index, reduced);
-                  setRestart((n) => n + 1);
-                }}
+                onClick={() => select(index)}
               >
                 <span />
               </button>
@@ -261,7 +295,7 @@ export function WelcomeScreen({ onEnter, onLogin }: { onEnter: () => void; onLog
             <button
               className="welcome-pause"
               aria-label={paused ? "Reproduzir carrossel" : "Pausar carrossel"}
-              onClick={() => setPaused((p) => !p)}
+              onClick={() => setPaused((value) => !value)}
             >
               {paused ? <Play size={15} /> : <Pause size={15} />}
             </button>
@@ -270,7 +304,7 @@ export function WelcomeScreen({ onEnter, onLogin }: { onEnter: () => void; onLog
       </section>
       <footer>
         <button className="welcome-cta" onClick={onEnter}>
-          Ver o Norte em ação
+          Começar agora
         </button>
         <button className="welcome-login" onClick={onLogin}>
           Já tenho uma conta
