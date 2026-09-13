@@ -3,7 +3,8 @@ import { ArrowLeft, Check, Compass, Mail } from "lucide-react";
 import { NorteChat } from "./NorteChat";
 import { AuthGate } from "./AuthGate";
 import { supabase } from "@/lib/supabase/client";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./ui/dialog";
+import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from "./ui/drawer";
+import "./signup-sheet.css";
 
 const field = "w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm";
 const action =
@@ -189,93 +190,128 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
       <AuthGate>
         <NorteChat demo onBack={onBack} onDemoComplete={openAccount} />
       </AuthGate>
-      <Dialog open={account} onOpenChange={setAccount}>
-        <DialogContent className="max-h-[90dvh] max-w-sm overflow-y-auto rounded-3xl">
-          <Compass className="text-primary" size={28} />
-          <DialogTitle className="text-2xl">Guarde seu próximo passo.</DialogTitle>
-          <DialogDescription>
-            Crie sua conta para continuar com esta conversa e os planos que começou.
-          </DialogDescription>
-          {!manual ? (
-            <div className="space-y-3">
-              <button disabled={busy} className={field} onClick={() => oauth("google")}>
-                Continuar com Google
-              </button>
-              <button disabled={busy} className={field} onClick={() => oauth("apple")}>
-                Continuar com Apple
-              </button>
-              <button
-                disabled={busy}
-                className={`${field} flex items-center justify-center gap-2`}
-                onClick={() => setManual(true)}
-              >
-                <Mail size={17} /> Criar com e-mail
-              </button>
-            </div>
-          ) : !verifying ? (
-            <form onSubmit={register} className="space-y-3">
-              <label className="block text-sm">
-                Nome
-                <input
-                  autoComplete="name"
-                  required
-                  maxLength={100}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className={`${field} mt-1`}
-                />
-              </label>
-              <label className="block text-sm">
-                E-mail
-                <input
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={`${field} mt-1`}
-                />
-              </label>
-              <button disabled={busy || !name.trim()} className={action}>
-                {busy ? "Enviando…" : "Confirmar meu e-mail"}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={savePassword} className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                {notice || "Confirme seu e-mail e escolha sua senha."}
+      <Drawer open={account} onOpenChange={setAccount} shouldScaleBackground={false}>
+        <DrawerContent className="signup-sheet" onEscapeKeyDown={() => setAccount(false)}>
+          <div className="signup-sheet-body">
+            <Compass className="signup-sheet-mark text-primary" size={32} />
+            <DrawerTitle className="signup-sheet-title">
+              Seu primeiro passo está pronto.
+            </DrawerTitle>
+            <DrawerDescription className="signup-sheet-description">
+              Crie sua conta para salvar o que você começou e continuar com o Norte.
+            </DrawerDescription>
+            {!manual ? (
+              <div className="signup-sheet-options">
+                <button
+                  disabled={busy}
+                  className="signup-provider signup-google"
+                  onClick={() => oauth("google")}
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.25c1.9-1.75 2.97-4.33 2.97-7.36Z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 22c2.7 0 4.96-.9 6.61-2.41l-3.25-2.51c-.9.6-2.05.96-3.36.96-2.6 0-4.81-1.76-5.6-4.12H3.04v2.59A10 10 0 0 0 12 22Z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M6.4 13.92a6 6 0 0 1 0-3.84V7.49H3.04a10 10 0 0 0 0 9.02l3.36-2.59Z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.96c1.47 0 2.79.5 3.82 1.49l2.87-2.87A9.6 9.6 0 0 0 12 2a10 10 0 0 0-8.96 5.49l3.36 2.59C7.19 7.72 9.4 5.96 12 5.96Z"
+                    />
+                  </svg>
+                  <span>Continuar com Google</span>
+                </button>
+                <button
+                  disabled={busy}
+                  className="signup-provider signup-apple"
+                  onClick={() => oauth("apple")}
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.05 12.54c.03 3.14 2.75 4.18 2.78 4.2-.02.07-.43 1.49-1.43 2.96-.87 1.27-1.78 2.54-3.2 2.57-1.4.04-1.85-.83-3.45-.83-1.6 0-2.1.8-3.43.86-1.38.05-2.43-1.38-3.31-2.65-1.8-2.6-3.17-7.35-1.32-10.56a5.13 5.13 0 0 1 4.33-2.63c1.35-.03 2.63.92 3.45.92.83 0 2.37-1.14 3.99-.97.67.03 2.57.27 3.78 2.04-.1.06-2.25 1.31-2.23 4.09ZM14.43 4.7c.73-.89 1.22-2.13 1.08-3.36-1.05.04-2.33.7-3.08 1.59-.67.77-1.26 2.02-1.1 3.22 1.17.09 2.37-.6 3.1-1.45Z" />
+                  </svg>
+                  <span>Continuar com Apple</span>
+                </button>
+                <div className="signup-sheet-divider">
+                  <span />
+                  ou
+                  <span />
+                </div>
+                <button
+                  disabled={busy}
+                  className="signup-provider signup-email"
+                  onClick={() => setManual(true)}
+                >
+                  <Mail size={23} /> <span>Criar conta com e-mail</span>
+                </button>
+              </div>
+            ) : !verifying ? (
+              <form onSubmit={register} className="space-y-3">
+                <label className="block text-sm">
+                  Nome
+                  <input
+                    autoComplete="name"
+                    required
+                    maxLength={100}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className={`${field} mt-1`}
+                  />
+                </label>
+                <label className="block text-sm">
+                  E-mail
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={`${field} mt-1`}
+                  />
+                </label>
+                <button disabled={busy || !name.trim()} className={action}>
+                  {busy ? "Enviando…" : "Confirmar meu e-mail"}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={savePassword} className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  {notice || "Confirme seu e-mail e escolha sua senha."}
+                </p>
+                <label className="block text-sm">
+                  Senha
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={`${field} mt-1`}
+                  />
+                </label>
+                <p className="text-xs text-muted-foreground">Use pelo menos 8 caracteres.</p>
+                <button disabled={busy} className={action}>
+                  {busy ? "Verificando…" : "Concluir minha conta"}
+                </button>
+              </form>
+            )}
+            {error && (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
               </p>
-              <label className="block text-sm">
-                Senha
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`${field} mt-1`}
-                />
-              </label>
-              <p className="text-xs text-muted-foreground">Use pelo menos 8 caracteres.</p>
-              <button disabled={busy} className={action}>
-                {busy ? "Verificando…" : "Concluir minha conta"}
-              </button>
-            </form>
-          )}
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
-          <button
-            className="min-h-11 text-sm text-muted-foreground"
-            onClick={() => setAccount(false)}
-          >
-            Voltar à conversa
-          </button>
-        </DialogContent>
-      </Dialog>
+            )}
+            <button className="signup-sheet-return" onClick={() => setAccount(false)}>
+              Continuar conversando
+            </button>
+          </div>
+        </DrawerContent>
+      </Drawer>
     </>
   );
 }

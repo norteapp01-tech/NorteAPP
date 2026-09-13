@@ -1,0 +1,134 @@
+.signup-sheet {
+  width: 100%;
+  max-width: 480px;
+  margin-inline: auto;
+  max-height: 92dvh;
+  border-radius: 28px 28px 0 0;
+  background: #101214;
+  border-color: #303438;
+  box-shadow: 0 -12px 50px #0003;
+  color: #f6f7f8;
+}
+.signup-sheet > div:first-child {
+  width: 44px;
+  height: 5px;
+  margin-top: 15px;
+  background: #51565c;
+  flex-shrink: 0;
+}
+.signup-sheet-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px 24px max(22px, env(safe-area-inset-bottom));
+}
+.signup-sheet-mark {
+  margin-bottom: 19px;
+}
+.signup-sheet-title {
+  font-size: 25px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  text-align: left;
+}
+.signup-sheet-description {
+  font-size: 15px;
+  line-height: 1.55;
+  color: #aeb4bc;
+  margin-top: 14px;
+  margin-bottom: 27px;
+  text-align: left;
+}
+.signup-sheet-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.signup-provider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 52px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #303438;
+  border-radius: 15px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.signup-provider svg {
+  width: 23px;
+  height: 23px;
+  flex-shrink: 0;
+}
+.signup-provider:active {
+  opacity: 0.8;
+}
+.signup-provider:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.signup-provider:focus-visible,
+.signup-sheet-return:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+.signup-google {
+  background: #fff;
+  color: #101214;
+  font-weight: 600;
+  border-color: #fff;
+}
+.signup-apple {
+  background: #181b1e;
+  color: #fff;
+}
+.signup-email {
+  background: transparent;
+  color: #fff;
+  border-color: #626971;
+}
+.signup-sheet-divider {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  color: #969da5;
+  font-size: 13px;
+  padding: 12px 0;
+}
+.signup-sheet-divider span {
+  height: 1px;
+  background: #454a50;
+  flex: 1;
+}
+.signup-sheet-return {
+  display: block;
+  margin: 24px auto 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #aeb4bc;
+}
+@media (max-width: 350px) {
+  .signup-sheet-body {
+    padding-inline: 20px;
+  }
+  .signup-sheet-title {
+    font-size: 23px;
+  }
+  .signup-provider {
+    font-size: 14px;
+    gap: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .signup-sheet,
+  .signup-provider {
+    animation: none !important;
+    transition: none !important;
+  }
+}
