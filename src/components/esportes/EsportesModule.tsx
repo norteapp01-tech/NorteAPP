@@ -1,8 +1,15 @@
 import { useState } from "react";
-import { ChevronDown, Footprints, PersonStanding, Bike, Check } from "lucide-react";
+import { ChevronDown, Footprints, PersonStanding, Bike, Check, Moon, Sun } from "lucide-react";
 import { UnderlineTabs } from "@/components/ui/app-design-system";
 import { Modal } from "@/components/ui/modal";
-import { modalityLabel, type SportModality } from "@/lib/sport-store";
+import {
+  loadMapStyle,
+  saveMapStyle,
+  mapStyleLabel,
+  modalityLabel,
+  type MapStyle,
+  type SportModality,
+} from "@/lib/sport-store";
 import { OverviewTab } from "./OverviewTab";
 import { PlanningTab } from "./PlanningTab";
 import { HistoryTab } from "./HistoryTab";
@@ -19,11 +26,19 @@ function loadLastModality(): SportModality {
 
 type Tab = "visao_geral" | "planejamento" | "historico";
 
+const mapStyleIcon = { escuro: Moon, claro: Sun } as const;
+
 export function EsportesModule() {
   const [modality, setModality] = useState<SportModality>(loadLastModality);
   const [modalityDrawerOpen, setModalityDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("visao_geral");
+  const [mapStyle, setMapStyle] = useState<MapStyle>(loadMapStyle);
+
+  const selectMapStyle = (style: MapStyle) => {
+    setMapStyle(style);
+    saveMapStyle(style);
+  };
 
   const selectModality = (m: SportModality) => {
     setModality(m);
@@ -48,7 +63,7 @@ export function EsportesModule() {
           onClick={() => setSettingsOpen(true)}
           className="text-xs font-semibold text-muted-foreground hover:text-primary"
         >
-          Metas semanais
+          Configurações
         </button>
       </div>
 
@@ -90,8 +105,41 @@ export function EsportesModule() {
       )}
 
       {settingsOpen && (
-        <Modal title="Metas semanais" onClose={() => setSettingsOpen(false)}>
-          <WeeklyGoalsPanel />
+        <Modal title="Configurações" onClose={() => setSettingsOpen(false)}>
+          <div className="space-y-5">
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                Estilo do mapa na gravação
+              </p>
+              <div className="flex gap-2">
+                {(Object.keys(mapStyleLabel) as MapStyle[]).map((style) => {
+                  const StyleIcon = mapStyleIcon[style];
+                  return (
+                    <button
+                      key={style}
+                      onClick={() => selectMapStyle(style)}
+                      className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold ${
+                        mapStyle === style
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground"
+                      }`}
+                    >
+                      <StyleIcon className="h-4 w-4" strokeWidth={1.8} />
+                      {mapStyleLabel[style]}
+                      {mapStyle === style && <Check className="h-3.5 w-3.5" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                Metas semanais
+              </p>
+              <WeeklyGoalsPanel />
+            </div>
+          </div>
         </Modal>
       )}
     </div>

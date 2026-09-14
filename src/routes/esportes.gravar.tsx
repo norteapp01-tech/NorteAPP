@@ -138,7 +138,7 @@ function GravarPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <div className="relative flex-1">
-        <MapboxRouteMap points={recorder.points} className="h-full" />
+        <MapboxRouteMap points={recorder.points} />
         <div className="absolute left-4 top-12 flex gap-2">
           <button
             onClick={() => setDiscardConfirm(true)}

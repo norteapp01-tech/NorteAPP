@@ -25,6 +25,37 @@ export const modalityActionLabel: Record<SportModality, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// Estilo do mapa — preferência leve por dispositivo (mesmo padrão da última
+// modalidade escolhida), sem precisar de coluna nova no perfil.
+// ---------------------------------------------------------------------------
+
+export type MapStyle = "escuro" | "claro";
+const MAP_STYLE_STORAGE_KEY = "norte:esportes:mapStyle";
+
+export const mapStyleLabel: Record<MapStyle, string> = { escuro: "Escuro", claro: "Claro" };
+
+export const mapStyleUrl: Record<MapStyle, string> = {
+  escuro: "mapbox://styles/mapbox/dark-v11",
+  claro: "mapbox://styles/mapbox/light-v11",
+};
+
+/** Verde de mais contraste em fundo claro; a mesma trilha em fundo escuro
+ * ficaria apagada demais se usasse esse tom mais saturado/escuro. */
+export const mapRouteColor: Record<MapStyle, string> = {
+  escuro: "#7ee08a",
+  claro: "#1f9d55",
+};
+
+export function loadMapStyle(): MapStyle {
+  if (typeof window === "undefined") return "escuro";
+  return window.localStorage.getItem(MAP_STYLE_STORAGE_KEY) === "claro" ? "claro" : "escuro";
+}
+
+export function saveMapStyle(style: MapStyle) {
+  window.localStorage.setItem(MAP_STYLE_STORAGE_KEY, style);
+}
+
+// ---------------------------------------------------------------------------
 // Geometria e tempo — puro, sem I/O. É a parte que precisa estar certa: nunca
 // soma um salto de GPS como se fosse percurso real, nunca inventa distância.
 // ---------------------------------------------------------------------------
