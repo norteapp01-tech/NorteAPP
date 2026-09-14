@@ -1,12 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import { X, Volume2, VolumeX } from "lucide-react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { X, Volume2, VolumeX, Camera, Share2 } from "lucide-react";
 import { MapboxRouteMap } from "@/components/esportes/MapboxRouteMap";
 import { RoutePicker, type RouteSelection } from "@/components/esportes/RoutePicker";
+import { RoutePreview } from "@/components/esportes/RoutePreview";
+import { ShareActivitySheet } from "@/components/esportes/ShareActivitySheet";
 import { useSportRecorder } from "@/lib/sport-recorder-context";
+import { supabase } from "@/lib/supabase/client";
 import {
   linkActivityToExecution,
   saveRecordedActivity,
+  updateActivity,
   computeDurations,
   computeDistanceM,
 } from "@/lib/sport-store";
@@ -19,7 +23,12 @@ import {
   formatSpeedKmh,
   computePaceSPerKm,
   computeSpeedKmh,
+  activityTypeLabel,
+  effortLevelLabel,
   type SportModality,
+  type SportActivity,
+  type ActivityType,
+  type EffortLevel,
 } from "@/lib/sport-store";
 import { formatChangeDistanceM } from "@/lib/sport-route-geometry";
 
@@ -326,7 +335,13 @@ function FinishForm({
 
   const [title, setTitle] = useState(defaultTitle);
   const [note, setNote] = useState("");
+  const [activityType, setActivityType] = useState<ActivityType | undefined>(undefined);
+  const [effortLevel, setEffortLevel] = useState<EffortLevel | undefined>(undefined);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [savedActivity, setSavedActivity] = useState<SportActivity | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const distanceM = computeDistanceM(data.points);
   const { activeDurationS, totalDurationS } = computeDurations(
@@ -334,13 +349,23 @@ function FinishForm({
     data.endedAt,
     data.pauses,
   );
+  const avgPaceSPerKm = computePaceSPerKm(distanceM, activeDurationS);
+  const avgSpeedKmh = computeSpeedKmh(distanceM, activeDurationS);
+
+  const onPhotoFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+  };
 
   const save = async () => {
     setSaving(true);
     try {
+      const finalTitle = title.trim() || defaultTitle;
       const activityId = await saveRecordedActivity({
         modality: data.modality,
-        title: title.trim() || defaultTitle,
+        title: finalTitle,
         note: note || undefined,
         startedAt: data.startedAt,
         endedAt: data.endedAt,
@@ -348,15 +373,92 @@ function FinishForm({
         pauses: data.pauses,
         executionId: data.executionId ?? executionId,
         routeId: data.routeId,
+        activityType,
+        effortLevel,
       });
       if (data.executionId ?? executionId) {
         await linkActivityToExecution(activityId, (data.executionId ?? executionId)!);
       }
-      onSaved();
+
+      let photoUrl: string | undefined;
+      if (photoFile) {
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData.user?.id;
+        if (userId) {
+          const ext = photoFile.name.split(".").pop() ?? "jpg";
+          const path = `${userId}/${activityId}.${ext}`;
+          const { error } = await supabase.storage
+            .from("sport-photos")
+            .upload(path, photoFile, { upsert: true });
+          if (!error) {
+            await updateActivity(activityId, { photoUrl: path });
+            photoUrl = path;
+          }
+        }
+      }
+
+      setSavedActivity({
+        id: activityId,
+        modality: data.modality,
+        source: "gravado",
+        title: finalTitle,
+        note: note || undefined,
+        startedAt: data.startedAt,
+        endedAt: data.endedAt,
+        activeDurationS,
+        totalDurationS,
+        distanceM,
+        avgPaceSPerKm: avgPaceSPerKm ?? undefined,
+        avgSpeedKmh: avgSpeedKmh ?? undefined,
+        routeId: data.routeId,
+        activityType,
+        effortLevel,
+        photoUrl,
+        privacyHideRoute: false,
+        privacyHideStartEnd: false,
+        isPrivate: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
     } finally {
       setSaving(false);
     }
   };
+
+  if (savedActivity) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-background px-6 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/15 text-2xl">
+          ✓
+        </div>
+        <div>
+          <p className="text-lg font-bold">Atividade salva</p>
+          <p className="mt-1 text-sm text-muted-foreground">{savedActivity.title}</p>
+        </div>
+        <div className="flex w-full max-w-xs flex-col gap-2">
+          <button
+            onClick={() => setShareOpen(true)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground"
+          >
+            <Share2 className="h-4 w-4" /> Compartilhar
+          </button>
+          <button
+            onClick={onSaved}
+            className="w-full rounded-xl border border-border py-3 text-sm font-semibold text-foreground"
+          >
+            Concluir
+          </button>
+        </div>
+        {shareOpen && (
+          <ShareActivitySheet
+            activity={savedActivity}
+            points={data.points}
+            onClose={() => setShareOpen(false)}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background px-5 pb-10 pt-12">
@@ -369,7 +471,9 @@ function FinishForm({
         className="mt-2 w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-xl font-bold outline-none focus:border-primary"
       />
 
-      <div className="mt-5 grid grid-cols-2 gap-2">
+      <RoutePreview points={data.points} className="mt-4 h-44" />
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
         <div className="rounded-xl bg-primary/10 p-3">
           <p className="text-xl font-bold text-primary">{formatDistanceKm(distanceM)}</p>
           <p className="text-[10px] uppercase text-muted-foreground">distância</p>
@@ -384,13 +488,51 @@ function FinishForm({
         </div>
         <div className="rounded-xl bg-surface-2 p-3">
           <p className="text-xl font-bold">
-            {data.modality === "ciclismo"
-              ? formatSpeedKmh(computeSpeedKmh(distanceM, activeDurationS))
-              : formatPace(computePaceSPerKm(distanceM, activeDurationS))}
+            {data.modality === "ciclismo" ? formatSpeedKmh(avgSpeedKmh) : formatPace(avgPaceSPerKm)}
           </p>
           <p className="text-[10px] uppercase text-muted-foreground">
             {data.modality === "ciclismo" ? "velocidade média" : "ritmo médio"}
           </p>
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <p className="mb-1.5 text-[11px] uppercase text-muted-foreground">Tipo (opcional)</p>
+        <div className="flex flex-wrap gap-1.5">
+          {(Object.keys(activityTypeLabel) as ActivityType[]).map((type) => (
+            <button
+              key={type}
+              onClick={() => setActivityType((v) => (v === type ? undefined : type))}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                activityType === type
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-border text-muted-foreground"
+              }`}
+            >
+              {activityTypeLabel[type]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-3">
+        <p className="mb-1.5 text-[11px] uppercase text-muted-foreground">
+          Como foi o esforço (opcional)
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {(Object.keys(effortLevelLabel) as EffortLevel[]).map((level) => (
+            <button
+              key={level}
+              onClick={() => setEffortLevel((v) => (v === level ? undefined : level))}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                effortLevel === level
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-border text-muted-foreground"
+              }`}
+            >
+              {effortLevelLabel[level]}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -402,8 +544,18 @@ function FinishForm({
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={3}
+          placeholder="Como foi essa atividade? O que você viu no caminho?"
           className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
         />
+      </label>
+
+      {photoPreviewUrl && (
+        <img src={photoPreviewUrl} alt="" className="mt-3 h-40 w-full rounded-xl object-cover" />
+      )}
+      <label className="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border py-2.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary">
+        <Camera className="h-3.5 w-3.5" />
+        {photoFile ? "Trocar foto" : "Adicionar foto"}
+        <input type="file" accept="image/*" className="hidden" onChange={onPhotoFile} />
       </label>
 
       <button

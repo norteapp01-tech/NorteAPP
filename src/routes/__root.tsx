@@ -129,6 +129,9 @@ const navItems: NavItem[] = [
 
 function BottomNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // A gravação é uma tela cheia dedicada — o nav fixo no rodapé cobria
+  // exatamente a fileira de Pausar/Continuar/Finalizar por cima.
+  if (pathname === "/esportes/gravar") return null;
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/85 backdrop-blur-xl">
       <div className="mx-auto flex max-w-md items-center justify-around px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2">
@@ -248,9 +251,13 @@ function RootComponent() {
         onLogin={() => setManualLogin(true)}
       />
     );
+  const isFullScreenRoute = pathname === "/esportes/gravar";
+
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="mx-auto min-h-screen max-w-md bg-background pb-28">
+      <div
+        className={`mx-auto min-h-screen max-w-md bg-background ${isFullScreenRoute ? "" : "pb-28"}`}
+      >
         <AuthGate>
           <SportRecorderProvider>
             <div key={pathname} className="page-enter">

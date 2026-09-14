@@ -70,6 +70,28 @@ export function saveMapStyle(style: MapStyle) {
   window.localStorage.setItem(MAP_STYLE_STORAGE_KEY, style);
 }
 
+const mapStyleId: Record<MapStyle, string> = {
+  escuro: "dark-v11",
+  claro: "light-v11",
+  padrao: "streets-v12",
+  satelite: "satellite-v9",
+  hibrido: "satellite-streets-v12",
+};
+
+/** Prévia real do estilo (Mapbox Static Images API) — a mesma renderização
+ * que o mapa ao vivo usaria naquele local, nunca uma imagem de estoque ou
+ * ilustração fingindo ser o estilo. */
+export function mapStylePreviewUrl(
+  style: MapStyle,
+  center: { lat: number; lng: number },
+  opts: { widthPx?: number; heightPx?: number; zoom?: number } = {},
+): string | null {
+  const token = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
+  if (!token) return null;
+  const { widthPx = 160, heightPx = 100, zoom = 13 } = opts;
+  return `https://api.mapbox.com/styles/v1/mapbox/${mapStyleId[style]}/static/${center.lng},${center.lat},${zoom},0,0/${widthPx}x${heightPx}@2x?access_token=${token}`;
+}
+
 // ---------------------------------------------------------------------------
 // Geometria e tempo — puro, sem I/O. É a parte que precisa estar certa: nunca
 // soma um salto de GPS como se fosse percurso real, nunca inventa distância.
@@ -198,6 +220,21 @@ function unwrap<T>(res: { data: T | null; error: { message: string } | null }): 
   return res.data as T;
 }
 
+export type ActivityType = "prova" | "longa" | "treino";
+export type EffortLevel = "leve" | "moderado" | "maximo";
+
+export const activityTypeLabel: Record<ActivityType, string> = {
+  prova: "Prova",
+  longa: "Longa",
+  treino: "Treino",
+};
+
+export const effortLevelLabel: Record<EffortLevel, string> = {
+  leve: "Confortável",
+  moderado: "Moderado",
+  maximo: "Esforço máximo",
+};
+
 export type SportActivity = {
   id: string;
   modality: SportModality;
@@ -213,6 +250,8 @@ export type SportActivity = {
   avgSpeedKmh?: number;
   executionId?: string;
   routeId?: string;
+  activityType?: ActivityType;
+  effortLevel?: EffortLevel;
   photoUrl?: string;
   privacyHideRoute: boolean;
   privacyHideStartEnd: boolean;
@@ -237,6 +276,8 @@ function mapActivity(r: Row): SportActivity {
     avgSpeedKmh: r.avg_speed_kmh !== null ? Number(r.avg_speed_kmh) : undefined,
     executionId: (r.execution_id as string) ?? undefined,
     routeId: (r.route_id as string) ?? undefined,
+    activityType: (r.activity_type as ActivityType) ?? undefined,
+    effortLevel: (r.effort_level as EffortLevel) ?? undefined,
     photoUrl: (r.photo_url as string) ?? undefined,
     privacyHideRoute: r.privacy_hide_route as boolean,
     privacyHideStartEnd: r.privacy_hide_start_end as boolean,
@@ -344,6 +385,8 @@ export async function saveRecordedActivity(input: {
   pauses: PauseInterval[];
   executionId?: string;
   routeId?: string;
+  activityType?: ActivityType;
+  effortLevel?: EffortLevel;
 }): Promise<string> {
   const userId = await ensureSession();
   const { totalDurationS, activeDurationS } = computeDurations(
@@ -375,6 +418,8 @@ export async function saveRecordedActivity(input: {
         avg_speed_kmh: avgSpeedKmh,
         execution_id: input.executionId,
         route_id: input.routeId,
+        activity_type: input.activityType,
+        effort_level: input.effortLevel,
       })
       .select()
       .single(),
