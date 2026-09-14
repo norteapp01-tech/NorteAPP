@@ -91,8 +91,9 @@ function AgendaScreen() {
 
   const selectedEvents = eventsByDate[selectedDate] ?? [];
   const occupiedMinutes = selectedEvents.reduce((sum, event) => {
-    const start = timeToMinutes(event.startTime ?? "00:00");
-    const end = timeToMinutes(event.endTime ?? event.startTime ?? "00:00");
+    if (!event.startTime) return sum; // sem horário escolhido não ocupa um horário real
+    const start = timeToMinutes(event.startTime);
+    const end = timeToMinutes(event.endTime || event.startTime);
     return sum + Math.max(0, end - start);
   }, 0);
   const availableMinutes = Math.max(0, 15 * 60 - occupiedMinutes);
@@ -570,8 +571,8 @@ function AgendaEventBlock({
   hourHeight: number;
   timeFormat: TimeFormat;
 }) {
-  const initialStart = timeToMinutes(event.startTime ?? `${String(startHour).padStart(2, "0")}:00`);
-  const initialEnd = timeToMinutes(event.endTime ?? minutesToTime(initialStart + 60));
+  const initialStart = timeToMinutes(event.startTime || `${String(startHour).padStart(2, "0")}:00`);
+  const initialEnd = timeToMinutes(event.endTime || minutesToTime(initialStart + 60));
   const [start, setStart] = useState(initialStart);
   const [end, setEnd] = useState(Math.max(initialStart + 15, initialEnd));
   const [menuOpen, setMenuOpen] = useState(false);
@@ -579,8 +580,8 @@ function AgendaEventBlock({
   const [saving, setSaving] = useState(false);
   const [schedule, setSchedule] = useState<ScheduleValue>({
     date,
-    startTime: event.startTime ?? minutesToTime(initialStart),
-    endTime: event.endTime ?? minutesToTime(initialEnd),
+    startTime: event.startTime || minutesToTime(initialStart),
+    endTime: event.endTime || minutesToTime(initialEnd),
   });
   const drag = useRef<{
     mode: "move" | "resize";
@@ -592,15 +593,15 @@ function AgendaEventBlock({
   const preview = useRef({ start: initialStart, end: Math.max(initialStart + 15, initialEnd) });
 
   useEffect(() => {
-    const nextStart = timeToMinutes(event.startTime ?? `${String(startHour).padStart(2, "0")}:00`);
-    const nextEnd = timeToMinutes(event.endTime ?? minutesToTime(nextStart + 60));
+    const nextStart = timeToMinutes(event.startTime || `${String(startHour).padStart(2, "0")}:00`);
+    const nextEnd = timeToMinutes(event.endTime || minutesToTime(nextStart + 60));
     setStart(nextStart);
     setEnd(Math.max(nextStart + 15, nextEnd));
     preview.current = { start: nextStart, end: Math.max(nextStart + 15, nextEnd) };
     setSchedule({
       date,
-      startTime: event.startTime ?? minutesToTime(nextStart),
-      endTime: event.endTime ?? minutesToTime(nextEnd),
+      startTime: event.startTime || minutesToTime(nextStart),
+      endTime: event.endTime || minutesToTime(nextEnd),
     });
   }, [date, event.endTime, event.startTime, startHour]);
 

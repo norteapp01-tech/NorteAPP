@@ -21,6 +21,7 @@ import {
   Route as RouteIcon,
   CircleDollarSign,
   HandHeart,
+  Footprints,
 } from "lucide-react";
 import { categoryMeta } from "@/lib/mock-data";
 import { useProfile } from "@/lib/profile-store";
@@ -64,6 +65,7 @@ import {
   type Exercise,
   type SetTarget,
 } from "@/lib/workout-store";
+import { EsportesModule } from "@/components/esportes/EsportesModule";
 import { LeituraModule } from "@/components/reading/LeituraModule";
 import { AlimentacaoModule } from "@/components/nutrition/AlimentacaoModule";
 import { FinancasModule } from "@/components/finance/FinancasModule";
@@ -109,6 +111,8 @@ function SubAgenda() {
         <h1 className="mt-1 flex items-center gap-3 text-3xl font-bold">
           {categoria === "academia" ? (
             <Dumbbell className="h-8 w-8 text-primary" strokeWidth={1.8} />
+          ) : categoria === "esportes" ? (
+            <Footprints className="h-8 w-8 text-primary" strokeWidth={1.8} />
           ) : categoria === "leitura" ? (
             <BookOpen className="h-8 w-8 text-primary" strokeWidth={1.8} />
           ) : categoria === "alimentacao" ? (
@@ -128,13 +132,15 @@ function SubAgenda() {
         categoria !== "alimentacao" &&
         categoria !== "financas" &&
         categoria !== "fe" &&
-        categoria !== "academia" && (
+        categoria !== "academia" &&
+        categoria !== "esportes" && (
           <div className="mt-6">
             <RoutineConfigCard categoria={categoria} />
           </div>
         )}
 
       {categoria === "academia" && <AcademiaModule />}
+      {categoria === "esportes" && <EsportesModule />}
       {categoria === "leitura" && <LeituraModule />}
       {categoria === "alimentacao" && <AlimentacaoModule />}
       {categoria === "financas" && <FinancasModule />}

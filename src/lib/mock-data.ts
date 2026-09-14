@@ -5,6 +5,7 @@ export type TaskStatus = "green" | "yellow" | "white" | "red";
 
 export const categoryMeta: Record<string, { label: string; emoji: string; accent: string }> = {
   academia: { label: "Academia", emoji: "💪", accent: "oklch(0.82 0.18 145)" },
+  esportes: { label: "Esportes", emoji: "🏃", accent: "oklch(0.82 0.18 145)" },
   leitura: { label: "Leitura", emoji: "📚", accent: "oklch(0.78 0.14 250)" },
   alimentacao: { label: "Alimentação", emoji: "🥗", accent: "oklch(0.82 0.16 85)" },
   financas: { label: "Finanças", emoji: "💰", accent: "oklch(0.75 0.12 200)" },

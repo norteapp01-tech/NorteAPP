@@ -15,6 +15,9 @@ import { nowDate, nowMs } from "./test-clock";
 
 export type GoalKind = "sonho" | "projeto" | "habito";
 export type TaskWeight = "leve" | "medio" | "pesado";
+/** Compartilhado com o módulo Esportes — vive aqui porque Execution/Routine
+ * precisam do tipo, e os dois são o único jeito de planejar uma atividade. */
+export type SportModality = "corrida" | "caminhada" | "ciclismo";
 export type ExecutionStatus = "planejada" | "concluida" | "perdida" | "reagendada" | "cancelada";
 /** Como o progresso deste planejamento é medido. */
 export type TrackingType = "etapas" | "frequencia" | "numero";
@@ -93,6 +96,11 @@ export type Execution = {
    * planejado, ou as duas coisas ao mesmo tempo. Os dois nascem juntos. */
   plannedStartDate?: string; // YYYY-MM-DD
   plannedEndDate?: string; // YYYY-MM-DD
+  /** Só presente quando category === "esportes" — objetivo é distância OU
+   * duração, nunca as duas juntas. */
+  sportModality?: SportModality;
+  sportTargetDistanceM?: number;
+  sportTargetDurationS?: number;
   category: string;
   location?: string;
   rigid: boolean;
@@ -125,6 +133,9 @@ export type Routine = {
   time: string;
   weight: TaskWeight;
   active: boolean;
+  sportModality?: SportModality;
+  sportTargetDistanceM?: number;
+  sportTargetDurationS?: number;
   createdAt: string;
 };
 
@@ -1035,6 +1046,9 @@ function mapExecution(r: Row, history: ExecutionHistoryEntry[]): Execution {
       : undefined,
     plannedStartDate: (r.planned_start_date as string) ?? undefined,
     plannedEndDate: (r.planned_end_date as string) ?? undefined,
+    sportModality: (r.sport_modality as SportModality) ?? undefined,
+    sportTargetDistanceM: (r.sport_target_distance_m as number) ?? undefined,
+    sportTargetDurationS: (r.sport_target_duration_s as number) ?? undefined,
     category: r.category as string,
     location: (r.location as string) ?? undefined,
     rigid: r.rigid as boolean,
@@ -1069,6 +1083,9 @@ function mapRoutine(r: Row): Routine {
     time: r.time as string,
     weight: r.weight as TaskWeight,
     active: r.active as boolean,
+    sportModality: (r.sport_modality as SportModality) ?? undefined,
+    sportTargetDistanceM: (r.sport_target_distance_m as number) ?? undefined,
+    sportTargetDurationS: (r.sport_target_duration_s as number) ?? undefined,
     createdAt: r.created_at as string,
   };
 }
@@ -1339,6 +1356,10 @@ export async function createExecution(input: {
   /** CRONOGRAMA — opcional. Independente de agenda; os dois nascem juntos ou nenhum. */
   plannedStartDate?: string;
   plannedEndDate?: string;
+  /** Só faz sentido com category "esportes" — objetivo é distância OU duração. */
+  sportModality?: SportModality;
+  sportTargetDistanceM?: number;
+  sportTargetDurationS?: number;
   category: string;
   location?: string;
   rigid?: boolean;
@@ -1362,6 +1383,9 @@ export async function createExecution(input: {
         end_time: input.endTime,
         planned_start_date: input.plannedStartDate,
         planned_end_date: input.plannedEndDate,
+        sport_modality: input.sportModality,
+        sport_target_distance_m: input.sportTargetDistanceM,
+        sport_target_duration_s: input.sportTargetDurationS,
         category: input.category,
         location: input.location,
         rigid: input.rigid ?? false,
@@ -1798,6 +1822,9 @@ async function materializeRoutineExecutions(routine: {
   weekday: number;
   time: string;
   weight: TaskWeight;
+  sportModality?: SportModality;
+  sportTargetDistanceM?: number;
+  sportTargetDurationS?: number;
 }) {
   const userId = await ensureSession();
   const { data: existing } = await supabase
@@ -1823,6 +1850,9 @@ async function materializeRoutineExecutions(routine: {
       weight: routine.weight,
       status: "planejada",
       routine_id: routine.id,
+      sport_modality: routine.sportModality,
+      sport_target_distance_m: routine.sportTargetDistanceM,
+      sport_target_duration_s: routine.sportTargetDurationS,
     });
   }
   if (toInsert.length > 0) unwrap(await supabase.from("executions").insert(toInsert));
@@ -1834,6 +1864,9 @@ export async function createRoutine(input: {
   weekday: number;
   time: string;
   weight?: TaskWeight;
+  sportModality?: SportModality;
+  sportTargetDistanceM?: number;
+  sportTargetDurationS?: number;
 }): Promise<string> {
   const userId = await ensureSession();
   const routine = unwrap<{
@@ -1854,6 +1887,9 @@ export async function createRoutine(input: {
         weekday: input.weekday,
         time: input.time,
         weight: input.weight ?? "leve",
+        sport_modality: input.sportModality,
+        sport_target_distance_m: input.sportTargetDistanceM,
+        sport_target_duration_s: input.sportTargetDurationS,
       })
       .select()
       .single(),
@@ -1865,6 +1901,9 @@ export async function createRoutine(input: {
     weekday: input.weekday,
     time: input.time,
     weight: input.weight ?? "leve",
+    sportModality: input.sportModality,
+    sportTargetDistanceM: input.sportTargetDistanceM,
+    sportTargetDurationS: input.sportTargetDurationS,
   });
   await invalidate();
   return routine.id as string;
@@ -1880,6 +1919,9 @@ export async function toggleRoutineActive(routineId: string, currentlyActive: bo
     time: string;
     weight: TaskWeight;
     active: boolean;
+    sport_modality: SportModality | null;
+    sport_target_distance_m: number | null;
+    sport_target_duration_s: number | null;
   }>(
     await supabase
       .from("routines")
@@ -1896,6 +1938,9 @@ export async function toggleRoutineActive(routineId: string, currentlyActive: bo
       weekday: routine.weekday as number,
       time: routine.time as string,
       weight: routine.weight as TaskWeight,
+      sportModality: (routine.sport_modality as SportModality) ?? undefined,
+      sportTargetDistanceM: (routine.sport_target_distance_m as number) ?? undefined,
+      sportTargetDurationS: (routine.sport_target_duration_s as number) ?? undefined,
     });
   }
   await invalidate();

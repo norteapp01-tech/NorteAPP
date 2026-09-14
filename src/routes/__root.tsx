@@ -17,6 +17,8 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthGate, SignInScreen } from "../components/AuthGate";
 import { hasLinkedAccount } from "../lib/supabase/client";
+import { SportRecorderProvider } from "../lib/sport-recorder-context";
+import { ActiveRecordingBar } from "../components/esportes/ActiveRecordingBar";
 
 function NotFoundComponent() {
   return (
@@ -246,19 +248,17 @@ function RootComponent() {
         onLogin={() => setManualLogin(true)}
       />
     );
-  // O admin é um painel próprio (desktop-first, sidebar) — nunca herda a casca
-  // de app mobile (largura de 448px, navegação inferior) das telas do Norte.
-  const isAdmin = pathname.startsWith("/admin");
   return (
     <QueryClientProvider client={queryClient}>
-      <div
-        className={isAdmin ? "bg-background" : "mx-auto min-h-screen max-w-md bg-background pb-28"}
-      >
+      <div className="mx-auto min-h-screen max-w-md bg-background pb-28">
         <AuthGate>
-          <div key={pathname} className={isAdmin ? undefined : "page-enter"}>
-            <Outlet />
-          </div>
-          {!isAdmin && <BottomNav />}
+          <SportRecorderProvider>
+            <div key={pathname} className="page-enter">
+              <Outlet />
+            </div>
+            <ActiveRecordingBar />
+            <BottomNav />
+          </SportRecorderProvider>
         </AuthGate>
       </div>
     </QueryClientProvider>

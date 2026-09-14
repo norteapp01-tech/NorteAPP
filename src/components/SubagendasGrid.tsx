@@ -1,17 +1,26 @@
 import { Link } from "@tanstack/react-router";
-import { Dumbbell, BookOpen, Salad, Wallet, HandHeart, type LucideIcon } from "lucide-react";
+import {
+  Dumbbell,
+  BookOpen,
+  Salad,
+  Wallet,
+  HandHeart,
+  Footprints,
+  type LucideIcon,
+} from "lucide-react";
 import { categoryMeta } from "@/lib/mock-data";
 
 /** Categorias que representam módulos pessoais de rotina — Trabalho e Geral continuam
  * existindo no domínio (tarefas/planos/registros podem usá-las), só não aparecem aqui
  * como "módulo dedicado" nessa faixa. */
-const routineCategories = ["academia", "leitura", "alimentacao", "financas", "fe"];
+const routineCategories = ["academia", "esportes", "leitura", "alimentacao", "financas", "fe"];
 
 /** Ícones lucide (consistentes com o resto do app) só pra essa faixa compacta — o
  * emoji de categoryMeta continua sendo a fonte usada em badges/cards em outras telas,
  * não é substituído, só não é o ideal pra um círculo de ícone pequeno e uniforme. */
 const routineIcons: Record<string, LucideIcon> = {
   academia: Dumbbell,
+  esportes: Footprints,
   leitura: BookOpen,
   alimentacao: Salad,
   financas: Wallet,
