@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Check, Compass, Mail } from "lucide-react";
+import { Compass, Mail } from "lucide-react";
 import { NorteChat } from "./NorteChat";
 import { AuthGate } from "./AuthGate";
+import { SubscriptionPlans } from "./SubscriptionPlans";
 import { supabase } from "@/lib/supabase/client";
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from "./ui/drawer";
 import "./signup-sheet.css";
@@ -147,53 +148,7 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
     }
   }
 
-  if (payment)
-    return (
-      <main className="flex min-h-svh flex-col px-6 py-8">
-        <button
-          className="mb-10 flex min-h-11 items-center gap-2 self-start text-sm text-muted-foreground"
-          onClick={() => {
-            setPayment(false);
-            setAccount(false);
-          }}
-        >
-          <ArrowLeft size={18} /> Sua conversa
-        </button>
-        <Compass className="mb-6 text-primary" size={30} />
-        <p className="text-xs uppercase tracking-[.2em] text-muted-foreground">NORTE</p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight">
-          Seu próximo passo,
-          <br />
-          com um Norte.
-        </h1>
-        <p className="mt-4 text-sm text-muted-foreground">
-          Sua conta está criada. Este será o próximo passo para continuar com o Norte.
-        </p>
-        <section className="my-8 rounded-3xl border border-border bg-surface p-6">
-          <p className="text-sm font-semibold text-primary">Assinatura Norte</p>
-          <h2 className="my-5 text-2xl font-semibold">Plano em preparação</h2>
-          <p className="mb-6 text-sm text-muted-foreground">
-            O valor e as condições serão apresentados aqui antes de qualquer contratação.
-          </p>
-          {[
-            "Conversa com o Norte",
-            "Planos e rotina no mesmo lugar",
-            "Acompanhamento do seu dia",
-          ].map((text) => (
-            <p key={text} className="mt-4 flex items-center gap-3 text-sm">
-              <Check size={17} className="text-primary" />
-              {text}
-            </p>
-          ))}
-        </section>
-        <button disabled className={action}>
-          Pagamento em breve
-        </button>
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          Nenhuma cobrança será feita nesta etapa.
-        </p>
-      </main>
-    );
+  if (payment) return <SubscriptionPlans />;
 
   return (
     <>
