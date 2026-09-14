@@ -251,6 +251,17 @@ export function MapboxRouteMap({
           Sem conexão — mapa pode não carregar, gravação continua
         </div>
       )}
+      {routePoints && routePoints.length >= 2 && (
+        <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-background/90 px-3 py-1.5 text-[10px] font-semibold backdrop-blur">
+          <span
+            className="inline-block h-0.5 w-3"
+            style={{
+              backgroundImage: `repeating-linear-gradient(90deg, ${REFERENCE_COLOR}, ${REFERENCE_COLOR} 2px, transparent 2px, transparent 4px)`,
+            }}
+          />
+          Trajeto desenhado (aprox.)
+        </div>
+      )}
       <div className="absolute bottom-3 right-3 flex flex-col gap-2">
         <button
           onClick={() => setStyleMenuOpen((v) => !v)}

@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Plus, ChevronRight } from "lucide-react";
 import { Card } from "@/components/sub-agenda-shared";
-import { formatDateBR } from "@/lib/goals-store";
+import { formatDateBR, todayISO } from "@/lib/goals-store";
 import {
   useSportStore,
   activitiesForModality,
+  mondayOfWeek,
   formatDistanceKm,
   formatDurationClock,
   formatPace,
@@ -15,18 +16,26 @@ import {
 import { ActivityDetailModal } from "./ActivityDetailModal";
 import { ManualEntryModal } from "./ManualEntryModal";
 
-type Period = "30d" | "90d" | "tudo";
+type Period = "semana" | "30d" | "90d" | "tudo";
 
-export function HistoryTab({ modality }: { modality: SportModality }) {
+export function HistoryTab({
+  modality,
+  initialPeriod,
+}: {
+  modality: SportModality;
+  initialPeriod?: Period;
+}) {
   const activities = useSportStore((s) => s.activities);
-  const [period, setPeriod] = useState<Period>("30d");
+  const [period, setPeriod] = useState<Period>(initialPeriod ?? "30d");
   const [selected, setSelected] = useState<SportActivity | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
 
   const cutoff =
     period === "tudo"
       ? null
-      : new Date(Date.now() - (period === "30d" ? 30 : 90) * 86_400_000).toISOString();
+      : period === "semana"
+        ? `${mondayOfWeek(todayISO())}T00:00:00.000Z`
+        : new Date(Date.now() - (period === "30d" ? 30 : 90) * 86_400_000).toISOString();
 
   const list = activitiesForModality(activities, modality).filter(
     (a) => !cutoff || a.startedAt >= cutoff,
@@ -38,6 +47,7 @@ export function HistoryTab({ modality }: { modality: SportModality }) {
         <div className="flex gap-1.5">
           {(
             [
+              ["semana", "Esta semana"],
               ["30d", "30 dias"],
               ["90d", "90 dias"],
               ["tudo", "Tudo"],

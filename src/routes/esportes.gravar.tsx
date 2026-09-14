@@ -224,15 +224,16 @@ function GravarPage() {
           <div className="absolute left-1/2 top-24 w-max max-w-[85%] -translate-x-1/2 rounded-full bg-background/90 px-3 py-1.5 text-center text-[11px] font-semibold backdrop-blur">
             {isOffRoute ? (
               <span className="text-warning">
-                Fora da rota por {formatChangeDistanceM(recorder.routeGuidanceState!.offRouteM)}
+                Fora da rota (desenhada) por{" "}
+                {formatChangeDistanceM(recorder.routeGuidanceState!.offRouteM)} aprox.
               </span>
             ) : recorder.routeGuidanceState!.distanceToNextChangeM !== null ? (
               <span>
                 Muda de direção em{" "}
-                {formatChangeDistanceM(recorder.routeGuidanceState!.distanceToNextChangeM)}
+                {formatChangeDistanceM(recorder.routeGuidanceState!.distanceToNextChangeM)} aprox.
               </span>
             ) : (
-              <span className="text-muted-foreground">Fim do trajeto planejado</span>
+              <span className="text-muted-foreground">Fim do trajeto desenhado</span>
             )}
           </div>
         )}

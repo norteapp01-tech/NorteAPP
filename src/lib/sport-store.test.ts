@@ -181,7 +181,11 @@ describe("seletores de Visão geral", () => {
     const acts = [activity({ startedAt: "2026-01-05T08:00:00Z", distanceM: 5000 })];
     const series = weeklyDistanceSeries(acts, "corrida", 4, monday);
     expect(series).toHaveLength(4);
-    expect(series[3]).toBe(5);
+    expect(series[3].distanceM).toBe(5000);
+    expect(series[3].sessions).toBe(1);
+    expect(series[3].isCurrent).toBe(true);
+    expect(series[3].weekStartIso).toBe(monday);
+    expect(series[0].isCurrent).toBe(false);
   });
 
   it("últimas N atividades respeita o limite e a ordenação recebida", () => {

@@ -50,7 +50,18 @@ export function EsportesModule() {
   const [modalityDrawerOpen, setModalityDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("visao_geral");
+  const [historyInitialPeriod, setHistoryInitialPeriod] = useState<"semana" | undefined>(undefined);
   const [mapStyle, setMapStyle] = useState<MapStyle>(loadMapStyle);
+
+  const changeTab = (tab: Tab) => {
+    if (activeTab === "historico" && tab !== "historico") setHistoryInitialPeriod(undefined);
+    setActiveTab(tab);
+  };
+
+  const openHistory = (period?: "semana") => {
+    setHistoryInitialPeriod(period);
+    setActiveTab("historico");
+  };
 
   const selectMapStyle = (style: MapStyle) => {
     setMapStyle(style);
@@ -93,12 +104,16 @@ export function EsportesModule() {
           ] as const
         }
         value={activeTab}
-        onChange={setActiveTab}
+        onChange={changeTab}
       />
 
-      {activeTab === "visao_geral" && <OverviewTab modality={modality} />}
+      {activeTab === "visao_geral" && (
+        <OverviewTab modality={modality} onOpenHistory={openHistory} />
+      )}
       {activeTab === "planejamento" && <PlanningTab modality={modality} />}
-      {activeTab === "historico" && <HistoryTab modality={modality} />}
+      {activeTab === "historico" && (
+        <HistoryTab modality={modality} initialPeriod={historyInitialPeriod} />
+      )}
 
       {modalityDrawerOpen && (
         <Modal title="Modalidade" onClose={() => setModalityDrawerOpen(false)}>

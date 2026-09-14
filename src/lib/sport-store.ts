@@ -571,7 +571,7 @@ export function activitiesForModality(
   return activities.filter((a) => a.modality === modality);
 }
 
-function mondayOfWeek(dateIso: string): string {
+export function mondayOfWeek(dateIso: string): string {
   const d = new Date(dateIso + "T00:00:00");
   const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;
@@ -592,29 +592,47 @@ export function weekSummary(
   return { sessions: inWeek.length, distanceM: inWeek.reduce((s, a) => s + a.distanceM, 0) };
 }
 
-/** Distância por semana (km, 1 casa), das mais antigas pras mais recentes —
- * pronto pro Sparkline existente. */
+export type WeeklyDistancePoint = {
+  weekStartIso: string;
+  weekEndIso: string;
+  distanceM: number;
+  sessions: number;
+  isCurrent: boolean;
+};
+
+/** Distância + sessões por semana, das mais antigas pras mais recentes,
+ * com os metadados pra distinguir a semana em andamento e permitir
+ * inspecionar cada barra (período/km/nº de atividades) — a última posição
+ * é sempre a semana de `todayIso`. */
 export function weeklyDistanceSeries(
   activities: SportActivity[],
   modality: SportModality,
   weeks: number,
   todayIso: string,
-): number[] {
+): WeeklyDistancePoint[] {
   const list = activitiesForModality(activities, modality);
   const pad = (n: number) => String(n).padStart(2, "0");
-  const series: number[] = [];
+  const currentWeekStart = mondayOfWeek(todayIso);
+  const series: WeeklyDistancePoint[] = [];
   for (let i = weeks - 1; i >= 0; i--) {
     const ref = new Date(todayIso + "T00:00:00");
     ref.setDate(ref.getDate() - i * 7);
     const refIso = `${ref.getFullYear()}-${pad(ref.getMonth() + 1)}-${pad(ref.getDate())}`;
     const weekStart = mondayOfWeek(refIso);
     const weekEndDate = new Date(weekStart + "T00:00:00");
-    weekEndDate.setDate(weekEndDate.getDate() + 7);
+    weekEndDate.setDate(weekEndDate.getDate() + 6);
     const weekEnd = `${weekEndDate.getFullYear()}-${pad(weekEndDate.getMonth() + 1)}-${pad(weekEndDate.getDate())}`;
-    const total = list
-      .filter((a) => a.startedAt.slice(0, 10) >= weekStart && a.startedAt.slice(0, 10) < weekEnd)
-      .reduce((s, a) => s + a.distanceM, 0);
-    series.push(Math.round((total / 1000) * 10) / 10);
+    const inWeek = list.filter((a) => {
+      const d = a.startedAt.slice(0, 10);
+      return d >= weekStart && d <= weekEnd;
+    });
+    series.push({
+      weekStartIso: weekStart,
+      weekEndIso: weekEnd,
+      distanceM: inWeek.reduce((s, a) => s + a.distanceM, 0),
+      sessions: inWeek.length,
+      isCurrent: weekStart === currentWeekStart,
+    });
   }
   return series;
 }

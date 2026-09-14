@@ -91,12 +91,17 @@ export function RoutePicker({
           {selectedRoute ? selectedRoute.title : "Sem rota"}
           {selectedRoute && (
             <span className="ml-1.5 font-normal text-muted-foreground">
-              · {formatChangeDistanceM(selectedRoute.distanceM)}
+              · {formatChangeDistanceM(selectedRoute.distanceM)} aprox.
             </span>
           )}
         </span>
         <ChevronDown className="h-4 w-4 text-muted-foreground" />
       </button>
+      {selectedRoute && (
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          Trajeto desenhado — distância aproximada, não é uma rota real de rua.
+        </p>
+      )}
 
       {selectedRoute && (
         <div className="mt-2 flex gap-2">
@@ -135,7 +140,7 @@ export function RoutePicker({
                 <span>
                   <span className="block text-sm font-semibold">{route.title}</span>
                   <span className="block text-xs text-muted-foreground">
-                    {formatChangeDistanceM(route.distanceM)}
+                    {formatChangeDistanceM(route.distanceM)} aprox. · trajeto desenhado
                   </span>
                 </span>
                 {value?.id === route.id && <Check className="h-4 w-4 text-primary" />}

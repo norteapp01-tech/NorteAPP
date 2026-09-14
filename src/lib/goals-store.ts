@@ -133,6 +133,7 @@ export type Routine = {
   time: string;
   weight: TaskWeight;
   active: boolean;
+  how?: string;
   sportModality?: SportModality;
   sportTargetDistanceM?: number;
   sportTargetDurationS?: number;
@@ -1083,6 +1084,7 @@ function mapRoutine(r: Row): Routine {
     time: r.time as string,
     weight: r.weight as TaskWeight,
     active: r.active as boolean,
+    how: (r.how as string) ?? undefined,
     sportModality: (r.sport_modality as SportModality) ?? undefined,
     sportTargetDistanceM: (r.sport_target_distance_m as number) ?? undefined,
     sportTargetDurationS: (r.sport_target_duration_s as number) ?? undefined,
@@ -1631,7 +1633,21 @@ export async function toggleExecutionDone(id: string) {
 
 export async function patchExecution(
   id: string,
-  patch: Partial<Pick<Execution, "how" | "why" | "weight" | "title" | "rigid" | "dueDate">>,
+  patch: Partial<
+    Pick<
+      Execution,
+      | "how"
+      | "why"
+      | "weight"
+      | "title"
+      | "rigid"
+      | "dueDate"
+      | "agendaDate"
+      | "startTime"
+      | "sportTargetDistanceM"
+      | "sportTargetDurationS"
+    >
+  >,
 ) {
   const dbPatch: Row = {};
   if (patch.how !== undefined) dbPatch.how = patch.how;
@@ -1640,7 +1656,63 @@ export async function patchExecution(
   if (patch.title !== undefined) dbPatch.title = patch.title;
   if (patch.rigid !== undefined) dbPatch.rigid = patch.rigid;
   if (patch.dueDate !== undefined) dbPatch.due_date = patch.dueDate;
+  if (patch.agendaDate !== undefined) dbPatch.agenda_date = patch.agendaDate;
+  if (patch.startTime !== undefined) dbPatch.start_time = patch.startTime;
+  if (patch.sportTargetDistanceM !== undefined)
+    dbPatch.sport_target_distance_m = patch.sportTargetDistanceM;
+  if (patch.sportTargetDurationS !== undefined)
+    dbPatch.sport_target_duration_s = patch.sportTargetDurationS;
   unwrap(await supabase.from("executions").update(dbPatch).eq("id", id).select().single());
+  await invalidate();
+}
+
+/** Editar uma rotina "esta e as futuras": atualiza a rotina em si (pros
+ * próximos meses a materializar) e todas as ocorrências dela que ainda
+ * não aconteceram a partir de `fromDate` (inclusive) — nunca toca
+ * ocorrências já concluídas/passadas, e nunca mexe em ocorrências antes
+ * de `fromDate` (essas continuam como estavam, é o que faz a distinção
+ * de "só esta" vs "esta e futuras" fazer sentido). */
+export async function updateRoutineAndFutureExecutions(
+  routineId: string,
+  patch: Partial<{
+    time: string;
+    how: string;
+    sportTargetDistanceM: number;
+    sportTargetDurationS: number;
+  }>,
+  fromDate: string,
+) {
+  const routineDbPatch: Row = {};
+  if (patch.time !== undefined) routineDbPatch.time = patch.time;
+  if (patch.how !== undefined) routineDbPatch.how = patch.how;
+  if (patch.sportTargetDistanceM !== undefined)
+    routineDbPatch.sport_target_distance_m = patch.sportTargetDistanceM;
+  if (patch.sportTargetDurationS !== undefined)
+    routineDbPatch.sport_target_duration_s = patch.sportTargetDurationS;
+  if (Object.keys(routineDbPatch).length > 0) {
+    unwrap(
+      await supabase.from("routines").update(routineDbPatch).eq("id", routineId).select().single(),
+    );
+  }
+
+  const executionDbPatch: Row = {};
+  if (patch.time !== undefined) executionDbPatch.start_time = patch.time;
+  if (patch.how !== undefined) executionDbPatch.how = patch.how;
+  if (patch.sportTargetDistanceM !== undefined)
+    executionDbPatch.sport_target_distance_m = patch.sportTargetDistanceM;
+  if (patch.sportTargetDurationS !== undefined)
+    executionDbPatch.sport_target_duration_s = patch.sportTargetDurationS;
+  if (Object.keys(executionDbPatch).length > 0) {
+    unwrap(
+      await supabase
+        .from("executions")
+        .update(executionDbPatch)
+        .eq("routine_id", routineId)
+        .eq("status", "planejada")
+        .gte("agenda_date", fromDate)
+        .select(),
+    );
+  }
   await invalidate();
 }
 
@@ -1822,6 +1894,7 @@ async function materializeRoutineExecutions(routine: {
   weekday: number;
   time: string;
   weight: TaskWeight;
+  how?: string;
   sportModality?: SportModality;
   sportTargetDistanceM?: number;
   sportTargetDurationS?: number;
@@ -1850,6 +1923,7 @@ async function materializeRoutineExecutions(routine: {
       weight: routine.weight,
       status: "planejada",
       routine_id: routine.id,
+      how: routine.how,
       sport_modality: routine.sportModality,
       sport_target_distance_m: routine.sportTargetDistanceM,
       sport_target_duration_s: routine.sportTargetDurationS,
@@ -1864,6 +1938,7 @@ export async function createRoutine(input: {
   weekday: number;
   time: string;
   weight?: TaskWeight;
+  how?: string;
   sportModality?: SportModality;
   sportTargetDistanceM?: number;
   sportTargetDurationS?: number;
@@ -1887,6 +1962,7 @@ export async function createRoutine(input: {
         weekday: input.weekday,
         time: input.time,
         weight: input.weight ?? "leve",
+        how: input.how,
         sport_modality: input.sportModality,
         sport_target_distance_m: input.sportTargetDistanceM,
         sport_target_duration_s: input.sportTargetDurationS,
@@ -1901,6 +1977,7 @@ export async function createRoutine(input: {
     weekday: input.weekday,
     time: input.time,
     weight: input.weight ?? "leve",
+    how: input.how,
     sportModality: input.sportModality,
     sportTargetDistanceM: input.sportTargetDistanceM,
     sportTargetDurationS: input.sportTargetDurationS,
@@ -1919,6 +1996,7 @@ export async function toggleRoutineActive(routineId: string, currentlyActive: bo
     time: string;
     weight: TaskWeight;
     active: boolean;
+    how: string | null;
     sport_modality: SportModality | null;
     sport_target_distance_m: number | null;
     sport_target_duration_s: number | null;
@@ -1938,6 +2016,7 @@ export async function toggleRoutineActive(routineId: string, currentlyActive: bo
       weekday: routine.weekday as number,
       time: routine.time as string,
       weight: routine.weight as TaskWeight,
+      how: (routine.how as string) ?? undefined,
       sportModality: (routine.sport_modality as SportModality) ?? undefined,
       sportTargetDistanceM: (routine.sport_target_distance_m as number) ?? undefined,
       sportTargetDurationS: (routine.sport_target_duration_s as number) ?? undefined,

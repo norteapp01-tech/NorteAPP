@@ -172,11 +172,15 @@ export function RouteDrawer({
         <div className="absolute bottom-3 left-3 rounded-full bg-background/90 px-3 py-1.5 text-xs font-semibold backdrop-blur">
           {points.length === 0
             ? "Toque no mapa pra começar a desenhar"
-            : `${points.length} ponto${points.length > 1 ? "s" : ""} · ${formatChangeDistanceM(distanceM)}`}
+            : `${points.length} ponto${points.length > 1 ? "s" : ""} · ${formatChangeDistanceM(distanceM)} (aprox.)`}
         </div>
       </div>
 
       <div className="border-t border-border bg-surface px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4">
+        <p className="mb-2 text-[11px] text-muted-foreground">
+          Trajeto desenhado — distância aproximada (linha reta entre os pontos, não uma rota real de
+          rua).
+        </p>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
