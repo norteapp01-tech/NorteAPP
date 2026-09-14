@@ -1,5 +1,16 @@
 import { useState } from "react";
-import { ChevronDown, Footprints, PersonStanding, Bike, Check, Moon, Sun } from "lucide-react";
+import {
+  ChevronDown,
+  Footprints,
+  PersonStanding,
+  Bike,
+  Check,
+  Moon,
+  Sun,
+  Map as MapIcon,
+  Satellite,
+  Layers,
+} from "lucide-react";
 import { UnderlineTabs } from "@/components/ui/app-design-system";
 import { Modal } from "@/components/ui/modal";
 import {
@@ -26,7 +37,13 @@ function loadLastModality(): SportModality {
 
 type Tab = "visao_geral" | "planejamento" | "historico";
 
-const mapStyleIcon = { escuro: Moon, claro: Sun } as const;
+const mapStyleIcon = {
+  escuro: Moon,
+  claro: Sun,
+  padrao: MapIcon,
+  satelite: Satellite,
+  hibrido: Layers,
+} as const;
 
 export function EsportesModule() {
   const [modality, setModality] = useState<SportModality>(loadLastModality);
@@ -111,14 +128,14 @@ export function EsportesModule() {
               <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
                 Estilo do mapa na gravação
               </p>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {(Object.keys(mapStyleLabel) as MapStyle[]).map((style) => {
                   const StyleIcon = mapStyleIcon[style];
                   return (
                     <button
                       key={style}
                       onClick={() => selectMapStyle(style)}
-                      className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold ${
+                      className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold ${
                         mapStyle === style
                           ? "border-primary bg-primary/10 text-primary"
                           : "border-border text-muted-foreground"

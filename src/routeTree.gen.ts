@@ -10,12 +10,15 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as AgenteTesteRouteImport } from './routes/agente-teste'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as CriarRouteImport } from './routes/criar'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as PlanejamentoRouteImport } from './routes/planejamento'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminIaRouteImport } from './routes/admin.ia'
 import { Route as EsportesGravarRouteImport } from './routes/esportes.gravar'
 import { Route as ObjetivoIdRouteImport } from './routes/objetivo.$id'
 import { Route as SubAgendaCategoriaRouteImport } from './routes/sub-agenda.$categoria'
@@ -23,6 +26,11 @@ import { Route as SubAgendaCategoriaRouteImport } from './routes/sub-agenda.$cat
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgendaRoute = AgendaRouteImport.update({
@@ -55,6 +63,16 @@ const PlanejamentoRoute = PlanejamentoRouteImport.update({
   path: '/planejamento',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminIaRoute = AdminIaRouteImport.update({
+  id: '/ia',
+  path: '/ia',
+  getParentRoute: () => AdminRoute,
+} as any)
 const EsportesGravarRoute = EsportesGravarRouteImport.update({
   id: '/esportes/gravar',
   path: '/esportes/gravar',
@@ -73,15 +91,18 @@ const SubAgendaCategoriaRoute = SubAgendaCategoriaRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/agenda': typeof AgendaRoute
   '/agente-teste': typeof AgenteTesteRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/criar': typeof CriarRoute
   '/dashboard': typeof DashboardRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/admin/ia': typeof AdminIaRoute
   '/esportes/gravar': typeof EsportesGravarRoute
   '/objetivo/$id': typeof ObjetivoIdRoute
   '/sub-agenda/$categoria': typeof SubAgendaCategoriaRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -91,36 +112,44 @@ export interface FileRoutesByTo {
   '/criar': typeof CriarRoute
   '/dashboard': typeof DashboardRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/admin/ia': typeof AdminIaRoute
   '/esportes/gravar': typeof EsportesGravarRoute
   '/objetivo/$id': typeof ObjetivoIdRoute
   '/sub-agenda/$categoria': typeof SubAgendaCategoriaRoute
+  '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/agenda': typeof AgendaRoute
   '/agente-teste': typeof AgenteTesteRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/criar': typeof CriarRoute
   '/dashboard': typeof DashboardRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/admin/ia': typeof AdminIaRoute
   '/esportes/gravar': typeof EsportesGravarRoute
   '/objetivo/$id': typeof ObjetivoIdRoute
   '/sub-agenda/$categoria': typeof SubAgendaCategoriaRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/agenda'
     | '/agente-teste'
     | '/configuracoes'
     | '/criar'
     | '/dashboard'
     | '/planejamento'
+    | '/admin/ia'
     | '/esportes/gravar'
     | '/objetivo/$id'
     | '/sub-agenda/$categoria'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -130,25 +159,31 @@ export interface FileRouteTypes {
     | '/criar'
     | '/dashboard'
     | '/planejamento'
+    | '/admin/ia'
     | '/esportes/gravar'
     | '/objetivo/$id'
     | '/sub-agenda/$categoria'
+    | '/admin'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/agenda'
     | '/agente-teste'
     | '/configuracoes'
     | '/criar'
     | '/dashboard'
     | '/planejamento'
+    | '/admin/ia'
     | '/esportes/gravar'
     | '/objetivo/$id'
     | '/sub-agenda/$categoria'
+    | '/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AgendaRoute: typeof AgendaRoute
   AgenteTesteRoute: typeof AgenteTesteRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
@@ -167,6 +202,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agenda': {
@@ -211,6 +253,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanejamentoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/ia': {
+      id: '/admin/ia'
+      path: '/ia'
+      fullPath: '/admin/ia'
+      preLoaderRoute: typeof AdminIaRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/esportes/gravar': {
       id: '/esportes/gravar'
       path: '/esportes/gravar'
@@ -235,8 +291,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminRouteChildren {
+  AdminIaRoute: typeof AdminIaRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminIaRoute: AdminIaRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   AgendaRoute: AgendaRoute,
   AgenteTesteRoute: AgenteTesteRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,

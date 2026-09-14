@@ -29,26 +29,41 @@ export const modalityActionLabel: Record<SportModality, string> = {
 // modalidade escolhida), sem precisar de coluna nova no perfil.
 // ---------------------------------------------------------------------------
 
-export type MapStyle = "escuro" | "claro";
+export type MapStyle = "escuro" | "claro" | "padrao" | "satelite" | "hibrido";
 const MAP_STYLE_STORAGE_KEY = "norte:esportes:mapStyle";
+const MAP_STYLE_VALUES: MapStyle[] = ["escuro", "claro", "padrao", "satelite", "hibrido"];
 
-export const mapStyleLabel: Record<MapStyle, string> = { escuro: "Escuro", claro: "Claro" };
+export const mapStyleLabel: Record<MapStyle, string> = {
+  escuro: "Escuro",
+  claro: "Claro",
+  padrao: "Padrão",
+  satelite: "Satélite",
+  hibrido: "Híbrido",
+};
 
 export const mapStyleUrl: Record<MapStyle, string> = {
   escuro: "mapbox://styles/mapbox/dark-v11",
   claro: "mapbox://styles/mapbox/light-v11",
+  padrao: "mapbox://styles/mapbox/streets-v12",
+  satelite: "mapbox://styles/mapbox/satellite-v9",
+  hibrido: "mapbox://styles/mapbox/satellite-streets-v12",
 };
 
-/** Verde de mais contraste em fundo claro; a mesma trilha em fundo escuro
- * ficaria apagada demais se usasse esse tom mais saturado/escuro. */
+/** Verde mais saturado nos fundos claros (perde contraste no tom padrão);
+ * amarelo nos fundos de satélite, onde o verde se mistura com vegetação
+ * real na imagem. */
 export const mapRouteColor: Record<MapStyle, string> = {
   escuro: "#7ee08a",
   claro: "#1f9d55",
+  padrao: "#1f9d55",
+  satelite: "#ffdd00",
+  hibrido: "#ffdd00",
 };
 
 export function loadMapStyle(): MapStyle {
   if (typeof window === "undefined") return "escuro";
-  return window.localStorage.getItem(MAP_STYLE_STORAGE_KEY) === "claro" ? "claro" : "escuro";
+  const saved = window.localStorage.getItem(MAP_STYLE_STORAGE_KEY);
+  return (MAP_STYLE_VALUES as string[]).includes(saved ?? "") ? (saved as MapStyle) : "escuro";
 }
 
 export function saveMapStyle(style: MapStyle) {
@@ -197,6 +212,7 @@ export type SportActivity = {
   avgPaceSPerKm?: number;
   avgSpeedKmh?: number;
   executionId?: string;
+  routeId?: string;
   photoUrl?: string;
   privacyHideRoute: boolean;
   privacyHideStartEnd: boolean;
@@ -220,6 +236,7 @@ function mapActivity(r: Row): SportActivity {
     avgPaceSPerKm: r.avg_pace_s_per_km !== null ? Number(r.avg_pace_s_per_km) : undefined,
     avgSpeedKmh: r.avg_speed_kmh !== null ? Number(r.avg_speed_kmh) : undefined,
     executionId: (r.execution_id as string) ?? undefined,
+    routeId: (r.route_id as string) ?? undefined,
     photoUrl: (r.photo_url as string) ?? undefined,
     privacyHideRoute: r.privacy_hide_route as boolean,
     privacyHideStartEnd: r.privacy_hide_start_end as boolean,
@@ -326,6 +343,7 @@ export async function saveRecordedActivity(input: {
   points: GeoPoint[];
   pauses: PauseInterval[];
   executionId?: string;
+  routeId?: string;
 }): Promise<string> {
   const userId = await ensureSession();
   const { totalDurationS, activeDurationS } = computeDurations(
@@ -356,6 +374,7 @@ export async function saveRecordedActivity(input: {
         avg_pace_s_per_km: avgPaceSPerKm,
         avg_speed_kmh: avgSpeedKmh,
         execution_id: input.executionId,
+        route_id: input.routeId,
       })
       .select()
       .single(),

@@ -1,4 +1,5 @@
 import type { GeoPoint, PauseInterval, SportModality } from "./sport-store";
+import type { RoutePoint } from "./sport-route-geometry";
 
 // ---------------------------------------------------------------------------
 // Buffer local (IndexedDB) da atividade em andamento — só existe uma de cada
@@ -17,6 +18,9 @@ export type RecordingState = {
   startedAt: string;
   points: GeoPoint[];
   pauses: PauseInterval[];
+  routeId?: string;
+  routePoints?: RoutePoint[];
+  routeGuidanceMode?: "livre" | "com_avisos";
 };
 
 function openDb(): Promise<IDBDatabase> {

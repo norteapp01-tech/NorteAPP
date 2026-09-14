@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, Volume2, VolumeX } from "lucide-react";
 import { MapboxRouteMap } from "@/components/esportes/MapboxRouteMap";
+import { RoutePicker, type RouteSelection } from "@/components/esportes/RoutePicker";
 import { useSportRecorder } from "@/lib/sport-recorder-context";
 import {
   linkActivityToExecution,
@@ -20,6 +21,31 @@ import {
   computeSpeedKmh,
   type SportModality,
 } from "@/lib/sport-store";
+import { formatChangeDistanceM } from "@/lib/sport-route-geometry";
+
+const OFF_ROUTE_THRESHOLD_M = 40;
+const CHANGE_ALERT_RADIUS_M = 60;
+
+/** Beep curto via Web Audio (sem arquivo de áudio) — melhor esforço, a
+ * gravação nunca depende disso pra funcionar. */
+function playChangeAlertBeep() {
+  try {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+  } catch {
+    // Melhor esforço — sem som nunca deve travar ou interromper a gravação.
+  }
+}
 
 export const Route = createFileRoute("/esportes/gravar")({
   head: () => ({ meta: [{ title: "Gravar atividade — Norte" }] }),
@@ -40,9 +66,24 @@ function GravarPage() {
   const [discardConfirm, setDiscardConfirm] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [finishedData, setFinishedData] = useState<ReturnType<typeof recorder.finish>>(null);
+  const [routeSelection, setRouteSelection] = useState<RouteSelection | null>(null);
+  const alertedChangeIndexRef = useRef<number | null>(null);
 
   const activeModality = recorder.modality ?? modalidade;
   const isBusy = recorder.status === "recording" || recorder.status === "paused";
+
+  useEffect(() => {
+    if (recorder.route?.guidanceMode !== "com_avisos") return;
+    const state = recorder.routeGuidanceState;
+    if (!state?.nextChange || state.distanceToNextChangeM === null) return;
+    if (
+      state.distanceToNextChangeM <= CHANGE_ALERT_RADIUS_M &&
+      alertedChangeIndexRef.current !== state.nextChange.pointIndex
+    ) {
+      alertedChangeIndexRef.current = state.nextChange.pointIndex;
+      if (soundEnabled) playChangeAlertBeep();
+    }
+  }, [recorder.routeGuidanceState, recorder.route, soundEnabled]);
 
   const leaveToOverview = () =>
     navigate({ to: "/sub-agenda/$categoria", params: { categoria: "esportes" } });
@@ -115,9 +156,19 @@ function GravarPage() {
           Mantenha a tela ligada e a Norte em primeiro plano durante a atividade — gravação com tela
           bloqueada ainda não é suportada nesta versão.
         </div>
+        <div className="w-full max-w-xs text-left">
+          <RoutePicker
+            modality={activeModality}
+            value={routeSelection}
+            onChange={setRouteSelection}
+          />
+        </div>
         <button
           disabled={!recorder.gpsReady}
-          onClick={() => recorder.start(activeModality, execucao)}
+          onClick={() => {
+            alertedChangeIndexRef.current = null;
+            recorder.start(activeModality, execucao, routeSelection ?? undefined);
+          }}
           className="w-full max-w-xs rounded-2xl bg-primary py-4 text-base font-bold text-primary-foreground disabled:opacity-40"
         >
           {modalityActionLabel[activeModality]}
@@ -135,10 +186,15 @@ function GravarPage() {
   const pace = activeModality !== "ciclismo" ? computePaceSPerKm(distanceM, activeDurationS) : null;
   const speed = activeModality === "ciclismo" ? computeSpeedKmh(distanceM, activeDurationS) : null;
 
+  const showRouteBanner =
+    recorder.route?.guidanceMode === "com_avisos" && recorder.routeGuidanceState;
+  const isOffRoute =
+    showRouteBanner && (recorder.routeGuidanceState?.offRouteM ?? 0) > OFF_ROUTE_THRESHOLD_M;
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <div className="relative flex-1">
-        <MapboxRouteMap points={recorder.points} />
+        <MapboxRouteMap points={recorder.points} routePoints={recorder.route?.points} />
         <div className="absolute left-4 top-12 flex gap-2">
           <button
             onClick={() => setDiscardConfirm(true)}
@@ -155,6 +211,22 @@ function GravarPage() {
         >
           {soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
         </button>
+        {showRouteBanner && (
+          <div className="absolute left-1/2 top-24 w-max max-w-[85%] -translate-x-1/2 rounded-full bg-background/90 px-3 py-1.5 text-center text-[11px] font-semibold backdrop-blur">
+            {isOffRoute ? (
+              <span className="text-warning">
+                Fora da rota por {formatChangeDistanceM(recorder.routeGuidanceState!.offRouteM)}
+              </span>
+            ) : recorder.routeGuidanceState!.distanceToNextChangeM !== null ? (
+              <span>
+                Muda de direção em{" "}
+                {formatChangeDistanceM(recorder.routeGuidanceState!.distanceToNextChangeM)}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">Fim do trajeto planejado</span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="border-t border-border bg-surface px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-5">
@@ -275,6 +347,7 @@ function FinishForm({
         points: data.points,
         pauses: data.pauses,
         executionId: data.executionId ?? executionId,
+        routeId: data.routeId,
       });
       if (data.executionId ?? executionId) {
         await linkActivityToExecution(activityId, (data.executionId ?? executionId)!);

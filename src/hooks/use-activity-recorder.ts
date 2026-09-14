@@ -1,11 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GeoPoint, PauseInterval, SportModality } from "@/lib/sport-store";
+import {
+  filterValidPoints,
+  type GeoPoint,
+  type PauseInterval,
+  type SportModality,
+} from "@/lib/sport-store";
 import {
   saveRecordingState,
   loadRecordingState,
   clearRecordingState,
   type RecordingState,
 } from "@/lib/sport-recording-db";
+import {
+  deriveRouteGuidance,
+  computeRouteGuidanceState,
+  type RouteGuidance,
+  type RouteGuidanceState,
+  type RoutePoint,
+} from "@/lib/sport-route-geometry";
+
+export type RouteGuidanceMode = "livre" | "com_avisos";
+export type StartRoute = { id: string; points: RoutePoint[]; guidanceMode: RouteGuidanceMode };
 
 // ---------------------------------------------------------------------------
 // Motor de gravação — funciona de verdade em primeiro plano (tela ligada,
@@ -31,6 +46,8 @@ export function useActivityRecorder() {
   const [pauses, setPauses] = useState<PauseInterval[]>([]);
   const [startedAt, setStartedAt] = useState<string | null>(null);
   const [recoverable, setRecoverable] = useState<RecordingState | null>(null);
+  const [route, setRoute] = useState<StartRoute | null>(null);
+  const [routeGuidanceState, setRouteGuidanceState] = useState<RouteGuidanceState | null>(null);
 
   const watchIdRef = useRef<number | null>(null);
   const wakeLockRef = useRef<{ release(): Promise<void> } | null>(null);
@@ -39,6 +56,8 @@ export function useActivityRecorder() {
   const startedAtRef = useRef<string | null>(null);
   const modalityRef = useRef<SportModality | null>(null);
   const executionIdRef = useRef<string | undefined>(undefined);
+  const routeRef = useRef<{ start: StartRoute; guidance: RouteGuidance } | null>(null);
+  const routeProgressRef = useRef<number | null>(null);
 
   useEffect(() => {
     loadRecordingState().then((state) => {
@@ -81,6 +100,9 @@ export function useActivityRecorder() {
       startedAt: startedAtRef.current,
       points: pointsRef.current,
       pauses: pausesRef.current,
+      routeId: routeRef.current?.start.id,
+      routePoints: routeRef.current?.start.points,
+      routeGuidanceMode: routeRef.current?.start.guidanceMode,
     });
   }, []);
 
@@ -96,6 +118,24 @@ export function useActivityRecorder() {
         };
         pointsRef.current = [...pointsRef.current, point];
         setPoints(pointsRef.current);
+
+        // Guiado por rota: só recalcula progresso/virada com o ponto mais
+        // recente se ele passou no mesmo filtro de plausibilidade usado no
+        // cálculo de distância — nunca projeta um salto de GPS na rota.
+        const activeRoute = routeRef.current;
+        if (activeRoute) {
+          const lastValid = filterValidPoints(pointsRef.current).at(-1);
+          if (lastValid?.recordedAt === point.recordedAt) {
+            const state = computeRouteGuidanceState(
+              activeRoute.guidance,
+              { lat: point.lat, lng: point.lng },
+              routeProgressRef.current,
+            );
+            routeProgressRef.current = state.progressM;
+            setRouteGuidanceState(state);
+          }
+        }
+
         persist();
       },
       (err) => setGpsError(err.message),
@@ -112,18 +152,24 @@ export function useActivityRecorder() {
   }, [releaseWakeLock]);
 
   const start = useCallback(
-    (m: SportModality, execId?: string) => {
+    (m: SportModality, execId?: string, startRoute?: StartRoute) => {
       const nowIso = new Date().toISOString();
       modalityRef.current = m;
       executionIdRef.current = execId;
       startedAtRef.current = nowIso;
       pointsRef.current = [];
       pausesRef.current = [];
+      routeRef.current = startRoute
+        ? { start: startRoute, guidance: deriveRouteGuidance(startRoute.points) }
+        : null;
+      routeProgressRef.current = null;
       setModality(m);
       setExecutionId(execId);
       setStartedAt(nowIso);
       setPoints([]);
       setPauses([]);
+      setRoute(startRoute ?? null);
+      setRouteGuidanceState(null);
       setStatus("recording");
       void requestWakeLock();
       persist();
@@ -159,6 +205,7 @@ export function useActivityRecorder() {
     const result = {
       modality: modalityRef.current,
       executionId: executionIdRef.current,
+      routeId: routeRef.current?.start.id,
       startedAt: startedAtRef.current,
       endedAt,
       points: pointsRef.current,
@@ -177,11 +224,15 @@ export function useActivityRecorder() {
     pointsRef.current = [];
     pausesRef.current = [];
     startedAtRef.current = null;
+    routeRef.current = null;
+    routeProgressRef.current = null;
     setModality(null);
     setExecutionId(undefined);
     setPoints([]);
     setPauses([]);
     setStartedAt(null);
+    setRoute(null);
+    setRouteGuidanceState(null);
     setStatus("idle");
   }, []);
 
@@ -198,11 +249,25 @@ export function useActivityRecorder() {
     startedAtRef.current = recoverable.startedAt;
     pointsRef.current = recoverable.points;
     pausesRef.current = recoverable.pauses;
+    const recoveredRoute =
+      recoverable.routeId && recoverable.routePoints && recoverable.routeGuidanceMode
+        ? {
+            id: recoverable.routeId,
+            points: recoverable.routePoints,
+            guidanceMode: recoverable.routeGuidanceMode,
+          }
+        : null;
+    routeRef.current = recoveredRoute
+      ? { start: recoveredRoute, guidance: deriveRouteGuidance(recoveredRoute.points) }
+      : null;
+    routeProgressRef.current = null;
     setModality(recoverable.modality);
     setExecutionId(recoverable.executionId);
     setStartedAt(recoverable.startedAt);
     setPoints(recoverable.points);
     setPauses(recoverable.pauses);
+    setRoute(recoveredRoute);
+    setRouteGuidanceState(null);
     const lastPause = pausesRef.current[pausesRef.current.length - 1];
     setStatus(lastPause && !lastPause.resumedAt ? "paused" : "recording");
     setRecoverable(null);
@@ -227,6 +292,8 @@ export function useActivityRecorder() {
     pauses,
     startedAt,
     recoverable,
+    route,
+    routeGuidanceState,
     start,
     pause,
     resume,
