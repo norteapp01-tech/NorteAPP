@@ -18,6 +18,7 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -93,6 +94,10 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
 
   async function register(event: React.FormEvent) {
     event.preventDefault();
+    if (password.length < 8 || password !== confirmPassword) {
+      setError("Use pelo menos 8 caracteres e confirme a mesma senha nos dois campos.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -103,7 +108,7 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
       if (updateError) throw updateError;
       setVerifying(true);
       setNotice(
-        "Enviamos um link para seu e-mail. Confirme o endereço e volte aqui para definir sua senha.",
+        "Enviamos um link para seu e-mail. Confirme o endereço e volte aqui para concluir seu cadastro.",
       );
     } catch {
       setError("Não foi possível cadastrar esse e-mail. Confira o endereço ou use outra conta.");
@@ -114,6 +119,10 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
 
   async function savePassword(event: React.FormEvent) {
     event.preventDefault();
+    if (password.length < 8 || password !== confirmPassword) {
+      setError("Use pelo menos 8 caracteres e confirme a mesma senha nos dois campos.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -129,6 +138,7 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
       });
       if (passwordError) throw passwordError;
       setPassword("");
+      setConfirmPassword("");
       await finishIfVerified();
     } catch {
       setError("Não foi possível salvar sua senha. Tente novamente.");
@@ -190,13 +200,16 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
       <AuthGate>
         <NorteChat demo onBack={onBack} onDemoComplete={openAccount} />
       </AuthGate>
-      <Drawer open={account} onOpenChange={setAccount} shouldScaleBackground={false}>
-        <DrawerContent className="signup-sheet" onEscapeKeyDown={() => setAccount(false)}>
+      <Drawer
+        open={account}
+        onOpenChange={setAccount}
+        shouldScaleBackground={false}
+        dismissible={false}
+      >
+        <DrawerContent className="signup-sheet" onEscapeKeyDown={(event) => event.preventDefault()}>
           <div className="signup-sheet-body">
             <Compass className="signup-sheet-mark text-primary" size={32} />
-            <DrawerTitle className="signup-sheet-title">
-              Seu primeiro passo está pronto.
-            </DrawerTitle>
+            <DrawerTitle className="signup-sheet-title">Crie sua conta para continuar.</DrawerTitle>
             <DrawerDescription className="signup-sheet-description">
               Crie sua conta para salvar o que você começou e continuar com o Norte.
             </DrawerDescription>
@@ -274,8 +287,33 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
                     className={`${field} mt-1`}
                   />
                 </label>
+                <label className="block text-sm">
+                  Senha
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={`${field} mt-1`}
+                  />
+                </label>
+                <label className="block text-sm">
+                  Confirmar senha
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className={`${field} mt-1`}
+                  />
+                </label>
+                <p className="text-xs text-muted-foreground">Use pelo menos 8 caracteres.</p>
                 <button disabled={busy || !name.trim()} className={action}>
-                  {busy ? "Enviando…" : "Confirmar meu e-mail"}
+                  {busy ? "Criando…" : "Criar minha conta"}
                 </button>
               </form>
             ) : (
@@ -296,6 +334,18 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
                   />
                 </label>
                 <p className="text-xs text-muted-foreground">Use pelo menos 8 caracteres.</p>
+                <label className="block text-sm">
+                  Confirmar senha
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className={`${field} mt-1`}
+                  />
+                </label>
                 <button disabled={busy} className={action}>
                   {busy ? "Verificando…" : "Concluir minha conta"}
                 </button>
@@ -306,9 +356,18 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
                 {error}
               </p>
             )}
-            <button className="signup-sheet-return" onClick={() => setAccount(false)}>
-              Continuar conversando
-            </button>
+            {manual && (
+              <button
+                disabled={busy}
+                className="signup-sheet-return"
+                onClick={() => {
+                  setManual(false);
+                  setError("");
+                }}
+              >
+                Voltar
+              </button>
+            )}
           </div>
         </DrawerContent>
       </Drawer>
