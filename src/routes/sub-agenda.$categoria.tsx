@@ -8,10 +8,7 @@ import {
   Plus,
   Trash2,
   Play,
-  Pause,
-  RotateCcw,
   Check,
-  X,
   Dumbbell,
   BookOpen,
   Salad,
@@ -54,11 +51,14 @@ import {
   reorderExercise,
   setWeeklyAssignment,
   startSession,
+  startRest,
+  sessionElapsedSeconds,
+  sessionPlanned,
+  exerciseCompletionState,
   logSet,
   updateSet,
   removeLastSet,
   completeExerciseLog,
-  finishSession,
   addBodyWeight,
   currentBodyWeight,
   bodyWeightsByDateDesc,
@@ -66,7 +66,10 @@ import {
   type WorkoutSession,
   type Exercise,
   type SetTarget,
+  type PlannedExercise,
 } from "@/lib/workout-store";
+import { formatDurationClock } from "@/lib/sport-store";
+import { useGymSession } from "@/lib/gym-session-context";
 import { EsportesModule } from "@/components/esportes/EsportesModule";
 import { LeituraModule } from "@/components/reading/LeituraModule";
 import { AlimentacaoModule } from "@/components/nutrition/AlimentacaoModule";
@@ -259,8 +262,6 @@ function RoutineConfigCard({ categoria }: { categoria: string }) {
 // Academia — diário de treino: plano semanal, treinos cadastrados, treino de
 // hoje (série a série, timer de descanso), resumo ao finalizar, peso corporal.
 // ---------------------------------------------------------------------------
-type RestState = { secondsLeft: number; total: number; running: boolean };
-
 function AcademiaModule() {
   const profile = useProfile();
   const gymRoutines = useGoalsStore((s) =>
@@ -272,32 +273,37 @@ function AcademiaModule() {
   const weeklyAssignment = useWorkoutStore((s) => s.weeklyAssignment);
   const bodyWeights = useWorkoutStore((s) => s.bodyWeights);
 
+  const gym = useGymSession();
   const [pickerDay, setPickerDay] = useState<number | null>(null);
   const [openExerciseId, setOpenExerciseId] = useState<string | null>(null);
   const [summarySessionId, setSummarySessionId] = useState<string | null>(null);
-  const [rest, setRest] = useState<RestState | null>(null);
   const [showWeightInput, setShowWeightInput] = useState(false);
   const [weightDraft, setWeightDraft] = useState("");
   const [savingWeight, setSavingWeight] = useState(false);
-  const [startingSession, setStartingSession] = useState(false);
-  const [finishingSession, setFinishingSession] = useState(false);
   const [activeTab, setActiveTab] = useState<"treino" | "ciclo">("treino");
   const [showRoutineConfig, setShowRoutineConfig] = useState(false);
+  const startAction = useAsyncAction();
 
+  // Finalizar pelo painel flutuante acontece de qualquer tela; o resumo mora
+  // aqui, então o contexto avisa qual sessão abrir assim que a aba carrega.
   useEffect(() => {
-    if (!rest || !rest.running || rest.secondsLeft <= 0) return;
-    const t = setTimeout(
-      () => setRest((r) => (r ? { ...r, secondsLeft: r.secondsLeft - 1 } : r)),
-      1000,
-    );
-    return () => clearTimeout(t);
-  }, [rest]);
+    if (!gym.finishedSummaryId) return;
+    setSummarySessionId(gym.finishedSummaryId);
+    gym.setFinishedSummaryId(null);
+  }, [gym]);
 
   const todayPlanId = todaysPlanId(weeklyAssignment);
   const todayPlan = plans.find((p) => p.id === todayPlanId);
-  const todaySession = todayPlanId ? sessionForToday(sessions, todayPlanId) : undefined;
+  const todayDoneSession = todayPlanId ? sessionForToday(sessions, todayPlanId) : undefined;
+  // O treino em andamento pode ser de ontem: uma sessão aberta e esquecida
+  // some da tela se a busca for só por hoje, e fica aberta pra sempre.
+  const liveSession = gym.session;
+  const liveIsToday = liveSession?.date === todayISO();
+  const livePlan = plans.find((p) => p.id === liveSession?.planId);
+  const livePlanned = liveSession ? sessionPlanned(liveSession, exercises) : [];
   const todayExercises = todayPlan ? exercisesForPlan(exercises, todayPlan.id) : [];
   const openExercise = exercises.find((e) => e.id === openExerciseId);
+  const openPlanned = livePlanned.find((p) => p.exerciseId === openExerciseId);
 
   const sortedWeights = bodyWeightsByDateDesc(bodyWeights);
   const currentWeight = currentBodyWeight(bodyWeights)?.weight;
@@ -369,72 +375,67 @@ function AcademiaModule() {
 
       <Card
         title={
-          todayPlan ? `Treino de hoje — ${todayPlan.letter} · ${todayPlan.name}` : "Treino de hoje"
+          liveSession && livePlan
+            ? `Treino em andamento — ${livePlan.letter} · ${livePlan.name}`
+            : todayPlan
+              ? `Treino de hoje — ${todayPlan.letter} · ${todayPlan.name}`
+              : "Treino de hoje"
         }
       >
-        {!todayPlan && <p className="text-sm text-muted-foreground">Hoje é dia de descanso.</p>}
-
-        {todayPlan && !todaySession && (
-          <>
-            <p className="text-xs text-muted-foreground">{todayExercises.length} exercícios</p>
-            <ul className="mt-2.5 space-y-2">
-              {todayExercises.map((ex) => (
-                <li key={ex.id}>
-                  <button
-                    disabled={startingSession}
-                    onClick={async () => {
-                      if (startingSession) return;
-                      setStartingSession(true);
-                      try {
-                        await startSession(todayPlan.id);
-                        setOpenExerciseId(ex.id);
-                      } finally {
-                        setStartingSession(false);
-                      }
-                    }}
-                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-surface-2 p-3 text-left transition-colors hover:border-primary/40 disabled:opacity-60"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{ex.name}</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {ex.setsTarget}x{ex.repsTarget} · {ex.loadTarget}kg
-                      </p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-            {todayExercises.length === 0 && (
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                Esse treino ainda não tem exercícios — adicione em "Treinos cadastrados".
-              </p>
-            )}
-          </>
+        {!todayPlan && !liveSession && (
+          <p className="text-sm text-muted-foreground">Hoje é dia de descanso.</p>
         )}
 
-        {todayPlan && todaySession && todaySession.status === "em_andamento" && (
+        {/* Treino em andamento — pode ser o de hoje ou um aberto em outro dia
+            e nunca finalizado, que antes sumia da tela sem jeito de retomar. */}
+        {liveSession && (
           <>
+            {!liveIsToday && (
+              <p className="mb-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-[11px] text-warning">
+                Treino {livePlan ? `${livePlan.letter} ` : ""}de {formatDateBR(liveSession.date)}{" "}
+                ainda está aberto. Retome pra continuar ou finalize pra fechar o registro.
+              </p>
+            )}
             <p className="text-xs font-semibold text-primary">
-              {todaySession.exerciseLogs.filter((l) => l.done).length} de{" "}
-              {todaySession.exerciseLogs.length} exercícios concluídos
+              {
+                livePlanned.filter(
+                  (p) =>
+                    exerciseCompletionState(
+                      liveSession.exerciseLogs.find((l) => l.exerciseId === p.exerciseId),
+                      p,
+                    ) === "concluido",
+                ).length
+              }{" "}
+              de {livePlanned.length} exercícios concluídos ·{" "}
+              {formatDurationClock(sessionElapsedSeconds(liveSession))}
+              {liveSession.pausedAt ? " (pausado)" : ""}
             </p>
             <ul className="mt-2.5 space-y-2">
-              {todayExercises.map((ex) => {
-                const log = todaySession.exerciseLogs.find((l) => l.exerciseId === ex.id);
+              {livePlanned.map((p) => {
+                const log = liveSession.exerciseLogs.find((l) => l.exerciseId === p.exerciseId);
+                const state = exerciseCompletionState(log, p);
                 return (
-                  <li key={ex.id}>
+                  <li key={p.exerciseId}>
                     <button
-                      onClick={() => setOpenExerciseId(ex.id)}
-                      className={`flex w-full items-center justify-between gap-2 rounded-lg border p-3 text-left transition-colors ${log?.done ? "border-success/40 bg-success/10" : "border-border bg-surface-2 hover:border-primary/40"}`}
+                      onClick={() => {
+                        gym.select(p.exerciseId);
+                        setOpenExerciseId(p.exerciseId);
+                      }}
+                      className={`flex w-full items-center justify-between gap-2 rounded-lg border p-3 text-left transition-colors ${
+                        state === "concluido"
+                          ? "border-success/40 bg-success/10"
+                          : state === "parcial"
+                            ? "border-warning/40 bg-warning/5 hover:border-primary/40"
+                            : "border-border bg-surface-2 hover:border-primary/40"
+                      }`}
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{ex.name}</p>
+                        <p className="truncate text-sm font-semibold">{p.name}</p>
                         <p className="text-[11px] text-muted-foreground">
-                          {log?.sets.length ?? 0}/{ex.setsTarget} séries · meta {ex.loadTarget}kg
+                          {log?.sets.length ?? 0}/{p.setsTarget} séries · meta {p.loadTarget}kg
                         </p>
                       </div>
-                      {log?.done ? (
+                      {state === "concluido" ? (
                         <Check className="check-enter h-4 w-4 shrink-0 text-success" />
                       ) : (
                         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -445,31 +446,69 @@ function AcademiaModule() {
               })}
             </ul>
             <button
-              onClick={async () => {
-                if (finishingSession) return;
-                setFinishingSession(true);
-                try {
-                  await finishSession(todaySession.id);
-                  setSummarySessionId(todaySession.id);
-                } finally {
-                  setFinishingSession(false);
-                }
-              }}
-              disabled={
-                finishingSession || todaySession.exerciseLogs.every((l) => l.sets.length === 0)
-              }
-              className="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+              onClick={() => gym.setPanelOpen(true)}
+              className="interactive-press mt-3 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
             >
-              {finishingSession ? "Finalizando…" : "Finalizar treino"}
+              Abrir controle do treino
             </button>
           </>
         )}
 
-        {todayPlan && todaySession && todaySession.status === "concluido" && (
+        {/* Sem treino em andamento: a sessão só nasce por um toque explícito em
+            "Iniciar treino". Tocar num exercício aqui só mostra o que está
+            planejado — não começa nada por acidente. */}
+        {!liveSession && todayPlan && todayDoneSession?.status !== "concluido" && (
+          <>
+            <p className="text-xs text-muted-foreground">{todayExercises.length} exercícios</p>
+            <ul className="mt-2.5 space-y-2">
+              {todayExercises.map((ex) => (
+                <li
+                  key={ex.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface-2 p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{ex.name}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {ex.setsTarget}x{ex.repsTarget} · {ex.loadTarget}kg
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {todayExercises.length === 0 ? (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Esse treino ainda não tem exercícios — adicione em "Treinos cadastrados".
+              </p>
+            ) : (
+              <button
+                onClick={() =>
+                  startAction.run(async () => {
+                    await startSession(todayPlan.id);
+                    gym.setPanelOpen(true);
+                  })
+                }
+                disabled={startAction.pending}
+                className="interactive-press mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
+              >
+                <Play className="h-4 w-4" />
+                {startAction.pending ? "Iniciando…" : "Iniciar treino"}
+              </button>
+            )}
+            {startAction.error && (
+              <InlineError
+                message={startAction.error}
+                onRetry={startAction.clearError}
+                className="mt-2"
+              />
+            )}
+          </>
+        )}
+
+        {!liveSession && todayDoneSession?.status === "concluido" && (
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <Check className="check-enter h-4 w-4 shrink-0 text-success" /> Treino concluído hoje —{" "}
             <button
-              onClick={() => setSummarySessionId(todaySession.id)}
+              onClick={() => setSummarySessionId(todayDoneSession.id)}
               className="-my-2 rounded px-1 py-2 font-medium text-primary decoration-2 underline decoration-dotted underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success"
             >
               ver resumo
@@ -571,14 +610,18 @@ function AcademiaModule() {
           onClose={() => setPickerDay(null)}
         />
       )}
-      {openExercise && todaySession && (
+      {openExercise && liveSession && openPlanned && (
         <ExerciseModal
-          session={todaySession}
+          session={liveSession}
           exercise={openExercise}
+          planned={openPlanned}
           onClose={() => setOpenExerciseId(null)}
-          onLogged={(restSeconds) =>
-            setRest({ secondsLeft: restSeconds, total: restSeconds, running: true })
-          }
+          onLogged={(restSeconds) => {
+            // Mesmo descanso do painel flutuante: um relógio só, no banco,
+            // derivado de horário — não um contador local que morria ao sair
+            // da tela.
+            if (gym.autoRest && restSeconds > 0) void startRest(liveSession.id, restSeconds);
+          }}
         />
       )}
       {summarySessionId && (
@@ -587,7 +630,6 @@ function AcademiaModule() {
           onClose={() => setSummarySessionId(null)}
         />
       )}
-      {rest && <RestTimerPill rest={rest} setRest={setRest} />}
       {showRoutineConfig && (
         <Modal onClose={() => setShowRoutineConfig(false)} title="Horários de treino">
           <RoutineConfigCard categoria="academia" />
@@ -930,11 +972,15 @@ function NumField({
 function ExerciseModal({
   session,
   exercise,
+  planned,
   onClose,
   onLogged,
 }: {
   session: WorkoutSession;
   exercise: Exercise;
+  /** Meta gravada quando o treino começou. Editar o exercício no meio do
+   * treino não muda o que esta sessão dizia que era a meta. */
+  planned: PlannedExercise;
   onClose: () => void;
   onLogged: (restSeconds: number) => void;
 }) {
@@ -942,14 +988,14 @@ function ExerciseModal({
   const liveSession = sessions.find((s) => s.id === session.id) ?? session;
   const log = liveSession.exerciseLogs.find((l) => l.exerciseId === exercise.id);
   const registeredCount = log?.sets.length ?? 0;
-  const plannedRemaining = Math.max(0, exercise.setsTarget - registeredCount);
+  const plannedRemaining = Math.max(0, planned.setsTarget - registeredCount);
   const [draftValues, setDraftValues] = useState<Record<number, { weight: string; reps: string }>>(
     {},
   );
   const draftFor = (idx: number) =>
     draftValues[idx] ?? {
-      weight: String(exercise.setTargets?.[idx]?.weight ?? exercise.loadTarget),
-      reps: String(exercise.setTargets?.[idx]?.reps ?? exercise.repsTarget),
+      weight: String(planned.setTargets[idx]?.weight ?? planned.loadTarget),
+      reps: String(planned.setTargets[idx]?.reps ?? planned.repsTarget),
     };
   const setDraftFor = (idx: number, patch: Partial<{ weight: string; reps: string }>) =>
     setDraftValues((d) => ({ ...d, [idx]: { ...draftFor(idx), ...patch } }));
@@ -962,11 +1008,11 @@ function ExerciseModal({
       const w = parseFloat(d.weight) || 0;
       const r = parseInt(d.reps, 10) || 0;
       await logSet(liveSession.id, exercise.id, w, r);
-      onLogged(exercise.setTargets?.[idx]?.restSeconds ?? exercise.restSeconds);
+      onLogged(planned.setTargets[idx]?.restSeconds ?? planned.restSeconds);
     });
 
-  const [extraWeight, setExtraWeight] = useState(String(exercise.loadTarget));
-  const [extraReps, setExtraReps] = useState(String(exercise.repsTarget));
+  const [extraWeight, setExtraWeight] = useState(String(planned.loadTarget));
+  const [extraReps, setExtraReps] = useState(String(planned.repsTarget));
   const [showExtraSet, setShowExtraSet] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const series = exerciseWeightSeries(sessions, exercise.planId, exercise.id);
@@ -976,14 +1022,14 @@ function ExerciseModal({
       const w = parseFloat(extraWeight) || 0;
       const r = parseInt(extraReps, 10) || 0;
       await logSet(liveSession.id, exercise.id, w, r);
-      onLogged(exercise.restSeconds);
+      onLogged(planned.restSeconds);
       setShowExtraSet(false);
     });
 
   return (
     <Modal onClose={onClose} title={exercise.name}>
       <p className="text-xs text-muted-foreground/70">
-        Meta: {exercise.setsTarget} séries × {exercise.repsTarget} reps — {exercise.loadTarget} kg
+        Meta: {planned.setsTarget} séries × {planned.repsTarget} reps — {planned.loadTarget} kg
       </p>
 
       <div className="mt-4 space-y-1.5">
@@ -1288,70 +1334,6 @@ function FinishSummaryModal({ sessionId, onClose }: { sessionId: string; onClose
         Fechar
       </button>
     </Modal>
-  );
-}
-
-const restPresets = [60, 90, 120, 180];
-
-function RestTimerPill({
-  rest,
-  setRest,
-}: {
-  rest: RestState;
-  setRest: React.Dispatch<React.SetStateAction<RestState | null>>;
-}) {
-  const done = rest.secondsLeft <= 0;
-  const mm = String(Math.floor(rest.secondsLeft / 60)).padStart(2, "0");
-  const ss = String(rest.secondsLeft % 60).padStart(2, "0");
-
-  const cycleTime = () =>
-    setRest((r) => {
-      if (!r) return r;
-      const idx = restPresets.indexOf(r.total);
-      const next = restPresets[(idx + 1) % restPresets.length] ?? restPresets[0];
-      return { secondsLeft: next, total: next, running: true };
-    });
-
-  return (
-    <div className="fixed bottom-24 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border border-border bg-background/95 px-4 py-2 shadow-lg backdrop-blur-xl">
-      {done ? (
-        <>
-          <span className="text-xs font-semibold text-success">Descanso concluído</span>
-          <button
-            onClick={() => setRest(null)}
-            aria-label="Fechar aviso de descanso"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </>
-      ) : (
-        <>
-          <span className="text-[10px] uppercase text-muted-foreground">Descanso</span>
-          <button onClick={cycleTime} className="font-mono text-sm font-bold text-primary">
-            {mm}:{ss}
-          </button>
-          <button
-            onClick={() => setRest((r) => (r ? { ...r, running: !r.running } : r))}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            {rest.running ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-          </button>
-          <button
-            onClick={() => setRest((r) => (r ? { ...r, secondsLeft: 0 } : r))}
-            className="text-[10px] font-semibold text-muted-foreground hover:text-primary"
-          >
-            pular
-          </button>
-          <button
-            onClick={() => setRest((r) => (r ? { ...r, secondsLeft: r.total } : r))}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-          </button>
-        </>
-      )}
-    </div>
   );
 }
 

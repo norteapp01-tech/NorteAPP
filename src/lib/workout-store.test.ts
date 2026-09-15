@@ -15,8 +15,15 @@ import {
   sessionSummary,
   allTimeMaxWeight,
   workoutInsights,
+  sessionElapsedSeconds,
+  restRemainingSeconds,
+  exerciseCompletionState,
+  nextPendingExerciseId,
+  openSession,
+  sessionPlanned,
   type WorkoutSession,
   type Exercise,
+  type PlannedExercise,
 } from "./workout-store";
 
 function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
@@ -42,6 +49,8 @@ function makeSession(overrides: Partial<WorkoutSession> = {}): WorkoutSession {
     finishedAt: "2026-09-04T11:00:00.000Z",
     exerciseLogs: [],
     status: "concluido",
+    pausedSeconds: 0,
+    restPausedSeconds: 0,
     ...overrides,
   };
 }
@@ -227,5 +236,227 @@ describe("workoutInsights — no máximo 2, honesto, sem causalidade indevida", 
     const text = insights.join(" ");
     expect(text.toLowerCase()).not.toMatch(/porque/);
     expect(text).toMatch(/pode ter contribuído|contribuiu/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Controle do treino em andamento — os dois relógios, o avanço com volta ao
+// início e os três estados de conclusão.
+// ---------------------------------------------------------------------------
+
+function makePlanned(overrides: Partial<PlannedExercise> = {}): PlannedExercise {
+  return {
+    exerciseId: "ex-1",
+    name: "Supino reto",
+    order: 0,
+    setsTarget: 3,
+    repsTarget: 10,
+    loadTarget: 40,
+    restSeconds: 90,
+    setTargets: [
+      { reps: 10, weight: 40, restSeconds: 90 },
+      { reps: 10, weight: 40, restSeconds: 90 },
+      { reps: 8, weight: 45, restSeconds: 120 },
+    ],
+    ...overrides,
+  };
+}
+
+const T0 = Date.parse("2026-09-15T10:00:00.000Z");
+
+describe("sessionElapsedSeconds — tempo por relógio, não por contagem de ticks", () => {
+  it("sessão aberta: mede a diferença até agora, sem depender de a aba ter ficado visível", () => {
+    const s = makeSession({ status: "em_andamento", startedAt: "2026-09-15T10:00:00.000Z" });
+    delete (s as { finishedAt?: string }).finishedAt;
+    // Vinte minutos de relógio — o mesmo valor que apareceria depois de
+    // recarregar a página, que é justamente o que o contador antigo perdia.
+    expect(sessionElapsedSeconds(s, T0 + 20 * 60_000)).toBe(20 * 60);
+  });
+
+  it("pausa em aberto desconta o tempo parado e congela o mostrador", () => {
+    const s = makeSession({
+      status: "em_andamento",
+      startedAt: "2026-09-15T10:00:00.000Z",
+      pausedAt: "2026-09-15T10:10:00.000Z",
+    });
+    delete (s as { finishedAt?: string }).finishedAt;
+    expect(sessionElapsedSeconds(s, T0 + 10 * 60_000)).toBe(10 * 60);
+    // Mais cinco minutos pausado: continua marcando dez.
+    expect(sessionElapsedSeconds(s, T0 + 15 * 60_000)).toBe(10 * 60);
+  });
+
+  it("pausas já encerradas ficam descontadas para sempre", () => {
+    const s = makeSession({
+      status: "em_andamento",
+      startedAt: "2026-09-15T10:00:00.000Z",
+      pausedSeconds: 300,
+    });
+    delete (s as { finishedAt?: string }).finishedAt;
+    expect(sessionElapsedSeconds(s, T0 + 20 * 60_000)).toBe(15 * 60);
+  });
+
+  it("sessão finalizada para de crescer — o resumo mostra o mesmo valor toda vez que abre", () => {
+    const s = makeSession({
+      startedAt: "2026-09-15T10:00:00.000Z",
+      finishedAt: "2026-09-15T11:00:00.000Z",
+    });
+    expect(sessionElapsedSeconds(s, T0 + 2 * 3600_000)).toBe(3600);
+    expect(sessionElapsedSeconds(s, T0 + 9 * 3600_000)).toBe(3600);
+  });
+});
+
+describe("restRemainingSeconds — descanso independente da pausa do treino", () => {
+  const base = () =>
+    makeSession({
+      status: "em_andamento",
+      restStartedAt: "2026-09-15T10:00:00.000Z",
+      restTotalSeconds: 90,
+    });
+
+  it("conta para baixo e para no zero, sem virar negativo", () => {
+    expect(restRemainingSeconds(base(), T0 + 30_000)).toBe(60);
+    expect(restRemainingSeconds(base(), T0 + 200_000)).toBe(0);
+  });
+
+  it("sem descanso em andamento retorna null, não zero", () => {
+    // Zero significa "acabou agora"; null significa "não tem descanso". A
+    // interface mostra coisas diferentes nos dois casos.
+    expect(restRemainingSeconds(makeSession({ status: "em_andamento" }))).toBeNull();
+  });
+
+  it("descanso pausado congela, e retomar não perde o que já correu", () => {
+    const paused = { ...base(), restPausedAt: "2026-09-15T10:00:30.000Z" };
+    expect(restRemainingSeconds(paused, T0 + 30_000)).toBe(60);
+    expect(restRemainingSeconds(paused, T0 + 120_000)).toBe(60);
+    const resumed = { ...base(), restPausedSeconds: 90 };
+    expect(restRemainingSeconds(resumed, T0 + 120_000)).toBe(60);
+  });
+
+  it("pausar o TREINO não pausa o descanso", () => {
+    const s = { ...base(), pausedAt: "2026-09-15T10:00:00.000Z" };
+    expect(restRemainingSeconds(s, T0 + 30_000)).toBe(60);
+  });
+});
+
+describe("exerciseCompletionState — parcial não é o mesmo que não realizado", () => {
+  const planned = makePlanned();
+
+  it("sem série nenhuma: não realizado", () => {
+    expect(exerciseCompletionState(undefined, planned)).toBe("nao_realizado");
+    expect(exerciseCompletionState({ exerciseId: "ex-1", done: false, sets: [] }, planned)).toBe(
+      "nao_realizado",
+    );
+  });
+
+  it("menos séries que a meta: parcial", () => {
+    const log = {
+      exerciseId: "ex-1",
+      done: false,
+      sets: [{ setIndex: 0, weight: 40, reps: 10 }],
+    };
+    expect(exerciseCompletionState(log, planned)).toBe("parcial");
+  });
+
+  it("meta atingida ou marcado como feito: concluído", () => {
+    const full = {
+      exerciseId: "ex-1",
+      done: false,
+      sets: [
+        { setIndex: 0, weight: 40, reps: 10 },
+        { setIndex: 1, weight: 40, reps: 10 },
+        { setIndex: 2, weight: 45, reps: 8 },
+      ],
+    };
+    expect(exerciseCompletionState(full, planned)).toBe("concluido");
+    expect(exerciseCompletionState({ exerciseId: "ex-1", done: true, sets: [] }, planned)).toBe(
+      "concluido",
+    );
+  });
+});
+
+describe("nextPendingExerciseId — pula a máquina ocupada e volta para ela depois", () => {
+  const planned = [
+    makePlanned({ exerciseId: "remada", name: "Remada", order: 0 }),
+    makePlanned({ exerciseId: "remada-alta", name: "Remada alta", order: 1 }),
+    makePlanned({ exerciseId: "remada-baixa", name: "Remada baixa", order: 2 }),
+  ];
+  const done = (id: string) => ({ exerciseId: id, done: true, sets: [] });
+  const empty = (id: string) => ({ exerciseId: id, done: false, sets: [] });
+
+  it("avança para o próximo pendente na ordem", () => {
+    const logs = [done("remada"), empty("remada-alta"), empty("remada-baixa")];
+    expect(nextPendingExerciseId(planned, logs, "remada")).toBe("remada-alta");
+  });
+
+  it("dá a volta: terminando o último, volta para o que ficou pra trás", () => {
+    // O caso real: a máquina da Remada alta estava ocupada, o usuário pulou
+    // para a Remada baixa e terminou. O painel tem que voltar, não parar.
+    const logs = [done("remada"), empty("remada-alta"), done("remada-baixa")];
+    expect(nextPendingExerciseId(planned, logs, "remada-baixa")).toBe("remada-alta");
+  });
+
+  it("sem nenhum pendente retorna null — nunca escolhe um concluído", () => {
+    const logs = [done("remada"), done("remada-alta"), done("remada-baixa")];
+    expect(nextPendingExerciseId(planned, logs, "remada")).toBeNull();
+  });
+
+  it("um exercício parcial ainda conta como pendente", () => {
+    const logs = [
+      done("remada"),
+      { exerciseId: "remada-alta", done: false, sets: [{ setIndex: 0, weight: 30, reps: 10 }] },
+      done("remada-baixa"),
+    ];
+    expect(nextPendingExerciseId(planned, logs, "remada-baixa")).toBe("remada-alta");
+  });
+});
+
+describe("openSession — treino aberto em outro dia não vira dado morto", () => {
+  it("encontra a sessão em andamento mesmo sendo de ontem", () => {
+    const yesterday = makeSession({ id: "s-ontem", date: "2026-09-14", status: "em_andamento" });
+    const old = makeSession({ id: "s-velha", date: "2026-09-01" });
+    expect(openSession([old, yesterday])?.id).toBe("s-ontem");
+  });
+
+  it("ignora sessões já concluídas", () => {
+    expect(openSession([makeSession({ id: "s-1" })])).toBeUndefined();
+  });
+});
+
+describe("sessionPlanned — editar a meta hoje não reescreve o treino de ontem", () => {
+  it("usa o retrato gravado no início, não o exercício vivo", () => {
+    const session = makeSession({
+      plannedSnapshot: [makePlanned({ loadTarget: 40, name: "Supino reto" })],
+    });
+    // O exercício foi editado depois: 60kg e outro nome.
+    const live = [makeExercise({ loadTarget: 60, name: "Supino reto (barra)" })];
+    const planned = sessionPlanned(session, live);
+    expect(planned[0].loadTarget).toBe(40);
+    expect(planned[0].name).toBe("Supino reto");
+  });
+
+  it("um exercício excluído do treino continua aparecendo no histórico", () => {
+    const session = makeSession({ plannedSnapshot: [makePlanned()] });
+    expect(sessionPlanned(session, []).map((p) => p.exerciseId)).toEqual(["ex-1"]);
+  });
+
+  it("sessão antiga sem retrato cai no treino vivo, sem quebrar", () => {
+    const session = makeSession();
+    expect(sessionPlanned(session, [makeExercise()])[0].loadTarget).toBe(40);
+  });
+});
+
+describe("sessionSummary — histórico sobrevive à exclusão do exercício", () => {
+  it("o nome vem do retrato mesmo com o exercício apagado do treino", () => {
+    const session = makeSession({
+      plannedSnapshot: [makePlanned({ name: "Remada curvada", loadTarget: 50 })],
+      exerciseLogs: [
+        { exerciseId: "ex-1", done: true, sets: [{ setIndex: 0, weight: 50, reps: 10 }] },
+      ],
+    });
+    // `exercises` vazio = exercício excluído do treino depois da sessão.
+    const summary = sessionSummary(session, undefined, [], [session]);
+    expect(summary.exercises).toHaveLength(1);
+    expect(summary.exercises[0].name).toBe("Remada curvada");
+    expect(summary.exercises[0].targetWeight).toBe(50);
   });
 });

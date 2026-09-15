@@ -19,6 +19,8 @@ import { AuthGate, SignInScreen } from "../components/AuthGate";
 import { hasLinkedAccount } from "../lib/supabase/client";
 import { SportRecorderProvider } from "../lib/sport-recorder-context";
 import { ActiveRecordingBar } from "../components/esportes/ActiveRecordingBar";
+import { GymSessionProvider } from "../lib/gym-session-context";
+import { WorkoutBubble } from "../components/academia/WorkoutBubble";
 import { themeBootScript } from "../lib/theme";
 
 function NotFoundComponent() {
@@ -264,11 +266,20 @@ function RootComponent() {
       >
         <AuthGate>
           <SportRecorderProvider>
-            <div key={pathname} className="page-enter">
-              <Outlet />
-            </div>
-            <ActiveRecordingBar />
-            <BottomNav />
+            {/* Bolha e painel ficam FORA do `div key={pathname}` de propósito:
+                é isso que os mantém montados ao trocar de tela, em vez de
+                remontar (e perder o painel aberto) a cada navegação. */}
+            <GymSessionProvider>
+              <div key={pathname} className="page-enter">
+                <Outlet />
+              </div>
+              <ActiveRecordingBar />
+              {/* Depois do nav: bolha e painel são controle de algo em curso e
+                  não podem ficar enterrados sob a navegação, que é fixa e
+                  ocupa a mesma camada. */}
+              <BottomNav />
+              <WorkoutBubble />
+            </GymSessionProvider>
           </SportRecorderProvider>
         </AuthGate>
       </div>

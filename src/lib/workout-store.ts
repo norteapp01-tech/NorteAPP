@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { todayISO, toISODate } from "./goals-store";
 import { supabase, ensureSession, useSupabaseUserId } from "./supabase/client";
 import { queryClient } from "./query-client";
-import { nowDate } from "./test-clock";
+import { nowDate, nowMs } from "./test-clock";
 
 // ---------------------------------------------------------------------------
 // Diário de treino da Academia — Treino (A/B/C...) -> Exercícios -> Sessões
@@ -32,8 +32,25 @@ export type Exercise = {
 
 export type SetTarget = { reps: number; weight: number; restSeconds: number };
 export type SetLog = { setIndex: number; weight: number; reps: number };
-export type ExerciseLog = { exerciseId: string; sets: SetLog[]; done: boolean };
+/** `exerciseId` é nulo quando o exercício foi excluído do treino depois deste
+ * registro — as séries continuam valendo e o nome vem do retrato da sessão. */
+export type ExerciseLog = { exerciseId: string | null; sets: SetLog[]; done: boolean };
 export type WorkoutSessionStatus = "em_andamento" | "concluido";
+
+/** O que o treino planejava no instante em que a sessão começou. Sem isso, um
+ * treino de três meses atrás passa a exibir a meta de hoje — a sessão lia o
+ * exercício vivo, então editar a carga reescrevia o passado. */
+export type PlannedExercise = {
+  exerciseId: string;
+  name: string;
+  order: number;
+  setsTarget: number;
+  repsTarget: number;
+  loadTarget: number;
+  restSeconds: number;
+  setTargets: SetTarget[];
+};
+
 export type WorkoutSession = {
   id: string;
   planId: string;
@@ -42,6 +59,16 @@ export type WorkoutSession = {
   finishedAt?: string;
   exerciseLogs: ExerciseLog[];
   status: WorkoutSessionStatus;
+  /** Desde quando o treino está pausado (null = correndo). */
+  pausedAt?: string;
+  /** Segundos já pausados antes da pausa atual. */
+  pausedSeconds: number;
+  restStartedAt?: string;
+  restTotalSeconds?: number;
+  restPausedAt?: string;
+  restPausedSeconds: number;
+  selectedExerciseId?: string;
+  plannedSnapshot?: PlannedExercise[];
 };
 
 export type BodyWeightEntry = { id: string; date: string; weight: number };
@@ -99,6 +126,113 @@ export function sessionForToday(
 ): WorkoutSession | undefined {
   const iso = todayISO();
   return sessions.find((s) => s.date === iso && s.planId === planId);
+}
+
+/** A sessão em andamento, seja de que dia for. `sessionForToday` só enxergava
+ * hoje: um treino aberto ontem e nunca finalizado desaparecia da interface e
+ * ficava aberto pra sempre no banco, sem nenhuma forma de retomar ou encerrar. */
+export function openSession(sessions: WorkoutSession[]): WorkoutSession | undefined {
+  return sessions
+    .filter((s) => s.status === "em_andamento")
+    .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
+}
+
+/** Duração do treino em segundos, por diferença de horários. Contar ticks de
+ * timer perdia tempo toda vez que a aba ia pro fundo ou a tela bloqueava. */
+export function sessionElapsedSeconds(session: WorkoutSession, now = nowMs()): number {
+  const start = new Date(session.startedAt).getTime();
+  const end = session.finishedAt ? new Date(session.finishedAt).getTime() : now;
+  const activePause = session.pausedAt
+    ? Math.max(0, (now - new Date(session.pausedAt).getTime()) / 1000)
+    : 0;
+  return Math.max(0, Math.round((end - start) / 1000 - session.pausedSeconds - activePause));
+}
+
+/** Segundos restantes de descanso, ou null quando não há descanso rodando.
+ * Chega a 0 e fica — o descanso estourado continua visível até ser dispensado. */
+export function restRemainingSeconds(session: WorkoutSession, now = nowMs()): number | null {
+  if (!session.restStartedAt || !session.restTotalSeconds) return null;
+  const activePause = session.restPausedAt
+    ? Math.max(0, (now - new Date(session.restPausedAt).getTime()) / 1000)
+    : 0;
+  const elapsed =
+    (now - new Date(session.restStartedAt).getTime()) / 1000 -
+    session.restPausedSeconds -
+    activePause;
+  return Math.max(0, Math.round(session.restTotalSeconds - elapsed));
+}
+
+export function isRestRunning(session: WorkoutSession): boolean {
+  return Boolean(session.restStartedAt && !session.restPausedAt);
+}
+
+/** Converte um exercício vivo no formato do retrato — usado tanto pra gravar o
+ * retrato quanto pra completar sessões antigas, que não têm um. */
+export function toPlannedExercise(exercise: Exercise): PlannedExercise {
+  const fallback = {
+    reps: exercise.repsTarget,
+    weight: exercise.loadTarget,
+    restSeconds: exercise.restSeconds,
+  };
+  const targets = exercise.setTargets?.length
+    ? exercise.setTargets
+    : Array.from({ length: exercise.setsTarget }, () => ({ ...fallback }));
+  return {
+    exerciseId: exercise.id,
+    name: exercise.name,
+    order: exercise.order,
+    setsTarget: exercise.setsTarget,
+    repsTarget: exercise.repsTarget,
+    loadTarget: exercise.loadTarget,
+    restSeconds: exercise.restSeconds,
+    setTargets: targets,
+  };
+}
+
+/** O que a sessão planejava, em ordem. Sessões gravadas antes do retrato
+ * existir caem no treino vivo — é o melhor dado disponível pra elas, e a
+ * ausência do retrato é justamente o que a migration passa a evitar daqui pra
+ * frente. */
+export function sessionPlanned(session: WorkoutSession, exercises: Exercise[]): PlannedExercise[] {
+  if (session.plannedSnapshot?.length) {
+    return [...session.plannedSnapshot].sort((a, b) => a.order - b.order);
+  }
+  return exercisesForPlan(exercises, session.planId).map(toPlannedExercise);
+}
+
+export type ExerciseCompletion = "concluido" | "parcial" | "nao_realizado";
+
+/** Três estados, não dois: um exercício com 2 de 4 séries não é "feito" nem
+ * "não feito". Finalizar o treino nunca promove um parcial a concluído. */
+export function exerciseCompletionState(
+  log: ExerciseLog | undefined,
+  planned: PlannedExercise | undefined,
+): ExerciseCompletion {
+  const done = log?.sets.length ?? 0;
+  if (log?.done) return "concluido";
+  if (done === 0) return "nao_realizado";
+  const target = planned?.setsTarget ?? 0;
+  return target > 0 && done >= target ? "concluido" : "parcial";
+}
+
+/** Próximo exercício que ainda tem série pendente, dando a volta na lista.
+ * É o caso real de academia: a máquina do próximo está ocupada, você pula pro
+ * seguinte, e ao terminar ele o painel tem que voltar pro que ficou pra trás —
+ * não parar no fim da lista. Retorna null quando não há mais nada pendente. */
+export function nextPendingExerciseId(
+  planned: PlannedExercise[],
+  logs: ExerciseLog[],
+  fromExerciseId: string,
+): string | null {
+  const from = planned.findIndex((p) => p.exerciseId === fromExerciseId);
+  if (planned.length === 0) return null;
+  const start = from < 0 ? 0 : from;
+  for (let step = 1; step <= planned.length; step += 1) {
+    const candidate = planned[(start + step) % planned.length];
+    const log = logs.find((l) => l.exerciseId === candidate.exerciseId);
+    if (exerciseCompletionState(log, candidate) !== "concluido") return candidate.exerciseId;
+  }
+  return null;
 }
 
 /** Carga máxima registrada por sessão finalizada daquele exercício, em ordem cronológica — alimenta o Sparkline. */
@@ -192,9 +326,13 @@ export function sessionSummary(
   let completedExercises = 0;
   let totalVolume = 0;
   let previousTotalVolume: number | undefined = previous ? 0 : undefined;
+  // O resumo descreve o treino COMO ELE FOI: nome e metas vêm do retrato
+  // gravado no início da sessão, não do exercício de hoje. É também o que
+  // mantém no histórico um exercício já excluído do treino.
+  const planned = sessionPlanned(session, exercises);
   for (const log of session.exerciseLogs) {
     if (log.sets.length === 0) continue;
-    const ex = exercises.find((e) => e.id === log.exerciseId);
+    const ex = planned.find((p) => p.exerciseId === log.exerciseId);
     if (!ex) continue;
     totalSets += log.sets.length;
     if (log.done) completedExercises += 1;
@@ -210,10 +348,10 @@ export function sessionSummary(
       previousTotalVolume += previousVolume;
     }
     const priorMax = allSessions.length
-      ? allTimeMaxWeight(allSessions, session.planId, ex.id, session.id)
+      ? allTimeMaxWeight(allSessions, session.planId, ex.exerciseId, session.id)
       : (prevBest ?? 0);
     rows.push({
-      exerciseId: ex.id,
+      exerciseId: ex.exerciseId,
       name: ex.name,
       setsCount: log.sets.length,
       maxWeight: best.weight,
@@ -356,6 +494,16 @@ function mapSession(r: Row, exerciseLogs: ExerciseLog[]): WorkoutSession {
     finishedAt: (r.finished_at as string) ?? undefined,
     exerciseLogs,
     status: r.status as WorkoutSessionStatus,
+    pausedAt: (r.paused_at as string) ?? undefined,
+    pausedSeconds: (r.paused_seconds as number) ?? 0,
+    restStartedAt: (r.rest_started_at as string) ?? undefined,
+    restTotalSeconds: (r.rest_total_seconds as number) ?? undefined,
+    restPausedAt: (r.rest_paused_at as string) ?? undefined,
+    restPausedSeconds: (r.rest_paused_seconds as number) ?? 0,
+    selectedExerciseId: (r.selected_exercise_id as string) ?? undefined,
+    plannedSnapshot: Array.isArray(r.planned_snapshot)
+      ? (r.planned_snapshot as PlannedExercise[])
+      : undefined,
   };
 }
 
@@ -388,7 +536,7 @@ export async function fetchState(): Promise<State> {
   const sessions = (sessionRows as Row[]).map((r) => {
     const exLogs = exLogsBySession[r.id as string] ?? [];
     const exerciseLogs: ExerciseLog[] = exLogs.map((el) => ({
-      exerciseId: el.exercise_id as string,
+      exerciseId: (el.exercise_id as string) ?? null,
       sets: (setLogsByExLog[el.id as string] ?? []).map((s) => ({
         setIndex: s.set_index as number,
         weight: s.weight as number,
@@ -564,24 +712,35 @@ export async function startSession(planId: string): Promise<string> {
     .maybeSingle();
   if (existing) return existing.id as string;
 
+  const { data: planExercises } = await supabase
+    .from("workout_exercises")
+    .select("*")
+    .eq("plan_id", planId)
+    .order("order_index");
+  const planned = ((planExercises as Row[]) ?? []).map((r) => toPlannedExercise(mapExercise(r)));
+
   const row = unwrap<{ id: string }>(
     await supabase
       .from("workout_sessions")
-      .insert({ user_id: userId, plan_id: planId, date: today, status: "em_andamento" })
+      .insert({
+        user_id: userId,
+        plan_id: planId,
+        date: today,
+        status: "em_andamento",
+        started_at: nowDate().toISOString(),
+        planned_snapshot: planned,
+        selected_exercise_id: planned[0]?.exerciseId ?? null,
+      })
       .select()
       .single(),
   );
-  const { data: planExercises } = await supabase
-    .from("workout_exercises")
-    .select("id")
-    .eq("plan_id", planId);
-  if (planExercises && planExercises.length > 0) {
+  if (planned.length > 0) {
     unwrap(
       await supabase.from("workout_exercise_logs").insert(
-        planExercises.map((e) => ({
+        planned.map((p) => ({
           user_id: userId,
           session_id: row.id,
-          exercise_id: e.id as string,
+          exercise_id: p.exerciseId,
           done: false,
         })),
       ),
@@ -589,6 +748,84 @@ export async function startSession(planId: string): Promise<string> {
   }
   await invalidate();
   return row.id;
+}
+
+async function patchSession(sessionId: string, patch: Row) {
+  unwrap(
+    await supabase.from("workout_sessions").update(patch).eq("id", sessionId).select().single(),
+  );
+  await invalidate();
+}
+
+/** Segundos de pausa a acumular ao retomar — o tempo desde que pausou. */
+function pausedSince(iso: string): number {
+  return Math.max(0, Math.round((nowMs() - new Date(iso).getTime()) / 1000));
+}
+
+export async function pauseSession(session: WorkoutSession) {
+  if (session.pausedAt) return;
+  await patchSession(session.id, { paused_at: nowDate().toISOString() });
+}
+
+export async function resumeSession(session: WorkoutSession) {
+  if (!session.pausedAt) return;
+  await patchSession(session.id, {
+    paused_at: null,
+    paused_seconds: session.pausedSeconds + pausedSince(session.pausedAt),
+  });
+}
+
+/** Sem `invalidate()` de propósito: qual exercício o painel mostra é estado de
+ * interface, e refazer todas as queries do domínio a cada seta pressionada
+ * faria a tela inteira piscar. A gravação serve só pra reabrir o app no mesmo
+ * exercício depois de um reload. */
+export async function selectExercise(sessionId: string, exerciseId: string) {
+  await supabase
+    .from("workout_sessions")
+    .update({ selected_exercise_id: exerciseId })
+    .eq("id", sessionId);
+}
+
+/** Começa (ou reinicia) o descanso com a duração daquela série. */
+export async function startRest(sessionId: string, seconds: number) {
+  if (seconds <= 0) return;
+  await patchSession(sessionId, {
+    rest_started_at: nowDate().toISOString(),
+    rest_total_seconds: seconds,
+    rest_paused_at: null,
+    rest_paused_seconds: 0,
+  });
+}
+
+export async function pauseRest(session: WorkoutSession) {
+  if (!session.restStartedAt || session.restPausedAt) return;
+  await patchSession(session.id, { rest_paused_at: nowDate().toISOString() });
+}
+
+export async function resumeRest(session: WorkoutSession) {
+  if (!session.restPausedAt) return;
+  await patchSession(session.id, {
+    rest_paused_at: null,
+    rest_paused_seconds: session.restPausedSeconds + pausedSince(session.restPausedAt),
+  });
+}
+
+/** Encerra o descanso. Mexe só no descanso — nenhuma série registrada é tocada. */
+export async function clearRest(sessionId: string) {
+  await patchSession(sessionId, {
+    rest_started_at: null,
+    rest_total_seconds: null,
+    rest_paused_at: null,
+    rest_paused_seconds: 0,
+  });
+}
+
+/** Soma/subtrai tempo no descanso em andamento, preservando o quanto já correu. */
+export async function adjustRest(session: WorkoutSession, deltaSeconds: number) {
+  if (!session.restStartedAt || !session.restTotalSeconds) return;
+  const total = session.restTotalSeconds + deltaSeconds;
+  if (total <= 0) return clearRest(session.id);
+  await patchSession(session.id, { rest_total_seconds: total });
 }
 
 /** Autocura: se por algum motivo a sessão não tiver o log deste exercício (ex.: exercício
@@ -684,11 +921,32 @@ export async function completeExerciseLog(sessionId: string, exerciseId: string)
   await invalidate();
 }
 
+/** Finaliza sem promover nada: um exercício com 2 de 4 séries continua parcial,
+ * e um sem série nenhuma continua não realizado. */
 export async function finishSession(sessionId: string) {
+  // Resolve a pausa aberta antes de fechar. Se `paused_at` ficasse preenchido,
+  // a duração da sessão encolheria a cada vez que o resumo fosse aberto — o
+  // cálculo mede a pausa ativa contra o relógio de agora.
+  const { data: current } = await supabase
+    .from("workout_sessions")
+    .select("paused_at, paused_seconds")
+    .eq("id", sessionId)
+    .maybeSingle();
+  const pausedAt = (current?.paused_at as string) ?? null;
   unwrap(
     await supabase
       .from("workout_sessions")
-      .update({ status: "concluido", finished_at: nowDate().toISOString() })
+      .update({
+        status: "concluido",
+        finished_at: nowDate().toISOString(),
+        paused_at: null,
+        paused_seconds:
+          ((current?.paused_seconds as number) ?? 0) + (pausedAt ? pausedSince(pausedAt) : 0),
+        rest_started_at: null,
+        rest_total_seconds: null,
+        rest_paused_at: null,
+        rest_paused_seconds: 0,
+      })
       .eq("id", sessionId)
       .select()
       .single(),

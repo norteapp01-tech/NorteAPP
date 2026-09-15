@@ -39,3 +39,6 @@ scripts/persona-sim/.auth/
 *.njsproj
 *.sln
 *.sw?
+
+# Artefato local do Claude Code
+.claude/
