@@ -1,8 +1,8 @@
 .welcome-live {
-  background: #080a09;
+  background: var(--background);
   max-width: 480px;
   padding: 28px 20px 24px;
-  color: #f6f7f6;
+  color: var(--foreground);
 }
 .welcome-live h1 {
   font-size: clamp(30px, 8.8vw, 42px);
@@ -12,7 +12,7 @@
 .welcome-live .welcome-subtitle {
   min-height: 44px;
   font-size: 14px;
-  color: #a3aaa6;
+  color: var(--muted-foreground);
   animation: welcome-subtitle-in 0.35s ease both;
 }
 .welcome-live .welcome-carousel {
@@ -28,7 +28,7 @@
 }
 .welcome-example-label {
   text-align: right;
-  color: #bfc4c1;
+  color: var(--muted-foreground);
   font-size: 11px;
   margin: 0 0 14px;
 }
@@ -45,11 +45,11 @@
   max-width: 100%;
   min-width: 26px;
   padding: 11px 13px;
-  background: #1b211d;
+  background: var(--surface-sheen), var(--surface);
   line-height: 1.45;
   font-size: 12px;
   border-radius: 17px;
-  color: #f1f3f1;
+  color: var(--foreground);
 }
 .welcome-cursor {
   color: var(--primary);
@@ -75,13 +75,13 @@
 .welcome-live .welcome-card {
   background: transparent;
   padding: 13px;
-  border-color: #252b27;
+  border-color: var(--border);
 }
 .welcome-live .welcome-card p {
-  color: #a3aaa6;
+  color: var(--muted-foreground);
 }
 .welcome-live .welcome-card small {
-  color: #99f47c;
+  color: var(--primary);
 }
 .welcome-live .welcome-controls {
   margin-top: auto;
@@ -93,10 +93,10 @@
 }
 .welcome-live .welcome-cta {
   background: linear-gradient(105deg, #98f976, #85ed72);
-  color: #071008;
+  color: var(--action-ink);
 }
 .welcome-live .welcome-login {
-  color: #a3aaa6;
+  color: var(--muted-foreground);
 }
 @keyframes welcome-subtitle-in {
   from {

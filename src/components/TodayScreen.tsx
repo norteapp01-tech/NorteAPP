@@ -198,7 +198,7 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
                 disabled={savingMood}
                 aria-pressed={selected}
                 aria-label={o.label}
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors disabled:opacity-60 ${selected ? "border-primary bg-primary/10" : "border-border bg-surface/80 hover:border-muted-foreground"}`}
+                className={`mood-control flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors disabled:opacity-60 ${selected ? "border-primary bg-primary/10" : "border-border bg-surface/80 hover:border-muted-foreground"}`}
               >
                 <span className={`text-xl ${selected ? "" : "opacity-70"}`}>{o.emoji}</span>
               </button>

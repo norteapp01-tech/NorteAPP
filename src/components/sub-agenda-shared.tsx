@@ -29,15 +29,15 @@ export function Sparkline({ values }: { values: number[] }) {
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-20 w-full">
       <defs>
         <linearGradient id="sl" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="oklch(0.82 0.18 145)" stopOpacity="0.4" />
-          <stop offset="100%" stopColor="oklch(0.82 0.18 145)" stopOpacity="0" />
+          <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
         </linearGradient>
       </defs>
       <polyline points={`0,100 ${pts} 100,100`} fill="url(#sl)" stroke="none" />
       <polyline
         points={pts}
         fill="none"
-        stroke="oklch(0.82 0.18 145)"
+        stroke="var(--primary)"
         strokeWidth="2"
         vectorEffect="non-scaling-stroke"
       />

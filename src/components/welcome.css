@@ -62,7 +62,7 @@
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: var(--surface);
+  background: var(--surface-sheen), var(--surface);
   padding: 16px;
   min-height: 365px;
 }
@@ -205,7 +205,7 @@
 }
 .welcome-macros > div {
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--surface-sheen), var(--surface);
   border-radius: 10px;
   padding: 8px;
 }

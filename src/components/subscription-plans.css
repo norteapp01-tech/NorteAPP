@@ -1,8 +1,8 @@
 .subscription-page {
   min-height: 100svh;
   overflow-x: hidden;
-  background: #0d0f10;
-  color: #f5f6f7;
+  background: var(--background);
+  color: var(--foreground);
 }
 .subscription-shell {
   width: min(100%, 500px);
@@ -17,7 +17,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  color: #f7f8f8;
+  color: var(--foreground);
   font-size: 13px;
   font-weight: 650;
   letter-spacing: 0.42em;
@@ -40,7 +40,7 @@
 }
 .subscription-header p {
   margin-top: 16px;
-  color: #9ca2aa;
+  color: var(--muted-foreground);
   font-size: 17px;
   line-height: 1.42;
 }
@@ -54,12 +54,12 @@
   position: relative;
   min-height: 42px;
   padding: 0 8px 10px;
-  color: #868c94;
+  color: var(--muted-foreground);
   font-size: 17px;
   font-weight: 650;
 }
 .subscription-billing button.active {
-  color: #f6f7f8;
+  color: var(--foreground);
 }
 .subscription-billing button.active::after {
   position: absolute;
@@ -82,9 +82,9 @@
   width: 100%;
   min-height: 86px;
   padding: 15px 18px;
-  border: 1px solid #353a3f;
+  border: 1px solid var(--border);
   border-radius: 18px;
-  background: #101315;
+  background: var(--surface-sheen), var(--surface);
   text-align: left;
   transition:
     border-color 0.18s ease,
@@ -96,16 +96,16 @@
 }
 .subscription-option.selected {
   border: 1.5px solid var(--primary);
-  background: #101513;
+  background: var(--surface-sheen), var(--surface);
 }
 .subscription-radio {
   display: grid;
   width: 28px;
   height: 28px;
   place-items: center;
-  border: 2px solid #485057;
+  border: 2px solid var(--border);
   border-radius: 50%;
-  color: #101513;
+  color: var(--surface);
 }
 .subscription-option.selected .subscription-radio {
   border-color: var(--primary);
@@ -137,14 +137,14 @@
 .subscription-option-copy small {
   display: block;
   margin-top: 5px;
-  color: #9299a1;
+  color: var(--muted-foreground);
   font-size: 14px;
 }
 .subscription-price-separator {
   width: 1px;
   height: 45px;
   margin: 0 18px;
-  background: #343a3f;
+  background: var(--border);
 }
 .subscription-price {
   white-space: nowrap;
@@ -155,15 +155,15 @@
   letter-spacing: -0.025em;
 }
 .subscription-price small {
-  color: #aeb4bc;
+  color: var(--muted-foreground);
   font-size: 14px;
 }
 .subscription-benefits {
   margin-top: 13px;
   padding: 23px 22px 0;
-  border: 1px solid #30353a;
+  border: 1px solid var(--border);
   border-radius: 20px;
-  background: #101315;
+  background: var(--surface-sheen), var(--surface);
 }
 .subscription-benefits h2 {
   font-size: 21px;
@@ -179,7 +179,7 @@
   display: flex;
   align-items: center;
   gap: 13px;
-  color: #d2d5d9;
+  color: var(--foreground);
   font-size: 14px;
   line-height: 1.35;
 }
@@ -200,8 +200,8 @@
   width: 100%;
   min-height: 57px;
   margin-top: 21px;
-  border-top: 1px solid #2c3135;
-  color: #b7bdc4;
+  border-top: 1px solid var(--border);
+  color: var(--muted-foreground);
   font-size: 14px;
   text-align: left;
 }
@@ -220,7 +220,7 @@
 }
 .subscription-action p {
   margin-top: 9px;
-  color: #969da5;
+  color: var(--muted-foreground);
   font-size: 14px;
 }
 .subscription-page button:focus-visible {
@@ -232,8 +232,8 @@
   max-width: 520px;
   margin-inline: auto;
   border-radius: 26px 26px 0 0;
-  border-color: #34393e;
-  background: #111416;
+  border-color: var(--border);
+  background: var(--popover);
 }
 .subscription-comparison-body {
   overflow-y: auto;
@@ -247,11 +247,11 @@
 }
 .subscription-comparison-body > p {
   margin-top: 8px;
-  color: #9da4ac;
+  color: var(--muted-foreground);
 }
 .subscription-comparison-grid {
   margin-top: 22px;
-  border: 1px solid #30353a;
+  border: 1px solid var(--border);
   border-radius: 16px;
   overflow: hidden;
 }
@@ -263,21 +263,21 @@
 .comparison-head > *,
 .comparison-row > * {
   padding: 11px 7px;
-  border-right: 1px solid #292e32;
+  border-right: 1px solid var(--border);
 }
 .comparison-head > *:last-child,
 .comparison-row > *:last-child {
   border-right: 0;
 }
 .comparison-head {
-  background: #181c1f;
+  background: var(--surface-2);
   font-size: 11px;
   text-align: center;
 }
 .comparison-row {
-  border-top: 1px solid #292e32;
+  border-top: 1px solid var(--border);
   font-size: 11px;
-  color: #aeb4bc;
+  color: var(--muted-foreground);
 }
 .comparison-row > span:not(:first-child) {
   display: grid;

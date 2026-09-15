@@ -55,7 +55,7 @@ export function RoutePreview({
         <polyline
           points={path}
           fill="none"
-          stroke="oklch(0.82 0.18 145)"
+          stroke="var(--primary)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -63,13 +63,13 @@ export function RoutePreview({
         />
         {!hideStartEnd && (
           <>
-            <circle cx={startX} cy={startY} r="2.2" fill="oklch(0.82 0.18 145)" />
+            <circle cx={startX} cy={startY} r="2.2" fill="var(--primary)" />
             <circle
               cx={endX}
               cy={endY}
               r="2.2"
               fill="oklch(0.98 0 0)"
-              stroke="oklch(0.82 0.18 145)"
+              stroke="var(--primary)"
               strokeWidth="1"
             />
           </>

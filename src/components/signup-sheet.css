@@ -4,16 +4,16 @@
   margin-inline: auto;
   max-height: 92dvh;
   border-radius: 28px 28px 0 0;
-  background: #101214;
-  border-color: #303438;
+  background: var(--surface-sheen), var(--surface);
+  border-color: var(--border);
   box-shadow: 0 -12px 50px #0003;
-  color: #f6f7f8;
+  color: var(--foreground);
 }
 .signup-sheet > div:first-child {
   width: 44px;
   height: 5px;
   margin-top: 15px;
-  background: #51565c;
+  background: var(--border);
   flex-shrink: 0;
 }
 .signup-sheet-body {
@@ -34,7 +34,7 @@
 .signup-sheet-description {
   font-size: 15px;
   line-height: 1.55;
-  color: #aeb4bc;
+  color: var(--muted-foreground);
   margin-top: 14px;
   margin-bottom: 27px;
   text-align: left;
@@ -53,7 +53,7 @@
   min-height: 52px;
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid #303438;
+  border: 1px solid var(--border);
   border-radius: 15px;
   font-size: 15px;
   font-weight: 500;
@@ -89,20 +89,20 @@
 }
 .signup-email {
   background: transparent;
-  color: #fff;
-  border-color: #626971;
+  color: var(--foreground);
+  border-color: var(--border);
 }
 .signup-sheet-divider {
   display: flex;
   align-items: center;
   gap: 15px;
-  color: #969da5;
+  color: var(--muted-foreground);
   font-size: 13px;
   padding: 12px 0;
 }
 .signup-sheet-divider span {
   height: 1px;
-  background: #454a50;
+  background: var(--border);
   flex: 1;
 }
 .signup-sheet-return {
@@ -111,7 +111,7 @@
   min-height: 44px;
   padding: 8px 12px;
   font-size: 14px;
-  color: #aeb4bc;
+  color: var(--muted-foreground);
 }
 @media (max-width: 350px) {
   .signup-sheet-body {

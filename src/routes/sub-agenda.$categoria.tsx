@@ -470,7 +470,7 @@ function AcademiaModule() {
             <Check className="check-enter h-4 w-4 shrink-0 text-success" /> Treino concluído hoje —{" "}
             <button
               onClick={() => setSummarySessionId(todaySession.id)}
-              className="-my-2 rounded px-1 py-2 font-medium text-[oklch(0.88_0.16_145)] decoration-2 underline decoration-dotted underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success"
+              className="-my-2 rounded px-1 py-2 font-medium text-primary decoration-2 underline decoration-dotted underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success"
             >
               ver resumo
             </button>

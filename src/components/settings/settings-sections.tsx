@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTheme, setTheme } from "@/lib/theme";
 import { ProfileEditor } from "@/components/settings/ProfileEditor";
 import { SubscriptionSection } from "@/components/settings/SubscriptionSection";
 import {
@@ -337,10 +338,43 @@ const weekStartOptions: { value: WeekStart; label: string }[] = [
 
 function PreferencesSection() {
   const profile = useProfile();
+  const theme = useTheme();
 
   return (
     <section>
       <SectionHeader icon={SlidersHorizontal} title="Preferências" />
+      <div className="mt-2 card-surface p-3.5">
+        <p id="appearance-label" className="text-sm">
+          Aparência
+        </p>
+        <div
+          className="mt-3 grid grid-cols-2 gap-3"
+          role="group"
+          aria-labelledby="appearance-label"
+        >
+          {(["dark", "light"] as const).map((choice) => (
+            <button
+              key={choice}
+              aria-pressed={theme === choice}
+              onClick={() => setTheme(choice)}
+              className={`interactive-press rounded-xl border p-3 text-left ${theme === choice ? "border-primary ring-1 ring-primary" : "border-border"}`}
+            >
+              <span className={`theme-preview theme-preview-${choice}`} aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+              <span className="mt-2 block text-sm font-medium">
+                {choice === "dark" ? "Escuro" : "Claro"}
+              </span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                {choice === "dark" ? "Preto e grafite" : "Vidro suave"}
+              </span>
+            </button>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">Salvo neste aparelho.</p>
+      </div>
       <div className="mt-2 card-surface p-3.5">
         <p className="text-sm">Meta diária de água</p>
         <div className="mt-2 flex gap-1.5">

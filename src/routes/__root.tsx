@@ -19,6 +19,7 @@ import { AuthGate, SignInScreen } from "../components/AuthGate";
 import { hasLinkedAccount } from "../lib/supabase/client";
 import { SportRecorderProvider } from "../lib/sport-recorder-context";
 import { ActiveRecordingBar } from "../components/esportes/ActiveRecordingBar";
+import { themeBootScript } from "../lib/theme";
 
 function NotFoundComponent() {
   return (
@@ -106,11 +107,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="pt-BR" className="dark">
+    <html lang="pt-BR" className="dark" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
-      <body className="dark">
+      <body>
         {children}
         <Scripts />
       </body>
@@ -133,8 +135,8 @@ function BottomNav() {
   // exatamente a fileira de Pausar/Continuar/Finalizar por cima.
   if (pathname === "/esportes/gravar") return null;
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/85 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-md items-center justify-around px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2">
+    <nav aria-label="Navegação principal" className="norte-bottom-nav">
+      <div className="norte-bottom-nav-items">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.to;
@@ -143,7 +145,8 @@ function BottomNav() {
               <Link
                 key={item.to}
                 to={item.to}
-                className="interactive-press -mt-7 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_8px_28px_-8px_oklch(0.82_0.18_145/0.55)]"
+                aria-label="Adicionar"
+                className="interactive-press norte-create-button"
               >
                 <Icon className="h-6 w-6" strokeWidth={2.5} />
               </Link>
@@ -153,7 +156,8 @@ function BottomNav() {
             <Link
               key={item.to}
               to={item.to}
-              className={`interactive-press flex min-w-16 flex-col items-center gap-1 rounded-xl px-2 py-1.5 text-[11px] ${active ? "text-primary" : "text-muted-foreground"}`}
+              aria-current={active ? "page" : undefined}
+              className={`interactive-press flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[11px] ${active ? "text-primary" : "text-muted-foreground"}`}
             >
               <Icon className="h-5 w-5" />
               <span className="font-medium">{item.label}</span>
