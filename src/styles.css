@@ -38,6 +38,15 @@
 }
 
 :root {
+  /* Tokens de movimento — uma única fonte de duração/easing pro app inteiro.
+   * Antes cada tela repetia literais (160/180/150/200/300ms) e as durações
+   * divergiam entre componentes que fazem a mesma coisa. */
+  --dur-press: 140ms;
+  --dur-state: 200ms;
+  --dur-tab: 200ms;
+  --dur-progress: 300ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+
   --radius: 1rem;
   --background: oklch(0.16 0.005 260);
   --foreground: oklch(0.98 0 0);
@@ -80,6 +89,16 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
+
+  /* Foco de teclado visível em todo lugar. Dezenas de campos usam
+   * `outline-none` com só uma troca de cor de borda como substituto (e
+   * alguns, como o compositor do chat, sem substituto nenhum) — quem navega
+   * por teclado ficava sem saber onde está. Esta regra vale pro app inteiro;
+   * componentes que já definem o próprio anel continuam mandando. */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
 }
 
 @utility card-surface {
@@ -109,8 +128,8 @@
 @media (prefers-reduced-motion: no-preference) {
   .interactive-press {
     transition-property: transform, opacity, color, background-color, border-color;
-    transition-duration: 160ms;
-    transition-timing-function: ease-out;
+    transition-duration: var(--dur-press);
+    transition-timing-function: var(--ease-out);
   }
 
   .interactive-press:active:not(:disabled) {
@@ -120,22 +139,75 @@
   button.card-surface,
   a.card-surface {
     transition:
-      transform 160ms ease-out,
-      opacity 160ms ease-out,
-      border-color 160ms ease-out;
+      transform var(--dur-press) var(--ease-out),
+      opacity var(--dur-press) var(--ease-out),
+      border-color var(--dur-press) var(--ease-out);
   }
 
-  button.card-surface:active,
+  /* `:not(:disabled)` igual ao `.interactive-press` — um card-botão
+   * desabilitado não deve reagir como se estivesse disponível. */
+  button.card-surface:active:not(:disabled),
   a.card-surface:active {
     transform: scale(0.99);
   }
 
   .page-enter {
-    animation: page-enter 180ms ease-out both;
+    animation: page-enter var(--dur-state) var(--ease-out) both;
   }
 
   .check-enter {
-    animation: check-enter 180ms ease-out both;
+    animation: check-enter var(--dur-state) var(--ease-out) both;
+  }
+
+  /* Troca de conteúdo (aba, dia selecionado) — entrada curta, sem deslocar
+   * o cabeçalho nem a navegação junto. */
+  .state-fade {
+    animation: state-fade var(--dur-tab) var(--ease-out) both;
+  }
+}
+
+/* Preenchimento de barra/anel de progresso — transição única do valor
+ * anterior pro novo. Fora do bloco `no-preference` de propósito: a regra de
+ * redução de movimento abaixo zera a duração, mantendo o valor final
+ * correto sem animação. */
+.progress-fill {
+  transition:
+    width var(--dur-progress) var(--ease-out),
+    transform var(--dur-progress) var(--ease-out),
+    stroke-dashoffset var(--dur-progress) var(--ease-out);
+}
+
+/* Anel de progresso em conic-gradient. Sem registrar o ângulo como
+ * propriedade tipada, o navegador trata a parada do gradiente como um valor
+ * não interpolável e o anel salta — era o caso dos dois anéis existentes
+ * (Espelho e card do agente), que não tinham como animar de jeito nenhum. */
+@property --progress-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.progress-ring {
+  background: conic-gradient(
+    var(--color-primary) var(--progress-angle),
+    var(--color-surface-2) 0
+  );
+  transition: --progress-angle var(--dur-progress) var(--ease-out);
+}
+
+/* Com redução de movimento, o app inteiro fica estático — incluindo os
+ * overlays do tw-animate-css (modal, gaveta, popover) e o `animate-pulse`,
+ * que antes continuavam animando porque só as 4 classes próprias estavam
+ * cobertas. Duração mínima (1ms) em vez de `none` pra que o `animationend`
+ * que fecha os modais continue disparando. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -158,5 +230,16 @@
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+@keyframes state-fade {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useState, type ComponentType } from "react";
+import { useState, type ComponentType, type CSSProperties } from "react";
 import {
   Activity,
   AlertCircle,
@@ -100,10 +100,13 @@ export function MirrorDashboard() {
         </p>
         <div className="mt-4 flex items-center gap-6">
           <div
-            className="relative grid h-28 w-28 shrink-0 place-items-center rounded-full"
-            style={{
-              background: `conic-gradient(var(--color-primary) ${kpis.cumprimento * 3.6}deg,var(--color-surface-2) 0)`,
-            }}
+            role="progressbar"
+            aria-valuenow={kpis.cumprimento}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Cumprimento da semana"
+            className="progress-ring relative grid h-28 w-28 shrink-0 place-items-center rounded-full"
+            style={{ "--progress-angle": `${kpis.cumprimento * 3.6}deg` } as CSSProperties}
           >
             <div className="grid h-[94px] w-[94px] place-items-center rounded-full bg-surface">
               <b className="text-3xl">
@@ -170,7 +173,7 @@ export function MirrorDashboard() {
                       </div>
                       <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface-2">
                         <div
-                          className="h-full rounded-full bg-primary"
+                          className="progress-fill h-full rounded-full bg-primary"
                           style={{ width: `${a.pct}%` }}
                         />
                       </div>
@@ -250,7 +253,10 @@ export function MirrorDashboard() {
                   </div>
                   <b className="text-sm">{p}%</b>
                   <div className="h-1 w-20 rounded-full bg-surface-2">
-                    <div className="h-full rounded-full bg-primary" style={{ width: `${p}%` }} />
+                    <div
+                      className="progress-fill h-full rounded-full bg-primary"
+                      style={{ width: `${p}%` }}
+                    />
                   </div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </Link>

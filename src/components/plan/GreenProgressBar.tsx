@@ -11,7 +11,7 @@ export function GreenProgressBar({
   return (
     <div className={`overflow-hidden rounded-full bg-surface-2 ${className}`}>
       <div
-        className="h-full rounded-full bg-primary transition-[width] duration-200"
+        className="progress-fill h-full rounded-full bg-primary"
         style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
       />
     </div>

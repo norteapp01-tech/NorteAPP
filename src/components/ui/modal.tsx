@@ -1,7 +1,58 @@
-import type { ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type AnimationEvent,
+  type ReactNode,
+} from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+/** Fecha em duas etapas.
+ *
+ * Antes, `open` era fixo em `true` e o pai removia o componente da árvore no
+ * mesmo instante do `onClose` — então `data-[state=closed]` nunca chegava a
+ * ser aplicado e toda a animação de saída declarada nas classes era código
+ * morto: o modal sumia de uma vez, sem acabamento.
+ *
+ * Agora o `open` é interno: fechar coloca em `false` (o Radix aplica o
+ * estado fechado e roda a animação) e só no fim avisamos o pai pra
+ * desmontar. Os ~40 call sites continuam com `{condicao && <Modal/>}`.
+ *
+ * Duas salvaguardas, porque "o modal não fecha" seria pior que não ter
+ * animação: `animationend` pode não disparar (ambiente sem as animações
+ * carregadas), então há um tempo-limite; e a regra de redução de movimento
+ * usa duração 1ms em vez de `none`, justamente pra que o evento continue
+ * acontecendo. */
+const EXIT_FALLBACK_MS = 400;
+
+function useExitBeforeUnmount(onClose: () => void) {
+  const [open, setOpen] = useState(true);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const requestClose = useCallback(() => {
+    setOpen((wasOpen) => {
+      if (!wasOpen) return wasOpen;
+      timer.current = setTimeout(onClose, EXIT_FALLBACK_MS);
+      return false;
+    });
+  }, [onClose]);
+
+  const onAnimationEnd = useCallback(
+    (event: AnimationEvent<HTMLElement>) => {
+      if (open || event.target !== event.currentTarget) return;
+      if (timer.current) clearTimeout(timer.current);
+      onClose();
+    },
+    [open, onClose],
+  );
+
+  useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
+
+  return { open, requestClose, onAnimationEnd };
+}
 
 /**
  * Modal centralizado padrão do app — substitui os bottom sheets presos ao
@@ -12,10 +63,11 @@ import { cn } from "@/lib/utils";
  * `aria-modal`/`role="dialog"`.
  *
  * Os componentes que usam isso continuam montando/desmontando via
- * `{condicao && <Algo onClose={...} />}` (mesmo padrão de sempre) — por isso
- * `open` fica sempre true enquanto o componente existe; fechar = o pai tirar
- * o componente da árvore. `onClose` é chamado tanto por Escape/clique fora/X
- * quanto deve ser chamado manualmente pelos botões de ação do próprio conteúdo.
+ * `{condicao && <Algo onClose={...} />}` (mesmo padrão de sempre) — o estado
+ * de aberto é interno (ver `useExitBeforeUnmount`), e `onClose` só é chamado
+ * depois que a animação de saída termina, pra o pai desmontar aí. `onClose`
+ * chega por Escape/clique fora/X e também deve ser chamado pelos botões de
+ * ação do próprio conteúdo.
  */
 export function Modal({
   onClose,
@@ -38,11 +90,13 @@ export function Modal({
   /** Só pra empilhar sobre outro overlay full-screen (ex.: Modo Leitura) — padrão z-50. */
   zIndexClassName?: string;
 }) {
+  const { open, requestClose, onAnimationEnd } = useExitBeforeUnmount(onClose);
+
   return (
     <DialogPrimitive.Root
-      open
+      open={open}
       onOpenChange={(next) => {
-        if (!next) onClose();
+        if (!next) requestClose();
       }}
     >
       <DialogPrimitive.Portal>
@@ -53,6 +107,7 @@ export function Modal({
           )}
         />
         <DialogPrimitive.Content
+          onAnimationEnd={onAnimationEnd}
           onOpenAutoFocus={(e) => {
             if (initialFocusRef?.current) {
               e.preventDefault();
@@ -101,18 +156,21 @@ export function SidePanel({
   children: ReactNode;
   widthClassName?: string;
 }) {
+  const { open, requestClose, onAnimationEnd } = useExitBeforeUnmount(onClose);
+
   return (
     <DialogPrimitive.Root
-      open
+      open={open}
       onOpenChange={(next) => {
-        if (!next) onClose();
+        if (!next) requestClose();
       }}
     >
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-background/85 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
         <DialogPrimitive.Content
+          onAnimationEnd={onAnimationEnd}
           className={cn(
-            "card-surface fixed inset-y-0 right-0 z-50 flex h-full w-[calc(100%-2.5rem)] flex-col rounded-l-3xl rounded-r-none border-r-0 p-5 shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right",
+            "card-surface fixed inset-y-0 right-0 z-50 flex h-full w-[calc(100%-2.5rem)] flex-col rounded-l-3xl rounded-r-none border-r-0 p-5 shadow-2xl outline-none duration-(--dur-state) data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right",
             widthClassName,
           )}
         >

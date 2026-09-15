@@ -1616,19 +1616,50 @@ async function pushHistory(
   );
 }
 
+/** Escreve o novo status no cache antes de falar com o servidor, e devolve
+ * uma função de desfazer — mesmo contrato do `toggleStep` logo acima, que já
+ * era o único lugar do app com rollback de verdade. Concluir é o gesto mais
+ * repetido do app e precisa responder no frame do toque, mas nunca pode
+ * mostrar sucesso pra algo que não foi salvo. */
+function optimisticExecutionStatus(id: string, status: ExecutionStatus): () => void {
+  const previous = queryClient.getQueryData<State>(QUERY_KEY);
+  if (previous) {
+    queryClient.setQueryData<State>(QUERY_KEY, {
+      ...previous,
+      executions: previous.executions.map((e) => (e.id === id ? { ...e, status } : e)),
+    });
+  }
+  return () => {
+    if (previous) queryClient.setQueryData(QUERY_KEY, previous);
+  };
+}
+
 export async function completeExecution(id: string) {
   const row = await fetchExecutionRow(id);
   if (row.status === "concluida") return;
-  await pushHistory(id, row.status as ExecutionStatus, "concluida");
-  await invalidate();
+  const rollback = optimisticExecutionStatus(id, "concluida");
+  try {
+    await pushHistory(id, row.status as ExecutionStatus, "concluida");
+    await invalidate();
+  } catch (err) {
+    rollback();
+    throw err;
+  }
 }
 
 /** Alterna feita/não-feita — usado no checkbox rápido do dia (permite desmarcar por engano). */
 export async function toggleExecutionDone(id: string) {
   const row = await fetchExecutionRow(id);
-  if (row.status === "concluida") await pushHistory(id, "concluida", "planejada", "desmarcado");
-  else await pushHistory(id, row.status as ExecutionStatus, "concluida");
-  await invalidate();
+  const wasDone = row.status === "concluida";
+  const rollback = optimisticExecutionStatus(id, wasDone ? "planejada" : "concluida");
+  try {
+    if (wasDone) await pushHistory(id, "concluida", "planejada", "desmarcado");
+    else await pushHistory(id, row.status as ExecutionStatus, "concluida");
+    await invalidate();
+  } catch (err) {
+    rollback();
+    throw err;
+  }
 }
 
 export async function patchExecution(

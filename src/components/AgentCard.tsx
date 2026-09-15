@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { CalendarDays, ChevronRight, Wallet, Utensils, Route, Check } from "lucide-react";
 import { correctTransaction } from "@/lib/finance-store";
 import { executeTool } from "@/lib/agent/tools";
@@ -151,8 +151,8 @@ export function AgentCard({
                 <div
                   role="img"
                   aria-label={`${selected}: ${pct.toFixed(0)}% dos gastos do mês`}
-                  className="relative h-20 w-20 rounded-full"
-                  style={{ background: `conic-gradient(var(--primary) ${pct}%, var(--border) 0)` }}
+                  className="progress-ring relative h-20 w-20 rounded-full"
+                  style={{ "--progress-angle": `${pct * 3.6}deg` } as CSSProperties}
                 >
                   <div className="absolute inset-3 rounded-full bg-background" />
                 </div>
@@ -323,7 +323,7 @@ export function AgentCard({
           <button
             disabled={saving}
             onClick={save}
-            className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground"
+            className="interactive-press min-w-28 rounded-lg bg-primary px-3 py-2 text-center text-sm text-primary-foreground disabled:opacity-50"
           >
             {saving ? "Salvando…" : "Salvar ajuste"}
           </button>

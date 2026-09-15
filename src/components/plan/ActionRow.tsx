@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CalendarClock, Check, MapPin, Pencil, RotateCcw, Trash2, Link2 } from "lucide-react";
 import { AppMenuButton } from "@/components/ui/app-design-system";
+import { useCompletedInSession } from "@/hooks/use-completed-in-session";
 import { DateField } from "@/components/ui/date-wheel-picker";
 import {
   DropdownMenu,
@@ -67,6 +68,7 @@ export function ActionRow({
   const scheduled = isScheduled(e);
   const profile = useProfile();
   const [busy, setBusy] = useState(false);
+  const justCompleted = useCompletedInSession(e.status === "concluida");
   const [rescheduling, setRescheduling] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ title: e.title, dueDate: e.dueDate });
@@ -125,7 +127,9 @@ export function ActionRow({
           aria-label={status === "concluida" ? "Reabrir ação" : "Concluir ação"}
           className={`relative mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border disabled:opacity-50 ${status === "concluida" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-surface"}`}
         >
-          {status === "concluida" && <Check className="check-enter h-3 w-3" strokeWidth={3} />}
+          {status === "concluida" && (
+            <Check className={`h-3 w-3 ${justCompleted ? "check-enter" : ""}`} strokeWidth={3} />
+          )}
           {isNext && status !== "concluida" && (
             <span
               className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary"

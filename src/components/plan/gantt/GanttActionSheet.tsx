@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, RotateCcw, Trash2 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
+import { useCompletedInSession } from "@/hooks/use-completed-in-session";
 import { DateField } from "@/components/ui/date-wheel-picker";
 import {
   ScheduleFields,
@@ -52,6 +53,7 @@ export function GanttActionSheet({
   });
   const [scheduleError, setScheduleError] = useState("");
   const [busy, setBusy] = useState(false);
+  const justCompleted = useCompletedInSession(e.status === "concluida");
   const [basicsError, setBasicsError] = useState("");
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
@@ -151,7 +153,12 @@ export function GanttActionSheet({
             aria-label={done ? "Reabrir ação" : "Concluir ação"}
             className={`mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border disabled:opacity-50 ${done ? "border-primary bg-primary text-primary-foreground" : "border-border bg-surface-2"}`}
           >
-            {done && <Check className="check-enter h-3.5 w-3.5" strokeWidth={3} />}
+            {done && (
+              <Check
+                className={`h-3.5 w-3.5 ${justCompleted ? "check-enter" : ""}`}
+                strokeWidth={3}
+              />
+            )}
           </button>
           <input
             value={title}

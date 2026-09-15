@@ -24,6 +24,8 @@ import {
   Footprints,
 } from "lucide-react";
 import { categoryMeta } from "@/lib/mock-data";
+import { InlineError } from "@/components/ui/inline-error";
+import { useAsyncAction } from "@/hooks/use-async-action";
 import { useProfile } from "@/lib/profile-store";
 import { formatTime } from "@/lib/format-utils";
 import { nowMs } from "@/lib/test-clock";
@@ -951,13 +953,17 @@ function ExerciseModal({
     };
   const setDraftFor = (idx: number, patch: Partial<{ weight: string; reps: string }>) =>
     setDraftValues((d) => ({ ...d, [idx]: { ...draftFor(idx), ...patch } }));
-  const registerPlanned = async (idx: number) => {
-    const d = draftFor(idx);
-    const w = parseFloat(d.weight) || 0;
-    const r = parseInt(d.reps, 10) || 0;
-    await logSet(liveSession.id, exercise.id, w, r);
-    onLogged(exercise.setTargets?.[idx]?.restSeconds ?? exercise.restSeconds);
-  };
+  // Registrar série é o toque mais repetido do app e escrevia sem trava
+  // nenhuma: dois toques rápidos gravavam a série duas vezes.
+  const setAction = useAsyncAction();
+  const registerPlanned = (idx: number) =>
+    setAction.run(async () => {
+      const d = draftFor(idx);
+      const w = parseFloat(d.weight) || 0;
+      const r = parseInt(d.reps, 10) || 0;
+      await logSet(liveSession.id, exercise.id, w, r);
+      onLogged(exercise.setTargets?.[idx]?.restSeconds ?? exercise.restSeconds);
+    });
 
   const [extraWeight, setExtraWeight] = useState(String(exercise.loadTarget));
   const [extraReps, setExtraReps] = useState(String(exercise.repsTarget));
@@ -965,13 +971,14 @@ function ExerciseModal({
   const [showHistory, setShowHistory] = useState(false);
   const series = exerciseWeightSeries(sessions, exercise.planId, exercise.id);
 
-  const addExtraSet = async () => {
-    const w = parseFloat(extraWeight) || 0;
-    const r = parseInt(extraReps, 10) || 0;
-    await logSet(liveSession.id, exercise.id, w, r);
-    onLogged(exercise.restSeconds);
-    setShowExtraSet(false);
-  };
+  const addExtraSet = () =>
+    setAction.run(async () => {
+      const w = parseFloat(extraWeight) || 0;
+      const r = parseInt(extraReps, 10) || 0;
+      await logSet(liveSession.id, exercise.id, w, r);
+      onLogged(exercise.restSeconds);
+      setShowExtraSet(false);
+    });
 
   return (
     <Modal onClose={onClose} title={exercise.name}>
@@ -1062,14 +1069,19 @@ function ExerciseModal({
                 <span className="text-[10px] text-muted-foreground">reps</span>
                 <button
                   onClick={() => registerPlanned(idx)}
+                  disabled={setAction.pending}
                   aria-label="Concluir série"
                   title="Concluir série"
-                  className="ml-auto h-5 w-5 shrink-0 rounded-full border-2 border-muted-foreground/40"
+                  className="interactive-press ml-auto h-5 w-5 shrink-0 rounded-full border-2 border-muted-foreground/40 disabled:opacity-40"
                 />
               </div>
             );
           })}
         </div>
+      )}
+
+      {setAction.error && (
+        <InlineError message={setAction.error} onRetry={setAction.clearError} className="mt-2" />
       )}
 
       {plannedRemaining === 0 && !showExtraSet && (
@@ -1102,9 +1114,10 @@ function ExerciseModal({
           <span className="text-[10px] text-muted-foreground">reps</span>
           <button
             onClick={addExtraSet}
+            disabled={setAction.pending}
             aria-label="Concluir série extra"
             title="Concluir série extra"
-            className="ml-auto h-5 w-5 shrink-0 rounded-full border-2 border-muted-foreground/40"
+            className="interactive-press ml-auto h-5 w-5 shrink-0 rounded-full border-2 border-muted-foreground/40 disabled:opacity-40"
           />
         </div>
       )}

@@ -878,7 +878,7 @@ function YearGrid({
             <p className="mt-1 text-[10px] text-muted-foreground">{counts(i)} eventos</p>
             <div className="mt-2 h-1 overflow-hidden rounded-full bg-border">
               <div
-                className="h-full bg-primary"
+                className="progress-fill h-full bg-primary"
                 style={{ width: `${Math.min(counts(i) * 15, 100)}%` }}
               />
             </div>

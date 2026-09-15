@@ -40,7 +40,10 @@ export function JornadaTab({ onOpenLogReading }: { onOpenLogReading: () => void 
                   {progress.chapter} de {progress.total} capítulos
                 </p>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
-                  <div className="h-full bg-primary" style={{ width: `${progress.pct}%` }} />
+                  <div
+                    className="progress-fill h-full bg-primary"
+                    style={{ width: `${progress.pct}%` }}
+                  />
                 </div>
               </>
             )}

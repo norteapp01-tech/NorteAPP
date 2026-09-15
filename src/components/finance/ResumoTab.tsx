@@ -263,7 +263,7 @@ function GoalRow({ goal, onClick }: { goal: FinancialGoal; onClick: () => void }
         <span className="text-sm font-bold text-primary">{pct}%</span>
       </div>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
-        <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+        <div className="progress-fill h-full bg-primary" style={{ width: `${pct}%` }} />
       </div>
     </button>
   );

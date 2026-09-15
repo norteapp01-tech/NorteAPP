@@ -144,7 +144,7 @@ function ProgressLine({ label, value }: { label: string; value: number }) {
         <span>{value}%</span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
-        <div className="h-full bg-primary" style={{ width: `${value}%` }} />
+        <div className="progress-fill h-full bg-primary" style={{ width: `${value}%` }} />
       </div>
     </div>
   );

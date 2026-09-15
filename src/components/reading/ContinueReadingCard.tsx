@@ -11,6 +11,7 @@ import {
 } from "@/lib/reading-store";
 import { Card } from "@/components/sub-agenda-shared";
 import { BookCover } from "./BookCover";
+import { ProgressBar } from "@/components/ui/progress-bar";
 
 function todayLine(book: Book, planned: number): string {
   if (book.progressMode === "pages") return `Hoje: ${planned} páginas`;
@@ -64,9 +65,12 @@ export function ContinueReadingCard({
               : ""}
           </p>
           {progress.total !== undefined && (
-            <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface-2">
-              <div className="h-full bg-primary" style={{ width: `${progress.pct}%` }} />
-            </div>
+            <ProgressBar
+              value={progress.pct}
+              className="mt-1 h-2"
+              fillClassName="rounded-none"
+              label="Progresso da leitura"
+            />
           )}
         </div>
       </div>

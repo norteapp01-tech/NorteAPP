@@ -3,6 +3,9 @@ import { Link } from "@tanstack/react-router";
 import { nowDate } from "@/lib/test-clock";
 import { Check, X, Sparkles, CalendarClock, Compass } from "lucide-react";
 import { AppMenuButton } from "@/components/ui/app-design-system";
+import { InlineError } from "@/components/ui/inline-error";
+import { useAsyncAction } from "@/hooks/use-async-action";
+import { useCompletedInSession } from "@/hooks/use-completed-in-session";
 import { categoryMeta } from "@/lib/mock-data";
 import { useProfile, greeting, updateProfile } from "@/lib/profile-store";
 import { formatTime } from "@/lib/format-utils";
@@ -173,7 +176,10 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
             {done} de {total} concluídas
           </span>
           <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-2">
-            <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+            <div
+              className="progress-fill h-full rounded-full bg-primary"
+              style={{ width: `${pct}%` }}
+            />
           </div>
         </div>
         {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
@@ -292,15 +298,7 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
               className={`group relative overflow-hidden px-4 py-4 transition-opacity ${doneNow ? "opacity-50" : ""} ${isNext ? "border-l-2 border-l-primary" : ""}`}
             >
               <div className="flex items-start gap-3">
-                <button
-                  onClick={async () => {
-                    await toggleExecutionDone(t.id);
-                  }}
-                  aria-label={doneNow ? "Reabrir tarefa" : "Concluir tarefa"}
-                  className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors ${doneNow ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground bg-transparent"}`}
-                >
-                  {doneNow && <Check className="check-enter h-4 w-4" strokeWidth={3} />}
-                </button>
+                <TaskCheckbox id={t.id} done={doneNow} />
                 <div className="min-w-0 flex-1">
                   <button
                     onClick={() => !doneNow && setFocus(t)}
@@ -353,21 +351,7 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
           </div>
           <div className="divide-y divide-border">
             {extraTasks.map((task) => (
-              <button
-                key={task.id}
-                onClick={() => completeExecution(task.id)}
-                className="interactive-press flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left"
-              >
-                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-primary text-primary">
-                  <Check className="h-3.5 w-3.5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{task.title}</span>
-                  <span className="block text-[11px] text-muted-foreground">
-                    Prazo {formatDateBR(task.dueDate)}
-                  </span>
-                </span>
-              </button>
+              <ExtraTaskRow key={task.id} id={task.id} title={task.title} dueDate={task.dueDate} />
             ))}
           </div>
         </section>
@@ -412,6 +396,78 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
           pending={pendingTasks}
           mode="reorganizar"
           onClose={() => setReorganizing(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Checkbox de concluir: responde no frame do toque (o store já escreve no
+ * cache antes do servidor), trava envio duplo e, se a escrita falhar, o
+ * store desfaz e o erro aparece na própria linha com "tentar de novo". */
+function TaskCheckbox({ id, done }: { id: string; done: boolean }) {
+  const { run, pending, error, clearError } = useAsyncAction();
+  const justCompleted = useCompletedInSession(done);
+  const toggle = () => run(() => toggleExecutionDone(id));
+
+  return (
+    <>
+      <button
+        onClick={toggle}
+        disabled={pending}
+        aria-label={done ? "Reabrir tarefa" : "Concluir tarefa"}
+        className={`interactive-press mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors ${done ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground bg-transparent"}`}
+      >
+        {done && (
+          <Check className={`h-4 w-4 ${justCompleted ? "check-enter" : ""}`} strokeWidth={3} />
+        )}
+      </button>
+      {error && (
+        <InlineError
+          message={error}
+          onRetry={() => {
+            clearError();
+            toggle();
+          }}
+          className="absolute inset-x-4 bottom-1"
+        />
+      )}
+    </>
+  );
+}
+
+/** Extra concluído sai da lista (o filtro de `extraTasks` só mantém
+ * "planejada"), então aqui a trava importa dobrado: sem ela, um toque duplo
+ * escrevia duas vezes numa linha que já estava saindo da tela. */
+function ExtraTaskRow({ id, title, dueDate }: { id: string; title: string; dueDate: string }) {
+  const { run, pending, error, clearError } = useAsyncAction();
+  const complete = () => run(() => completeExecution(id));
+
+  return (
+    <div>
+      <button
+        onClick={complete}
+        disabled={pending}
+        className="interactive-press flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left disabled:opacity-60"
+      >
+        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-primary text-primary">
+          <Check className="h-3.5 w-3.5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium">{title}</span>
+          <span className="block text-[11px] text-muted-foreground">
+            Prazo {formatDateBR(dueDate)}
+          </span>
+        </span>
+      </button>
+      {error && (
+        <InlineError
+          message={error}
+          onRetry={() => {
+            clearError();
+            complete();
+          }}
+          className="px-4 pb-2"
         />
       )}
     </div>

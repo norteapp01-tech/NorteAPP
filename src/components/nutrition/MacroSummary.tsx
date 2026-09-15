@@ -29,7 +29,7 @@ export function MacroSummary({ totals, goals }: { totals: DailyGoals; goals: Dai
               </p>
               <div className="absolute inset-x-0 bottom-0 h-0.5 bg-surface">
                 <div
-                  className="h-full bg-primary transition-all"
+                  className="progress-fill h-full bg-primary"
                   style={{ width: `${progress.pct}%` }}
                 />
               </div>

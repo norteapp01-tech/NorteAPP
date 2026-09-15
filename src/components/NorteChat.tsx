@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowUp, Compass, Mic, Paperclip, Square } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Compass, Mic, Paperclip, Square } from "lucide-react";
 import { runAgentTurn, type ChatTurn } from "@/lib/agent/run-agent";
 import { transcribeAudio } from "@/lib/agent/chat.functions";
 import { useSupabaseUserId, getAccessToken } from "@/lib/supabase/client";
@@ -67,6 +67,12 @@ export function NorteChat({
   const [ready, setReady] = useState(false);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  // Margem pra considerar "está lendo o fim" — evita exigir pixel exato.
+  const NEAR_BOTTOM_PX = 120;
+  const isNearBottom = () => {
+    const el = document.scrollingElement ?? document.documentElement;
+    return el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX;
+  };
   const [error, setError] = useState("");
   const [settings, setSettings] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -77,6 +83,16 @@ export function NorteChat({
   const bottom = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
   const successfulReplies = useRef(0);
+  const nearBottom = useRef(true);
+  const [unreadBelow, setUnreadBelow] = useState(false);
+
+  const scrollToBottom = () => {
+    bottom.current?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "end",
+    });
+    setUnreadBelow(false);
+  };
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -109,8 +125,26 @@ export function NorteChat({
         /* Conversation remains available in this session. */
       }
     }
-    bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [turns, ready, userId]);
+
+  // Rolagem só acompanha quem já está no fim da conversa. Antes ela era
+  // incondicional e no mesmo efeito da persistência, então puxava a tela pra
+  // baixo no meio da leitura do histórico — inclusive ao editar um card
+  // antigo, que também mexe em `turns`.
+  useEffect(() => {
+    const onScroll = () => {
+      nearBottom.current = isNearBottom();
+      if (nearBottom.current) setUnreadBelow(false);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (turns.length === 0) return;
+    if (nearBottom.current) scrollToBottom();
+    else setUnreadBelow(true);
+  }, [turns]);
 
   async function send(text: string) {
     if (!text.trim() || lock.current || !ready) return;
@@ -245,7 +279,7 @@ export function NorteChat({
                   key={text}
                   disabled={busy || !ready}
                   onClick={() => send(text)}
-                  className="rounded-full border border-border px-3 py-2 text-sm"
+                  className="interactive-press rounded-full border border-border px-3 py-2 text-sm disabled:opacity-50"
                 >
                   {text}
                 </button>
@@ -350,14 +384,14 @@ export function NorteChat({
                 <button
                   disabled={busy}
                   onClick={() => send("Confirmo")}
-                  className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                  className="interactive-press rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
                 >
                   Confirmar{turn.pendingActions.length > 1 ? " alterações" : ""}
                 </button>
                 <button
                   disabled={busy}
                   onClick={() => send("Cancelar")}
-                  className="rounded-xl border border-border px-4 py-2 text-sm"
+                  className="interactive-press rounded-xl border border-border px-4 py-2 text-sm disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -399,6 +433,15 @@ export function NorteChat({
         )}
         <div ref={bottom} />
       </div>
+      {unreadBelow && (
+        <button
+          onClick={scrollToBottom}
+          className={`interactive-press state-fade sticky ${demo ? "bottom-16" : "bottom-40"} z-10 mx-auto flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold shadow-lg`}
+        >
+          <ArrowDown className="h-3.5 w-3.5" />
+          Novas mensagens
+        </button>
+      )}
       <div className={`sticky ${demo ? "bottom-0" : "bottom-24"} bg-background py-3`}>
         {recording && (
           <p className="mb-2 text-sm text-primary">

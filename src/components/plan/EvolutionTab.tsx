@@ -279,6 +279,7 @@ function ProgressRing({ pct, pace }: { pct: number; pace: "ahead" | "ontrack" | 
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={c * (1 - pct / 100)}
+          className="progress-fill"
         />
       </svg>
     </div>
@@ -331,7 +332,10 @@ function Row({ label, pct, color }: { label: string; pct: number; color: string 
         <span>{pct}%</span>
       </div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2">
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+        <div
+          className="progress-fill h-full rounded-full"
+          style={{ width: `${pct}%`, background: color }}
+        />
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { Droplet } from "lucide-react";
 import { useTodayHydration, todayIntake } from "@/lib/hydration-store";
 import { useProfile } from "@/lib/profile-store";
 import { AddWaterSheet } from "./AddWaterSheet";
+import { ProgressBar } from "@/components/ui/progress-bar";
 
 export function HydrationCard({ className = "" }: { className?: string }) {
   const logs = useTodayHydration();
@@ -31,9 +32,7 @@ export function HydrationCard({ className = "" }: { className?: string }) {
             {currentL}
             <span className="text-xs font-normal text-muted-foreground"> / {goalL} L</span>
           </p>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
-            <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
-          </div>
+          <ProgressBar value={pct} className="mt-2" label="Progresso de hidratação do dia" />
         </div>
       </button>
       {open && <AddWaterSheet onClose={() => setOpen(false)} />}

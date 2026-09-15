@@ -71,7 +71,7 @@ function GoalCard({ goal, onClick }: { goal: FinancialGoal; onClick: () => void 
           {formatBRL(goal.savedAmount)} / {formatBRL(goal.targetAmount)}
         </p>
         <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-2">
-          <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+          <div className="progress-fill h-full bg-primary" style={{ width: `${pct}%` }} />
         </div>
         <p className="mt-1 text-[10px] text-primary">{pct}%</p>
       </div>
@@ -108,7 +108,7 @@ function GoalDetailSheet({ goalId, onClose }: { goalId: string; onClose: () => v
             </span>
           </p>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-2">
-            <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+            <div className="progress-fill h-full bg-primary" style={{ width: `${pct}%` }} />
           </div>
           <p className="mt-1 text-xs text-primary">{pct}%</p>
           {goal.deadline && pace !== null && (

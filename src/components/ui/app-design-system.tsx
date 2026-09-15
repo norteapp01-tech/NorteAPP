@@ -31,8 +31,18 @@ export function UnderlineTabs<T extends string>({
   onChange: (value: T) => void;
   className?: string;
 }) {
+  // As abas são `flex-1`, então todas têm a mesma largura e a posição do
+  // sublinhado sai direto do índice — sem medir o DOM. Antes era um <span>
+  // montado dentro da aba ativa, o que fazia o verde sumir de um lado e
+  // aparecer no outro em vez de percorrer o caminho.
+  const activeIndex = Math.max(
+    0,
+    items.findIndex((item) => item.key === value),
+  );
+  const slotWidth = 100 / Math.max(1, items.length);
+
   return (
-    <div className={cn("flex border-b border-border", className)} role="tablist">
+    <div className={cn("relative flex border-b border-border", className)} role="tablist">
       {items.map((item) => {
         const active = item.key === value;
         return (
@@ -47,10 +57,14 @@ export function UnderlineTabs<T extends string>({
             )}
           >
             {item.label}
-            {active && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-primary" />}
           </button>
         );
       })}
+      <span
+        aria-hidden
+        className="absolute bottom-0 h-0.5 bg-primary transition-[left] duration-(--dur-tab) ease-(--ease-out)"
+        style={{ width: `${slotWidth}%`, left: `${activeIndex * slotWidth}%` }}
+      />
     </div>
   );
 }
@@ -79,14 +93,29 @@ export function WeekdaySelector({
           <button
             key={day}
             onClick={() => onSelect(day)}
+            aria-pressed={selected}
+            aria-current={current ? "date" : undefined}
             className={cn(
+              // Selecionado e "hoje" eram desenhados igual, então numa semana
+              // em que você escolhe outro dia apareciam dois chips idênticos
+              // destacados e nenhum indicava qual estava aberto. Agora a
+              // seleção é preenchida e hoje fica só com a borda marcada.
               "interactive-press min-w-0 rounded-lg border p-2 text-center transition-colors hover:bg-surface",
-              current || selected
-                ? "border-primary bg-primary/5"
-                : "border-transparent bg-surface-2",
+              selected
+                ? "border-primary bg-primary/15"
+                : current
+                  ? "border-primary/40 bg-surface-2"
+                  : "border-transparent bg-surface-2",
             )}
           >
-            <span className="block text-[10px] text-muted-foreground">{label}</span>
+            <span
+              className={cn(
+                "block text-[10px]",
+                current && !selected ? "text-primary" : "text-muted-foreground",
+              )}
+            >
+              {label}
+            </span>
             <strong className="mt-1 block truncate text-lg leading-none">{primary(day)}</strong>
             {secondary && (
               <span className="mt-1 block truncate text-[9px] text-muted-foreground">

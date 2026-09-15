@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Check, Circle, RotateCw, Plus, ChevronRight, Utensils, Settings2 } from "lucide-react";
+import { InlineError } from "@/components/ui/inline-error";
+import { useAsyncAction } from "@/hooks/use-async-action";
 import { todayISO } from "@/lib/goals-store";
 import { nowDate } from "@/lib/test-clock";
 import {
@@ -371,30 +373,34 @@ function OptionPicker({
     { name: string; quantity: string; unit: "g" | "ml" | "un" }[]
   >([]);
   const [macros, setMacros] = useState({ protein: "", carbs: "", fat: "", calories: "" });
-  const save = async () => {
-    if (!selected) return;
-    await setMealPlanAssignment({ mealId: meal.id, weekday, optionId: selected, time });
-    onClose();
-  };
-  const create = async () => {
-    if (!description.trim()) return;
-    const id = await addMealOption(meal.id, {
-      description,
-      protein: macros.protein ? Number(macros.protein) : undefined,
-      carbs: macros.carbs ? Number(macros.carbs) : undefined,
-      fat: macros.fat ? Number(macros.fat) : undefined,
-      calories: macros.calories ? Number(macros.calories) : undefined,
-      ingredients: ingredients
-        .filter((item) => item.name.trim())
-        .map((item) => ({
-          name: item.name.trim(),
-          quantity: item.quantity ? Number(item.quantity) : undefined,
-          unit: item.unit,
-        })),
+  const saveAction = useAsyncAction();
+  const createAction = useAsyncAction();
+  const save = () =>
+    saveAction.run(async () => {
+      if (!selected) return;
+      await setMealPlanAssignment({ mealId: meal.id, weekday, optionId: selected, time });
+      onClose();
     });
-    setSelected(id);
-    setAdding(false);
-  };
+  const create = () =>
+    createAction.run(async () => {
+      if (!description.trim()) return;
+      const id = await addMealOption(meal.id, {
+        description,
+        protein: macros.protein ? Number(macros.protein) : undefined,
+        carbs: macros.carbs ? Number(macros.carbs) : undefined,
+        fat: macros.fat ? Number(macros.fat) : undefined,
+        calories: macros.calories ? Number(macros.calories) : undefined,
+        ingredients: ingredients
+          .filter((item) => item.name.trim())
+          .map((item) => ({
+            name: item.name.trim(),
+            quantity: item.quantity ? Number(item.quantity) : undefined,
+            unit: item.unit,
+          })),
+      });
+      setSelected(id);
+      setAdding(false);
+    });
   return (
     <Modal onClose={onClose} title={meal.name}>
       <div className="space-y-3">
@@ -510,10 +516,18 @@ function OptionPicker({
             </div>
             <button
               onClick={() => void create()}
-              className="mt-3 w-full rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground"
+              disabled={createAction.pending}
+              className="interactive-press mt-3 w-full rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
             >
-              Salvar e selecionar
+              {createAction.pending ? "Salvando…" : "Salvar e selecionar"}
             </button>
+            {createAction.error && (
+              <InlineError
+                message={createAction.error}
+                onRetry={createAction.clearError}
+                className="mt-2"
+              />
+            )}
           </div>
         )}
         {!adding && (
@@ -528,12 +542,19 @@ function OptionPicker({
               />
             </label>
             <button
-              disabled={!selected}
+              disabled={!selected || saveAction.pending}
               onClick={() => void save()}
-              className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+              className="interactive-press w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
             >
-              Aplicar neste dia
+              {saveAction.pending ? "Salvando…" : "Aplicar neste dia"}
             </button>
+            {saveAction.error && (
+              <InlineError
+                message={saveAction.error}
+                onRetry={saveAction.clearError}
+                className="mt-2"
+              />
+            )}
           </>
         )}
       </div>

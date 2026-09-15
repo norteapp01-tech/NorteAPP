@@ -72,7 +72,7 @@ export function PlanProgressChart() {
                   <p className="truncate text-xs font-semibold">{row.goal.title}</p>
                   <div className="relative mt-1.5 h-5 overflow-hidden rounded-md bg-surface-2">
                     <div
-                      className="h-full rounded-md transition-[width]"
+                      className="progress-fill h-full rounded-md"
                       style={{ width: `${row.progress}%`, background: paceColor[row.pace] }}
                     />
                     <span className="absolute inset-0 flex items-center justify-end px-2 font-mono text-[10px] font-bold text-foreground">
