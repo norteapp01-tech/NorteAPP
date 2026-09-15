@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
+import { queryClient } from "../query-client";
 
 // Norte é single-user, sem tela de login. A sessão é criada via Anonymous Auth do
 // Supabase — um auth.uid() real e estável, persistido pelo próprio supabase-js em
@@ -70,6 +71,10 @@ export function useSupabaseUserId(): string | undefined {
   useEffect(() => {
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      bootstrapped = session?.user.id ? Promise.resolve(session.user.id) : null;
+      if (!cancelled) setUserId(session?.user.id);
+    });
     const attempt = () => {
       ensureSession().then(
         (id) => {
@@ -87,6 +92,7 @@ export function useSupabaseUserId(): string | undefined {
     return () => {
       cancelled = true;
       if (retryTimer) clearTimeout(retryTimer);
+      listener.subscription.unsubscribe();
     };
   }, []);
   return userId;
@@ -134,11 +140,44 @@ export async function changePassword(password: string) {
 }
 
 export async function signOutNorte() {
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut({ scope: "local" });
+  if (error) throw error;
   bootstrapped = null;
+  await queryClient.cancelQueries();
+  queryClient.clear();
+  for (const storage of [localStorage, sessionStorage]) {
+    Object.keys(storage)
+      .filter(
+        (key) =>
+          key.startsWith("norte-chat:") ||
+          key.startsWith("norte-demo-replies:") ||
+          key === "norte-onboarding-stage" ||
+          key === "norte-welcome-entered",
+      )
+      .forEach((key) => storage.removeItem(key));
+  }
 }
 
-export type AuthUser = { email: string | null; isAnonymous: boolean };
+export type AuthUser = {
+  id: string;
+  email: string | null;
+  isAnonymous: boolean;
+  name: string | null;
+  avatar: string | null;
+  verified: boolean;
+  providers: string[];
+};
+function authProfile(user: import("@supabase/supabase-js").User): AuthUser {
+  return {
+    id: user.id,
+    email: user.email ?? null,
+    isAnonymous: !!user.is_anonymous,
+    name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? null,
+    avatar: user.user_metadata?.avatar_url ?? null,
+    verified: !!user.email_confirmed_at,
+    providers: user.identities?.map((identity) => identity.provider) ?? [],
+  };
+}
 
 export function useAuthUser(): AuthUser | undefined {
   const [user, setUser] = useState<AuthUser | undefined>(undefined);
@@ -146,16 +185,12 @@ export function useAuthUser(): AuthUser | undefined {
     let mounted = true;
     supabase.auth.getUser().then(({ data }) => {
       if (mounted && data.user) {
-        setUser({ email: data.user.email ?? null, isAnonymous: !!data.user.is_anonymous });
+        setUser(authProfile(data.user));
       }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
-      setUser(
-        session?.user
-          ? { email: session.user.email ?? null, isAnonymous: !!session.user.is_anonymous }
-          : undefined,
-      );
+      setUser(session?.user ? authProfile(session.user) : undefined);
     });
     return () => {
       mounted = false;

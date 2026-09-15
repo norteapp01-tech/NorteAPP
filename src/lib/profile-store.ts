@@ -86,13 +86,21 @@ const QUERY_KEY = ["profile"] as const;
 
 export function useProfile(): Profile {
   const userId = useSupabaseUserId();
-  const { data } = useQuery({ queryKey: QUERY_KEY, queryFn: fetchProfile, enabled: !!userId });
+  const { data } = useQuery({
+    queryKey: [...QUERY_KEY, userId],
+    queryFn: fetchProfile,
+    enabled: !!userId,
+  });
   return data ?? DEFAULT_PROFILE;
 }
 
 export function useProfileLoading(): boolean {
   const userId = useSupabaseUserId();
-  const { isLoading } = useQuery({ queryKey: QUERY_KEY, queryFn: fetchProfile, enabled: !!userId });
+  const { isLoading } = useQuery({
+    queryKey: [...QUERY_KEY, userId],
+    queryFn: fetchProfile,
+    enabled: !!userId,
+  });
   return !userId || isLoading;
 }
 
