@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, ChevronLeft, Play, Plus, Square } from "lucide-react";
 import { UnderlineTabs } from "@/components/ui/app-design-system";
+import { PlanPathNode } from "@/components/plan/PlanPath";
 import { InlineError } from "@/components/ui/inline-error";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { weekVisualLabels, weekVisualOrder } from "@/components/sub-agenda-shared";
@@ -228,16 +229,35 @@ export function CyclePage({
 
       <div className="mt-5 state-fade" key={tab}>
         {tab === "planejamento" && (
-          <div className="space-y-3">
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                Caminho do ciclo
+              </h2>
+              <span className="text-[13px] text-muted-foreground">{stages.length} etapas</span>
+            </div>
             {stages.map((block, index) => (
-              <StageCard
-                key={block.id}
-                cycle={cycle}
-                block={block}
-                index={index}
-                isOpen={openStageId === block.id}
-                onToggle={() => setOpenStageId(openStageId === block.id ? null : block.id)}
-              />
+              <div key={block.id} className="flex gap-3">
+                <div aria-hidden className="flex shrink-0 flex-col items-center">
+                  <div
+                    className={`w-[1.5px] flex-1 ${index === 0 ? "invisible" : current?.id === block.id ? "bg-primary" : "bg-border"}`}
+                  />
+                  <PlanPathNode state={current?.id === block.id ? "current" : "future"} />
+                  <div
+                    className={`w-[1.5px] flex-1 ${index === stages.length - 1 ? "invisible" : current?.id === block.id ? "bg-primary" : "bg-border"}`}
+                  />
+                </div>
+                <div className="min-w-0 flex-1 pb-4">
+                  <StageCard
+                    key={block.id}
+                    cycle={cycle}
+                    block={block}
+                    index={index}
+                    isOpen={openStageId === block.id}
+                    onToggle={() => setOpenStageId(openStageId === block.id ? null : block.id)}
+                  />
+                </div>
+              </div>
             ))}
             {stages.length === 0 && (
               <p className="text-sm text-muted-foreground">
@@ -255,7 +275,7 @@ export function CyclePage({
                 })
               }
               disabled={action.pending}
-              className="interactive-press flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-xs font-semibold text-muted-foreground hover:border-primary/40 hover:text-primary disabled:opacity-40"
+              className="interactive-press mt-2 flex h-12 w-fit items-center gap-1.5 rounded-2xl border border-primary/50 px-4 text-sm font-semibold text-primary hover:bg-primary/5 disabled:opacity-40"
             >
               <Plus className="h-4 w-4" /> Adicionar etapa
             </button>

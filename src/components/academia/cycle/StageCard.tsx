@@ -93,7 +93,7 @@ export function StageCard({
   return (
     <div className={`card-surface p-4 ${state === "vigente" ? "border-l-2 border-l-primary" : ""}`}>
       <div className="flex items-start gap-3">
-        <button className="min-w-0 flex-1 text-left" onClick={onToggle}>
+        <button className="min-w-0 flex-1 text-left" onClick={onToggle} aria-expanded={isOpen}>
           <div className="flex items-center gap-2">
             <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
               Etapa {index + 1}
@@ -168,66 +168,72 @@ export function StageCard({
       )}
 
       {isOpen && (
-        <div className="mt-4 space-y-5 border-t border-border pt-4">
+        <div className="mt-3 space-y-5 border-t border-border pt-3 animate-in fade-in slide-in-from-top-1">
           {/* --- identidade e duração ------------------------------------- */}
-          <div className="space-y-2">
-            <Field
-              label="Nome"
-              value={block.name}
-              onCommit={(v) => void updateBlock(block.id, { name: v || "Etapa" })}
-            />
-            <Field
-              label="Foco (anotação sua, não é meta)"
-              value={block.focus ?? ""}
-              placeholder="Ex: resistência"
-              onCommit={(v) => void updateBlock(block.id, { focus: v })}
-            />
-            <div>
-              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Duração
-              </span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  value={durationDraft ?? blockDurationDays(block)}
-                  onChange={(e) => setDurationDraft(Math.max(1, Number(e.target.value) || 1))}
-                  className="w-20 rounded-md border border-border bg-surface px-2 py-1.5 text-right text-xs tabular-nums outline-none focus:border-primary"
-                />
-                <span className="text-[11px] text-muted-foreground">dias</span>
-              </div>
-              {/* A mudança só acontece depois de a pessoa ver o que vai se
-                  mover — data futura é calendário de quem se organizou. */}
-              {durationDraft !== null && durationDraft !== blockDurationDays(block) && (
-                <div className="mt-2 rounded-lg border border-warning/30 bg-warning/10 p-2.5">
-                  <p className="text-[11px] leading-relaxed">
-                    {shifted.length === 0
-                      ? "Nenhuma etapa seguinte será deslocada."
-                      : `Serão deslocadas: ${shifted.map((b) => b.name).join(", ")}. As anteriores e o histórico ficam onde estão.`}
-                  </p>
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      onClick={() => setDurationDraft(null)}
-                      className="interactive-press flex-1 rounded-lg border border-border py-1.5 text-[11px] font-semibold"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      onClick={() =>
-                        action.run(async () => {
-                          await resizeBlock(cycle, blocks, block.id, durationDraft);
-                          setDurationDraft(null);
-                        })
-                      }
-                      className="interactive-press flex-1 rounded-lg bg-primary py-1.5 text-[11px] font-bold text-primary-foreground"
-                    >
-                      Aplicar
-                    </button>
-                  </div>
+          <details className="group border-b border-border pb-3">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold">
+              Editar nome, foco e duração
+              <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="mt-3 space-y-3">
+              <Field
+                label="Nome"
+                value={block.name}
+                onCommit={(v) => void updateBlock(block.id, { name: v || "Etapa" })}
+              />
+              <Field
+                label="Foco (anotação sua, não é meta)"
+                value={block.focus ?? ""}
+                placeholder="Ex: resistência"
+                onCommit={(v) => void updateBlock(block.id, { focus: v })}
+              />
+              <div>
+                <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Duração
+                </span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    value={durationDraft ?? blockDurationDays(block)}
+                    onChange={(e) => setDurationDraft(Math.max(1, Number(e.target.value) || 1))}
+                    className="w-20 rounded-md border border-border bg-surface px-2 py-1.5 text-right text-xs tabular-nums outline-none focus:border-primary"
+                  />
+                  <span className="text-[11px] text-muted-foreground">dias</span>
                 </div>
-              )}
+                {/* A mudança só acontece depois de a pessoa ver o que vai se
+                  mover — data futura é calendário de quem se organizou. */}
+                {durationDraft !== null && durationDraft !== blockDurationDays(block) && (
+                  <div className="mt-2 rounded-lg border border-warning/30 bg-warning/10 p-2.5">
+                    <p className="text-[11px] leading-relaxed">
+                      {shifted.length === 0
+                        ? "Nenhuma etapa seguinte será deslocada."
+                        : `Serão deslocadas: ${shifted.map((b) => b.name).join(", ")}. As anteriores e o histórico ficam onde estão.`}
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        onClick={() => setDurationDraft(null)}
+                        className="interactive-press flex-1 rounded-lg border border-border py-1.5 text-[11px] font-semibold"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={() =>
+                          action.run(async () => {
+                            await resizeBlock(cycle, blocks, block.id, durationDraft);
+                            setDurationDraft(null);
+                          })
+                        }
+                        className="interactive-press flex-1 rounded-lg bg-primary py-1.5 text-[11px] font-bold text-primary-foreground"
+                      >
+                        Aplicar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          </details>
 
           {/* --- treinos --------------------------------------------------- */}
           <section>
@@ -245,12 +251,17 @@ export function StageCard({
               )}
             </div>
 
-            <ul className="mt-2 space-y-2">
+            <ul className="relative mt-3 space-y-2 border-l border-border pl-4">
               {myPlans.map((plan) => (
-                <li key={plan.id} className="rounded-lg border border-border bg-surface-2 p-2.5">
+                <li
+                  key={plan.id}
+                  className="relative rounded-xl border border-border bg-surface/50 p-3"
+                >
+                  <span aria-hidden className="absolute -left-4 top-6 h-px w-4 bg-border" />
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setOpenPlanId(openPlanId === plan.id ? null : plan.id)}
+                      aria-expanded={openPlanId === plan.id}
                       className="flex min-w-0 flex-1 items-center gap-2 text-left"
                     >
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-xs font-bold text-primary">
@@ -335,7 +346,7 @@ export function StageCard({
           </section>
 
           {/* --- distribuição semanal -------------------------------------- */}
-          <details className="group">
+          <details className="group border-t border-border pt-3">
             <summary className="flex cursor-pointer list-none items-center gap-2">
               <h3 className="flex-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                 Dias da semana

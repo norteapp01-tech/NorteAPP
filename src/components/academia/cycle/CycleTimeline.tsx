@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Target } from "lucide-react";
+import { ScaleSelector } from "@/components/plan/gantt/ScaleSelector";
 import {
   daysBetweenISO,
   formatDateShortBR,
@@ -10,7 +11,6 @@ import {
 import { useWorkoutStore } from "@/lib/workout-store";
 import {
   blockDurationDays,
-  plansOfBlock,
   stageDivision,
   stageState,
   useCycleStore,
@@ -30,18 +30,12 @@ import {
 
 const MIN_PX_PER_DAY: Record<GanttScale, number> = {
   dia: 54,
-  semana: 8,
-  mes: 3,
-  "45dias": 2,
-  "90dias": 0.9,
+  semana: 24,
+  mes: 12,
+  "45dias": 8,
+  "90dias": 5,
 };
-const ROW_HEIGHT = 56;
-const SCALES: { key: GanttScale; label: string }[] = [
-  { key: "semana", label: "Semana" },
-  { key: "mes", label: "Mês" },
-  { key: "45dias", label: "45 dias" },
-  { key: "90dias", label: "90 dias" },
-];
+const ROW_HEIGHT = 128;
 
 export function CycleTimeline({
   cycle,
@@ -84,7 +78,7 @@ export function CycleTimeline({
       : null;
 
   return (
-    <section className="card-surface p-4">
+    <section>
       <div className="flex items-baseline justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -97,33 +91,20 @@ export function CycleTimeline({
             {totalDays} dias · {blocks.length} etapas
           </p>
         </div>
-        <div className="flex shrink-0 gap-1">
-          {SCALES.map((s) => (
-            <button
-              key={s.key}
-              onClick={() => setScale(s.key)}
-              aria-pressed={scale === s.key}
-              className={`interactive-press rounded-md px-2 py-1 text-[10px] font-semibold ${
-                scale === s.key ? "bg-primary/15 text-primary" : "text-muted-foreground"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
       </div>
+      <ScaleSelector scale={scale} onChange={setScale} />
 
       <div ref={viewportRef} className="mt-3 overflow-x-auto">
         <div className="relative" style={{ width, minWidth: "100%" }}>
           {/* eixo */}
-          <div className="flex border-b border-border pb-1">
+          <div className="flex border-b border-border">
             {buckets.map((bucket) => {
               const days = daysBetweenISO(bucket.startISO, bucket.endISO) + 1;
               return (
                 <div
                   key={bucket.startISO}
                   style={{ width: days * pxPerDay }}
-                  className="shrink-0 truncate border-l border-border pl-1 text-[9px] text-muted-foreground"
+                  className="shrink-0 truncate border-r border-border px-3 py-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
                 >
                   {bucket.label}
                 </div>
@@ -131,13 +112,26 @@ export function CycleTimeline({
             })}
           </div>
 
-          <div className="relative mt-2" style={{ height: blocks.length * ROW_HEIGHT }}>
+          <div className="relative" style={{ height: blocks.length * ROW_HEIGHT }}>
+            <div aria-hidden className="pointer-events-none absolute inset-0 flex">
+              {buckets.map((bucket) => (
+                <div
+                  key={bucket.startISO}
+                  className="h-full shrink-0 border-r border-border/50"
+                  style={{ width: (daysBetweenISO(bucket.startISO, bucket.endISO) + 1) * pxPerDay }}
+                />
+              ))}
+            </div>
             {todayOffset !== null && (
               <div
                 aria-hidden
-                className="absolute top-0 z-10 w-px bg-primary"
+                className="pointer-events-none absolute top-0 z-20 w-px bg-primary"
                 style={{ left: todayOffset, height: blocks.length * ROW_HEIGHT }}
-              />
+              >
+                <span className="absolute left-1/2 top-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-primary px-2 py-1 text-[9px] font-bold text-primary-foreground">
+                  HOJE · {new Date(today + "T00:00:00").getDate()}
+                </span>
+              </div>
             )}
 
             {blocks.map((block, i) => {
@@ -145,28 +139,37 @@ export function CycleTimeline({
               const barWidth = Math.max(24, blockDurationDays(block) * pxPerDay);
               const state = stageState(block, blockPlans, today);
               return (
-                <button
+                <section
                   key={block.id}
-                  onClick={() => onOpenStage(block.id)}
-                  className={`interactive-press absolute flex flex-col justify-center overflow-hidden rounded-lg border px-2 text-left ${
-                    state === "vigente"
-                      ? "border-primary bg-primary/15"
-                      : state === "rascunho"
-                        ? "border-dashed border-warning/50 bg-warning/5"
-                        : "border-border bg-surface-2"
-                  }`}
-                  style={{
-                    left: offset,
-                    width: barWidth,
-                    top: i * ROW_HEIGHT,
-                    height: ROW_HEIGHT - 8,
-                  }}
+                  className="absolute w-full border-b border-border/70"
+                  style={{ top: i * ROW_HEIGHT, height: ROW_HEIGHT }}
                 >
-                  <span className="truncate text-[11px] font-semibold">{block.name}</span>
-                  <span className="truncate text-[10px] text-muted-foreground">
-                    {stageDivision(blockPlans, plans, block.id)}
-                  </span>
-                </button>
+                  <p className="sticky left-0 w-fit max-w-[75vw] truncate px-4 pt-9 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    {i + 1}. {block.name}
+                  </p>
+                  <button
+                    onClick={() => onOpenStage(block.id)}
+                    aria-label={`Abrir etapa ${i + 1}: ${block.name}`}
+                    className={`interactive-press absolute flex flex-col justify-center overflow-hidden rounded-lg border px-2 text-left ${
+                      block.startDate <= today && block.endDate >= today
+                        ? "border-primary bg-background text-primary"
+                        : state === "rascunho"
+                          ? "border-dashed border-warning/50 bg-warning/5"
+                          : "border-border bg-surface-2"
+                    }`}
+                    style={{
+                      left: offset,
+                      width: barWidth,
+                      top: 60,
+                      height: 52,
+                    }}
+                  >
+                    <span className="truncate text-[11px] font-semibold">{block.name}</span>
+                    <span className="truncate text-[10px] text-muted-foreground">
+                      {stageDivision(blockPlans, plans, block.id)}
+                    </span>
+                  </button>
+                </section>
               );
             })}
           </div>

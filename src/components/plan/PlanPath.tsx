@@ -4,7 +4,7 @@ import { stepsForGoal, type Execution, type Goal, type Step } from "@/lib/goals-
 
 type StageState = "done" | "current" | "future";
 
-function Node({ state }: { state: StageState }) {
+export function PlanPathNode({ state }: { state: StageState }) {
   if (state === "done") {
     return (
       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
@@ -109,7 +109,7 @@ export function PlanPath({
                   <div
                     className={`w-[1.5px] flex-1 ${i === 0 ? "invisible" : nodeGreen ? "bg-primary" : "bg-border"}`}
                   />
-                  <Node state={state} />
+                  <PlanPathNode state={state} />
                   <div
                     className={`w-[1.5px] flex-1 ${i === ordered.length - 1 ? "invisible" : nodeGreen ? "bg-primary" : "bg-border"}`}
                   />
