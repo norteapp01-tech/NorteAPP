@@ -134,3 +134,138 @@ nova com `count(*)`, e dois toques rápidos liam a mesma contagem e gravavam as
 duas no mesmo índice. A migration **renumera em sequência** em vez de apagar —
 descartar uma das duas afirmaria que a série não aconteceu. A trava por ref
 (`useAsyncAction`) impede novos casos no cliente; a constraint impede no banco.
+
+---
+
+# Ciclo de treino
+
+## O ciclo é o planejamento, não uma cópia dele
+
+Criar um ciclo cria **uma** linha em `goals` (categoria `academia`) e uma `steps`
+por bloco. `workout_cycles.goal_id` e `workout_cycle_blocks.step_id` apontam
+para elas.
+
+Consequência prática: abrir por Academia ou por Planos mostra a mesma coisa, e
+mudar a duração de um bloco move a data-alvo da etapa correspondente. Há link
+nos dois sentidos — "Ver em Planos" no card do ciclo, e um atalho para o ciclo
+no topo da tela do planejamento.
+
+O que **não** virou tarefa da Agenda: série, carga, repetição e registro. Isso é
+domínio de treino e continua em `workout_*`. Só o horário do treino vira
+compromisso, e pelo fluxo de rotinas que já existia — a tela mostra o que vai
+ser criado antes de criar, e um dia que já tem rotina de academia é mantido
+como está, nunca duplicado nem sobrescrito.
+
+## Blocos
+
+`Ciclo → blocos com datas → treinos do bloco → exercícios → alvos por série.`
+
+Os intervalos são **calculados a partir das durações**, não digitados um a um:
+
+```
+blockRangesFrom("2026-09-01", [10, 15, 20])
+  → 01–10 set · 11–25 set · 26 set–15 out
+```
+
+Cada bloco começa no dia seguinte ao fim do anterior, por construção. Não existe
+sobreposição nem buraco para validar depois.
+
+Mudar a duração de um bloco empurra **só os seguintes**. Faltar um treino não
+empurra nada sozinho: adiar é uma ação explícita ("adiar 3/7 dias"), e ela
+também só mexe daquele bloco em diante.
+
+O **foco** do bloco é texto livre do usuário ("resistência"). Não é meta, não
+tem número e não entra em nenhum cálculo. O Norte não prescreve carga nem volume.
+
+## Por que os treinos do bloco são cópias
+
+Um treino dentro de um bloco tem `block_id` preenchido e não aparece em "Treinos
+cadastrados". Selecionar um treino da biblioteca para um bloco **copia** o
+treino e seus exercícios.
+
+Sem a cópia, ajustar a fase 3 mudaria a fase 1, o treino de hoje e o histórico —
+exatamente o que o ciclo não pode fazer.
+
+Com a cópia vem o problema oposto: "Supino" do bloco 2 seria outro exercício
+qualquer e a curva de evolução recomeçaria do zero a cada fase. Por isso existe
+`lineage_id` em `workout_exercises` e em `workout_plans`, preservado na cópia:
+
+- `exerciseSeriesByLineage` e `maxWeightAtReps` seguem a linhagem, não o id.
+- `previousFinishedSession` compara pela linhagem do plano — a sessão de hoje
+  acha "a anterior deste mesmo treino" mesmo depois da troca de bloco.
+- `workout_sessions.plan_lineage_id` e `plan_label` guardam essa identidade na
+  própria sessão, então ela sobrevive à exclusão do plano.
+
+**Excluir nunca apaga histórico.** Remover um bloco ou tirar um treino dele
+**arquiva** (`archived_at`) em vez de apagar, e `workout_sessions.plan_id`
+passou de `cascade` para `set null` — antes, apagar um treino apagava todas as
+sessões registradas dele, apesar de o código afirmar o contrário.
+
+## Um exercício em vários treinos
+
+"Duas séries de abdominal nos treinos A até E" é uma ação só. Os destinos ficam
+à vista antes de gravar; um treino que já tem exercício com aquele nome é
+deixado como está e reportado depois. Cada treino recebe a sua própria linha
+(editável separadamente) e todas compartilham a mesma linhagem — a evolução do
+abdominal é uma curva só.
+
+## Qual programação está valendo
+
+`todayProgramming` resolve, nesta ordem:
+
+| Situação | Resultado |
+| --- | --- |
+| Ciclo ativo, hoje num bloco, dia com treino | `ciclo` |
+| Ciclo ativo, hoje num bloco, dia marcado como descanso | `descanso` |
+| Ciclo ativo, hoje num bloco, dia sem linha | `nenhum` |
+| Ciclo ativo, hoje fora de todos os blocos | `nenhum` + aviso |
+| Sem ciclo ativo | `semana` (atribuição solta) |
+
+Um ciclo ativo por vez, garantido por índice único parcial no banco. A origem é
+sempre dita em voz alta no card de hoje, e o "Plano da semana" passa a mostrar a
+semana **do bloco vigente** — deixar os dois lados mostrando programações
+diferentes seria a combinação silenciosa que não pode acontecer.
+
+Um dia sem linha no bloco **não** cai no plano da semana por baixo dos panos.
+
+## Metas e evolução
+
+Quatro tipos, todos com ponto de partida, alvo, unidade e prazo:
+
+| Tipo | Medido a partir de |
+| --- | --- |
+| Peso corporal | último registro em `workout_body_weights` |
+| Carga em um exercício | maior peso com **pelo menos** N repetições |
+| Séries e repetições | volume acumulado da linhagem no período |
+| Frequência de treinos | sessões concluídas no período |
+
+**Repetições de referência** existem porque 80kg×3 e 80kg×10 não são o mesmo
+resultado. Uma meta de carga a 8 repetições ignora a série pesada de 3 — comparar
+só o quilo mentiria sobre a evolução.
+
+O sentido da meta vem da diferença entre início e alvo, não de suposição: uma
+meta de peso corporal que desce é atingida ao chegar **abaixo** do alvo.
+
+O ponto de partida é pré-preenchido com o dado real quando ele existe. Quando
+não existe, a tela diz isso e a meta fica marcada como "sem registro ainda" em
+vez de exibir um zero que parece medição.
+
+## Três números que não viram um
+
+O resumo do ciclo mostra **tempo transcorrido**, **treinos realizados versus
+programados** e **metas atingidas**, separados:
+
+- Tempo é dia corrido. Passar o prazo não é ter cumprido nada.
+- O denominador de treinos conta **dias com treino marcado** dentro do período,
+  não dias de calendário.
+- Metas vêm da avaliação real de cada meta, não da contagem de blocos.
+
+Uma barra única escondendo os três esconderia justamente a diferença entre "o
+prazo andou" e "eu treinei".
+
+## Limitações conhecidas
+
+- O ciclo não gera execuções na Agenda por conta própria: os horários viram
+  rotinas quando o usuário manda, uma vez, pelo painel do bloco. Mudar o horário
+  no bloco depois disso não reescreve as rotinas já criadas.
+- Não há importação de ciclo pronto nem sugestão de programação. O usuário monta.

@@ -30,6 +30,7 @@ function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
   return {
     id: "ex-1",
     planId: "plan-a",
+    lineageId: "lin-ex-1",
     name: "Supino reto",
     setsTarget: 3,
     repsTarget: 10,

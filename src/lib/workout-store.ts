@@ -16,11 +16,22 @@ export type WorkoutPlan = {
   name: string;
   muscleGroups: string;
   order: number;
+  /** Identidade que sobrevive à cópia entre blocos do ciclo — é por ela que
+   * uma sessão acha "a anterior deste mesmo treino" depois de mudar de fase. */
+  lineageId: string;
+  /** Nulo = treino da biblioteca. Preenchido = cópia que vive dentro de um
+   * bloco do ciclo e só é editada por lá. */
+  blockId?: string;
+  sourcePlanId?: string;
+  archivedAt?: string;
 };
 
 export type Exercise = {
   id: string;
   planId: string;
+  /** Mesmo exercício visto em blocos diferentes: a curva de evolução segue
+   * esta identidade, não o id da cópia. */
+  lineageId: string;
   name: string;
   setsTarget: number;
   repsTarget: number;
@@ -42,6 +53,7 @@ export type WorkoutSessionStatus = "em_andamento" | "concluido";
  * exercício vivo, então editar a carga reescrevia o passado. */
 export type PlannedExercise = {
   exerciseId: string;
+  lineageId?: string;
   name: string;
   order: number;
   setsTarget: number;
@@ -69,6 +81,10 @@ export type WorkoutSession = {
   restPausedSeconds: number;
   selectedExerciseId?: string;
   plannedSnapshot?: PlannedExercise[];
+  /** Identidade e rótulo do treino gravados na sessão: sobrevivem à exclusão
+   * do plano e às cópias entre blocos. */
+  planLineageId?: string;
+  planLabel?: string;
 };
 
 export type BodyWeightEntry = { id: string; date: string; weight: number };
@@ -179,6 +195,7 @@ export function toPlannedExercise(exercise: Exercise): PlannedExercise {
     : Array.from({ length: exercise.setsTarget }, () => ({ ...fallback }));
   return {
     exerciseId: exercise.id,
+    lineageId: exercise.lineageId,
     name: exercise.name,
     order: exercise.order,
     setsTarget: exercise.setsTarget,
@@ -252,6 +269,111 @@ export function exerciseWeightSeries(
     .filter((p) => p.maxWeight > 0);
 }
 
+/** Treinos da biblioteca ("Treinos cadastrados") — sem os que pertencem a um
+ * bloco do ciclo e sem os arquivados. Um treino de bloco é editado dentro do
+ * bloco; deixá-lo solto na biblioteca faria a edição vazar entre fases. */
+export function libraryPlans(plans: WorkoutPlan[]): WorkoutPlan[] {
+  return plans.filter((p) => !p.blockId && !p.archivedAt).sort((a, b) => a.order - b.order);
+}
+
+/** Ids de exercício que pertencem a uma mesma linhagem, considerando tanto os
+ * exercícios vivos quanto os retratos guardados nas sessões. Um id pertence a
+ * exatamente uma linhagem, então juntar as duas fontes não mistura nada. */
+function lineageExerciseIds(
+  sessions: WorkoutSession[],
+  exercises: Exercise[],
+  lineageId: string,
+): Set<string> {
+  const ids = new Set<string>();
+  for (const e of exercises) if (e.lineageId === lineageId) ids.add(e.id);
+  for (const s of sessions) {
+    for (const p of s.plannedSnapshot ?? []) {
+      if (p.lineageId === lineageId) ids.add(p.exerciseId);
+    }
+  }
+  return ids;
+}
+
+/** Carga máxima por sessão concluída seguindo a LINHAGEM do exercício — a
+ * curva não recomeça do zero quando o ciclo copia o treino para outro bloco. */
+export function exerciseSeriesByLineage(
+  sessions: WorkoutSession[],
+  exercises: Exercise[],
+  lineageId: string,
+): { date: string; maxWeight: number }[] {
+  const ids = lineageExerciseIds(sessions, exercises, lineageId);
+  if (ids.size === 0) return [];
+  const out: { date: string; maxWeight: number }[] = [];
+  for (const s of sessions) {
+    if (s.status !== "concluido") continue;
+    let max = 0;
+    for (const log of s.exerciseLogs) {
+      if (!log.exerciseId || !ids.has(log.exerciseId)) continue;
+      for (const set of log.sets) max = Math.max(max, set.weight);
+    }
+    if (max > 0) out.push({ date: s.date, maxWeight: max });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Maior carga levantada com PELO MENOS `minReps` repetições. 80kg×3 e 80kg×10
+ * não são o mesmo resultado; comparar só o quilo mentiria sobre a evolução. */
+export function maxWeightAtReps(
+  sessions: WorkoutSession[],
+  exercises: Exercise[],
+  lineageId: string,
+  minReps: number,
+  range?: { from: string; to: string },
+): number {
+  const ids = lineageExerciseIds(sessions, exercises, lineageId);
+  let max = 0;
+  for (const s of sessions) {
+    if (s.status !== "concluido") continue;
+    if (range && (s.date < range.from || s.date > range.to)) continue;
+    for (const log of s.exerciseLogs) {
+      if (!log.exerciseId || !ids.has(log.exerciseId)) continue;
+      for (const set of log.sets) {
+        if (set.reps >= minReps) max = Math.max(max, set.weight);
+      }
+    }
+  }
+  return max;
+}
+
+/** Séries e repetições acumuladas de uma linhagem — base das metas de volume. */
+export function volumeForLineage(
+  sessions: WorkoutSession[],
+  exercises: Exercise[],
+  lineageId: string,
+  range?: { from: string; to: string },
+): { sets: number; reps: number } {
+  const ids = lineageExerciseIds(sessions, exercises, lineageId);
+  let sets = 0;
+  let reps = 0;
+  for (const s of sessions) {
+    if (s.status !== "concluido") continue;
+    if (range && (s.date < range.from || s.date > range.to)) continue;
+    for (const log of s.exerciseLogs) {
+      if (!log.exerciseId || !ids.has(log.exerciseId)) continue;
+      sets += log.sets.length;
+      for (const set of log.sets) reps += set.reps;
+    }
+  }
+  return { sets, reps };
+}
+
+/** Sessões concluídas num intervalo — numerador de "treinos realizados". */
+export function finishedSessionsInRange(
+  sessions: WorkoutSession[],
+  from: string,
+  to: string,
+): WorkoutSession[] {
+  return sessions.filter((s) => s.status === "concluido" && s.date >= from && s.date <= to);
+}
+
+/** A sessão anterior DO MESMO TREINO. Compara por linhagem quando existe, e
+ * não pelo id do plano: o ciclo copia o treino A a cada bloco, e comparar por
+ * id faria a evolução recomeçar do zero em toda troca de fase. */
 export function previousFinishedSession(
   sessions: WorkoutSession[],
   planId: string,
@@ -259,10 +381,14 @@ export function previousFinishedSession(
 ): WorkoutSession | undefined {
   const current = sessions.find((s) => s.id === beforeSessionId);
   if (!current) return undefined;
+  const sameWorkout = (s: WorkoutSession) =>
+    current.planLineageId && s.planLineageId
+      ? s.planLineageId === current.planLineageId
+      : s.planId === planId;
   return sessions
     .filter(
       (s) =>
-        s.planId === planId &&
+        sameWorkout(s) &&
         s.status === "concluido" &&
         s.id !== beforeSessionId &&
         s.date < current.date,
@@ -348,7 +474,16 @@ export function sessionSummary(
       previousTotalVolume += previousVolume;
     }
     const priorMax = allSessions.length
-      ? allTimeMaxWeight(allSessions, session.planId, ex.exerciseId, session.id)
+      ? ex.lineageId
+        ? Math.max(
+            ...exerciseSeriesByLineage(
+              allSessions.filter((s) => s.id !== session.id),
+              exercises,
+              ex.lineageId,
+            ).map((p) => p.maxWeight),
+            0,
+          )
+        : allTimeMaxWeight(allSessions, session.planId, ex.exerciseId, session.id)
       : (prevBest ?? 0);
     rows.push({
       exerciseId: ex.exerciseId,
@@ -459,6 +594,10 @@ function mapPlan(r: Row): WorkoutPlan {
     name: r.name as string,
     muscleGroups: (r.muscle_groups as string) ?? "",
     order: (r.order_index as number) ?? 0,
+    lineageId: (r.lineage_id as string) ?? (r.id as string),
+    blockId: (r.block_id as string) ?? undefined,
+    sourcePlanId: (r.source_plan_id as string) ?? undefined,
+    archivedAt: (r.archived_at as string) ?? undefined,
   };
 }
 
@@ -472,6 +611,7 @@ function mapExercise(r: Row): Exercise {
   return {
     id: r.id as string,
     planId: r.plan_id as string,
+    lineageId: (r.lineage_id as string) ?? (r.id as string),
     name: r.name as string,
     setsTarget: (r.sets_target as number) ?? 0,
     repsTarget: (r.reps_target as number) ?? 0,
@@ -504,6 +644,8 @@ function mapSession(r: Row, exerciseLogs: ExerciseLog[]): WorkoutSession {
     plannedSnapshot: Array.isArray(r.planned_snapshot)
       ? (r.planned_snapshot as PlannedExercise[])
       : undefined,
+    planLineageId: (r.plan_lineage_id as string) ?? undefined,
+    planLabel: (r.plan_label as string) ?? undefined,
   };
 }
 
@@ -718,6 +860,11 @@ export async function startSession(planId: string): Promise<string> {
     .eq("plan_id", planId)
     .order("order_index");
   const planned = ((planExercises as Row[]) ?? []).map((r) => toPlannedExercise(mapExercise(r)));
+  const { data: planRow } = await supabase
+    .from("workout_plans")
+    .select("lineage_id, letter, name")
+    .eq("id", planId)
+    .maybeSingle();
 
   const row = unwrap<{ id: string }>(
     await supabase
@@ -730,6 +877,8 @@ export async function startSession(planId: string): Promise<string> {
         started_at: nowDate().toISOString(),
         planned_snapshot: planned,
         selected_exercise_id: planned[0]?.exerciseId ?? null,
+        plan_lineage_id: (planRow?.lineage_id as string) ?? null,
+        plan_label: planRow ? `${planRow.letter} · ${planRow.name}` : null,
       })
       .select()
       .single(),
