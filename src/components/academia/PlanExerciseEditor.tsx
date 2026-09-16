@@ -20,6 +20,7 @@ export function PlanExerciseEditor({ planId }: { planId: string }) {
   const [addingExercise, setAddingExercise] = useState(false);
   const [form, setForm] = useState({
     name: "",
+    notes: "",
     setsTarget: "4",
     setTargets: Array.from({ length: 4 }, () => ({
       reps: 10,
@@ -37,6 +38,7 @@ export function PlanExerciseEditor({ planId }: { planId: string }) {
             <p className="text-[10px] text-muted-foreground">
               {ex.setsTarget}x{ex.repsTarget} · {ex.loadTarget}kg · desc. {ex.restSeconds}s
             </p>
+            {ex.notes && <p className="truncate text-[10px] text-muted-foreground">{ex.notes}</p>}
           </div>
           <button
             disabled={i === 0}
@@ -108,6 +110,19 @@ export function PlanExerciseEditor({ planId }: { planId: string }) {
               <span>reps</span>
               <span>desc.</span>
             </div>
+            {form.setTargets.length > 1 && (
+              <button
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    setTargets: form.setTargets.map(() => ({ ...form.setTargets[0] })),
+                  })
+                }
+                className="interactive-press w-full rounded-md border border-dashed border-border py-1 text-[10px] text-muted-foreground hover:border-primary/40 hover:text-primary"
+              >
+                repetir os valores da série 1 nas demais
+              </button>
+            )}
             {form.setTargets.map((target, index) => (
               <div key={index} className="grid grid-cols-[44px_1fr_1fr_1fr] items-center gap-1">
                 <span className="text-[10px] text-muted-foreground">Série {index + 1}</span>
@@ -130,6 +145,13 @@ export function PlanExerciseEditor({ planId }: { planId: string }) {
               </div>
             ))}
           </div>
+          <input
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            placeholder="Observações (opcional)"
+            aria-label="Observações do exercício"
+            className="w-full rounded-md border border-border bg-surface-2 px-2 py-1.5 text-xs outline-none focus:border-primary"
+          />
           <button
             disabled={addingExercise}
             onClick={async () => {
@@ -143,9 +165,11 @@ export function PlanExerciseEditor({ planId }: { planId: string }) {
                   loadTarget: form.setTargets[0]?.weight ?? 0,
                   restSeconds: form.setTargets[0]?.restSeconds ?? 60,
                   setTargets: form.setTargets,
+                  notes: form.notes.trim() || undefined,
                 });
                 setForm({
                   name: "",
+                  notes: "",
                   setsTarget: "4",
                   setTargets: Array.from({ length: 4 }, () => ({
                     reps: 10,

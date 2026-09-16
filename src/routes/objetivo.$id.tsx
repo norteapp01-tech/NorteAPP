@@ -34,6 +34,7 @@ import {
   type Goal,
 } from "@/lib/goals-store";
 import { useCycleStore } from "@/lib/workout-cycle-store";
+import { CyclePage } from "@/components/academia/cycle/CyclePage";
 
 export const Route = createFileRoute("/objetivo/$id")({
   head: ({ params }) => ({
@@ -158,6 +159,13 @@ export function GoalDetail() {
     setCreateActionStepId(open.id);
   };
 
+  // Um planejamento do tipo `ciclo_treino` É o ciclo: abrir por Planos mostra
+  // exatamente as mesmas abas e ações que abrir pela Academia. Um atalho para
+  // "a outra tela" faria as duas parecerem cópias.
+  if (goal.planType === "ciclo_treino" && cycle) {
+    return <CyclePage cycleId={cycle.id} backTo="/planejamento" backLabel="Planos" />;
+  }
+
   return (
     <div className="px-5 pt-12 pb-10">
       <PlanHeader
@@ -169,26 +177,6 @@ export function GoalDetail() {
         onShowDetails={() => setShowDetails(true)}
         onLinkAction={() => setShowPicker(true)}
       />
-
-      {cycle && (
-        // O ciclo e este planejamento são a MESMA coisa, vista de dois lugares.
-        // Sem este caminho de volta, a Academia pareceria uma cópia paralela.
-        <Link
-          to="/sub-agenda/$categoria"
-          params={{ categoria: "academia" }}
-          className="interactive-press mt-4 flex items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5"
-        >
-          <span className="min-w-0">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-primary">
-              Ciclo de treino
-            </span>
-            <span className="block truncate text-xs text-muted-foreground">
-              Blocos, treinos e metas ficam na Academia
-            </span>
-          </span>
-          <span className="shrink-0 text-[11px] font-semibold text-primary">abrir</span>
-        </Link>
-      )}
 
       <div className="mt-5">
         <PlanTabs tab={tab} onChange={setTab} />

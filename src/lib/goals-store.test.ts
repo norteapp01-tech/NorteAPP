@@ -193,6 +193,7 @@ describe("createGoal — regressão do bug 'Planejamento não encontrado'", () =
       lifeArea: "Carreira",
       deadlineLabel: "Mês",
       metric: { target: 1, unit: "etapas" },
+      planType: "comum",
     });
 
     const cached = queryClient.getQueryData<{ goals: { id: string; title: string }[] }>(QUERY_KEY);
@@ -270,6 +271,7 @@ function makeGoal(overrides: Partial<Goal> = {}): Goal {
     why: "",
     trackingType: "etapas",
     kind: "projeto",
+    planType: "comum",
     category: "carreira",
     lifeArea: "Carreira",
     deadlineLabel: "Mês",

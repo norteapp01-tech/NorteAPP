@@ -38,6 +38,7 @@ export type Exercise = {
   loadTarget: number;
   restSeconds: number;
   setTargets?: SetTarget[];
+  notes?: string;
   order: number;
 };
 
@@ -380,6 +381,37 @@ export function maxWeightAtReps(
   return max;
 }
 
+/** Maior carga sustentada por N séries com as repetições de referência, dentro
+ * de UMA sessão. "3×10 com 30kg" não é a mesma conquista que uma única série
+ * de 10 com 30kg, e tratar um pico isolado como prova de melhoria seria
+ * exatamente o erro que a meta tenta evitar. */
+export function maxWeightForSetsReps(
+  sessions: WorkoutSession[],
+  exercises: Exercise[],
+  lineageId: string,
+  minReps: number,
+  minSets: number,
+  range?: { from: string; to: string },
+): number {
+  if (minSets <= 1) return maxWeightAtReps(sessions, exercises, lineageId, minReps, range);
+  const ids = lineageExerciseIds(sessions, exercises, lineageId);
+  let best = 0;
+  for (const s of sessions) {
+    if (s.status !== "concluido") continue;
+    if (range && (s.date < range.from || s.date > range.to)) continue;
+    const weights: number[] = [];
+    for (const log of s.exerciseLogs) {
+      if (!log.exerciseId || !ids.has(log.exerciseId)) continue;
+      for (const set of log.sets) if (set.reps >= minReps) weights.push(set.weight);
+    }
+    if (weights.length < minSets) continue;
+    // A N-ésima maior carga da sessão é a que foi sustentada por N séries.
+    weights.sort((a, b) => b - a);
+    best = Math.max(best, weights[minSets - 1]);
+  }
+  return best;
+}
+
 /** Séries e repetições acumuladas de uma linhagem — base das metas de volume. */
 export function volumeForLineage(
   sessions: WorkoutSession[],
@@ -657,6 +689,7 @@ function mapExercise(r: Row): Exercise {
     repsTarget: (r.reps_target as number) ?? 0,
     loadTarget: (r.load_target as number) ?? 0,
     restSeconds: (r.rest_seconds as number) ?? 60,
+    notes: (r.notes as string) ?? undefined,
     setTargets:
       storedTargets.length > 0
         ? storedTargets
@@ -801,6 +834,7 @@ export async function addExercise(
     loadTarget: number;
     restSeconds: number;
     setTargets?: SetTarget[];
+    notes?: string;
   },
 ): Promise<string> {
   const userId = await ensureSession();
@@ -820,6 +854,7 @@ export async function addExercise(
         load_target: input.loadTarget,
         rest_seconds: input.restSeconds,
         set_targets: input.setTargets ?? null,
+        notes: input.notes ?? null,
         order_index: count ?? 0,
       })
       .select()
@@ -834,7 +869,7 @@ export async function updateExercise(
   patch: Partial<
     Pick<
       Exercise,
-      "name" | "setsTarget" | "repsTarget" | "loadTarget" | "restSeconds" | "setTargets"
+      "name" | "setsTarget" | "repsTarget" | "loadTarget" | "restSeconds" | "setTargets" | "notes"
     >
   >,
 ) {
@@ -845,6 +880,7 @@ export async function updateExercise(
   if (patch.loadTarget !== undefined) dbPatch.load_target = patch.loadTarget;
   if (patch.restSeconds !== undefined) dbPatch.rest_seconds = patch.restSeconds;
   if (patch.setTargets !== undefined) dbPatch.set_targets = patch.setTargets;
+  if (patch.notes !== undefined) dbPatch.notes = patch.notes;
   unwrap(await supabase.from("workout_exercises").update(dbPatch).eq("id", id).select().single());
   await invalidate();
 }

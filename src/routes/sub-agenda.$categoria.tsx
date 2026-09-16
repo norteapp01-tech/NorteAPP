@@ -372,7 +372,7 @@ function AcademiaModule() {
             <CalendarClock className="h-4 w-4" /> Horários
           </button>
         </div>
-        {/* Com um bloco vigente, a semana é a DELE. Continuar mostrando a
+        {/* Com uma etapa vigente, a semana é a DELA. Continuar mostrando a
             atribuição antiga aqui e a do ciclo no card de hoje colocaria duas
             programações na mesma tela sem dizer qual manda. */}
         <WeekdaySelector
@@ -394,7 +394,7 @@ function AcademiaModule() {
         />
         {currentBlockDays && programming.block && (
           <p className="mt-2 text-[11px] text-muted-foreground">
-            Semana definida pelo bloco{" "}
+            Semana definida pela etapa{" "}
             <span className="font-semibold text-foreground">{programming.block.name}</span> — toque
             para editar no ciclo.
           </p>
@@ -680,7 +680,7 @@ function ProgrammingSource({ programming }: { programming: TodayProgramming }) {
   if (programming.source === "semana") return null;
   if (!programming.cycle) return null;
   const detail = programming.outsideBlocks
-    ? "hoje está fora dos blocos"
+    ? "hoje está fora das etapas"
     : programming.block
       ? programming.block.name
       : "";

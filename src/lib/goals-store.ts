@@ -21,6 +21,9 @@ export type SportModality = "corrida" | "caminhada" | "ciclismo";
 export type ExecutionStatus = "planejada" | "concluida" | "perdida" | "reagendada" | "cancelada";
 /** Como o progresso deste planejamento é medido. */
 export type TrackingType = "etapas" | "frequencia" | "numero";
+/** Especialização do planejamento, persistida na própria linha — abrir por
+ * Planos ou pela Academia tem que reconhecer a mesma coisa. */
+export type PlanType = "comum" | "ciclo_treino";
 export type PlanningStatus = "ativo" | "concluido" | "em_risco" | "atrasado";
 
 export type Goal = {
@@ -40,6 +43,7 @@ export type Goal = {
   deadlineISO?: string;
   createdAt: string;
   metric: { target: number; unit: string };
+  planType: PlanType;
 };
 
 export type Subtask = { id: string; title: string; done: boolean };
@@ -1012,6 +1016,7 @@ function mapGoal(r: Row): Goal {
     deadlineISO: (r.deadline_date as string) ?? undefined,
     createdAt: r.created_at as string,
     metric: { target: Number(r.metric_target ?? 0), unit: (r.metric_unit as string) ?? "" },
+    planType: (r.plan_type as PlanType) ?? "comum",
   };
 }
 
@@ -1193,6 +1198,7 @@ export async function createGoal(input: {
   deadlineLabel: string;
   deadlineISO?: string;
   metric: { target: number; unit: string };
+  planType?: PlanType;
   steps?: { title: string; targetDate?: string }[];
 }): Promise<{ id: string; firstStepId?: string }> {
   const userId = await ensureSession();
@@ -1214,6 +1220,7 @@ export async function createGoal(input: {
         deadline_date: input.deadlineISO,
         metric_target: input.metric.target,
         metric_unit: input.metric.unit,
+        plan_type: input.planType ?? "comum",
       })
       .select()
       .single(),

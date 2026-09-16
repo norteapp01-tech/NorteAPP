@@ -53,6 +53,7 @@ function fixtureGoal(overrides: Partial<Goal> = {}): Goal {
     deadlineISO: "2026-09-30",
     createdAt: "2026-09-01T00:00:00.000Z",
     metric: { target: 1, unit: "etapas" },
+    planType: "comum",
     ...overrides,
   };
 }

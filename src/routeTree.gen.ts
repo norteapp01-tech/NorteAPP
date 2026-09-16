@@ -16,6 +16,7 @@ import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as CriarRouteImport } from './routes/criar'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as PlanejamentoRouteImport } from './routes/planejamento'
+import { Route as CicloIdRouteImport } from './routes/ciclo.$id'
 import { Route as EsportesGravarRouteImport } from './routes/esportes.gravar'
 import { Route as ObjetivoIdRouteImport } from './routes/objetivo.$id'
 import { Route as SubAgendaCategoriaRouteImport } from './routes/sub-agenda.$categoria'
@@ -55,6 +56,11 @@ const PlanejamentoRoute = PlanejamentoRouteImport.update({
   path: '/planejamento',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CicloIdRoute = CicloIdRouteImport.update({
+  id: '/ciclo/$id',
+  path: '/ciclo/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EsportesGravarRoute = EsportesGravarRouteImport.update({
   id: '/esportes/gravar',
   path: '/esportes/gravar',
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/criar': typeof CriarRoute
   '/dashboard': typeof DashboardRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/ciclo/$id': typeof CicloIdRoute
   '/esportes/gravar': typeof EsportesGravarRoute
   '/objetivo/$id': typeof ObjetivoIdRoute
   '/sub-agenda/$categoria': typeof SubAgendaCategoriaRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/criar': typeof CriarRoute
   '/dashboard': typeof DashboardRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/ciclo/$id': typeof CicloIdRoute
   '/esportes/gravar': typeof EsportesGravarRoute
   '/objetivo/$id': typeof ObjetivoIdRoute
   '/sub-agenda/$categoria': typeof SubAgendaCategoriaRoute
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/criar': typeof CriarRoute
   '/dashboard': typeof DashboardRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/ciclo/$id': typeof CicloIdRoute
   '/esportes/gravar': typeof EsportesGravarRoute
   '/objetivo/$id': typeof ObjetivoIdRoute
   '/sub-agenda/$categoria': typeof SubAgendaCategoriaRoute
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
     | '/criar'
     | '/dashboard'
     | '/planejamento'
+    | '/ciclo/$id'
     | '/esportes/gravar'
     | '/objetivo/$id'
     | '/sub-agenda/$categoria'
@@ -130,6 +140,7 @@ export interface FileRouteTypes {
     | '/criar'
     | '/dashboard'
     | '/planejamento'
+    | '/ciclo/$id'
     | '/esportes/gravar'
     | '/objetivo/$id'
     | '/sub-agenda/$categoria'
@@ -142,6 +153,7 @@ export interface FileRouteTypes {
     | '/criar'
     | '/dashboard'
     | '/planejamento'
+    | '/ciclo/$id'
     | '/esportes/gravar'
     | '/objetivo/$id'
     | '/sub-agenda/$categoria'
@@ -155,6 +167,7 @@ export interface RootRouteChildren {
   CriarRoute: typeof CriarRoute
   DashboardRoute: typeof DashboardRoute
   PlanejamentoRoute: typeof PlanejamentoRoute
+  CicloIdRoute: typeof CicloIdRoute
   EsportesGravarRoute: typeof EsportesGravarRoute
   ObjetivoIdRoute: typeof ObjetivoIdRoute
   SubAgendaCategoriaRoute: typeof SubAgendaCategoriaRoute
@@ -211,6 +224,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanejamentoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ciclo/$id': {
+      id: '/ciclo/$id'
+      path: '/ciclo/$id'
+      fullPath: '/ciclo/$id'
+      preLoaderRoute: typeof CicloIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/esportes/gravar': {
       id: '/esportes/gravar'
       path: '/esportes/gravar'
@@ -243,6 +263,7 @@ const rootRouteChildren: RootRouteChildren = {
   CriarRoute: CriarRoute,
   DashboardRoute: DashboardRoute,
   PlanejamentoRoute: PlanejamentoRoute,
+  CicloIdRoute: CicloIdRoute,
   EsportesGravarRoute: EsportesGravarRoute,
   ObjetivoIdRoute: ObjetivoIdRoute,
   SubAgendaCategoriaRoute: SubAgendaCategoriaRoute,

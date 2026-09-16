@@ -7,6 +7,7 @@ import {
   exerciseSeriesByLineage,
   finishedSessionsInRange,
   maxWeightAtReps,
+  maxWeightForSetsReps,
   volumeForLineage,
   currentBodyWeight,
   type BodyWeightEntry,
@@ -37,6 +38,10 @@ export type WorkoutCycle = {
   endDate: string;
   status: CycleStatus;
   createdAt: string;
+  /** Plano da semana que valia antes de o ciclo ser ativado — é o que permite
+   * devolver a programação da pessoa ao encerrar, em vez de deixá-la sem nada. */
+  previousWeekly?: Record<number, string | null>;
+  activatedAt?: string;
 };
 
 export type CycleBlock = {
@@ -61,14 +66,36 @@ export type BlockDay = {
   startTime?: string;
 };
 
-export type CycleGoalKind = "peso_corporal" | "carga" | "series_reps" | "frequencia";
+export type CycleGoalKind =
+  "peso_corporal" | "carga" | "series_reps" | "frequencia" | "medida_corporal" | "descritiva";
+
+/** Medida informada pela pessoa (circunferência, % de gordura), com método e
+ * data. Nunca deduzida de outro número. */
+export type BodyMeasurement = {
+  id: string;
+  label: string;
+  value: number;
+  unit: string;
+  method?: string;
+  measuredAt: string;
+  note?: string;
+};
 
 export type CycleGoal = {
   id: string;
   cycleId: string;
   blockId?: string;
+  title: string;
   kind: CycleGoalKind;
+  /** Séries de referência, ao lado das repetições: "3×10 com 30kg" é uma meta
+   * diferente de "uma série de 10 com 30kg". */
+  referenceSets?: number;
+  /** Valor informado à mão — só para metas que nenhum registro comprova. */
+  manualCurrent?: number;
+  manualDone: boolean;
   exerciseLineageId?: string;
+  /** Rótulo do que está sendo medido: o nome do exercício nas metas de carga e
+   * volume, e o nome da medição nas metas de medida corporal. */
   exerciseLabel?: string;
   referenceReps?: number;
   startValue: number;
@@ -84,6 +111,7 @@ type State = {
   blockPlans: BlockPlan[];
   blockDays: BlockDay[];
   cycleGoals: CycleGoal[];
+  measurements: BodyMeasurement[];
 };
 
 const EMPTY_STATE: State = {
@@ -92,6 +120,7 @@ const EMPTY_STATE: State = {
   blockPlans: [],
   blockDays: [],
   cycleGoals: [],
+  measurements: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -229,6 +258,46 @@ export function plannedSessionsInRange(
   return count;
 }
 
+export type StageState = "rascunho" | "futura" | "vigente" | "encerrada";
+
+/** Estado da etapa. "rascunho" é DERIVADO de não ter treino montado — uma
+ * etapa futura vazia é incompleta por definição, e marcar isso numa coluna
+ * separada só abriria espaço para os dois discordarem. */
+export function stageState(
+  block: CycleBlock,
+  blockPlans: BlockPlan[],
+  iso = todayISO(),
+): StageState {
+  const hasPrograms = blockPlans.some((bp) => bp.blockId === block.id);
+  if (!hasPrograms) return "rascunho";
+  if (iso > block.endDate) return "encerrada";
+  if (iso < block.startDate) return "futura";
+  return "vigente";
+}
+
+/** Resumo da divisão de uma etapa: "A · B · C". */
+export function stageDivision(
+  blockPlans: BlockPlan[],
+  plans: WorkoutPlan[],
+  blockId: string,
+): string {
+  const letters = plansOfBlock(blockPlans, plans, blockId).map((p) => p.letter);
+  return letters.length > 0 ? letters.join(" · ") : "sem treinos";
+}
+
+/** Etapas que serão deslocadas por uma mudança de duração — mostradas ANTES de
+ * aplicar, porque mexer em data futura afeta o calendário de quem já se
+ * organizou em cima dele. */
+export function stagesShiftedBy(
+  blocks: CycleBlock[],
+  cycleId: string,
+  fromBlockId: string,
+): CycleBlock[] {
+  const ordered = blocksForCycle(blocks, cycleId);
+  const index = ordered.findIndex((b) => b.id === fromBlockId);
+  return index < 0 ? [] : ordered.slice(index + 1);
+}
+
 export type CycleProgress = {
   /** Dias corridos — NÃO é progresso do planejamento. */
   elapsedDays: number;
@@ -287,6 +356,7 @@ export function evaluateCycleGoal(
     sessions: WorkoutSession[];
     exercises: Exercise[];
     bodyWeights: BodyWeightEntry[];
+    measurements?: BodyMeasurement[];
   },
   iso = todayISO(),
 ): GoalEvaluation {
@@ -306,11 +376,12 @@ export function evaluateCycleGoal(
       hasData = true;
     }
   } else if (goal.kind === "carga" && goal.exerciseLineageId) {
-    const best = maxWeightAtReps(
+    const best = maxWeightForSetsReps(
       ctx.sessions,
       ctx.exercises,
       goal.exerciseLineageId,
       goal.referenceReps ?? 1,
+      goal.referenceSets ?? 1,
       range,
     );
     if (best > 0) {
@@ -324,6 +395,35 @@ export function evaluateCycleGoal(
   } else if (goal.kind === "frequencia") {
     current = finishedSessionsInRange(ctx.sessions, from, to).length;
     hasData = true;
+  } else if (goal.kind === "medida_corporal") {
+    // Medida corporal vem de uma medição registrada COM data e método, ou do
+    // valor informado na meta. Nunca é deduzida de peso nem de qualquer outro
+    // número — uma intenção não vira porcentagem medida.
+    const latest = (ctx.measurements ?? [])
+      .filter((m) => m.label === goal.exerciseLabel && m.measuredAt >= from && m.measuredAt <= to)
+      .sort((a, b) => b.measuredAt.localeCompare(a.measuredAt))[0];
+    if (latest) {
+      current = latest.value;
+      hasData = true;
+    } else if (goal.manualCurrent !== undefined) {
+      current = goal.manualCurrent;
+      hasData = true;
+    }
+  } else if (goal.kind === "descritiva") {
+    if (goal.manualCurrent !== undefined) {
+      current = goal.manualCurrent;
+      hasData = true;
+    }
+  }
+
+  if (goal.kind === "descritiva") {
+    return {
+      goal,
+      current,
+      progress: goal.manualDone ? 1 : 0,
+      reached: goal.manualDone,
+      hasData: true,
+    };
   }
 
   // Meta de emagrecer anda pra baixo; a de carga, pra cima. O sinal vem da
@@ -364,7 +464,15 @@ export const cycleGoalKindLabel: Record<CycleGoalKind, string> = {
   carga: "Carga em um exercício",
   series_reps: "Séries e repetições",
   frequencia: "Frequência de treinos",
+  medida_corporal: "Medida corporal",
+  descritiva: "Acompanhamento manual",
 };
+
+/** Metas que nenhum registro do app comprova — o valor vem da pessoa, e a
+ * interface diz isso em vez de exibir como se fosse medição automática. */
+export function isManualGoal(kind: CycleGoalKind): boolean {
+  return kind === "medida_corporal" || kind === "descritiva";
+}
 
 // ---------------------------------------------------------------------------
 // Mapeamento
@@ -385,6 +493,8 @@ function mapCycle(r: Row): WorkoutCycle {
     endDate: r.end_date as string,
     status: r.status as CycleStatus,
     createdAt: r.created_at as string,
+    previousWeekly: (r.previous_weekly as Record<number, string | null>) ?? undefined,
+    activatedAt: (r.activated_at as string) ?? undefined,
   };
 }
 
@@ -407,7 +517,11 @@ function mapCycleGoal(r: Row): CycleGoal {
     id: r.id as string,
     cycleId: r.cycle_id as string,
     blockId: (r.block_id as string) ?? undefined,
+    title: (r.title as string) ?? "",
     kind: r.kind as CycleGoalKind,
+    referenceSets: (r.reference_sets as number) ?? undefined,
+    manualCurrent: r.manual_current === null ? undefined : Number(r.manual_current),
+    manualDone: Boolean(r.manual_done),
     exerciseLineageId: (r.exercise_lineage_id as string) ?? undefined,
     exerciseLabel: (r.exercise_label as string) ?? undefined,
     referenceReps: (r.reference_reps as number) ?? undefined,
@@ -420,13 +534,15 @@ function mapCycleGoal(r: Row): CycleGoal {
 }
 
 export async function fetchCycleState(): Promise<State> {
-  const [cyclesRes, blocksRes, blockPlansRes, blockDaysRes, goalsRes] = await Promise.all([
-    supabase.from("workout_cycles").select("*").order("start_date", { ascending: false }),
-    supabase.from("workout_cycle_blocks").select("*").order("order_index"),
-    supabase.from("workout_block_plans").select("*").order("order_index"),
-    supabase.from("workout_block_days").select("*").order("weekday"),
-    supabase.from("workout_cycle_goals").select("*").order("created_at"),
-  ]);
+  const [cyclesRes, blocksRes, blockPlansRes, blockDaysRes, goalsRes, measuresRes] =
+    await Promise.all([
+      supabase.from("workout_cycles").select("*").order("start_date", { ascending: false }),
+      supabase.from("workout_cycle_blocks").select("*").order("order_index"),
+      supabase.from("workout_block_plans").select("*").order("order_index"),
+      supabase.from("workout_block_days").select("*").order("weekday"),
+      supabase.from("workout_cycle_goals").select("*").order("created_at"),
+      supabase.from("workout_body_measurements").select("*").order("measured_at"),
+    ]);
   return {
     cycles: (unwrap(cyclesRes) as Row[]).map(mapCycle),
     blocks: (unwrap(blocksRes) as Row[]).map(mapBlock),
@@ -444,6 +560,15 @@ export async function fetchCycleState(): Promise<State> {
       startTime: (r.start_time as string) ?? undefined,
     })),
     cycleGoals: (unwrap(goalsRes) as Row[]).map(mapCycleGoal),
+    measurements: (unwrap(measuresRes) as Row[]).map((r) => ({
+      id: r.id as string,
+      label: r.label as string,
+      value: Number(r.value),
+      unit: r.unit as string,
+      method: (r.method as string) ?? undefined,
+      measuredAt: r.measured_at as string,
+      note: (r.note as string) ?? undefined,
+    })),
   };
 }
 
@@ -501,7 +626,8 @@ export async function createCycle(input: {
     lifeArea: "Saúde",
     deadlineLabel: `${daysBetweenISO(input.startDate, endDate) + 1} dias`,
     deadlineISO: endDate,
-    metric: { target: input.blocks.length, unit: "blocos" },
+    metric: { target: input.blocks.length, unit: "etapas" },
+    planType: "ciclo_treino",
     steps: input.blocks.map((b, i) => ({ title: b.name, targetDate: ranges[i].endDate })),
   });
 
@@ -760,6 +886,7 @@ export async function copyPlanIntoBlock(blockId: string, sourcePlanId: string): 
           load_target: e.load_target as number,
           rest_seconds: e.rest_seconds as number,
           set_targets: e.set_targets ?? null,
+          notes: (e.notes as string) ?? null,
           order_index: e.order_index as number,
           lineage_id: e.lineage_id as string,
         })),
@@ -971,7 +1098,10 @@ export async function applyRoutinePlan(items: RoutinePlanItem[]) {
 
 /** Ativar torna esta a programação vigente. O índice único no banco garante um
  * ciclo ativo por vez; aqui o anterior é encerrado explicitamente em vez de
- * duas programações passarem a valer juntas. */
+ * duas programações passarem a valer juntas.
+ *
+ * O plano da semana que existia antes fica guardado no ciclo: encerrar sem
+ * isso deixaria a pessoa sem programação nenhuma, tendo apagado a dela. */
 export async function activateCycle(cycleId: string) {
   const userId = await ensureSession();
   await supabase
@@ -979,14 +1109,107 @@ export async function activateCycle(cycleId: string) {
     .update({ status: "concluido" })
     .eq("user_id", userId)
     .eq("status", "ativo");
+
+  const { data: weekly } = await supabase
+    .from("workout_weekly_assignment")
+    .select("weekday, plan_id");
+  const previous: Record<number, string | null> = {};
+  for (const row of weekly ?? []) previous[row.weekday as number] = (row.plan_id as string) ?? null;
+
   unwrap(
     await supabase
       .from("workout_cycles")
-      .update({ status: "ativo" })
+      .update({
+        status: "ativo",
+        previous_weekly: previous,
+        activated_at: nowDate().toISOString(),
+      })
       .eq("id", cycleId)
       .select()
       .single(),
   );
+  await invalidate();
+}
+
+/** Encerra o ciclo. `restoreWeekly` devolve o plano da semana que existia antes
+ * — escolha explícita, nunca automática: quem montou uma semana nova durante o
+ * ciclo não quer vê-la sobrescrita ao terminar. */
+export async function endCycle(cycle: WorkoutCycle, restoreWeekly: boolean) {
+  const userId = await ensureSession();
+  if (restoreWeekly && cycle.previousWeekly) {
+    const rows = Object.entries(cycle.previousWeekly).map(([weekday, planId]) => ({
+      user_id: userId,
+      weekday: Number(weekday),
+      plan_id: planId,
+    }));
+    if (rows.length > 0) {
+      unwrap(
+        await supabase
+          .from("workout_weekly_assignment")
+          .upsert(rows, { onConflict: "user_id,weekday" })
+          .select("weekday"),
+      );
+    }
+  }
+  unwrap(
+    await supabase
+      .from("workout_cycles")
+      .update({ status: "concluido" })
+      .eq("id", cycle.id)
+      .select()
+      .single(),
+  );
+  await invalidate();
+}
+
+export async function updateCycleGoal(
+  goalId: string,
+  patch: Partial<Pick<CycleGoal, "manualCurrent" | "manualDone" | "title" | "targetValue">>,
+) {
+  const dbPatch: Row = {};
+  if (patch.manualCurrent !== undefined) dbPatch.manual_current = patch.manualCurrent;
+  if (patch.manualDone !== undefined) dbPatch.manual_done = patch.manualDone;
+  if (patch.title !== undefined) dbPatch.title = patch.title;
+  if (patch.targetValue !== undefined) dbPatch.target_value = patch.targetValue;
+  if (Object.keys(dbPatch).length === 0) return;
+  unwrap(
+    await supabase.from("workout_cycle_goals").update(dbPatch).eq("id", goalId).select().single(),
+  );
+  await invalidate();
+}
+
+/** Medição corporal informada — com método e data, porque um número sem
+ * origem não dá pra comparar com o seguinte. */
+export async function addMeasurement(input: {
+  label: string;
+  value: number;
+  unit: string;
+  method?: string;
+  measuredAt: string;
+  note?: string;
+}): Promise<string> {
+  const userId = await ensureSession();
+  const row = unwrap<{ id: string }>(
+    await supabase
+      .from("workout_body_measurements")
+      .insert({
+        user_id: userId,
+        label: input.label,
+        value: input.value,
+        unit: input.unit,
+        method: input.method ?? null,
+        measured_at: input.measuredAt,
+        note: input.note ?? null,
+      })
+      .select("id")
+      .single(),
+  );
+  await invalidate();
+  return row.id;
+}
+
+export async function removeMeasurement(id: string) {
+  await supabase.from("workout_body_measurements").delete().eq("id", id);
   await invalidate();
 }
 
@@ -1020,8 +1243,13 @@ export async function removeCycle(cycleId: string) {
 export async function createCycleGoal(input: {
   cycleId: string;
   blockId?: string;
+  title: string;
   kind: CycleGoalKind;
+  referenceSets?: number;
+  manualCurrent?: number;
   exerciseLineageId?: string;
+  /** Rótulo do que está sendo medido: o nome do exercício nas metas de carga e
+   * volume, e o nome da medição nas metas de medida corporal. */
   exerciseLabel?: string;
   referenceReps?: number;
   startValue: number;
@@ -1037,7 +1265,10 @@ export async function createCycleGoal(input: {
         user_id: userId,
         cycle_id: input.cycleId,
         block_id: input.blockId ?? null,
+        title: input.title,
         kind: input.kind,
+        reference_sets: input.referenceSets ?? null,
+        manual_current: input.manualCurrent ?? null,
         exercise_lineage_id: input.exerciseLineageId ?? null,
         exercise_label: input.exerciseLabel ?? null,
         reference_reps: input.referenceReps ?? null,

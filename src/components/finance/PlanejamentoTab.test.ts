@@ -15,6 +15,7 @@ function plan(id: string, category = "financas"): Goal {
     deadlineLabel: "90 dias",
     createdAt: "2026-09-07T00:00:00Z",
     metric: { target: 1, unit: "etapas" },
+    planType: "comum",
   };
 }
 

@@ -311,3 +311,101 @@ prazo andou" e "eu treinei".
   rotinas quando o usuário manda, uma vez, pelo painel do bloco. Mudar o horário
   no bloco depois disso não reescreve as rotinas já criadas.
 - Não há importação de ciclo pronto nem sugestão de programação. O usuário monta.
+
+---
+
+# Ciclo como planejamento completo
+
+## A especialização mora no planejamento
+
+`goals.plan_type` é um enum (`comum` | `ciclo_treino`). Criar um ciclo grava
+`ciclo_treino` no planejamento correspondente, e `/objetivo/$id` renderiza a
+**mesma** `CyclePage` que `/ciclo/$id` quando encontra esse tipo.
+
+Deduzir a especialização da tela de origem faria a mesma linha do banco se
+comportar de dois jeitos. Planos comuns seguem exatamente como antes — nenhum
+recurso de academia aparece neles.
+
+## Estrutura
+
+```
+Ciclo → Etapas (datas) → Treinos (A/B/C…) → Exercícios → Séries planejadas
+```
+
+As "etapas" são as linhas de `workout_cycle_blocks` que já existiam — mudou o
+nome na interface, não o dado, então ciclos antigos continuam inteiros.
+
+Uma etapa é **rascunho** quando não tem treino montado. Isso é derivado, não
+uma coluna: uma etapa futura vazia é incompleta por definição, e guardar o
+estado numa coluna só criaria a chance de os dois discordarem.
+
+## Criar curto, editar completo
+
+"Criar ciclo" pede nome, início e duração, cria uma etapa cobrindo o período e
+**abre a página do ciclo**. A montagem acontece lá, em quatro abas —
+Planejamento, Cronograma, Evolução e Metas — com o mesmo vocabulário visual das
+abas de Planos.
+
+Mudar a duração de uma etapa **mostra quais etapas seguintes serão deslocadas
+antes de aplicar**. As anteriores e o histórico nunca se movem.
+
+## Por que os treinos da etapa são cópias
+
+A letra (A, B, C) é rótulo **dentro da etapa**, não identificador global: o "A"
+da etapa 1 e o "A" da etapa 2 são treinos diferentes e podem ter conteúdos
+diferentes.
+
+Copiar a etapa 1 para a 2 gera configuração independente. Remover a puxada,
+trocar a carga da remada e acrescentar outro exercício na etapa 2 não toca na
+etapa 1 nem nas sessões já registradas — verificado no teste de aceitação.
+
+`lineage_id` em exercícios e planos é preservado na cópia, então a evolução
+histórica continua sendo uma curva só quando é realmente o mesmo exercício.
+
+## Programação e treino do dia
+
+Ativar mostra **a prévia do que passa a valer**: etapa vigente, a semana dela
+dia a dia, quantas etapas ainda estão sem treino, e a data da próxima mudança.
+
+O plano da semana que existia antes fica guardado em
+`workout_cycles.previous_weekly`. Encerrar oferece três saídas explícitas:
+voltar, encerrar mantendo a semana atual, ou encerrar restaurando a anterior.
+Nada disso é automático — quem montou uma semana nova durante o ciclo não quer
+vê-la sobrescrita.
+
+Se a próxima etapa estiver incompleta, a página avisa. O Norte não inventa
+treino para preencher o vazio.
+
+## Metas
+
+Seis tipos. Os quatro primeiros são atualizados por registro real; os dois
+últimos são marcados como **manual** na interface:
+
+| Tipo | De onde vem o valor |
+| --- | --- |
+| Carga em um exercício | maior peso sustentado por N séries de M repetições |
+| Séries e repetições | volume acumulado da linhagem |
+| Peso corporal | último registro de peso |
+| Frequência | sessões concluídas no período |
+| Medida corporal | medição registrada com método e data |
+| Acompanhamento manual | marcada pela pessoa; sem número |
+
+**Séries de referência** existem porque "3×10 com 30kg" não é a mesma conquista
+que uma única série de 10 com 30kg. `maxWeightForSetsReps` pega a N-ésima maior
+carga **dentro de uma sessão** — somar séries de dias diferentes fingiria um
+3×10 que não aconteceu.
+
+`workout_body_measurements` guarda label, valor, unidade, **método** e data. O
+Norte não calcula percentual de gordura a partir do peso, e uma intenção como
+"reduzir gordura nas costas" vira meta descritiva, não uma porcentagem
+inventada.
+
+## Limitações conhecidas
+
+- O cronograma do ciclo é próprio (nível etapa), não o `GanttChart` de Planos:
+  aquele desenha barras por execução, e o ciclo precisa de barras por etapa.
+  Compartilham `ganttBuckets`, a escala e a linguagem visual, não o componente.
+- Reordenar etapas não existe: a ordem vem das datas. Para trocar, ajuste as
+  durações.
+- Os horários do ciclo viram rotinas da Agenda quando a pessoa manda, uma vez.
+  Mudar o horário na etapa depois disso não reescreve as rotinas já criadas.

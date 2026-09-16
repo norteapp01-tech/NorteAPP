@@ -19,6 +19,8 @@ import {
   plannedSessionsInRange,
   cycleProgress,
   evaluateCycleGoal,
+  stageState,
+  stagesShiftedBy,
   type BlockDay,
   type CycleBlock,
   type CycleGoal,
@@ -27,6 +29,7 @@ import {
 import {
   exerciseSeriesByLineage,
   maxWeightAtReps,
+  maxWeightForSetsReps,
   volumeForLineage,
   type Exercise,
   type WorkoutSession,
@@ -95,6 +98,8 @@ function makeGoal(o: Partial<CycleGoal> = {}): CycleGoal {
   return {
     id: "g-1",
     cycleId: "cyc-1",
+    title: "Remada 60kg",
+    manualDone: false,
     kind: "carga",
     exerciseLineageId: "lin-supino",
     startValue: 40,
@@ -519,5 +524,164 @@ describe("evaluateCycleGoal", () => {
     );
     expect(ev.progress).toBe(1);
     expect(ev.reached).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Etapas: estado derivado e o que a mudança de duração desloca.
+// ---------------------------------------------------------------------------
+
+describe("stageState — rascunho é derivado de não ter treino", () => {
+  const block = makeBlock({ startDate: "2026-09-10", endDate: "2026-09-20" });
+  const withPlan = [{ id: "bp", blockId: "blk-1", planId: "p1", order: 0 }];
+
+  it("sem treino montado é rascunho, mesmo estando na data", () => {
+    expect(stageState(block, [], "2026-09-15")).toBe("rascunho");
+  });
+
+  it("com treino, o estado vem das datas", () => {
+    expect(stageState(block, withPlan, "2026-09-01")).toBe("futura");
+    expect(stageState(block, withPlan, "2026-09-15")).toBe("vigente");
+    expect(stageState(block, withPlan, "2026-09-25")).toBe("encerrada");
+  });
+
+  it("as bordas do período contam como vigente", () => {
+    expect(stageState(block, withPlan, "2026-09-10")).toBe("vigente");
+    expect(stageState(block, withPlan, "2026-09-20")).toBe("vigente");
+  });
+});
+
+describe("stagesShiftedBy — mostra o que vai se mover ANTES de aplicar", () => {
+  const blocks = blockRangesFrom("2026-09-01", [10, 15, 20]).map((r, i) =>
+    makeBlock({ id: `blk-${i}`, name: `Etapa ${i + 1}`, order: i, ...r }),
+  );
+
+  it("só as etapas seguintes são deslocadas", () => {
+    expect(stagesShiftedBy(blocks, "cyc-1", "blk-0").map((b) => b.name)).toEqual([
+      "Etapa 2",
+      "Etapa 3",
+    ]);
+  });
+
+  it("mexer na última não desloca ninguém", () => {
+    expect(stagesShiftedBy(blocks, "cyc-1", "blk-2")).toEqual([]);
+  });
+});
+
+describe("metas manuais — o app não inventa medição", () => {
+  const cycle = makeCycle({ startDate: "2026-09-01", endDate: "2026-10-15" });
+  const base = {
+    cycle,
+    blocks: [makeBlock()],
+    blockDays: [] as BlockDay[],
+    sessions: [] as WorkoutSession[],
+    exercises: [] as Exercise[],
+    bodyWeights: [],
+  };
+
+  it("medida corporal sem medição registrada não finge valor", () => {
+    const goal = makeGoal({
+      kind: "medida_corporal",
+      exerciseLineageId: undefined,
+      exerciseLabel: "cintura",
+      startValue: 90,
+      targetValue: 84,
+      unit: "cm",
+    });
+    const ev = evaluateCycleGoal(goal, { ...base, measurements: [] }, "2026-09-20");
+    expect(ev.hasData).toBe(false);
+    expect(ev.reached).toBe(false);
+  });
+
+  it("usa a medição mais recente do rótulo, dentro do período", () => {
+    const goal = makeGoal({
+      kind: "medida_corporal",
+      exerciseLineageId: undefined,
+      exerciseLabel: "cintura",
+      startValue: 90,
+      targetValue: 84,
+      unit: "cm",
+    });
+    const ev = evaluateCycleGoal(
+      goal,
+      {
+        ...base,
+        measurements: [
+          { id: "m1", label: "cintura", value: 88, unit: "cm", measuredAt: "2026-09-05" },
+          { id: "m2", label: "cintura", value: 83, unit: "cm", measuredAt: "2026-09-18" },
+          { id: "m3", label: "braço", value: 40, unit: "cm", measuredAt: "2026-09-19" },
+        ],
+      },
+      "2026-09-20",
+    );
+    expect(ev.current).toBe(83);
+    expect(ev.reached).toBe(true);
+  });
+
+  it("meta descritiva não tem percentual — é cumprida ou não", () => {
+    const goal = makeGoal({
+      kind: "descritiva",
+      exerciseLineageId: undefined,
+      startValue: 0,
+      targetValue: 0,
+      unit: "",
+    });
+    expect(evaluateCycleGoal(goal, base, "2026-09-20").reached).toBe(false);
+    expect(evaluateCycleGoal({ ...goal, manualDone: true }, base, "2026-09-20").reached).toBe(true);
+  });
+});
+
+describe("maxWeightForSetsReps — o pico isolado não vale pela série toda", () => {
+  const exercises = [makeExercise()];
+  const session = makeSession({
+    date: "2026-09-05",
+    exerciseLogs: [
+      {
+        exerciseId: "ex-1",
+        done: true,
+        sets: [
+          { setIndex: 0, weight: 40, reps: 10 },
+          { setIndex: 1, weight: 30, reps: 10 },
+          { setIndex: 2, weight: 30, reps: 10 },
+        ],
+      },
+    ],
+  });
+
+  it("3 séries de 10: vale 30kg, não os 40kg de uma série só", () => {
+    expect(maxWeightForSetsReps([session], exercises, "lin-supino", 10, 3)).toBe(30);
+  });
+
+  it("1 série de 10: aí sim os 40kg contam", () => {
+    expect(maxWeightForSetsReps([session], exercises, "lin-supino", 10, 1)).toBe(40);
+  });
+
+  it("séries insuficientes na sessão não produzem número nenhum", () => {
+    expect(maxWeightForSetsReps([session], exercises, "lin-supino", 10, 4)).toBe(0);
+  });
+
+  it("não soma séries de sessões diferentes para fingir um 3×10", () => {
+    const a = makeSession({
+      id: "a",
+      date: "2026-09-05",
+      exerciseLogs: [
+        { exerciseId: "ex-1", done: true, sets: [{ setIndex: 0, weight: 50, reps: 10 }] },
+      ],
+    });
+    const b = makeSession({
+      id: "b",
+      date: "2026-09-07",
+      exerciseLogs: [
+        {
+          exerciseId: "ex-1",
+          done: true,
+          sets: [
+            { setIndex: 0, weight: 50, reps: 10 },
+            { setIndex: 1, weight: 50, reps: 10 },
+          ],
+        },
+      ],
+    });
+    expect(maxWeightForSetsReps([a, b], exercises, "lin-supino", 10, 3)).toBe(0);
   });
 });

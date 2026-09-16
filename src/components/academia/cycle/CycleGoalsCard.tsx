@@ -4,7 +4,9 @@ import { Card } from "@/components/sub-agenda-shared";
 import { formatDateShortBR } from "@/lib/goals-store";
 import {
   cycleGoalKindLabel,
+  isManualGoal,
   removeCycleGoal,
+  updateCycleGoal,
   type CycleBlock,
   type GoalEvaluation,
   type WorkoutCycle,
@@ -81,38 +83,59 @@ function GoalRow({
   onToggle: () => void;
 }) {
   const { goal, current, progress, reached, hasData } = evaluation;
-  const label =
-    goal.kind === "carga" || goal.kind === "series_reps"
-      ? (goal.exerciseLabel ?? cycleGoalKindLabel[goal.kind])
-      : cycleGoalKindLabel[goal.kind];
+  const label = goal.title || goal.exerciseLabel || cycleGoalKindLabel[goal.kind];
+  const manual = isManualGoal(goal.kind);
 
   return (
     <div
       className={`rounded-lg border p-2.5 ${reached ? "border-success/40 bg-success/5" : "border-border bg-surface-2"}`}
     >
+      {goal.kind === "descritiva" && (
+        <button
+          onClick={() => void updateCycleGoal(goal.id, { manualDone: !goal.manualDone })}
+          className={`interactive-press mb-2 w-full rounded-md border py-1.5 text-[11px] font-semibold ${goal.manualDone ? "border-success/50 bg-success/10 text-success" : "border-border"}`}
+        >
+          {goal.manualDone ? "Cumprida — desmarcar" : "Marcar como cumprida"}
+        </button>
+      )}
       <button onClick={onToggle} className="w-full text-left">
         <div className="flex items-baseline justify-between gap-2">
-          <p className="min-w-0 truncate text-sm font-semibold">{label}</p>
-          <p className="shrink-0 font-mono text-xs font-bold tabular-nums">
-            {hasData ? formatValue(current, goal.unit) : "—"}
-            <span className="text-muted-foreground">
-              {" "}
-              / {formatValue(goal.targetValue, goal.unit)}
-            </span>
+          <p className="min-w-0 truncate text-sm font-semibold">
+            {label}
+            {manual && (
+              <span className="ml-1.5 rounded-full bg-surface px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
+                manual
+              </span>
+            )}
           </p>
+          {goal.kind !== "descritiva" && (
+            <p className="shrink-0 font-mono text-xs font-bold tabular-nums">
+              {hasData ? formatValue(current, goal.unit) : "—"}
+              <span className="text-muted-foreground">
+                {" "}
+                / {formatValue(goal.targetValue, goal.unit)}
+              </span>
+            </p>
+          )}
         </div>
-        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface">
-          <div
-            className={`progress-fill h-full rounded-full ${reached ? "bg-success" : "bg-primary"}`}
-            style={{ width: `${Math.round(progress * 100)}%` }}
-          />
-        </div>
+        {goal.kind !== "descritiva" && (
+          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface">
+            <div
+              className={`progress-fill h-full rounded-full ${reached ? "bg-success" : "bg-primary"}`}
+              style={{ width: `${Math.round(progress * 100)}%` }}
+            />
+          </div>
+        )}
         <p className="mt-1 text-[10px] text-muted-foreground">
-          {!hasData
-            ? "Sem registro ainda — nada medido."
-            : reached
-              ? "Meta atingida."
-              : `${Math.round(progress * 100)}% do caminho`}
+          {goal.kind === "descritiva"
+            ? reached
+              ? "Marcada como cumprida."
+              : "Acompanhamento manual."
+            : !hasData
+              ? "Sem registro ainda — nada medido."
+              : reached
+                ? "Meta atingida."
+                : `${Math.round(progress * 100)}% do caminho`}
           {blockName ? ` · ${blockName}` : ""}
         </p>
       </button>
@@ -125,10 +148,11 @@ function GoalRow({
             <Row term="Alvo" value={formatValue(goal.targetValue, goal.unit)} />
             {goal.referenceReps && (
               <Row
-                term="Repetições de referência"
-                value={`${goal.referenceReps} — só séries com pelo menos isso contam`}
+                term="Referência"
+                value={`${goal.referenceSets ?? 1} × ${goal.referenceReps} repetições`}
               />
             )}
+            {manual && <Row term="Origem" value="informado por você, não calculado pelo app" />}
             {goal.deadline && <Row term="Prazo" value={formatDateShortBR(goal.deadline)} />}
           </dl>
           <button
