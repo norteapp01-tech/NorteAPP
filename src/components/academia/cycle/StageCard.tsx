@@ -19,13 +19,11 @@ import {
   resizeBlock,
   routinePlanForBlock,
   setBlockDay,
-  stageDivision,
   stageState,
   stagesShiftedBy,
   updateBlock,
   useCycleStore,
   type CycleBlock,
-  type StageState,
   type WorkoutCycle,
 } from "@/lib/workout-cycle-store";
 import { BulkExerciseModal } from "./BulkExerciseModal";
@@ -39,20 +37,6 @@ import { BulkExerciseModal } from "./BulkExerciseModal";
 // não identificador global — dois "A" de etapas diferentes são treinos
 // diferentes.
 // ---------------------------------------------------------------------------
-
-const stateLabel: Record<StageState, string> = {
-  rascunho: "rascunho",
-  futura: "futura",
-  vigente: "vigente",
-  encerrada: "encerrada",
-};
-
-const stateTone: Record<StageState, string> = {
-  rascunho: "bg-warning/15 text-warning",
-  futura: "bg-surface-2 text-muted-foreground",
-  vigente: "bg-primary/15 text-primary",
-  encerrada: "bg-surface-2 text-muted-foreground",
-};
 
 export function StageCard({
   cycle,
@@ -71,6 +55,7 @@ export function StageCard({
   const blockPlans = useCycleStore((s) => s.blockPlans);
   const blockDays = useCycleStore((s) => s.blockDays);
   const plans = useWorkoutStore((s) => s.plans);
+  const exercises = useWorkoutStore((s) => s.exercises);
   const routines = useGoalsStore((s) => s.routines);
 
   const [addingPlan, setAddingPlan] = useState(false);
@@ -93,25 +78,20 @@ export function StageCard({
   return (
     <div className={`card-surface p-4 ${state === "vigente" ? "border-l-2 border-l-primary" : ""}`}>
       <div className="flex items-start gap-3">
+        <span
+          aria-hidden
+          className="mt-0.5 h-6 w-6 shrink-0 rounded-full border border-border bg-surface-2"
+        />
         <button className="min-w-0 flex-1 text-left" onClick={onToggle} aria-expanded={isOpen}>
-          <div className="flex items-center gap-2">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-              Etapa {index + 1}
-            </p>
-            <span
-              className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${stateTone[state]}`}
-            >
-              {stateLabel[state]}
-            </span>
-          </div>
+          <p
+            className={`text-[11px] font-bold uppercase tracking-wider ${state === "vigente" ? "text-primary" : "text-muted-foreground"}`}
+          >
+            {state === "vigente" ? "Etapa atual" : `Etapa ${index + 1}`}
+          </p>
           <p className="mt-0.5 text-[16px] font-semibold leading-snug">{block.name}</p>
           <p className="mt-0.5 text-[13px] text-muted-foreground">
-            {formatDateShortBR(block.startDate)} — {formatDateShortBR(block.endDate)} ·{" "}
-            {blockDurationDays(block)} dias
-          </p>
-          <p className="mt-0.5 text-[12px] text-muted-foreground">
-            {stageDivision(blockPlans, plans, block.id)}
-            {block.focus ? ` · ${block.focus}` : ""}
+            {myPlans.length} {myPlans.length === 1 ? "treino" : "treinos"} · Até{" "}
+            {formatDateShortBR(block.endDate)}
           </p>
         </button>
         <div className="flex shrink-0 items-center gap-1">
@@ -161,21 +141,117 @@ export function StageCard({
         </p>
       )}
 
-      {state === "rascunho" && !isOpen && (
-        <p className="mt-2 rounded-lg border border-warning/30 bg-warning/10 px-2.5 py-2 text-[11px] text-warning">
-          Etapa incompleta: ainda não tem treino montado.
-        </p>
-      )}
-
       {isOpen && (
         <div className="mt-3 space-y-5 border-t border-border pt-3 animate-in fade-in slide-in-from-top-1">
+          {/* --- treinos --------------------------------------------------- */}
+          <section>
+            <div className="flex flex-wrap items-baseline justify-end gap-2">
+              {myPlans.length > 1 && (
+                <button
+                  onClick={() => setBulkOpen(true)}
+                  className="interactive-press text-[11px] font-semibold text-primary"
+                >
+                  + exercício em vários
+                </button>
+              )}
+            </div>
+
+            <ul className="relative mt-3 space-y-2 border-l border-border pl-4">
+              {myPlans.map((plan) => (
+                <li
+                  key={plan.id}
+                  className="relative rounded-2xl border border-border bg-surface-2 p-3"
+                >
+                  <span aria-hidden className="absolute -left-4 top-6 h-px w-4 bg-border" />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setOpenPlanId(openPlanId === plan.id ? null : plan.id)}
+                      aria-expanded={openPlanId === plan.id}
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    >
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border text-[11px] font-semibold text-muted-foreground">
+                        {plan.letter}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium">{plan.name}</span>
+                        <span className="mt-0.5 block text-[13px] text-muted-foreground">
+                          {exercises.filter((exercise) => exercise.planId === plan.id).length}{" "}
+                          exercícios
+                        </span>
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${openPlanId === plan.id ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    <button
+                      onClick={() => action.run(() => removePlanFromBlock(block.id, plan.id))}
+                      aria-label={`Tirar ${plan.name} da etapa`}
+                      className="shrink-0 text-muted-foreground hover:text-danger"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  {openPlanId === plan.id && <PlanExerciseEditor planId={plan.id} />}
+                </li>
+              ))}
+            </ul>
+
+            {myPlans.length === 0 && (
+              <p className="text-[13px] text-muted-foreground">
+                Quais treinos você quer fazer nesta etapa?
+              </p>
+            )}
+
+            {!addingPlan ? (
+              <div className="mt-3 border-t border-border pt-2">
+                <button
+                  onClick={() => setAddingPlan(true)}
+                  className="interactive-press flex min-h-11 items-center gap-1.5 text-sm font-semibold text-primary"
+                >
+                  <Plus className="h-4 w-4" /> Novo treino
+                </button>
+              </div>
+            ) : (
+              <AddPlanPanel
+                library={libraryPlans(plans)}
+                otherStages={others}
+                previousName={previous?.name}
+                pending={action.pending}
+                onCopyStage={(fromId) =>
+                  action.run(async () => {
+                    await copyBlockPrograms(fromId, block.id);
+                    setAddingPlan(false);
+                  })
+                }
+                onPick={(planId) =>
+                  action.run(async () => {
+                    await copyPlanIntoBlock(block.id, planId);
+                    setAddingPlan(false);
+                  })
+                }
+                onCreate={(input) =>
+                  action.run(async () => {
+                    const id = await createPlanInBlock(block.id, input);
+                    setAddingPlan(false);
+                    setOpenPlanId(id);
+                  })
+                }
+                onCancel={() => setAddingPlan(false)}
+              />
+            )}
+          </section>
+
           {/* --- identidade e duração ------------------------------------- */}
-          <details className="group border-b border-border pb-3">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold">
+          <details className="group">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[13px] text-muted-foreground">
               Editar nome, foco e duração
               <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
             </summary>
             <div className="mt-3 space-y-3">
+              <p className="text-[13px] text-muted-foreground">
+                {formatDateShortBR(block.startDate)} — {formatDateShortBR(block.endDate)} ·{" "}
+                {blockDurationDays(block)} dias
+              </p>
               <Field
                 label="Nome"
                 value={block.name}
@@ -235,120 +311,10 @@ export function StageCard({
             </div>
           </details>
 
-          {/* --- treinos --------------------------------------------------- */}
-          <section>
-            <div className="flex items-baseline justify-between">
-              <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                Treinos desta etapa
-              </h3>
-              {myPlans.length > 1 && (
-                <button
-                  onClick={() => setBulkOpen(true)}
-                  className="interactive-press text-[11px] font-semibold text-primary"
-                >
-                  + exercício em vários
-                </button>
-              )}
-            </div>
-
-            <ul className="relative mt-3 space-y-2 border-l border-border pl-4">
-              {myPlans.map((plan) => (
-                <li
-                  key={plan.id}
-                  className="relative rounded-xl border border-border bg-surface/50 p-3"
-                >
-                  <span aria-hidden className="absolute -left-4 top-6 h-px w-4 bg-border" />
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setOpenPlanId(openPlanId === plan.id ? null : plan.id)}
-                      aria-expanded={openPlanId === plan.id}
-                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                    >
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-xs font-bold text-primary">
-                        {plan.letter}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                        {plan.name}
-                      </span>
-                      <ChevronDown
-                        className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${openPlanId === plan.id ? "rotate-180" : ""}`}
-                      />
-                    </button>
-                    <button
-                      onClick={() => action.run(() => removePlanFromBlock(block.id, plan.id))}
-                      aria-label={`Tirar ${plan.name} da etapa`}
-                      className="shrink-0 text-muted-foreground hover:text-danger"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  {openPlanId === plan.id && <PlanExerciseEditor planId={plan.id} />}
-                </li>
-              ))}
-            </ul>
-
-            {myPlans.length === 0 && (
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                Nenhum treino nesta etapa ainda — ela fica como rascunho até ter pelo menos um.
-              </p>
-            )}
-
-            {!addingPlan ? (
-              <div className="mt-2 grid grid-cols-3 gap-1.5">
-                <button
-                  onClick={() => setAddingPlan(true)}
-                  className="interactive-press flex items-center justify-center gap-1 rounded-lg border border-dashed border-border py-2 text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary"
-                >
-                  <Plus className="h-3.5 w-3.5" /> treino
-                </button>
-                <button
-                  onClick={() => setAddingPlan(true)}
-                  className="interactive-press flex items-center justify-center gap-1 rounded-lg border border-dashed border-border py-2 text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary"
-                >
-                  <Layers3 className="h-3.5 w-3.5" /> cadastrado
-                </button>
-                <button
-                  onClick={() => setAddingPlan(true)}
-                  disabled={others.length === 0}
-                  className="interactive-press flex items-center justify-center gap-1 rounded-lg border border-dashed border-border py-2 text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary disabled:opacity-40"
-                >
-                  <Copy className="h-3.5 w-3.5" /> copiar
-                </button>
-              </div>
-            ) : (
-              <AddPlanPanel
-                library={libraryPlans(plans)}
-                otherStages={others}
-                previousName={previous?.name}
-                pending={action.pending}
-                onCopyStage={(fromId) =>
-                  action.run(async () => {
-                    await copyBlockPrograms(fromId, block.id);
-                    setAddingPlan(false);
-                  })
-                }
-                onPick={(planId) =>
-                  action.run(async () => {
-                    await copyPlanIntoBlock(block.id, planId);
-                    setAddingPlan(false);
-                  })
-                }
-                onCreate={(input) =>
-                  action.run(async () => {
-                    const id = await createPlanInBlock(block.id, input);
-                    setAddingPlan(false);
-                    setOpenPlanId(id);
-                  })
-                }
-                onCancel={() => setAddingPlan(false)}
-              />
-            )}
-          </section>
-
           {/* --- distribuição semanal -------------------------------------- */}
           <details className="group border-t border-border pt-3">
             <summary className="flex cursor-pointer list-none items-center gap-2">
-              <h3 className="flex-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              <h3 className="flex-1 text-[13px] font-medium text-muted-foreground">
                 Dias da semana
               </h3>
               <span className="text-[11px] text-muted-foreground">

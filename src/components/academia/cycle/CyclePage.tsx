@@ -114,7 +114,7 @@ export function CyclePage({
               cycle.status === "ativo"
                 ? "bg-primary/15 text-primary"
                 : cycle.status === "rascunho"
-                  ? "bg-warning/15 text-warning"
+                  ? "bg-surface-2 text-muted-foreground"
                   : "bg-surface-2 text-muted-foreground"
             }`}
           >
@@ -277,7 +277,7 @@ export function CyclePage({
               disabled={action.pending}
               className="interactive-press mt-2 flex h-12 w-fit items-center gap-1.5 rounded-2xl border border-primary/50 px-4 text-sm font-semibold text-primary hover:bg-primary/5 disabled:opacity-40"
             >
-              <Plus className="h-4 w-4" /> Adicionar etapa
+              <Plus className="h-4 w-4" /> Nova etapa
             </button>
           </div>
         )}
