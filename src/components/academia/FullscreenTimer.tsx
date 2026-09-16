@@ -1,24 +1,26 @@
-import { Minimize2, Pause, Play, Minus, Plus } from "lucide-react";
+import { useState } from "react";
+import { Minimize2, Pause, Play, RotateCcw, SlidersHorizontal } from "lucide-react";
 import { useGymSession } from "@/lib/gym-session-context";
 import { formatDurationClock } from "@/lib/sport-store";
 import {
-  adjustRest,
-  clearRest,
   exerciseCompletionState,
-  isRestRunning,
   pauseRest,
   pauseSession,
-  restRemainingSeconds,
+  resetRest,
+  restBaseSeconds,
+  restState,
   resumeRest,
   resumeSession,
   sessionElapsedSeconds,
+  setRestOverride,
   startRest,
 } from "@/lib/workout-store";
+import { RestDurationEditor } from "./TimerBlock";
 
 // ---------------------------------------------------------------------------
-// Cronômetro em tela cheia — os MESMOS dados do painel compacto, só maiores.
-// Recolher não reinicia nada: os dois relógios vivem no banco, derivados de
-// horários, então a tela é só uma leitura deles.
+// Cronômetro em tela cheia — o MESMO que estiver à mostra no painel compacto,
+// só maior. Não é um segundo temporizador: lê o mesmo estado, então expandir,
+// recolher ou virar a face não perde tempo nem reinicia contagem.
 //
 // Sem promessa de alerta quando o descanso acaba com o app em segundo plano:
 // o navegador não garante execução nem som nessa situação.
@@ -26,16 +28,24 @@ import {
 
 export function FullscreenTimer() {
   const gym = useGymSession();
-  const { session, plan, planned, selectedExerciseId, setFullscreen } = gym;
+  const { session, plan, planned, selectedExerciseId, timerFace, setFullscreen } = gym;
+  const [editing, setEditing] = useState(false);
   if (!session) return null;
 
-  const elapsed = sessionElapsedSeconds(session);
-  const rest = restRemainingSeconds(session);
-  const restOver = rest !== null && rest <= 0;
   const current = planned.find((p) => p.exerciseId === selectedExerciseId);
   const log = session.exerciseLogs.find((l) => l.exerciseId === current?.exerciseId);
   const completion = exerciseCompletionState(log, current);
-  const restRunning = isRestRunning(session);
+  const setIndex = log?.sets.length ?? 0;
+  const configured = current?.setTargets[setIndex]?.restSeconds ?? current?.restSeconds;
+  const base = restBaseSeconds(session, current?.exerciseId, configured);
+  const rest = restState(session, base);
+  const elapsed = sessionElapsedSeconds(session);
+
+  const playRest = () => {
+    if (rest.status === "correndo") return void pauseRest(session);
+    if (rest.status === "pausado") return void resumeRest(session);
+    return void startRest(session.id, base);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background px-6 pb-10 pt-12">
@@ -60,92 +70,94 @@ export function FullscreenTimer() {
         </button>
       </div>
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-10">
-        <div className="text-center">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-            Duração do treino
-          </p>
-          <p className="mt-1 font-mono text-6xl font-bold tabular-nums">
-            {formatDurationClock(elapsed)}
-          </p>
-          <button
-            onClick={() => void (session.pausedAt ? resumeSession(session) : pauseSession(session))}
-            className="interactive-press mt-4 inline-flex items-center gap-2 rounded-xl border border-border px-5 py-2.5 text-sm font-semibold"
-          >
-            {session.pausedAt ? (
-              <>
-                <Play className="h-4 w-4" /> Retomar treino
-              </>
-            ) : (
-              <>
-                <Pause className="h-4 w-4" /> Pausar treino
-              </>
-            )}
-          </button>
-          {session.pausedAt && (
-            <p className="mt-2 text-[11px] text-warning">
-              Treino pausado — o tempo não está correndo.
+      <div className="flex flex-1 flex-col items-center justify-center">
+        {timerFace === "descanso" ? (
+          <div className="w-full max-w-xs text-center">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              Descanso
             </p>
-          )}
-        </div>
-
-        <div className="w-full max-w-xs text-center">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-            Descanso
-          </p>
-          {rest === null ? (
-            <button
-              onClick={() => void startRest(session.id, current?.restSeconds || 60)}
-              className="interactive-press mt-2 w-full rounded-xl border border-dashed border-border py-3 text-sm text-muted-foreground"
+            <p
+              className={`mt-1 font-mono text-7xl font-bold tabular-nums ${rest.status === "fim" ? "text-success" : ""}`}
             >
-              Iniciar descanso
-            </button>
-          ) : (
-            <>
-              <p
-                className={`mt-1 font-mono text-5xl font-bold tabular-nums ${restOver ? "text-success" : ""}`}
-              >
-                {formatDurationClock(rest)}
-              </p>
-              <div className="mt-4 flex items-center justify-center gap-2">
-                <button
-                  onClick={() => void adjustRest(session, -15)}
-                  aria-label="Menos 15 segundos"
-                  className="interactive-press flex h-11 w-11 items-center justify-center rounded-xl border border-border"
-                >
-                  <Minus className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => void (restRunning ? pauseRest(session) : resumeRest(session))}
-                  className="interactive-press flex items-center gap-2 rounded-xl border border-border px-5 py-3 text-sm font-semibold"
-                >
-                  {restRunning ? (
-                    <>
-                      <Pause className="h-4 w-4" /> Pausar
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4" /> Continuar
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() => void adjustRest(session, 15)}
-                  aria-label="Mais 15 segundos"
-                  className="interactive-press flex h-11 w-11 items-center justify-center rounded-xl border border-border"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
-              </div>
+              {formatDurationClock(rest.remaining)}
+            </p>
+            <div className="mt-6 flex items-center justify-center gap-2">
               <button
-                onClick={() => void clearRest(session.id)}
-                className="interactive-press mt-3 text-xs font-semibold text-muted-foreground underline"
+                onClick={() => void resetRest(session.id, base)}
+                aria-label={`Reiniciar descanso em ${formatDurationClock(base)}`}
+                className="interactive-press flex h-12 w-12 items-center justify-center rounded-xl border border-border"
               >
-                Zerar descanso
+                <RotateCcw className="h-5 w-5" />
               </button>
-            </>
-          )}
-        </div>
+              <button
+                onClick={playRest}
+                className="interactive-press flex items-center gap-2 rounded-xl border border-border px-6 py-3.5 text-sm font-semibold"
+              >
+                {rest.status === "correndo" ? (
+                  <>
+                    <Pause className="h-4 w-4" /> Pausar
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4" />{" "}
+                    {rest.status === "pausado" ? "Continuar" : "Iniciar"}
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setEditing((v) => !v)}
+                aria-label="Ajustar tempo de descanso"
+                aria-expanded={editing}
+                className="interactive-press flex h-12 w-12 items-center justify-center rounded-xl border border-border"
+              >
+                <SlidersHorizontal className="h-5 w-5" />
+              </button>
+            </div>
+            {editing && (
+              <div className="mt-3 text-left">
+                <RestDurationEditor
+                  current={base}
+                  onCancel={() => setEditing(false)}
+                  onStart={async (seconds) => {
+                    if (current) await setRestOverride(session, current.exerciseId, seconds);
+                    await startRest(session.id, seconds);
+                    setEditing(false);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-center">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              Duração do treino
+            </p>
+            <p className="mt-1 font-mono text-7xl font-bold tabular-nums">
+              {formatDurationClock(elapsed)}
+            </p>
+            <button
+              onClick={() =>
+                void (session.pausedAt ? resumeSession(session) : pauseSession(session))
+              }
+              className="interactive-press mt-6 inline-flex items-center gap-2 rounded-xl border border-border px-6 py-3.5 text-sm font-semibold"
+            >
+              {session.pausedAt ? (
+                <>
+                  <Play className="h-4 w-4" /> Retomar treino
+                </>
+              ) : (
+                <>
+                  <Pause className="h-4 w-4" /> Pausar treino
+                </>
+              )}
+            </button>
+            {session.pausedAt && (
+              <p className="mt-2 text-[11px] text-warning">
+                Treino pausado — o tempo não está correndo.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <p className="text-center text-[11px] text-muted-foreground">

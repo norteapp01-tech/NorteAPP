@@ -85,6 +85,9 @@ export type WorkoutSession = {
    * do plano e às cópias entre blocos. */
   planLineageId?: string;
   planLabel?: string;
+  /** Descanso escolhido na hora para um exercício, valendo só nesta sessão.
+   * Não toca na ficha do treino. */
+  restOverrides: Record<string, number>;
 };
 
 export type BodyWeightEntry = { id: string; date: string; weight: number };
@@ -180,6 +183,43 @@ export function restRemainingSeconds(session: WorkoutSession, now = nowMs()): nu
 
 export function isRestRunning(session: WorkoutSession): boolean {
   return Boolean(session.restStartedAt && !session.restPausedAt);
+}
+
+/** Os quatro estados do descanso, explicitamente separados — duração-base,
+ * tempo restante e estado de execução são três coisas distintas, e tratá-las
+ * como uma só foi o que fazia o cronômetro "desaparecer" quando parava. */
+export type RestStatus = "pronto" | "correndo" | "pausado" | "fim";
+
+export type RestState = {
+  status: RestStatus;
+  /** Sempre presente: quando não há descanso rodando, é a duração-base. */
+  remaining: number;
+  /** Duração que um Play/Reiniciar vai carregar. */
+  base: number;
+};
+
+/** Descanso cadastrado para a série atual, com a escolha temporária da sessão
+ * tendo precedência. Nunca zero: um descanso de duração zero não é descanso. */
+export function restBaseSeconds(
+  session: WorkoutSession,
+  exerciseId: string | undefined,
+  configured: number | undefined,
+): number {
+  const override = exerciseId ? session.restOverrides[exerciseId] : undefined;
+  const value = override ?? configured ?? DEFAULT_REST_SECONDS;
+  return value > 0 ? value : DEFAULT_REST_SECONDS;
+}
+
+export const DEFAULT_REST_SECONDS = 60;
+export const MAX_REST_SECONDS = 60 * 60;
+
+export function restState(session: WorkoutSession, base: number, now = nowMs()): RestState {
+  if (!session.restStartedAt || !session.restTotalSeconds) {
+    return { status: "pronto", remaining: base, base };
+  }
+  const remaining = restRemainingSeconds(session, now) ?? 0;
+  if (remaining <= 0) return { status: "fim", remaining: 0, base };
+  return { status: session.restPausedAt ? "pausado" : "correndo", remaining, base };
 }
 
 /** Converte um exercício vivo no formato do retrato — usado tanto pra gravar o
@@ -646,6 +686,7 @@ function mapSession(r: Row, exerciseLogs: ExerciseLog[]): WorkoutSession {
       : undefined,
     planLineageId: (r.plan_lineage_id as string) ?? undefined,
     planLabel: (r.plan_label as string) ?? undefined,
+    restOverrides: (r.rest_overrides as Record<string, number>) ?? {},
   };
 }
 
@@ -940,7 +981,7 @@ export async function startRest(sessionId: string, seconds: number) {
   if (seconds <= 0) return;
   await patchSession(sessionId, {
     rest_started_at: nowDate().toISOString(),
-    rest_total_seconds: seconds,
+    rest_total_seconds: Math.min(MAX_REST_SECONDS, Math.round(seconds)),
     rest_paused_at: null,
     rest_paused_seconds: 0,
   });
@@ -969,12 +1010,30 @@ export async function clearRest(sessionId: string) {
   });
 }
 
-/** Soma/subtrai tempo no descanso em andamento, preservando o quanto já correu. */
-export async function adjustRest(session: WorkoutSession, deltaSeconds: number) {
-  if (!session.restStartedAt || !session.restTotalSeconds) return;
-  const total = session.restTotalSeconds + deltaSeconds;
-  if (total <= 0) return clearRest(session.id);
-  await patchSession(session.id, { rest_total_seconds: total });
+/** Volta o descanso para a duração-base e o deixa PARADO, pronto para o Play.
+ * Marcar o início e a pausa no mesmo instante congela o relógio no cheio — é o
+ * mesmo cálculo de sempre, sem um estado paralelo só para "reiniciado". */
+export async function resetRest(sessionId: string, base: number) {
+  const iso = nowDate().toISOString();
+  await patchSession(sessionId, {
+    rest_started_at: iso,
+    rest_total_seconds: Math.max(1, Math.round(base)),
+    rest_paused_at: iso,
+    rest_paused_seconds: 0,
+  });
+}
+
+/** Grava a escolha de descanso feita na hora para um exercício. Vale só nesta
+ * sessão: a ficha permanente do treino não é tocada. */
+export async function setRestOverride(
+  session: WorkoutSession,
+  exerciseId: string,
+  seconds: number,
+) {
+  const safe = Math.max(1, Math.min(MAX_REST_SECONDS, Math.round(seconds)));
+  await patchSession(session.id, {
+    rest_overrides: { ...session.restOverrides, [exerciseId]: safe },
+  });
 }
 
 /** Autocura: se por algum motivo a sessão não tiver o log deste exercício (ex.: exercício

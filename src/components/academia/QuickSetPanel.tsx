@@ -1,39 +1,20 @@
 import { useLayoutEffect, useState, type CSSProperties, type RefObject } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  Maximize2,
-  Minus,
-  Pause,
-  Play,
-  Plus,
-  X,
-} from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ChevronUp, Plus, X } from "lucide-react";
 import { InlineError } from "@/components/ui/inline-error";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { useGymSession } from "@/lib/gym-session-context";
-import { formatDurationClock } from "@/lib/sport-store";
 import {
-  adjustRest,
-  clearRest,
   completeExerciseLog,
   exerciseCompletionState,
   finishSession,
-  isRestRunning,
   logSet,
-  pauseRest,
-  pauseSession,
-  restRemainingSeconds,
-  resumeRest,
-  resumeSession,
-  sessionElapsedSeconds,
+  restBaseSeconds,
   startRest,
   updateSet,
   type PlannedExercise,
 } from "@/lib/workout-store";
+import { TimerBlock } from "./TimerBlock";
 
 // ---------------------------------------------------------------------------
 // Painel rápido — UMA série por vez. A série atual dá lugar à próxima no mesmo
@@ -114,8 +95,6 @@ export function QuickSetPanel({
         p,
       ) !== "concluido",
   );
-  const rest = restRemainingSeconds(session);
-  const elapsed = sessionElapsedSeconds(session);
 
   // Ancora perto da bolha e escolhe o lado com espaço. A bolha pode ter sido
   // solta em qualquer canto, então alinhar pela borda dela não basta: o
@@ -163,7 +142,14 @@ export function QuickSetPanel({
       await logSet(session.id, current.exerciseId, weight, reps);
       const isLastPlanned = setIndex + 1 >= current.setsTarget;
       if (isLastPlanned) await completeExerciseLog(session.id, current.exerciseId);
-      if (autoRest && target.restSeconds > 0) await startRest(session.id, target.restSeconds);
+      // Duração da série que acabou de ser concluída — com a escolha temporária
+      // deste exercício tendo precedência, se houver uma.
+      if (autoRest) {
+        await startRest(
+          session.id,
+          restBaseSeconds(session, current.exerciseId, target.restSeconds),
+        );
+      }
       // Só depois de tudo gravado: uma falha acima interrompe aqui e mantém os
       // valores digitados na tela, sem avançar.
       setDraft(null);
@@ -381,40 +367,14 @@ export function QuickSetPanel({
               />
             )}
 
-            <RestRow
-              rest={rest}
-              running={isRestRunning(session)}
-              onStart={() => void startRest(session.id, target.restSeconds || 60)}
-              onPause={() => void pauseRest(session)}
-              onResume={() => void resumeRest(session)}
-              onAdjust={(delta) => void adjustRest(session, delta)}
-              onClear={() => void clearRest(session.id)}
+            <TimerBlock
+              session={session}
+              face={gym.timerFace}
+              onChangeFace={gym.setTimerFace}
+              exerciseId={current?.exerciseId}
+              configuredRest={target.restSeconds}
+              onExpand={() => gym.setFullscreen(true)}
             />
-
-            <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-border bg-surface-2 px-2.5 py-2">
-              <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Treino</p>
-                <p className="font-mono text-base font-bold tabular-nums">
-                  {formatDurationClock(elapsed)}
-                </p>
-              </div>
-              <button
-                onClick={() =>
-                  void (session.pausedAt ? resumeSession(session) : pauseSession(session))
-                }
-                className="interactive-press flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-semibold"
-              >
-                {session.pausedAt ? (
-                  <>
-                    <Play className="h-3.5 w-3.5" /> Retomar
-                  </>
-                ) : (
-                  <>
-                    <Pause className="h-3.5 w-3.5" /> Pausar
-                  </>
-                )}
-              </button>
-            </div>
 
             {pending.length === 0 && (
               <p className="mt-2 rounded-xl border border-success/40 bg-success/10 px-3 py-2 text-center text-xs font-semibold text-success">
@@ -437,13 +397,6 @@ export function QuickSetPanel({
             Abrir treino
           </button>
           <button
-            onClick={() => gym.setFullscreen(true)}
-            aria-label="Expandir cronômetro"
-            className="interactive-press flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </button>
-          <button
             onClick={() => setConfirmFinish(true)}
             className="interactive-press flex-1 rounded-lg bg-primary px-2 py-1.5 text-[11px] font-bold text-primary-foreground"
           >
@@ -452,81 +405,6 @@ export function QuickSetPanel({
         </footer>
       )}
     </section>
-  );
-}
-
-function RestRow({
-  rest,
-  running,
-  onStart,
-  onPause,
-  onResume,
-  onAdjust,
-  onClear,
-}: {
-  rest: number | null;
-  running: boolean;
-  onStart: () => void;
-  onPause: () => void;
-  onResume: () => void;
-  onAdjust: (delta: number) => void;
-  onClear: () => void;
-}) {
-  if (rest === null) {
-    return (
-      <button
-        onClick={onStart}
-        className="interactive-press mt-2 w-full rounded-xl border border-dashed border-border py-2 text-[11px] text-muted-foreground"
-      >
-        Iniciar descanso
-      </button>
-    );
-  }
-  const over = rest <= 0;
-  return (
-    <div
-      className={`mt-2 flex items-center gap-1.5 rounded-xl border px-2.5 py-2 ${over ? "border-success bg-success/10" : "border-border bg-surface-2"}`}
-    >
-      <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Descanso</p>
-        <p
-          className={`font-mono text-base font-bold tabular-nums ${over ? "text-success" : ""}`}
-          aria-live="off"
-        >
-          {formatDurationClock(rest)}
-        </p>
-      </div>
-      <div className="ml-auto flex items-center gap-1">
-        <button
-          onClick={() => onAdjust(-15)}
-          aria-label="Menos 15 segundos de descanso"
-          className="interactive-press flex h-7 w-7 items-center justify-center rounded-lg border border-border"
-        >
-          <Minus className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={() => onAdjust(15)}
-          aria-label="Mais 15 segundos de descanso"
-          className="interactive-press flex h-7 w-7 items-center justify-center rounded-lg border border-border"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={running ? onPause : onResume}
-          aria-label={running ? "Pausar descanso" : "Continuar descanso"}
-          className="interactive-press flex h-7 w-7 items-center justify-center rounded-lg border border-border"
-        >
-          {running ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-        </button>
-        {/* Zerar mexe SÓ no descanso — nenhuma série registrada é tocada. */}
-        <button
-          onClick={onClear}
-          className="interactive-press rounded-lg border border-border px-2 py-1 text-[10px] font-semibold"
-        >
-          zerar
-        </button>
-      </div>
-    </div>
   );
 }
 

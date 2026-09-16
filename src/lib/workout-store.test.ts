@@ -21,6 +21,9 @@ import {
   nextPendingExerciseId,
   openSession,
   sessionPlanned,
+  restBaseSeconds,
+  restState,
+  DEFAULT_REST_SECONDS,
   type WorkoutSession,
   type Exercise,
   type PlannedExercise,
@@ -52,6 +55,7 @@ function makeSession(overrides: Partial<WorkoutSession> = {}): WorkoutSession {
     status: "concluido",
     pausedSeconds: 0,
     restPausedSeconds: 0,
+    restOverrides: {},
     ...overrides,
   };
 }
@@ -459,5 +463,102 @@ describe("sessionSummary — histórico sobrevive à exclusão do exercício", (
     expect(summary.exercises).toHaveLength(1);
     expect(summary.exercises[0].name).toBe("Remada curvada");
     expect(summary.exercises[0].targetWeight).toBe(50);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Descanso — duração-base, tempo restante e estado de execução são TRÊS coisas
+// distintas. Tratá-las como uma só era o que fazia o cronômetro sumir.
+// ---------------------------------------------------------------------------
+
+const REST_T0 = Date.parse("2026-09-16T10:00:00.000Z");
+
+function restSession(o: Partial<WorkoutSession> = {}): WorkoutSession {
+  const s = makeSession({ status: "em_andamento", ...o });
+  delete (s as { finishedAt?: string }).finishedAt;
+  return s;
+}
+
+describe("restBaseSeconds — de onde vem os 03:00", () => {
+  it("usa o descanso cadastrado para a série", () => {
+    expect(restBaseSeconds(restSession(), "ex-1", 90)).toBe(90);
+  });
+
+  it("a escolha temporária da sessão tem precedência sobre a ficha", () => {
+    const s = restSession({ restOverrides: { "ex-1": 180 } });
+    expect(restBaseSeconds(s, "ex-1", 90)).toBe(180);
+  });
+
+  it("a escolha vale só para o exercício dela — outro usa a própria ficha", () => {
+    const s = restSession({ restOverrides: { "ex-1": 180 } });
+    expect(restBaseSeconds(s, "ex-2", 45)).toBe(45);
+  });
+
+  it("sem configuração cai no padrão, nunca em zero", () => {
+    expect(restBaseSeconds(restSession(), "ex-1", undefined)).toBe(DEFAULT_REST_SECONDS);
+    expect(restBaseSeconds(restSession(), "ex-1", 0)).toBe(DEFAULT_REST_SECONDS);
+  });
+});
+
+describe("restState — o descanso nunca desaparece", () => {
+  it("sem nada iniciado: pronto, mostrando a duração-base", () => {
+    const r = restState(restSession(), 180, REST_T0);
+    expect(r.status).toBe("pronto");
+    expect(r.remaining).toBe(180);
+  });
+
+  it("rodando: conta para baixo", () => {
+    const s = restSession({ restStartedAt: "2026-09-16T10:00:00.000Z", restTotalSeconds: 180 });
+    expect(restState(s, 180, REST_T0 + 80_000)).toMatchObject({
+      status: "correndo",
+      remaining: 100,
+    });
+  });
+
+  it("pausado em 01:40 continua em 01:40, por mais que o relógio ande", () => {
+    const s = restSession({
+      restStartedAt: "2026-09-16T10:00:00.000Z",
+      restTotalSeconds: 180,
+      restPausedAt: "2026-09-16T10:01:20.000Z",
+    });
+    expect(restState(s, 180, REST_T0 + 80_000).remaining).toBe(100);
+    expect(restState(s, 180, REST_T0 + 600_000).remaining).toBe(100);
+    expect(restState(s, 180, REST_T0 + 600_000).status).toBe("pausado");
+  });
+
+  it("no fim fica em 00:00 e nunca fica negativo", () => {
+    const s = restSession({ restStartedAt: "2026-09-16T10:00:00.000Z", restTotalSeconds: 180 });
+    expect(restState(s, 180, REST_T0 + 180_000)).toMatchObject({ status: "fim", remaining: 0 });
+    expect(restState(s, 180, REST_T0 + 999_000).remaining).toBe(0);
+  });
+
+  it("a base fica disponível em qualquer estado — é o que o Play recarrega", () => {
+    const s = restSession({ restStartedAt: "2026-09-16T10:00:00.000Z", restTotalSeconds: 180 });
+    expect(restState(s, 300, REST_T0 + 999_000).base).toBe(300);
+  });
+
+  it("pausar o TREINO não congela o descanso", () => {
+    const s = restSession({
+      restStartedAt: "2026-09-16T10:00:00.000Z",
+      restTotalSeconds: 180,
+      pausedAt: "2026-09-16T10:00:00.000Z",
+    });
+    expect(restState(s, 180, REST_T0 + 60_000).remaining).toBe(120);
+  });
+});
+
+describe("reiniciar o descanso — volta ao cheio e fica PARADO", () => {
+  it("marcar início e pausa no mesmo instante congela na duração-base", () => {
+    // É exatamente o que `resetRest` grava; aqui verifico que o cálculo lê isso
+    // como "cheio e parado", sem um estado paralelo só para "reiniciado".
+    const s = restSession({
+      restStartedAt: "2026-09-16T10:00:00.000Z",
+      restPausedAt: "2026-09-16T10:00:00.000Z",
+      restTotalSeconds: 180,
+    });
+    expect(restState(s, 180, REST_T0 + 500_000)).toMatchObject({
+      status: "pausado",
+      remaining: 180,
+    });
   });
 });

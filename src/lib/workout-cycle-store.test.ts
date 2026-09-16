@@ -71,6 +71,7 @@ function makeSession(o: Partial<WorkoutSession> = {}): WorkoutSession {
     status: "concluido",
     pausedSeconds: 0,
     restPausedSeconds: 0,
+    restOverrides: {},
     ...o,
   };
 }

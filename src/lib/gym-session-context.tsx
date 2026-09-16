@@ -17,6 +17,7 @@ import {
   type WorkoutPlan,
   type WorkoutSession,
 } from "./workout-store";
+import type { TimerFace } from "@/components/academia/TimerPrism";
 
 // ---------------------------------------------------------------------------
 // Estado do treino em andamento, montado uma vez na raiz do app — é isso que
@@ -42,6 +43,10 @@ type GymSessionValue = {
   setPanelOpen: (open: boolean) => void;
   fullscreen: boolean;
   setFullscreen: (open: boolean) => void;
+  /** Qual cronômetro o bloco mostra. Vive aqui, não no painel: minimizar e
+   * reabrir não pode devolver a face que o usuário já trocou. */
+  timerFace: TimerFace;
+  setTimerFace: (face: TimerFace) => void;
   autoRest: boolean;
   setAutoRest: (on: boolean) => void;
   /** Sessão recém-finalizada cujo resumo a aba Academia ainda deve abrir —
@@ -75,6 +80,8 @@ export function GymSessionProvider({ children }: { children: ReactNode }) {
 
   const [panelOpen, setPanelOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  // Sessão nova começa no descanso — é o cronômetro que se usa a cada série.
+  const [timerFace, setTimerFace] = useState<TimerFace>("descanso");
   const [autoRest, setAutoRestState] = useState(readAutoRest);
   const [localSelection, setLocalSelection] = useState<string | null>(null);
   const [finishedSummaryId, setFinishedSummaryId] = useState<string | null>(null);
@@ -96,6 +103,7 @@ export function GymSessionProvider({ children }: { children: ReactNode }) {
       setPanelOpen(false);
       setFullscreen(false);
       setLocalSelection(null);
+      setTimerFace("descanso");
     }
   }, [session]);
 
@@ -149,6 +157,8 @@ export function GymSessionProvider({ children }: { children: ReactNode }) {
     setPanelOpen,
     fullscreen,
     setFullscreen,
+    timerFace,
+    setTimerFace,
     autoRest,
     setAutoRest,
     finishedSummaryId,

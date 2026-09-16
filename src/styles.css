@@ -45,6 +45,7 @@
   --dur-state: 200ms;
   --dur-tab: 200ms;
   --dur-progress: 300ms;
+  --dur-flip: 220ms;
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
 
   --radius: 1rem;
@@ -323,6 +324,26 @@
   .state-fade {
     animation: state-fade var(--dur-tab) var(--ease-out) both;
   }
+}
+
+/* Prisma de duas faces (cronômetro da Academia). A perspectiva é curta de
+ * propósito: o bloco tem ~80px e um valor grande daria a impressão de a face
+ * "voar" para fora do painel. `preserve-3d` no miolo e `backface-visibility`
+ * nas faces são o que impede o verso — e o texto espelhado — de aparecer. */
+.timer-prism {
+  perspective: 700px;
+}
+.timer-prism-inner {
+  position: relative;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--dur-flip) var(--ease-out);
+}
+.timer-prism-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 /* Preenchimento de barra/anel de progresso — transição única do valor

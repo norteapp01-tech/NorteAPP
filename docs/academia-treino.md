@@ -45,7 +45,49 @@ desvio — o contador anterior vivia em `useState` e perdia todo segundo em que
 a aba não estava visível, além de morrer ao navegar.
 
 O descanso é independente da pausa do treino: dá pra pausar um sem pausar o
-outro. "Zerar" mexe **só** no descanso; nenhuma série registrada é tocada.
+outro. Reiniciar mexe **só** no descanso; nenhuma série registrada é tocada.
+
+### Um bloco, duas faces
+
+Os dois relógios ocupam o **mesmo** espaço, alternados por um arrasto vertical
+(ou pelo seletor ao lado do título, ou pelas setas do teclado). É apresentação:
+virar a face nunca pausa, reinicia nem altera tempo nenhum.
+
+A altura do bloco é fixa e as faces são absolutas dentro dela — trocar de face
+não empurra nem encolhe o resto do painel. `backface-visibility: hidden` impede
+o verso e o texto espelhado; `inert` mantém a face escondida fora do alcance do
+foco e do toque, inclusive durante o giro.
+
+O gesto tem limiar de 14px, provoca **uma** troca por arrasto, ignora toques que
+começam sobre botões e campos, e o `touch-action: none` vale só dentro do bloco
+— a rolagem do resto do painel continua livre. Com `prefers-reduced-motion`, a
+regra global reduz a duração e a troca vira instantânea.
+
+### Os quatro estados do descanso
+
+Duração-base, tempo restante e estado de execução são três coisas distintas.
+Confundi-las era o que fazia o cronômetro "sumir" e virar "Iniciar descanso":
+
+| Estado | O que mostra | O que o Play faz |
+| --- | --- | --- |
+| `pronto` | a duração-base | começa a contagem |
+| `correndo` | o restante | pausa |
+| `pausado` | o restante congelado | continua de onde parou |
+| `fim` | `00:00`, nunca negativo | recarrega a base e começa |
+
+Reiniciar volta para a base e fica **parado**, pronto para o Play. No banco isso
+é só marcar início e pausa no mesmo instante — o cálculo de sempre lê como
+"cheio e parado", sem um estado paralelo só para "reiniciado".
+
+A duração-base vem do descanso cadastrado para aquela série. Tocar nos números
+abre um editor (1/2/3/5 min ou minutos e segundos à mão) cuja escolha vira a
+base **daquele exercício, só nesta sessão** — `workout_sessions.rest_overrides`,
+um mapa por exercício. A ficha permanente do treino não é tocada, e trocar de
+exercício volta a usar a configuração dele, salvo se houver escolha temporária
+também para ele.
+
+Abrir o editor ou tocar numa opção não altera nada: só "Iniciar" mexe no
+cronômetro.
 
 Não há aviso sonoro garantido no fim do descanso com o app em segundo plano —
 o navegador não garante nem execução nem áudio nessa situação, e a tela diz
