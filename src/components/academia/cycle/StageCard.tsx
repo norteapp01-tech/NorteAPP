@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { CalendarPlus, ChevronDown, ChevronUp, Copy, Layers3, Plus, Trash2 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import {
+  CalendarPlus,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Layers3,
+  Plus,
+  Trash2,
+  TrendingUp,
+} from "lucide-react";
 import { InlineError } from "@/components/ui/inline-error";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { weekVisualLabels, weekVisualOrder } from "@/components/sub-agenda-shared";
@@ -396,6 +406,18 @@ export function StageCard({
               </div>
             </div>
           </details>
+
+          {/* A Evolução mora na aba principal: uma cópia aqui dentro divergiria
+              da outra na primeira mudança. Este atalho abre lá, já com esta
+              etapa selecionada. */}
+          <Link
+            to="/sub-agenda/$categoria"
+            params={{ categoria: "academia" }}
+            search={{ aba: "evolucao", etapa: block.id }}
+            className="interactive-press flex w-full items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-[11px] font-semibold"
+          >
+            <TrendingUp className="h-3.5 w-3.5" /> Ver evolução desta etapa
+          </Link>
 
           {action.error && <InlineError message={action.error} onRetry={action.clearError} />}
         </div>

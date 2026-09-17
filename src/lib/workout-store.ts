@@ -39,8 +39,41 @@ export type Exercise = {
   restSeconds: number;
   setTargets?: SetTarget[];
   notes?: string;
+  muscleGroup?: MuscleGroup;
+  equipment?: ExerciseEquipment;
   order: number;
 };
+
+/** Catálogo determinístico — a granularidade em que dá para somar séries sem
+ * inventar estímulo. Exercício sem classificação fica nulo, e a interface diz
+ * "Não classificado" em vez de adivinhar. */
+export type MuscleGroup =
+  | "peito"
+  | "costas"
+  | "ombros"
+  | "biceps"
+  | "triceps"
+  | "antebraco"
+  | "quadriceps"
+  | "posteriores"
+  | "gluteos"
+  | "panturrilhas"
+  | "abdomen"
+  | "corpo_inteiro"
+  | "cardio";
+
+/** Entra na chave de comparação, não é só rótulo: 40kg na barra e 40kg por
+ * halter não são a mesma carga, e trocar de aparelho quebra a curva. */
+export type ExerciseEquipment =
+  | "barra"
+  | "halteres"
+  | "maquina"
+  | "cabo"
+  | "peso_corporal"
+  | "assistido"
+  | "kettlebell"
+  | "elastico"
+  | "outro";
 
 export type SetTarget = { reps: number; weight: number; restSeconds: number };
 export type SetLog = { setIndex: number; weight: number; reps: number };
@@ -56,6 +89,10 @@ export type PlannedExercise = {
   exerciseId: string;
   lineageId?: string;
   name: string;
+  /** Guardados no retrato para que reclassificar a ficha hoje não reescreva a
+   * distribuição muscular de meses atrás. */
+  muscleGroup?: MuscleGroup;
+  equipment?: ExerciseEquipment;
   order: number;
   setsTarget: number;
   repsTarget: number;
@@ -238,6 +275,8 @@ export function toPlannedExercise(exercise: Exercise): PlannedExercise {
     exerciseId: exercise.id,
     lineageId: exercise.lineageId,
     name: exercise.name,
+    muscleGroup: exercise.muscleGroup,
+    equipment: exercise.equipment,
     order: exercise.order,
     setsTarget: exercise.setsTarget,
     repsTarget: exercise.repsTarget,
@@ -690,6 +729,8 @@ function mapExercise(r: Row): Exercise {
     loadTarget: (r.load_target as number) ?? 0,
     restSeconds: (r.rest_seconds as number) ?? 60,
     notes: (r.notes as string) ?? undefined,
+    muscleGroup: (r.muscle_group as MuscleGroup) ?? undefined,
+    equipment: (r.equipment as ExerciseEquipment) ?? undefined,
     setTargets:
       storedTargets.length > 0
         ? storedTargets
@@ -835,6 +876,8 @@ export async function addExercise(
     restSeconds: number;
     setTargets?: SetTarget[];
     notes?: string;
+    muscleGroup?: MuscleGroup;
+    equipment?: ExerciseEquipment;
   },
 ): Promise<string> {
   const userId = await ensureSession();
@@ -855,6 +898,8 @@ export async function addExercise(
         rest_seconds: input.restSeconds,
         set_targets: input.setTargets ?? null,
         notes: input.notes ?? null,
+        muscle_group: input.muscleGroup ?? null,
+        equipment: input.equipment ?? null,
         order_index: count ?? 0,
       })
       .select()
@@ -869,7 +914,15 @@ export async function updateExercise(
   patch: Partial<
     Pick<
       Exercise,
-      "name" | "setsTarget" | "repsTarget" | "loadTarget" | "restSeconds" | "setTargets" | "notes"
+      | "name"
+      | "setsTarget"
+      | "repsTarget"
+      | "loadTarget"
+      | "restSeconds"
+      | "setTargets"
+      | "notes"
+      | "muscleGroup"
+      | "equipment"
     >
   >,
 ) {
@@ -881,6 +934,8 @@ export async function updateExercise(
   if (patch.restSeconds !== undefined) dbPatch.rest_seconds = patch.restSeconds;
   if (patch.setTargets !== undefined) dbPatch.set_targets = patch.setTargets;
   if (patch.notes !== undefined) dbPatch.notes = patch.notes;
+  if (patch.muscleGroup !== undefined) dbPatch.muscle_group = patch.muscleGroup;
+  if (patch.equipment !== undefined) dbPatch.equipment = patch.equipment;
   unwrap(await supabase.from("workout_exercises").update(dbPatch).eq("id", id).select().single());
   await invalidate();
 }

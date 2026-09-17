@@ -7,7 +7,10 @@ import {
   removeExercise,
   reorderExercise,
   type SetTarget,
+  type MuscleGroup,
+  type ExerciseEquipment,
 } from "@/lib/workout-store";
+import { equipmentLabel, muscleGroupLabel } from "@/lib/workout-evolution";
 
 /** Editor de exercícios de um treino: ordem, exclusão e configuração por série
  * (kg, reps e descanso de CADA série, não um valor só pro exercício inteiro).
@@ -21,6 +24,8 @@ export function PlanExerciseEditor({ planId }: { planId: string }) {
   const [form, setForm] = useState({
     name: "",
     notes: "",
+    muscleGroup: "" as MuscleGroup | "",
+    equipment: "" as ExerciseEquipment | "",
     setsTarget: "4",
     setTargets: Array.from({ length: 4 }, () => ({
       reps: 10,
@@ -37,6 +42,10 @@ export function PlanExerciseEditor({ planId }: { planId: string }) {
             <p className="truncate text-xs font-semibold">{ex.name}</p>
             <p className="text-[10px] text-muted-foreground">
               {ex.setsTarget}x{ex.repsTarget} · {ex.loadTarget}kg · desc. {ex.restSeconds}s
+            </p>
+            <p className="truncate text-[10px] text-muted-foreground">
+              {ex.muscleGroup ? muscleGroupLabel[ex.muscleGroup] : "Não classificado"}
+              {ex.equipment ? ` · ${equipmentLabel[ex.equipment]}` : ""}
             </p>
             {ex.notes && <p className="truncate text-[10px] text-muted-foreground">{ex.notes}</p>}
           </div>
@@ -145,6 +154,36 @@ export function PlanExerciseEditor({ planId }: { planId: string }) {
               </div>
             ))}
           </div>
+          {/* Classificação escolhida pela pessoa, nunca adivinhada: é ela que
+              permite somar séries por grupo e comparar cargas entre sessões. */}
+          <div className="grid grid-cols-2 gap-1.5">
+            <select
+              value={form.muscleGroup}
+              onChange={(e) => setForm({ ...form, muscleGroup: e.target.value as MuscleGroup })}
+              aria-label="Grupo muscular principal"
+              className="min-w-0 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-xs outline-none focus:border-primary"
+            >
+              <option value="">Grupo principal…</option>
+              {(Object.keys(muscleGroupLabel) as MuscleGroup[]).map((key) => (
+                <option key={key} value={key}>
+                  {muscleGroupLabel[key]}
+                </option>
+              ))}
+            </select>
+            <select
+              value={form.equipment}
+              onChange={(e) => setForm({ ...form, equipment: e.target.value as ExerciseEquipment })}
+              aria-label="Equipamento"
+              className="min-w-0 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-xs outline-none focus:border-primary"
+            >
+              <option value="">Equipamento…</option>
+              {(Object.keys(equipmentLabel) as ExerciseEquipment[]).map((key) => (
+                <option key={key} value={key}>
+                  {equipmentLabel[key]}
+                </option>
+              ))}
+            </select>
+          </div>
           <input
             value={form.notes}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -166,10 +205,14 @@ export function PlanExerciseEditor({ planId }: { planId: string }) {
                   restSeconds: form.setTargets[0]?.restSeconds ?? 60,
                   setTargets: form.setTargets,
                   notes: form.notes.trim() || undefined,
+                  muscleGroup: form.muscleGroup || undefined,
+                  equipment: form.equipment || undefined,
                 });
                 setForm({
                   name: "",
                   notes: "",
+                  muscleGroup: "",
+                  equipment: "",
                   setsTarget: "4",
                   setTargets: Array.from({ length: 4 }, () => ({
                     reps: 10,

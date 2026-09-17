@@ -50,7 +50,7 @@ export function CycleTab() {
       <>
         <section className="card-surface p-5">
           <RouteIcon className="h-7 w-7 text-primary" strokeWidth={1.8} />
-          <h2 className="mt-4 text-lg font-bold">Seu ciclo de treino</h2>
+          <h2 className="mt-4 text-lg font-bold">Seu planejamento de treino</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             Um ciclo divide um período em etapas com datas — cada etapa com seus próprios treinos,
             séries e metas. Mudar uma etapa futura não mexe no que já foi feito.
@@ -59,7 +59,7 @@ export function CycleTab() {
             onClick={() => setCreating(true)}
             className="interactive-press mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground"
           >
-            <Plus className="h-4 w-4" /> Criar ciclo
+            <Plus className="h-4 w-4" /> Montar planejamento
           </button>
         </section>
         {creating && <CycleCreatorModal onClose={() => setCreating(false)} />}
@@ -92,7 +92,7 @@ export function CycleTab() {
   return (
     <div className="space-y-5">
       {active && progress && (
-        <Card title="Ciclo ativo">
+        <Card title="Planejamento ativo">
           <Link
             to="/ciclo/$id"
             params={{ id: active.id }}
@@ -167,7 +167,7 @@ export function CycleTab() {
             params={{ id: active.id }}
             className="interactive-press mt-3 block w-full rounded-xl bg-primary py-2.5 text-center text-xs font-bold text-primary-foreground"
           >
-            Abrir ciclo
+            Abrir planejamento
           </Link>
         </Card>
       )}
@@ -185,9 +185,9 @@ export function CycleTab() {
       )}
 
       {!active && drafts.length === 0 && (
-        <Card title="Nenhum ciclo ativo">
+        <Card title="Nenhum planejamento ativo">
           <p className="text-sm text-muted-foreground">
-            Sem ciclo ativo, o treino de hoje segue o "Plano da semana".
+            Sem planejamento ativo, o treino de hoje segue o "Plano da semana".
           </p>
         </Card>
       )}
@@ -196,7 +196,7 @@ export function CycleTab() {
         onClick={() => setCreating(true)}
         className="interactive-press flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-xs font-semibold text-muted-foreground hover:border-primary/40 hover:text-primary"
       >
-        <Plus className="h-4 w-4" /> Novo ciclo
+        <Plus className="h-4 w-4" /> Montar planejamento
       </button>
 
       {past.length > 0 && (
@@ -208,7 +208,7 @@ export function CycleTab() {
           >
             <CalendarRange className="h-5 w-5 text-muted-foreground" />
             <div className="flex-1">
-              <p className="text-sm font-semibold">Ciclos anteriores</p>
+              <p className="text-sm font-semibold">Planejamentos anteriores</p>
               <p className="text-xs text-muted-foreground">{past.length} encerrados</p>
             </div>
             <ChevronDown

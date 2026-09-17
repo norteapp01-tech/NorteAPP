@@ -409,3 +409,115 @@ inventada.
   durações.
 - Os horários do ciclo viram rotinas da Agenda quando a pessoa manda, uma vez.
   Mudar o horário na etapa depois disso não reescreve as rotinas já criadas.
+
+---
+
+# Evolução
+
+## O que a tela responde
+
+Quatro perguntas, nesta ordem: mantive a frequência, em quais exercícios
+progredi, como distribuí o treino, e o que mudou. Funciona **sem planejamento
+nenhum** — escolher um é filtro, nunca requisito.
+
+Tudo parte de `applyFilters`, um conjunto filtrado único. Indicadores, gráficos
+e listas leem dele, então não há como o número do topo discordar do ponto do
+gráfico. E cada número abre os registros que o compõem.
+
+## Os três indicadores
+
+| Indicador | O que conta |
+| --- | --- |
+| Treinos realizados | sessões concluídas (em andamento não entra) |
+| Dias treinados | datas distintas com sessão concluída |
+| Séries registradas | séries efetivamente gravadas; metas da ficha não contam |
+
+A variação é em **quantidade**, não em porcentagem: sair de 0 para 3 não é
+"+300%", e sair de 3 para 0 não é "queda de 100%". A comparação usa o intervalo
+imediatamente anterior de mesma duração, com as datas à vista. Quando ele não
+cabe no escopo da etapa, a tela diz "Sem comparação disponível" em vez de
+inventar uma.
+
+Frequência **não** é chamada de aderência: mostrar realizado/programado exigiria
+saber o que estava previsto naquela época, e a ficha semanal de hoje não pode
+reescrever o passado.
+
+## Progressão de carga — critério estreito de propósito
+
+Para entrar em "Maiores progressões de carga":
+
+- mesmo exercício **e** mesmo equipamento (trocar de aparelho começa outra série
+  histórica — 40kg na barra e 40kg por halter não são a mesma carga);
+- séries com o **mesmo número de repetições**;
+- pelo menos 3 sessões com registro comparável no período;
+- melhor carga daquela referência em cada sessão, comparando a primeira com a
+  última elegível;
+- exercícios assistidos ou sem carga externa ficam fora: reduzir assistência é
+  progresso, mas não é aumento de kg.
+
+O percentual é variação relativa da carga registrada. Não compara força entre
+exercícios, não mede crescimento muscular, esforço nem preferência. O critério
+está acessível por toque, ao lado do título.
+
+## O gráfico
+
+Um só, com busca de exercício e até três fixados. Dois modos: carga para N
+repetições, ou repetições com X kg. **30 kg × 5 e 30 kg × 12 nunca entram na
+mesma curva**, e não há estimativa de 1RM nesta versão.
+
+Cada ponto é uma sessão elegível — duas sessões no mesmo dia continuam sendo
+dois pontos. Referência sem registro não desenha nada, em vez de interpolar. Com
+um ponto só, a tela diz "Primeiro registro".
+
+Tocar num ponto abre todas as séries daquela sessão. A mesma série aparece em
+lista logo abaixo do gráfico: nada importante depende de passar o mouse.
+
+## Distribuição
+
+**Grupos musculares**: séries por grupo *principal*, uma série em um grupo só —
+a soma das barras é o total de séries registradas. Distribuir "Peito e tríceps"
+entre os dois seria suposição, e o total deixaria de bater. Exercício sem
+classificação aparece como "Não classificado".
+
+**Treinos**: sessões por identidade estável (`plan_lineage_id`). Duas fichas
+chamadas "A" em etapas diferentes não são o mesmo treino. O rótulo é "Mais
+realizados", nunca "favoritos" nem "mais pesados".
+
+Tocar numa barra filtra o painel e abre os registros daquele total.
+
+## Classificação (migration 0043)
+
+`workout_exercises.muscle_group` e `.equipment` são enums escolhidos pela
+pessoa no editor de exercícios. Nada é adivinhado: sem escolha, o exercício fica
+"Não classificado".
+
+A classificação entra no **retrato da sessão** (`planned_snapshot`), então
+reclassificar a ficha hoje não reescreve a distribuição de meses atrás. Sessões
+gravadas antes de a classificação existir não têm esse dado em lugar nenhum;
+só para elas a ficha atual é usada como melhor evidência disponível.
+
+## Conquistas
+
+Recorde é mais carga com as mesmas repetições, ou mais repetições com a mesma
+carga, comparado com **todo** o histórico anterior à sessão — inclusive fora do
+período visível, senão encurtar a janela fabricaria recordes.
+
+O primeiro registro estabelece referência e não é anunciado como recorde. Empate
+não é recorde. Cada sessão rende no máximo um recorde por exercício. Cada
+conquista abre os registros que comprovam a comparação. Não há confete.
+
+Ao finalizar um treino, a confirmação mostra a evidência quando existe —
+"Remada: 2 repetições a mais com 25 kg" — com atalho para a Evolução. Sem
+conquista, o treino é só confirmado: o app não inventa elogio.
+
+## Limitações conhecidas
+
+- **Duas sessões do mesmo treino no mesmo dia não são possíveis**: a constraint
+  `workout_sessions (user_id, plan_id, date)` da migration 0039 impede. Duas
+  sessões no mesmo dia precisam ser de treinos diferentes. Os cálculos tratam
+  sessões do mesmo dia como distintas; é o banco que limita a criação.
+- Cardio, calorias e gordura corporal não são inferidos da duração da sessão.
+  Esses números só existirão quando houver registros adequados.
+- Sessões anteriores à migration 0043 usam a classificação atual da ficha, por
+  não haver outra evidência. As novas guardam a própria.
+- Não há classificação retroativa em massa: mudar a ficha vale daqui pra frente.

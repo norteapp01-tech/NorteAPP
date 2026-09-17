@@ -5,7 +5,7 @@ import { CyclePage } from "@/components/academia/cycle/CyclePage";
  * `/objetivo/$id` quando o planejamento é do tipo `ciclo_treino` — é a mesma
  * linha no banco, então as duas portas precisam mostrar as mesmas coisas. */
 export const Route = createFileRoute("/ciclo/$id")({
-  head: () => ({ meta: [{ title: "Ciclo de treino — Norte" }] }),
+  head: () => ({ meta: [{ title: "Planejamento de treino — Norte" }] }),
   component: CicloRoute,
 });
 

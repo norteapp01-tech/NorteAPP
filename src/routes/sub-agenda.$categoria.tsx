@@ -71,8 +71,10 @@ import {
 } from "@/lib/workout-store";
 import { formatDurationClock } from "@/lib/sport-store";
 import { useGymSession } from "@/lib/gym-session-context";
+import { recordsForSession, resolveSets } from "@/lib/workout-evolution";
 import { PlanExerciseEditor } from "@/components/academia/PlanExerciseEditor";
 import { CycleTab } from "@/components/academia/cycle/CycleTab";
+import { EvolutionTab } from "@/components/academia/evolution/EvolutionTab";
 import { todayProgramming, useCycleStore, type TodayProgramming } from "@/lib/workout-cycle-store";
 import { EsportesModule } from "@/components/esportes/EsportesModule";
 import { LeituraModule } from "@/components/reading/LeituraModule";
@@ -96,6 +98,12 @@ const ExerciseEvolutionChart = lazy(() =>
 import { Card, weekdayLabels } from "@/components/sub-agenda-shared";
 
 export const Route = createFileRoute("/sub-agenda/$categoria")({
+  // `aba` e `etapa` existem para o atalho "Ver evolução desta etapa" abrir a
+  // Evolução já filtrada — e para o endereço poder ser compartilhado.
+  validateSearch: (search: Record<string, unknown>): { aba?: string; etapa?: string } => ({
+    aba: typeof search.aba === "string" ? search.aba : undefined,
+    etapa: typeof search.etapa === "string" ? search.etapa : undefined,
+  }),
   head: () => ({ meta: [{ title: `Sub-agenda — Norte` }] }),
   component: SubAgenda,
 });
@@ -267,6 +275,7 @@ function RoutineConfigCard({ categoria }: { categoria: string }) {
 // hoje (série a série, timer de descanso), resumo ao finalizar, peso corporal.
 // ---------------------------------------------------------------------------
 function AcademiaModule() {
+  const search = Route.useSearch();
   const profile = useProfile();
   const gymRoutines = useGoalsStore((s) =>
     s.routines.filter((r) => r.category === "academia" && r.active),
@@ -287,7 +296,11 @@ function AcademiaModule() {
   const [showWeightInput, setShowWeightInput] = useState(false);
   const [weightDraft, setWeightDraft] = useState("");
   const [savingWeight, setSavingWeight] = useState(false);
-  const [activeTab, setActiveTab] = useState<"treino" | "ciclo">("treino");
+  // `ciclo` continua sendo o identificador interno: o rótulo mudou para
+  // "Planejamento", os dados e as rotas não.
+  const [activeTab, setActiveTab] = useState<"treino" | "evolucao" | "ciclo">(
+    search.aba === "evolucao" ? "evolucao" : search.aba === "planejamento" ? "ciclo" : "treino",
+  );
   const [showRoutineConfig, setShowRoutineConfig] = useState(false);
   const startAction = useAsyncAction();
 
@@ -343,13 +356,23 @@ function AcademiaModule() {
       items={
         [
           { key: "treino", label: "Treino" },
-          { key: "ciclo", label: "Ciclo de treino" },
+          { key: "evolucao", label: "Evolução" },
+          { key: "ciclo", label: "Planejamento" },
         ] as const
       }
       value={activeTab}
       onChange={setActiveTab}
     />
   );
+
+  if (activeTab === "evolucao") {
+    return (
+      <div className="mt-6 space-y-5">
+        {tabs}
+        <EvolutionTab initialStageId={search.etapa} />
+      </div>
+    );
+  }
 
   if (activeTab === "ciclo") {
     return (
@@ -1115,11 +1138,39 @@ function FinishSummaryModal({ sessionId, onClose }: { sessionId: string; onClose
         )
       : undefined;
 
+  // Evidência do que MUDOU, quando existe uma comparação verificável. Sem
+  // conquista, o treino é só confirmado — o app não inventa elogio.
+  const records = recordsForSession(resolveSets(sessions, exercises, plans), sessionId);
+
   return (
     <Modal onClose={onClose} title="Treino concluído">
       <h3 className="text-xl font-bold">
         {plan ? `Treino ${plan.letter} — ${plan.name}` : "Treino"}
       </h3>
+
+      {records.length > 0 && (
+        <div className="mt-3 rounded-xl border border-primary/40 bg-primary/5 p-3">
+          <ul className="space-y-1">
+            {records.map((r) => (
+              <li key={`${r.lineageId}-${r.kind}`} className="text-sm font-semibold">
+                {r.name}:{" "}
+                {r.kind === "repeticoes"
+                  ? `${r.reps - (r.previousReps ?? 0)} ${r.reps - (r.previousReps ?? 0) === 1 ? "repetição" : "repetições"} a mais com ${r.weight} kg`
+                  : `${Math.round((r.weight - (r.previousWeight ?? 0)) * 100) / 100} kg a mais em ${r.reps} repetições`}
+              </li>
+            ))}
+          </ul>
+          <Link
+            to="/sub-agenda/$categoria"
+            params={{ categoria: "academia" }}
+            search={{ aba: "evolucao" }}
+            onClick={onClose}
+            className="interactive-press mt-2 inline-block text-[11px] font-bold text-primary underline"
+          >
+            Ver evolução
+          </Link>
+        </div>
+      )}
 
       <div className="mt-4 grid grid-cols-2 gap-2 text-center">
         <div className="rounded-xl bg-success/10 p-3">
