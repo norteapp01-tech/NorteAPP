@@ -330,8 +330,10 @@ export function cycleProgress(
   return {
     elapsedDays,
     totalDays,
-    plannedSessions: plannedSessionsInRange(blocks, blockDays, cycle.startDate, until),
-    doneSessions: finishedSessionsInRange(sessions, cycle.startDate, until).length,
+    plannedSessions:
+      iso < cycle.startDate ? 0 : plannedSessionsInRange(blocks, blockDays, cycle.startDate, until),
+    doneSessions:
+      iso < cycle.startDate ? 0 : finishedSessionsInRange(sessions, cycle.startDate, until).length,
     goalsReached: goalStates.filter((g) => g.reached).length,
     goalsTotal: goalStates.length,
   };
@@ -353,6 +355,7 @@ export function evaluateCycleGoal(
     cycle: WorkoutCycle;
     blocks: CycleBlock[];
     blockDays: BlockDay[];
+    blockPlans?: BlockPlan[];
     sessions: WorkoutSession[];
     exercises: Exercise[];
     bodyWeights: BodyWeightEntry[];
@@ -365,19 +368,29 @@ export function evaluateCycleGoal(
   const rawTo = block?.endDate ?? ctx.cycle.endDate;
   const to = iso < rawTo ? iso : rawTo;
   const range = { from, to };
+  const sessions =
+    block && ctx.blockPlans
+      ? ctx.sessions.filter((session) =>
+          ctx.blockPlans!.some(
+            (plan) => plan.blockId === block.id && plan.planId === session.planId,
+          ),
+        )
+      : ctx.sessions;
 
   let current = goal.startValue;
   let hasData = false;
 
   if (goal.kind === "peso_corporal") {
-    const latest = currentBodyWeight(ctx.bodyWeights);
+    const latest = currentBodyWeight(
+      ctx.bodyWeights.filter((entry) => entry.date >= from && entry.date <= to),
+    );
     if (latest) {
       current = latest.weight;
       hasData = true;
     }
   } else if (goal.kind === "carga" && goal.exerciseLineageId) {
     const best = maxWeightForSetsReps(
-      ctx.sessions,
+      sessions,
       ctx.exercises,
       goal.exerciseLineageId,
       goal.referenceReps ?? 1,
@@ -389,12 +402,12 @@ export function evaluateCycleGoal(
       hasData = true;
     }
   } else if (goal.kind === "series_reps" && goal.exerciseLineageId) {
-    const vol = volumeForLineage(ctx.sessions, ctx.exercises, goal.exerciseLineageId, range);
+    const vol = volumeForLineage(sessions, ctx.exercises, goal.exerciseLineageId, range);
     current = goal.unit === "reps" ? vol.reps : vol.sets;
     hasData = vol.sets > 0;
   } else if (goal.kind === "frequencia") {
-    current = finishedSessionsInRange(ctx.sessions, from, to).length;
-    hasData = true;
+    current = finishedSessionsInRange(sessions, from, to).length;
+    hasData = to >= from;
   } else if (goal.kind === "medida_corporal") {
     // Medida corporal vem de uma medição registrada COM data e método, ou do
     // valor informado na meta. Nunca é deduzida de peso nem de qualquer outro
@@ -1164,9 +1177,16 @@ export async function endCycle(cycle: WorkoutCycle, restoreWeekly: boolean) {
 
 export async function updateCycleGoal(
   goalId: string,
-  patch: Partial<Pick<CycleGoal, "manualCurrent" | "manualDone" | "title" | "targetValue">>,
+  patch: Partial<
+    Pick<
+      CycleGoal,
+      "manualCurrent" | "manualDone" | "title" | "targetValue" | "blockId" | "deadline"
+    >
+  >,
 ) {
   const dbPatch: Row = {};
+  if (patch.blockId !== undefined) dbPatch.block_id = patch.blockId;
+  if (patch.deadline !== undefined) dbPatch.deadline = patch.deadline;
   if (patch.manualCurrent !== undefined) dbPatch.manual_current = patch.manualCurrent;
   if (patch.manualDone !== undefined) dbPatch.manual_done = patch.manualDone;
   if (patch.title !== undefined) dbPatch.title = patch.title;

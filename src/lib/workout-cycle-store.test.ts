@@ -418,6 +418,65 @@ describe("evaluateCycleGoal", () => {
   const blocks = [makeBlock()];
   const base = { cycle, blocks, blockDays: [] as BlockDay[], bodyWeights: [] };
 
+  it("peso da etapa ignora pesagens de outras etapas e futuras", () => {
+    const goal = makeGoal({
+      kind: "peso_corporal",
+      blockId: "blk-1",
+      startValue: 90,
+      targetValue: 80,
+    });
+    const ctx = {
+      ...base,
+      sessions: [],
+      exercises: [],
+      bodyWeights: [
+        { id: "before", date: "2026-08-31", weight: 88 },
+        { id: "inside", date: "2026-09-05", weight: 86 },
+        { id: "after", date: "2026-09-20", weight: 79 },
+      ],
+    };
+    expect(evaluateCycleGoal(goal, ctx, "2026-09-30").current).toBe(86);
+    expect(evaluateCycleGoal(goal, ctx, "2026-09-03").hasData).toBe(false);
+  });
+
+  it("frequência da etapa exclui treinos de outros planos na mesma data", () => {
+    const goal = makeGoal({ kind: "frequencia", blockId: "blk-1", startValue: 0, targetValue: 3 });
+    const result = evaluateCycleGoal(
+      goal,
+      {
+        ...base,
+        exercises: [],
+        blockPlans: [{ id: "bp", blockId: "blk-1", planId: "plan-1", order: 0 }],
+        sessions: [makeSession(), makeSession({ id: "other", planId: "other-plan" })],
+      },
+      "2026-09-10",
+    );
+    expect(result.current).toBe(1);
+  });
+
+  it("etapa futura não contabiliza treinos nem metas de frequência ainda", () => {
+    const future = makeCycle({ startDate: "2026-10-01", endDate: "2026-10-15" });
+    const futureBlock = makeBlock({ startDate: future.startDate, endDate: future.endDate });
+    const sessions = [makeSession({ date: "2026-10-01" })];
+    const progress = cycleProgress(
+      future,
+      [futureBlock],
+      [{ id: "d", blockId: futureBlock.id, weekday: 4, planId: "plan-1" }],
+      sessions,
+      [],
+      "2026-09-16",
+    );
+    expect(progress.plannedSessions).toBe(0);
+    expect(progress.doneSessions).toBe(0);
+    expect(
+      evaluateCycleGoal(
+        makeGoal({ kind: "frequencia", blockId: futureBlock.id }),
+        { ...base, cycle: future, blocks: [futureBlock], sessions, exercises: [] },
+        "2026-09-16",
+      ).hasData,
+    ).toBe(false);
+  });
+
   it("sem registro nenhum, não finge medição", () => {
     const ev = evaluateCycleGoal(
       makeGoal(),

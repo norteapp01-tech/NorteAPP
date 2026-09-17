@@ -50,20 +50,23 @@ const unitFor: Record<CycleGoalKind, string> = {
 export function CycleGoalModal({
   cycle,
   blocks,
+  initialBlockId,
   onClose,
 }: {
   cycle: WorkoutCycle;
   blocks: CycleBlock[];
+  initialBlockId?: string;
   onClose: () => void;
 }) {
   const exercises = useWorkoutStore((s) => s.exercises);
   const sessions = useWorkoutStore((s) => s.sessions);
   const bodyWeights = useWorkoutStore((s) => s.bodyWeights);
   const measurements = useCycleStore((s) => s.measurements);
+  const blockPlans = useCycleStore((s) => s.blockPlans);
 
   const [kind, setKind] = useState<CycleGoalKind>("carga");
   const [title, setTitle] = useState("");
-  const [blockId, setBlockId] = useState<string>("");
+  const [blockId, setBlockId] = useState<string>(initialBlockId ?? "");
   const [lineageId, setLineageId] = useState("");
   const [measureLabel, setMeasureLabel] = useState("");
   const [method, setMethod] = useState("");
@@ -80,10 +83,15 @@ export function CycleGoalModal({
   const options = useMemo(() => {
     const seen = new Map<string, string>();
     for (const e of [...exercises].sort((a, b) => a.name.localeCompare(b.name))) {
+      if (
+        initialBlockId &&
+        !blockPlans.some((p) => p.blockId === initialBlockId && p.planId === e.planId)
+      )
+        continue;
       if (!seen.has(e.lineageId)) seen.set(e.lineageId, e.name);
     }
     return [...seen.entries()].map(([id, name]) => ({ id, name }));
-  }, [exercises]);
+  }, [exercises, initialBlockId, blockPlans]);
 
   const knownLabels = useMemo(() => [...new Set(measurements.map((m) => m.label))], [measurements]);
   const exerciseName = options.find((o) => o.id === lineageId)?.name;
@@ -364,7 +372,12 @@ export function CycleGoalModal({
         </>
       )}
 
-      {blocks.length > 0 && (
+      {initialBlockId && (
+        <p className="mt-4 text-sm text-muted-foreground">
+          Meta de {blocks.find((b) => b.id === initialBlockId)?.name} · prazo da etapa
+        </p>
+      )}
+      {!initialBlockId && blocks.length > 0 && (
         <label className="mt-4 block">
           <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Vale para

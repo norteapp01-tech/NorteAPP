@@ -1,18 +1,10 @@
 import { useMemo, useState } from "react";
 import { TrendingUp } from "lucide-react";
 import { formatDateShortBR, todayISO } from "@/lib/goals-store";
+import { exerciseSeriesByLineage, useWorkoutStore } from "@/lib/workout-store";
 import {
-  exerciseSeriesByLineage,
-  finishedSessionsInRange,
-  useWorkoutStore,
-} from "@/lib/workout-store";
-import {
-  blockDurationDays,
   cycleProgress,
-  daysOfBlock,
   isManualGoal,
-  plannedSessionsInRange,
-  stageState,
   useCycleStore,
   type CycleBlock,
   type GoalEvaluation,
@@ -47,10 +39,69 @@ export function CycleEvolution({
   blocks: CycleBlock[];
   evaluations: GoalEvaluation[];
 }) {
+  const [selectedId, setSelectedId] = useState("");
+  const today = todayISO();
+  const block =
+    blocks.find((b) => b.id === selectedId) ??
+    blocks.find((b) => b.startDate <= today && b.endDate >= today) ??
+    blocks[0];
+  if (!block)
+    return (
+      <p className="text-sm text-muted-foreground">Crie uma etapa para acompanhar a evolução.</p>
+    );
+  return (
+    <div className="space-y-4">
+      <label className="block text-sm font-medium">
+        Evolução da etapa
+        <select
+          aria-label="Etapa a acompanhar"
+          value={block.id}
+          onChange={(e) => setSelectedId(e.target.value)}
+          className="mt-2 w-full rounded-xl border border-border bg-surface p-3"
+        >
+          {blocks.map((b, i) => (
+            <option key={b.id} value={b.id}>
+              {i + 1}. {b.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="text-xs text-muted-foreground">
+        {formatDateShortBR(block.startDate)} — {formatDateShortBR(block.endDate)} · Registros desta
+        etapa
+      </p>
+      <StageEvolution
+        key={block.id}
+        cycle={{ ...cycle, startDate: block.startDate, endDate: block.endDate }}
+        blocks={[block]}
+        evaluations={evaluations.filter((ev) => ev.goal.blockId === block.id)}
+      />
+    </div>
+  );
+}
+
+function StageEvolution({
+  cycle,
+  blocks,
+  evaluations,
+}: {
+  cycle: WorkoutCycle;
+  blocks: CycleBlock[];
+  evaluations: GoalEvaluation[];
+}) {
   const blockDays = useCycleStore((s) => s.blockDays);
   const blockPlans = useCycleStore((s) => s.blockPlans);
-  const sessions = useWorkoutStore((s) => s.sessions);
-  const exercises = useWorkoutStore((s) => s.exercises);
+  const allSessions = useWorkoutStore((s) => s.sessions);
+  const allExercises = useWorkoutStore((s) => s.exercises);
+  const allWeights = useWorkoutStore((s) => s.bodyWeights);
+  const planIds = new Set(
+    blockPlans.filter((p) => blocks.some((b) => b.id === p.blockId)).map((p) => p.planId),
+  );
+  const sessions = allSessions.filter((s) => planIds.has(s.planId));
+  const exercises = allExercises.filter((e) => planIds.has(e.planId));
+  const weights = allWeights
+    .filter((w) => w.date >= cycle.startDate && w.date <= cycle.endDate && w.date <= todayISO())
+    .sort((a, b) => a.date.localeCompare(b.date));
   const [lineageId, setLineageId] = useState("");
   const today = todayISO();
 
@@ -65,11 +116,22 @@ export function CycleEvolution({
     for (const e of [...exercises].sort((a, b) => a.name.localeCompare(b.name))) {
       if (!seen.has(e.lineageId)) seen.set(e.lineageId, e.name);
     }
+    for (const session of sessions) {
+      for (const exercise of session.plannedSnapshot ?? []) {
+        const id = exercise.lineageId ?? exercise.exerciseId;
+        if (!seen.has(id)) seen.set(id, exercise.name);
+      }
+    }
     return [...seen.entries()].map(([id, name]) => ({ id, name }));
-  }, [exercises]);
+  }, [exercises, sessions]);
 
-  const series = lineageId ? exerciseSeriesByLineage(sessions, exercises, lineageId) : [];
-  const inCycle = series.filter((p) => p.date >= cycle.startDate && p.date <= cycle.endDate);
+  const selectedLineage = lineageId || exerciseOptions[0]?.id || "";
+  const series = selectedLineage
+    ? exerciseSeriesByLineage(sessions, exercises, selectedLineage)
+    : [];
+  const inCycle = series.filter(
+    (p) => p.date >= cycle.startDate && p.date <= cycle.endDate && p.date <= today,
+  );
   const reached = evaluations.filter((e) => e.reached);
   const pending = evaluations.filter((e) => !e.reached);
 
@@ -100,7 +162,7 @@ export function CycleEvolution({
       <Card label="Metas">
         {evaluations.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Nenhuma meta definida — sem meta, o ciclo mede só o que foi feito.
+            Defina uma meta na etapa, em Planejamento, para acompanhar seu alvo aqui.
           </p>
         ) : (
           <>
@@ -134,7 +196,7 @@ export function CycleEvolution({
 
       <Card label="Evolução de um exercício">
         <select
-          value={lineageId}
+          value={selectedLineage}
           onChange={(e) => setLineageId(e.target.value)}
           aria-label="Exercício a acompanhar"
           className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
@@ -147,17 +209,30 @@ export function CycleEvolution({
           ))}
         </select>
 
-        {lineageId && inCycle.length === 0 && (
+        {inCycle.length === 0 && (
           <p className="mt-2.5 text-sm text-muted-foreground">
-            Nenhum registro deste exercício dentro do ciclo ainda.
+            Nenhum registro deste exercício nesta etapa ainda.
           </p>
         )}
 
         {inCycle.length > 0 && (
           <>
+            <p className="mt-3 text-sm">
+              Primeiro registro: {inCycle[0].maxWeight} kg · Último:{" "}
+              {inCycle[inCycle.length - 1].maxWeight} kg
+            </p>
+            {inCycle.length > 1 && (
+              <p className="mt-1 text-sm text-primary">
+                Variação de carga:{" "}
+                {(inCycle[inCycle.length - 1].maxWeight - inCycle[0].maxWeight).toFixed(1)} kg
+              </p>
+            )}
             <ul className="mt-2.5 space-y-1">
               {inCycle.slice(-8).map((point) => (
-                <li key={point.date} className="flex items-center gap-2 text-[11px]">
+                <li
+                  key={`${point.date}-${inCycle.indexOf(point)}`}
+                  className="flex items-center gap-2 text-[11px]"
+                >
                   <span className="w-16 shrink-0 text-muted-foreground">
                     {formatDateShortBR(point.date)}
                   </span>
@@ -184,46 +259,35 @@ export function CycleEvolution({
         )}
       </Card>
 
-      <Card label="Resumo por etapa">
-        <ul className="space-y-2">
-          {blocks.map((block) => {
-            const until = today < block.endDate ? today : block.endDate;
-            const planned =
-              until < block.startDate
-                ? 0
-                : plannedSessionsInRange(blocks, blockDays, block.startDate, until);
-            const done =
-              until < block.startDate
-                ? 0
-                : finishedSessionsInRange(sessions, block.startDate, until).length;
-            const state = stageState(block, blockPlans, today);
-            return (
-              <li
-                key={block.id}
-                className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface-2 p-2.5"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">{block.name}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {formatDateShortBR(block.startDate)} — {formatDateShortBR(block.endDate)} ·{" "}
-                    {blockDurationDays(block)} dias · {state}
-                  </p>
-                </div>
-                <span className="shrink-0 font-mono text-sm font-bold tabular-nums">
-                  {done}
-                  <span className="text-muted-foreground">/{planned}</span>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-        {blocks.some((b) => daysOfBlock(blockDays, b.id).length === 0) && (
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Etapas sem dias marcados não programam treino — por isso aparecem com 0 no denominador,
-            e não como 100% cumpridas.
-          </p>
+      <Card label="Peso corporal na etapa">
+        {weights.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhuma pesagem registrada neste período.</p>
+        ) : (
+          <>
+            <p className="text-sm">
+              Primeiro registro: {weights[0].weight} kg · Último:{" "}
+              {weights[weights.length - 1].weight} kg
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {formatDateShortBR(weights[0].date)} →{" "}
+              {formatDateShortBR(weights[weights.length - 1].date)}
+            </p>
+            {weights.length > 1 ? (
+              <p className="mt-2 text-sm">
+                Variação: {(weights[weights.length - 1].weight - weights[0].weight).toFixed(1)} kg
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Registre outra pesagem para comparar.
+              </p>
+            )}
+          </>
         )}
       </Card>
+      <p className="text-xs text-muted-foreground">
+        Tempo de cardio ainda não é registrado separadamente dos treinos e não entra nesta
+        comparação.
+      </p>
     </div>
   );
 }

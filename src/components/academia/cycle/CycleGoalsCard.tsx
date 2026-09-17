@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Plus, Target, Trash2 } from "lucide-react";
-import { Card } from "@/components/sub-agenda-shared";
 import { formatDateShortBR } from "@/lib/goals-store";
 import {
   cycleGoalKindLabel,
@@ -12,6 +11,8 @@ import {
   type WorkoutCycle,
 } from "@/lib/workout-cycle-store";
 import { CycleGoalModal } from "./CycleGoalModal";
+import { useAsyncAction } from "@/hooks/use-async-action";
+import { InlineError } from "@/components/ui/inline-error";
 
 // ---------------------------------------------------------------------------
 // Metas do ciclo — poucos indicadores, detalhe sob demanda.
@@ -24,22 +25,29 @@ export function CycleGoalsCard({
   cycle,
   blocks,
   evaluations,
+  block,
 }: {
   cycle: WorkoutCycle;
   blocks: CycleBlock[];
   evaluations: GoalEvaluation[];
+  block?: CycleBlock;
 }) {
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const action = useAsyncAction();
 
   return (
-    <Card title="Metas do ciclo">
+    <section
+      aria-label={block ? "Metas da etapa" : "Metas sem etapa"}
+      className={block ? "" : "card-surface p-4"}
+    >
+      {!block && <h3 className="mb-3 text-sm font-semibold">Metas sem etapa</h3>}
       {evaluations.length === 0 ? (
         <div className="text-center">
           <Target className="mx-auto h-6 w-6 text-muted-foreground" strokeWidth={1.8} />
           <p className="mt-2 text-sm text-muted-foreground">
-            Nenhuma meta definida. Sem meta, o ciclo mede só o que foi feito — não se você chegou
-            onde queria.
+            O que você quer alcançar nesta etapa? Defina um alvo de carga, peso corporal ou
+            frequência.
           </p>
         </div>
       ) : (
@@ -52,22 +60,58 @@ export function CycleGoalsCard({
                 expanded={openId === ev.goal.id}
                 onToggle={() => setOpenId(openId === ev.goal.id ? null : ev.goal.id)}
               />
+              {!block && (
+                <label className="mt-2 block text-xs text-muted-foreground">
+                  Vincular à etapa
+                  <select
+                    disabled={action.pending}
+                    aria-label={`Vincular meta ${ev.goal.title}`}
+                    value=""
+                    onChange={(e) => {
+                      const selected = blocks.find((b) => b.id === e.target.value);
+                      if (selected)
+                        void action.run(() =>
+                          updateCycleGoal(ev.goal.id, {
+                            blockId: selected.id,
+                            deadline: selected.endDate,
+                          }),
+                        );
+                    }}
+                    className="mt-1 w-full rounded-lg border border-border bg-surface p-2"
+                  >
+                    <option value="">Escolher etapa</option>
+                    {blocks.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </li>
           ))}
         </ul>
       )}
 
-      <button
-        onClick={() => setCreating(true)}
-        className="interactive-press mt-3 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-border py-2 text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary"
-      >
-        <Plus className="h-3.5 w-3.5" /> nova meta
-      </button>
+      {block && (
+        <button
+          onClick={() => setCreating(true)}
+          className="interactive-press mt-3 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-border py-2 text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary"
+        >
+          <Plus className="h-3.5 w-3.5" /> nova meta
+        </button>
+      )}
 
       {creating && (
-        <CycleGoalModal cycle={cycle} blocks={blocks} onClose={() => setCreating(false)} />
+        <CycleGoalModal
+          cycle={cycle}
+          blocks={blocks}
+          initialBlockId={block?.id}
+          onClose={() => setCreating(false)}
+        />
       )}
-    </Card>
+      {action.error && <InlineError message={action.error} onRetry={action.clearError} />}
+    </section>
   );
 }
 

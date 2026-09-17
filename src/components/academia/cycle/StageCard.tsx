@@ -18,14 +18,16 @@ import {
   removePlanFromBlock,
   resizeBlock,
   routinePlanForBlock,
-  setBlockDay,
   stageState,
   stagesShiftedBy,
   updateBlock,
   useCycleStore,
   type CycleBlock,
   type WorkoutCycle,
+  type GoalEvaluation,
 } from "@/lib/workout-cycle-store";
+import { StageWeek } from "./StageWeek";
+import { CycleGoalsCard } from "./CycleGoalsCard";
 import { BulkExerciseModal } from "./BulkExerciseModal";
 
 // ---------------------------------------------------------------------------
@@ -44,7 +46,9 @@ export function StageCard({
   index,
   isOpen,
   onToggle,
+  evaluations,
 }: {
+  evaluations: GoalEvaluation[];
   cycle: WorkoutCycle;
   block: CycleBlock;
   index: number;
@@ -176,7 +180,9 @@ export function StageCard({
                         <span className="block text-sm font-medium">{plan.name}</span>
                         <span className="mt-0.5 block text-[13px] text-muted-foreground">
                           {exercises.filter((exercise) => exercise.planId === plan.id).length}{" "}
-                          exercícios
+                          {exercises.filter((exercise) => exercise.planId === plan.id).length === 1
+                            ? "exercício"
+                            : "exercícios"}
                         </span>
                       </span>
                       <ChevronDown
@@ -240,6 +246,86 @@ export function StageCard({
               />
             )}
           </section>
+
+          <details className="group border-t border-border pt-3">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-medium">
+              Metas da etapa{" "}
+              <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="mt-3">
+              <CycleGoalsCard
+                cycle={cycle}
+                blocks={siblings}
+                block={block}
+                evaluations={evaluations.filter((ev) => ev.goal.blockId === block.id)}
+              />
+            </div>
+          </details>
+
+          {/* --- distribuição semanal -------------------------------------- */}
+          <details className="group border-t border-border pt-3">
+            <summary className="flex cursor-pointer list-none items-center gap-2">
+              <h3 className="flex-1 text-[13px] font-medium text-muted-foreground">
+                Dias da semana
+              </h3>
+              <span className="text-[11px] text-muted-foreground">
+                {days.filter((d) => d.planId).length}{" "}
+                {days.filter((d) => d.planId).length === 1 ? "dia" : "dias"}
+              </span>
+              <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
+            <StageWeek blockId={block.id} days={days} plans={myPlans} />
+
+            {routineItems.length > 0 && (
+              <div className="mt-3 rounded-lg border border-border bg-surface-2 p-2.5">
+                <button
+                  onClick={() => setAgendaOpen((v) => !v)}
+                  className="interactive-press flex w-full items-center gap-2 text-left"
+                >
+                  <CalendarPlus className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="min-w-0 flex-1 text-[11px] font-semibold">
+                    Levar os horários para a Agenda
+                  </span>
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${agendaOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {agendaOpen && (
+                  <>
+                    <ul className="mt-2 space-y-1">
+                      {routineItems.map((item) => (
+                        <li
+                          key={`${item.weekday}-${item.time}`}
+                          className="flex items-center justify-between gap-2 text-[11px]"
+                        >
+                          <span className="min-w-0 truncate">
+                            {weekVisualLabels[weekVisualOrder.indexOf(item.weekday)]} · {item.time}{" "}
+                            · {item.title}
+                          </span>
+                          <span
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.alreadyExists ? "bg-surface text-muted-foreground" : "bg-primary/15 text-primary"}`}
+                          >
+                            {item.alreadyExists ? "já existe" : "criar"}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      onClick={() => action.run(() => applyRoutinePlan(routineItems))}
+                      disabled={action.pending || routineItems.every((i) => i.alreadyExists)}
+                      className="interactive-press mt-2 w-full rounded-lg bg-primary py-2 text-[11px] font-bold text-primary-foreground disabled:opacity-40"
+                    >
+                      Criar os que faltam
+                    </button>
+                    <p className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground">
+                      Um dia que já tem rotina de academia é mantido como está — nada é duplicado
+                      nem sobrescrito.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+          </details>
 
           {/* --- identidade e duração ------------------------------------- */}
           <details className="group">
@@ -309,115 +395,6 @@ export function StageCard({
                 )}
               </div>
             </div>
-          </details>
-
-          {/* --- distribuição semanal -------------------------------------- */}
-          <details className="group border-t border-border pt-3">
-            <summary className="flex cursor-pointer list-none items-center gap-2">
-              <h3 className="flex-1 text-[13px] font-medium text-muted-foreground">
-                Dias da semana
-              </h3>
-              <span className="text-[11px] text-muted-foreground">
-                {days.filter((d) => d.planId).length} dias
-              </span>
-              <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
-            </summary>
-            <ul className="mt-2 space-y-1.5">
-              {weekVisualOrder.map((weekday, i) => {
-                const day = days.find((d) => d.weekday === weekday);
-                return (
-                  <li key={weekday} className="flex items-center gap-2">
-                    <span className="w-9 shrink-0 text-[11px] font-semibold text-muted-foreground">
-                      {weekVisualLabels[i]}
-                    </span>
-                    <select
-                      value={day?.planId ?? ""}
-                      aria-label={`Treino de ${weekVisualLabels[i]}`}
-                      onChange={(e) =>
-                        action.run(() =>
-                          setBlockDay(block.id, weekday, e.target.value || null, day?.startTime),
-                        )
-                      }
-                      className="min-w-0 flex-1 rounded-md border border-border bg-surface px-2 py-1.5 text-xs outline-none focus:border-primary"
-                    >
-                      <option value="">Descanso</option>
-                      {myPlans.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.letter} · {p.name}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="time"
-                      value={day?.startTime ?? ""}
-                      disabled={!day?.planId}
-                      aria-label={`Horário de ${weekVisualLabels[i]}`}
-                      onChange={(e) =>
-                        action.run(() =>
-                          setBlockDay(
-                            block.id,
-                            weekday,
-                            day?.planId ?? null,
-                            e.target.value || null,
-                          ),
-                        )
-                      }
-                      className="w-24 shrink-0 rounded-md border border-border bg-surface px-2 py-1.5 text-xs outline-none focus:border-primary disabled:opacity-40"
-                    />
-                  </li>
-                );
-              })}
-            </ul>
-
-            {routineItems.length > 0 && (
-              <div className="mt-3 rounded-lg border border-border bg-surface-2 p-2.5">
-                <button
-                  onClick={() => setAgendaOpen((v) => !v)}
-                  className="interactive-press flex w-full items-center gap-2 text-left"
-                >
-                  <CalendarPlus className="h-4 w-4 shrink-0 text-primary" />
-                  <span className="min-w-0 flex-1 text-[11px] font-semibold">
-                    Levar os horários para a Agenda
-                  </span>
-                  <ChevronDown
-                    className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${agendaOpen ? "rotate-180" : ""}`}
-                  />
-                </button>
-                {agendaOpen && (
-                  <>
-                    <ul className="mt-2 space-y-1">
-                      {routineItems.map((item) => (
-                        <li
-                          key={`${item.weekday}-${item.time}`}
-                          className="flex items-center justify-between gap-2 text-[11px]"
-                        >
-                          <span className="min-w-0 truncate">
-                            {weekVisualLabels[weekVisualOrder.indexOf(item.weekday)]} · {item.time}{" "}
-                            · {item.title}
-                          </span>
-                          <span
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.alreadyExists ? "bg-surface text-muted-foreground" : "bg-primary/15 text-primary"}`}
-                          >
-                            {item.alreadyExists ? "já existe" : "criar"}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                    <button
-                      onClick={() => action.run(() => applyRoutinePlan(routineItems))}
-                      disabled={action.pending || routineItems.every((i) => i.alreadyExists)}
-                      className="interactive-press mt-2 w-full rounded-lg bg-primary py-2 text-[11px] font-bold text-primary-foreground disabled:opacity-40"
-                    >
-                      Criar os que faltam
-                    </button>
-                    <p className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground">
-                      Um dia que já tem rotina de academia é mantido como está — nada é duplicado
-                      nem sobrescrito.
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
           </details>
 
           {action.error && <InlineError message={action.error} onRetry={action.clearError} />}

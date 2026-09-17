@@ -33,7 +33,7 @@ import { CycleGoalsCard } from "./CycleGoalsCard";
 // funcionalidades diferentes.
 // ---------------------------------------------------------------------------
 
-type Tab = "planejamento" | "cronograma" | "evolucao" | "metas";
+type Tab = "planejamento" | "cronograma" | "evolucao";
 
 export function CyclePage({
   cycleId,
@@ -83,6 +83,7 @@ export function CyclePage({
       cycle,
       blocks: stages,
       blockDays,
+      blockPlans,
       sessions,
       exercises,
       bodyWeights,
@@ -91,6 +92,24 @@ export function CyclePage({
   );
   const progress = cycleProgress(cycle, stages, blockDays, sessions, evaluations, today);
   const incomplete = stages.filter((b) => stageState(b, blockPlans, today) === "rascunho");
+  const setup = (cycle.status === "concluido" || cycle.status === "arquivado" ? [] : stages)
+    .filter((block) => block.endDate >= today)
+    .map((block) => {
+      const workouts = plansOfBlock(blockPlans, plans, block.id);
+      const empty = workouts.find(
+        (plan) => !exercises.some((exercise) => exercise.planId === plan.id),
+      );
+      const message =
+        workouts.length === 0
+          ? "Adicione os treinos desta etapa"
+          : empty
+            ? `Monte os exercícios do treino ${empty.letter}`
+            : !blockDays.some((day) => day.blockId === block.id && day.planId)
+              ? "Distribua os treinos na semana"
+              : null;
+      return { block, message };
+    })
+    .find((item) => item.message);
 
   return (
     <div className="px-5 pb-10 pt-12">
@@ -219,7 +238,6 @@ export function CyclePage({
               { key: "planejamento", label: "Planejamento" },
               { key: "cronograma", label: "Cronograma" },
               { key: "evolucao", label: "Evolução" },
-              { key: "metas", label: "Metas" },
             ] as const
           }
           value={tab}
@@ -230,6 +248,29 @@ export function CyclePage({
       <div className="mt-5 state-fade" key={tab}>
         {tab === "planejamento" && (
           <div>
+            {setup && (
+              <div className="card-surface mb-5 border-l-2 border-l-primary p-4">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-primary">
+                  Próximo passo
+                </p>
+                <button
+                  onClick={() => {
+                    setOpenStageId(setup.block.id);
+                    requestAnimationFrame(() =>
+                      document
+                        .getElementById(`cycle-stage-${setup.block.id}`)
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                    );
+                  }}
+                  className="mt-2 w-full text-left"
+                >
+                  <span className="block text-base font-semibold">{setup.message}</span>
+                  <span className="mt-1 block text-sm text-muted-foreground">
+                    {setup.block.name} · Continuar montagem →
+                  </span>
+                </button>
+              </div>
+            )}
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Caminho do ciclo
@@ -237,7 +278,7 @@ export function CyclePage({
               <span className="text-[13px] text-muted-foreground">{stages.length} etapas</span>
             </div>
             {stages.map((block, index) => (
-              <div key={block.id} className="flex gap-3">
+              <div key={block.id} id={`cycle-stage-${block.id}`} className="flex gap-3 scroll-mt-6">
                 <div aria-hidden className="flex shrink-0 flex-col items-center">
                   <div
                     className={`w-[1.5px] flex-1 ${index === 0 ? "invisible" : current?.id === block.id ? "bg-primary" : "bg-border"}`}
@@ -252,6 +293,7 @@ export function CyclePage({
                     key={block.id}
                     cycle={cycle}
                     block={block}
+                    evaluations={evaluations}
                     index={index}
                     isOpen={openStageId === block.id}
                     onToggle={() => setOpenStageId(openStageId === block.id ? null : block.id)}
@@ -279,6 +321,15 @@ export function CyclePage({
             >
               <Plus className="h-4 w-4" /> Nova etapa
             </button>
+            {evaluations.some((ev) => !ev.goal.blockId) && (
+              <div className="mt-5">
+                <CycleGoalsCard
+                  cycle={cycle}
+                  blocks={stages}
+                  evaluations={evaluations.filter((ev) => !ev.goal.blockId)}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -296,10 +347,6 @@ export function CyclePage({
 
         {tab === "evolucao" && (
           <CycleEvolution cycle={cycle} blocks={stages} evaluations={evaluations} />
-        )}
-
-        {tab === "metas" && (
-          <CycleGoalsCard cycle={cycle} blocks={stages} evaluations={evaluations} />
         )}
       </div>
     </div>
