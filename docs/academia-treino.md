@@ -521,3 +521,111 @@ conquista, o treino é só confirmado: o app não inventa elogio.
 - Sessões anteriores à migration 0043 usam a classificação atual da ficha, por
   não haver outra evidência. As novas guardam a própria.
 - Não há classificação retroativa em massa: mudar a ficha vale daqui pra frente.
+
+---
+
+# Evolução — mapa de estímulo, sobrecarga e distribuição
+
+A Academia tem três abas: **Treino | Evolução | Programa**. "Programa" é o nome
+visível do que era "Ciclo de treino" — identificadores internos, rotas e dados
+seguem os mesmos.
+
+A Evolução é **uma página contínua**, nesta ordem: filtros, indicadores, mapa de
+estímulo, sobrecarga progressiva, distribuição, pontos de atenção e medidas
+corporais. Funciona para quem nunca criou um programa.
+
+## Dois níveis de filtro
+
+**Globais** (período, programa, etapa) afetam tudo. **Seleção de músculo**
+(mapa ou radar) detalha só a lista de exercícios — o mapa e o radar continuam
+mostrando o corpo inteiro, destacando o grupo, para preservar o contexto da
+comparação.
+
+Período padrão: 30 dias, com 7 dias, 3 meses, 1 ano e personalizar. A comparação
+usa o intervalo imediatamente anterior de mesma duração, informado nos detalhes.
+Período vazio mantém o filtro escolhido e explica a ausência.
+
+## Regras das três métricas
+
+**Frequência.** Só há percentual quando existe programação **histórica**: os
+dias marcados nas etapas, cujas datas são fixas. A atribuição semanal solta é
+estado atual e não pode dizer o que estava previsto há dois meses — sem ela, o
+card mostra "N treinos realizados" e diz por quê. Treinos extras aparecem
+separados e não empurram o cumprimento acima de 100%.
+
+**Volume registrado.** Soma de carga × repetições das séries elegíveis. Peso
+corporal, assistido e séries sem carga ficam de fora, e a quantidade excluída é
+reportada — forçar modalidades incompatíveis numa conta só produziria um número
+sem significado. O detalhe avisa que volume maior não prova ganho de força:
+ele também sobe com mais sessões ou exercícios diferentes.
+
+**Grupo em destaque.** Grupo com mais séries **diretas**, com a quantidade
+explícita. Não é "músculo mais forte" nem "favorito".
+
+## Mapa de estímulo
+
+Figura anatômica por regiões, frente e costas. Cada região é **um elemento**:
+o que se vê e o que se toca são o mesmo path/ellipse, então as áreas clicáveis
+não saem do lugar em telas diferentes. Há também um seletor textual — o desenho
+nunca é a única forma de escolher.
+
+A escala representa **quantidade de séries diretas**, em quatro níveis
+declarados. A legenda vai de "Menos séries" a "Mais séries". As cores não
+afirmam recuperação, risco de lesão, overtraining nem faixa ideal, e região sem
+registro aparece em cinza como "sem registros" — descrição do que foi
+registrado, não acusação de não ter treinado.
+
+Não implementamos "séries próximas à falha × frequência": ela conta frequência
+duas vezes e depende de dados de esforço que este modelo não guarda.
+
+## Séries diretas versus participação
+
+`workout_exercises.muscle_group` é o grupo que **recebe** a série;
+`secondary_muscles` (migration 0044) são os que participam. Somar a série
+inteira em cada músculo inflaria o total — cinco séries de supino virariam
+quinze. Por isso o radar e o mapa somam apenas as diretas, e a participação é
+mostrada à parte ao selecionar o grupo. A soma das barras bate com o total de
+séries registradas.
+
+Exercício sem classificação aparece como "Não classificado", nunca distribuído
+por suposição.
+
+## Sobrecarga progressiva
+
+Uma linha por exercício com registros no período: nome, grupo, minigráfico das
+sessões comparáveis, resultado objetivo e acesso ao detalhe.
+
+A comparação exige mesma identidade de exercício e **mesmo equipamento**.
+Prioriza mais repetições com a mesma carga; depois mais carga numa referência de
+repetições. Sem comparação defensável: "Sem comparação". Sem mudança
+observável: "Estável nas últimas sessões".
+
+Nunca concluímos platô por tempo decorrido, nem atribuímos queda a fadiga ou
+falta de foco — uma carga menor pode ser deload, técnica, amplitude ou mudança
+de objetivo.
+
+O detalhe abre no eixo com mais sessões comparáveis, permite alternar entre
+carga e repetições (um eixo por vez, nunca dois incompatíveis no mesmo gráfico),
+e cada ponto abre as séries que o originaram.
+
+## Pontos de atenção
+
+No máximo três, calculadas por regras transparentes sobre os registros —
+nenhuma chamada de IA. Cada uma leva à sua origem. Músculo que nunca foi
+treinado não vira problema: só entra quando já houve registro e ficou parado.
+Nada é alterado no programa automaticamente.
+
+## Limitações reais
+
+- **As imagens de referência não chegaram na conversa.** A identidade visual
+  seguiu a descrição escrita (fundo preto, cards grafite, verde da marca, ícones
+  outline) e os componentes reais do app. A figura anatômica é uma ilustração
+  vetorial estilizada por regiões; ela cumpre os requisitos funcionais
+  (regiões = áreas clicáveis, escala declarada, seletor textual), mas não pôde
+  ser comparada com a referência aprovada.
+- RPE/RIR não existem no modelo de dados: nenhum indicador de esforço é exibido,
+  e nada é presumido das séries sem registro.
+- Cardio, calorias e gordura corporal continuam fora — não são inferidos da
+  duração da sessão nem das cargas.
+- Sessões anteriores à classificação usam a ficha atual como melhor evidência
+  disponível; as novas guardam a própria no retrato da sessão.

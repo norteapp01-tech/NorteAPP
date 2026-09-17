@@ -110,6 +110,7 @@ export type ResolvedSet = {
   lineageId: string;
   name: string;
   muscleGroup: MuscleGroup | null;
+  secondaryMuscles: MuscleGroup[];
   equipment: ExerciseEquipment | null;
   weight: number;
   reps: number;
@@ -151,6 +152,7 @@ export function resolveSets(
       const name = snap?.name ?? live?.name ?? "Exercício";
       const muscleGroup = snap?.muscleGroup ?? live?.muscleGroup ?? null;
       const equipment = snap?.equipment ?? live?.equipment ?? null;
+      const secondaryMuscles = snap?.secondaryMuscles ?? live?.secondaryMuscles ?? [];
       for (const set of log.sets) {
         out.push({
           sessionId: session.id,
@@ -161,6 +163,7 @@ export function resolveSets(
           lineageId,
           name,
           muscleGroup,
+          secondaryMuscles,
           equipment,
           weight: set.weight,
           reps: set.reps,
@@ -634,4 +637,367 @@ export function recordsForSession(allSets: ResolvedSet[], sessionId: string): Pe
   return personalRecords(allSets, { from: session.date, to: session.date }, 5).filter(
     (r) => r.sessionId === sessionId,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Frequência
+// ---------------------------------------------------------------------------
+
+/**
+ * Frequência do período.
+ *
+ * O denominador só existe quando há programação HISTÓRICA confiável — os dias
+ * das etapas do ciclo, cujas datas são fixas. A atribuição semanal solta é
+ * estado ATUAL: usá-la para dizer o que estava previsto há dois meses
+ * reescreveria o passado a cada mudança de ficha.
+ *
+ * Sem denominador, devolve só a contagem realizada. Um percentual inventado
+ * seria pior do que nenhum.
+ */
+export type Frequency = {
+  done: number;
+  planned?: number;
+  /** Sessões além do programado — contadas à parte, nunca empurrando o
+   * cumprimento acima de 100%. */
+  extra: number;
+  percent?: number;
+  reason?: string;
+};
+
+export function frequency(data: FilteredData, plannedInRange: number | null): Frequency {
+  const done = data.sessions.length;
+  if (plannedInRange === null) {
+    return {
+      done,
+      extra: 0,
+      reason: "Sem programação histórica para comparar — mostramos o realizado.",
+    };
+  }
+  const counted = Math.min(done, plannedInRange);
+  return {
+    done,
+    planned: plannedInRange,
+    extra: Math.max(0, done - plannedInRange),
+    percent: plannedInRange > 0 ? Math.round((counted / plannedInRange) * 100) : 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Volume
+// ---------------------------------------------------------------------------
+
+export type Volume = {
+  /** Soma de carga × repetições das séries elegíveis. */
+  kg: number;
+  sets: number;
+  /** Séries deixadas de fora por não terem carga externa comparável. */
+  excludedSets: number;
+  deltaKg?: number;
+};
+
+/** Peso corporal, assistido e séries sem carga não entram na tonelagem —
+ * forçar modalidades incompatíveis numa conta só produziria um número que não
+ * significa nada. */
+function isEligibleForVolume(set: ResolvedSet): boolean {
+  if (set.equipment && EQUIPMENT_WITHOUT_EXTERNAL_LOAD.includes(set.equipment)) return false;
+  return set.weight > 0 && set.reps > 0;
+}
+
+export function volume(sets: ResolvedSet[]): Omit<Volume, "deltaKg"> {
+  let kg = 0;
+  let counted = 0;
+  let excluded = 0;
+  for (const set of sets) {
+    if (!isEligibleForVolume(set)) {
+      excluded += 1;
+      continue;
+    }
+    kg += set.weight * set.reps;
+    counted += 1;
+  }
+  return { kg: Math.round(kg), sets: counted, excludedSets: excluded };
+}
+
+export function volumeWithComparison(
+  current: ResolvedSet[],
+  previous: ResolvedSet[] | null,
+): Volume {
+  const now = volume(current);
+  if (!previous) return now;
+  return { ...now, deltaKg: now.kg - volume(previous).kg };
+}
+
+// ---------------------------------------------------------------------------
+// Estímulo por músculo
+// ---------------------------------------------------------------------------
+
+export type MuscleStimulus = {
+  group: MuscleGroupFilter;
+  label: string;
+  /** Séries cujo grupo PRINCIPAL é este — é o que soma. */
+  directSets: number;
+  /** Séries em que o músculo participa como secundário. Reportado à parte:
+   * somar a série inteira em cada músculo inflaria o total. */
+  assistedSets: number;
+  sessions: number;
+  lastDate?: string;
+};
+
+export function muscleStimulus(sets: ResolvedSet[]): MuscleStimulus[] {
+  const map = new Map<string, MuscleStimulus>();
+  const ensure = (key: MuscleGroupFilter): MuscleStimulus => {
+    const found = map.get(key);
+    if (found) return found;
+    const created: MuscleStimulus = {
+      group: key,
+      label: key === UNCLASSIFIED ? "Não classificado" : muscleGroupLabel[key as MuscleGroup],
+      directSets: 0,
+      assistedSets: 0,
+      sessions: 0,
+    };
+    map.set(key, created);
+    return created;
+  };
+  const sessionsByGroup = new Map<string, Set<string>>();
+
+  for (const set of sets) {
+    const primary = (set.muscleGroup ?? UNCLASSIFIED) as MuscleGroupFilter;
+    const row = ensure(primary);
+    row.directSets += 1;
+    if (!row.lastDate || set.date > row.lastDate) row.lastDate = set.date;
+    if (!sessionsByGroup.has(primary)) sessionsByGroup.set(primary, new Set());
+    sessionsByGroup.get(primary)!.add(set.sessionId);
+
+    for (const secondary of set.secondaryMuscles) {
+      if (secondary === set.muscleGroup) continue;
+      const other = ensure(secondary);
+      other.assistedSets += 1;
+      if (!sessionsByGroup.has(secondary)) sessionsByGroup.set(secondary, new Set());
+      sessionsByGroup.get(secondary)!.add(set.sessionId);
+    }
+  }
+
+  for (const [key, ids] of sessionsByGroup) {
+    const row = map.get(key);
+    if (row) row.sessions = ids.size;
+  }
+  return [...map.values()].sort((a, b) => b.directSets - a.directSets);
+}
+
+/** Grupo com mais séries DIRETAS — descrição do registro, não julgamento de
+ * força nem de preferência. */
+export function topMuscle(stimulus: MuscleStimulus[]): MuscleStimulus | undefined {
+  return stimulus.filter((m) => m.group !== UNCLASSIFIED && m.directSets > 0)[0];
+}
+
+// ---------------------------------------------------------------------------
+// Pontos de atenção
+// ---------------------------------------------------------------------------
+
+export type AttentionPoint = {
+  id: string;
+  text: string;
+  tone: "neutro" | "bom" | "alerta";
+  /** Para onde levar quando a pessoa quiser conferir a origem. */
+  target:
+    | { kind: "exercicio"; lineageId: string }
+    | { kind: "musculo"; group: MuscleGroupFilter }
+    | { kind: "programacao" }
+    | { kind: "classificacao" };
+};
+
+/**
+ * No máximo três observações, todas verificáveis a partir dos registros e com
+ * um caminho para a evidência.
+ *
+ * Regras transparentes calculadas dos dados — nenhuma chamada de IA, nenhuma
+ * frase gerada. Músculo sem registro não é tratado como problema: só vira
+ * observação quando JÁ foi treinado antes e ficou muito tempo sem.
+ */
+export function attentionPoints(
+  data: FilteredData,
+  progressions: LoadProgression[],
+  stimulus: MuscleStimulus[],
+  freq: Frequency,
+  today: string,
+  daysWithoutThreshold = 14,
+): AttentionPoint[] {
+  const points: AttentionPoint[] = [];
+
+  const best = progressions[0];
+  if (best) {
+    points.push({
+      id: `prog-${best.lineageId}`,
+      tone: "bom",
+      text: `${best.name}: ${best.firstWeight} → ${best.lastWeight} kg em ${best.reps} repetições.`,
+      target: { kind: "exercicio", lineageId: best.lineageId },
+    });
+  }
+
+  if (freq.planned !== undefined) {
+    points.push({
+      id: "freq",
+      tone: freq.done >= freq.planned ? "bom" : "neutro",
+      text: `Você concluiu ${freq.done} de ${freq.planned} treinos programados.`,
+      target: { kind: "programacao" },
+    });
+  }
+
+  const stale = stimulus
+    .filter((m) => m.group !== UNCLASSIFIED && m.lastDate)
+    .map((m) => ({ m, days: daysBetweenISO(m.lastDate!, today) }))
+    .filter((x) => x.days >= daysWithoutThreshold)
+    .sort((a, b) => b.days - a.days)[0];
+  if (stale) {
+    points.push({
+      id: `stale-${stale.m.group}`,
+      tone: "alerta",
+      text: `${stale.m.label}: último registro há ${stale.days} dias.`,
+      target: { kind: "musculo", group: stale.m.group },
+    });
+  }
+
+  const unclassified = stimulus.find((m) => m.group === UNCLASSIFIED);
+  if (unclassified && points.length < 3) {
+    points.push({
+      id: "sem-classificacao",
+      tone: "neutro",
+      text: `${unclassified.directSets} séries de exercícios sem grupo muscular definido.`,
+      target: { kind: "classificacao" },
+    });
+  }
+
+  return points.slice(0, 3);
+}
+
+// ---------------------------------------------------------------------------
+// Progresso por exercício, no formato da lista "Sobrecarga progressiva"
+// ---------------------------------------------------------------------------
+
+export type ExerciseTrend = {
+  lineageId: string;
+  name: string;
+  muscleGroup: MuscleGroup | null;
+  equipment: ExerciseEquipment | null;
+  sessions: number;
+  lastDate: string;
+  /** Pontos do minigráfico — melhor carga na referência de cada sessão. */
+  spark: number[];
+  /** Frase objetiva do resultado, ou a ausência honesta dele. */
+  summary: string;
+  kind: "melhora" | "estavel" | "sem_comparacao";
+  reference?: { reps: number; weight?: number };
+};
+
+/**
+ * Tendência de cada exercício com registros no período.
+ *
+ * Prioriza, nesta ordem: mais repetições com a MESMA carga, depois mais carga
+ * numa referência de repetições. Sem comparação defensável, diz "Sem
+ * comparação" — e sem mudança observável, "Estável nas últimas sessões".
+ *
+ * Nunca conclui platô por tempo, nem atribui queda a fadiga ou falta de foco:
+ * uma carga menor pode ser deload, técnica, amplitude ou mudança de objetivo.
+ */
+export function exerciseTrends(sets: ResolvedSet[]): ExerciseTrend[] {
+  const groups = new Map<string, ResolvedSet[]>();
+  for (const set of sets) {
+    const key = comparabilityKey(set.lineageId, set.equipment);
+    (groups.get(key) ?? groups.set(key, []).get(key)!).push(set);
+  }
+
+  const out: ExerciseTrend[] = [];
+  for (const group of groups) {
+    const rows = group[1];
+    const head = rows[0];
+    const sessionIds = new Set(rows.map((r) => r.sessionId));
+    const lastDate = rows.reduce((max, r) => (r.date > max ? r.date : max), rows[0].date);
+
+    // 1. Mais repetições com a mesma carga.
+    let best: ExerciseTrend | null = null;
+    const byWeight = new Map<number, { date: string; sessionId: string; reps: number }[]>();
+    for (const r of rows) {
+      if (r.weight <= 0) continue;
+      const list = byWeight.get(r.weight) ?? byWeight.set(r.weight, []).get(r.weight)!;
+      const found = list.find((x) => x.sessionId === r.sessionId);
+      if (found) found.reps = Math.max(found.reps, r.reps);
+      else list.push({ date: r.date, sessionId: r.sessionId, reps: r.reps });
+    }
+    for (const [weight, list] of byWeight) {
+      if (list.length < 2) continue;
+      const ordered = [...list].sort((a, b) => a.date.localeCompare(b.date));
+      const delta = ordered.at(-1)!.reps - ordered[0].reps;
+      if (delta > 0 && (!best || delta > 0)) {
+        best = {
+          lineageId: head.lineageId,
+          name: head.name,
+          muscleGroup: head.muscleGroup,
+          equipment: head.equipment,
+          sessions: sessionIds.size,
+          lastDate,
+          spark: ordered.map((x) => x.reps),
+          summary: `+${delta} ${delta === 1 ? "repetição" : "repetições"} com ${weight} kg`,
+          kind: "melhora",
+          reference: { reps: ordered.at(-1)!.reps, weight },
+        };
+        break;
+      }
+    }
+
+    // 2. Mais carga numa referência de repetições.
+    if (!best) {
+      const byReps = new Map<number, Set<string>>();
+      for (const r of rows) {
+        if (!byReps.has(r.reps)) byReps.set(r.reps, new Set());
+        byReps.get(r.reps)!.add(r.sessionId);
+      }
+      const reference = [...byReps.entries()].sort((a, b) => b[1].size - a[1].size)[0];
+      if (reference && reference[1].size >= 2) {
+        const points = rows
+          .filter((r) => r.reps === reference[0])
+          .reduce(
+            (acc, r) => {
+              const found = acc.find((x) => x.sessionId === r.sessionId);
+              if (found) found.weight = Math.max(found.weight, r.weight);
+              else acc.push({ sessionId: r.sessionId, date: r.date, weight: r.weight });
+              return acc;
+            },
+            [] as { sessionId: string; date: string; weight: number }[],
+          )
+          .sort((a, b) => a.date.localeCompare(b.date));
+        const delta = Math.round((points.at(-1)!.weight - points[0].weight) * 100) / 100;
+        best = {
+          lineageId: head.lineageId,
+          name: head.name,
+          muscleGroup: head.muscleGroup,
+          equipment: head.equipment,
+          sessions: sessionIds.size,
+          lastDate,
+          spark: points.map((p) => p.weight),
+          summary:
+            delta > 0
+              ? `+${delta} kg em ${reference[0]} repetições`
+              : "Estável nas últimas sessões",
+          kind: delta > 0 ? "melhora" : "estavel",
+          reference: { reps: reference[0] },
+        };
+      }
+    }
+
+    out.push(
+      best ?? {
+        lineageId: head.lineageId,
+        name: head.name,
+        muscleGroup: head.muscleGroup,
+        equipment: head.equipment,
+        sessions: sessionIds.size,
+        lastDate,
+        spark: [],
+        summary: "Sem comparação",
+        kind: "sem_comparacao",
+      },
+    );
+  }
+
+  return out;
 }

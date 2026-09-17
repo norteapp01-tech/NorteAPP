@@ -25,6 +25,7 @@ export function PlanExerciseEditor({ planId }: { planId: string }) {
     name: "",
     notes: "",
     muscleGroup: "" as MuscleGroup | "",
+    secondaryMuscles: [] as MuscleGroup[],
     equipment: "" as ExerciseEquipment | "",
     setsTarget: "4",
     setTargets: Array.from({ length: 4 }, () => ({
@@ -184,6 +185,41 @@ export function PlanExerciseEditor({ planId }: { planId: string }) {
               ))}
             </select>
           </div>
+          {/* Secundários NÃO recebem a série: entram como participação, para
+              que a soma dos grupos continue batendo com as séries reais. */}
+          {form.muscleGroup && (
+            <details className="rounded-md border border-border bg-surface-2 px-2 py-1.5">
+              <summary className="cursor-pointer list-none text-[10px] text-muted-foreground">
+                Músculos secundários ({form.secondaryMuscles.length}) — participam, não somam
+              </summary>
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {(Object.keys(muscleGroupLabel) as MuscleGroup[])
+                  .filter((key) => key !== form.muscleGroup)
+                  .map((key) => {
+                    const on = form.secondaryMuscles.includes(key);
+                    return (
+                      <button
+                        key={key}
+                        onClick={() =>
+                          setForm({
+                            ...form,
+                            secondaryMuscles: on
+                              ? form.secondaryMuscles.filter((m) => m !== key)
+                              : [...form.secondaryMuscles, key],
+                          })
+                        }
+                        aria-pressed={on}
+                        className={`interactive-press rounded-md border px-1.5 py-1 text-[10px] ${
+                          on ? "border-primary bg-primary/15 text-primary" : "border-border"
+                        }`}
+                      >
+                        {muscleGroupLabel[key]}
+                      </button>
+                    );
+                  })}
+              </div>
+            </details>
+          )}
           <input
             value={form.notes}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -206,12 +242,14 @@ export function PlanExerciseEditor({ planId }: { planId: string }) {
                   setTargets: form.setTargets,
                   notes: form.notes.trim() || undefined,
                   muscleGroup: form.muscleGroup || undefined,
+                  secondaryMuscles: form.secondaryMuscles,
                   equipment: form.equipment || undefined,
                 });
                 setForm({
                   name: "",
                   notes: "",
                   muscleGroup: "",
+                  secondaryMuscles: [],
                   equipment: "",
                   setsTarget: "4",
                   setTargets: Array.from({ length: 4 }, () => ({

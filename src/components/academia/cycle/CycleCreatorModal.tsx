@@ -27,7 +27,7 @@ export function CycleCreatorModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal
       onClose={onClose}
-      title="Montar planejamento"
+      title="Montar programa"
       footer={
         <div className="space-y-2">
           {action.error && <InlineError message={action.error} onRetry={action.clearError} />}

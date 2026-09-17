@@ -901,6 +901,7 @@ export async function copyPlanIntoBlock(blockId: string, sourcePlanId: string): 
           set_targets: e.set_targets ?? null,
           notes: (e.notes as string) ?? null,
           muscle_group: (e.muscle_group as string) ?? null,
+          secondary_muscles: (e.secondary_muscles as string[]) ?? [],
           equipment: (e.equipment as string) ?? null,
           order_index: e.order_index as number,
           lineage_id: e.lineage_id as string,

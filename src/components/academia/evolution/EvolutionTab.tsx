@@ -1,46 +1,63 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ListFilter, X } from "lucide-react";
-import { formatDateShortBR } from "@/lib/goals-store";
-import { useWorkoutStore } from "@/lib/workout-store";
-import { blocksForCycle, useCycleStore } from "@/lib/workout-cycle-store";
+import { formatDateShortBR, todayISO } from "@/lib/goals-store";
+import { useWorkoutLoading, useWorkoutStore, type MuscleGroup } from "@/lib/workout-store";
+import {
+  blocksForCycle,
+  daysOfBlock,
+  plannedSessionsInRange,
+  useCycleStore,
+} from "@/lib/workout-cycle-store";
 import {
   applyFilters,
-  indicators,
+  attentionPoints,
+  frequency,
+  loadProgressions,
   muscleGroupLabel,
+  muscleStimulus,
   previousRange,
   rangeOfLastDays,
-  UNCLASSIFIED,
+  topMuscle,
+  volumeWithComparison,
+  type AttentionPoint,
   type DateRange,
   type EvolutionFilters,
-  type Indicator,
-  type MuscleGroupFilter,
 } from "@/lib/workout-evolution";
-import { ProgressionModule } from "./ProgressionModule";
-import { DistributionModule } from "./DistributionModule";
-import { DeepDives } from "./DeepDives";
-import { FilterDrawer } from "./FilterDrawer";
-import { SessionListDrawer, DaysCalendarDrawer, SetsByExerciseDrawer } from "./IndicatorDrawers";
+import { BodyMap } from "./BodyMap";
+import { RadarDistribution } from "./RadarDistribution";
+import { OverloadList } from "./OverloadList";
+import { AttentionCard } from "./AttentionCard";
+import { IndicatorCards } from "./IndicatorCards";
+import { ExerciseDetailSheet } from "./ExerciseDetailSheet";
+import { MeasurementsCard } from "./MeasurementsCard";
+import { EvolutionFilterSheet } from "./FilterDrawer";
+import { ModuleCard, SkeletonBlock } from "./shared";
 
 // ---------------------------------------------------------------------------
-// Evolução da Academia.
+// Evolução da Academia — UMA página contínua, nesta ordem: filtros,
+// indicadores, mapa de estímulo, sobrecarga progressiva, distribuição, pontos
+// de atenção e medidas corporais.
 //
-// Responde a quatro perguntas, nesta ordem: mantive a frequência, em quais
-// exercícios progredi, como distribuí o treino, e o que mudou. Tudo parte de
-// UM conjunto filtrado (`applyFilters`), então o número do topo e o ponto do
-// gráfico não têm como discordar — e cada número abre os registros que o
-// compõem.
+// Dois níveis de filtro, visualmente distintos:
+// - GLOBAIS (período, programa, etapa): afetam tudo.
+// - SELEÇÃO DE MÚSCULO: detalha a lista de exercícios. O mapa e o radar
+//   continuam mostrando o corpo inteiro, só destacando o grupo — é o que
+//   preserva o contexto da comparação.
 //
-// Funciona sem planejamento nenhum: escolher um é filtro, nunca requisito.
+// Funciona para quem nunca criou um programa: escolher um é recorte, não
+// requisito.
 // ---------------------------------------------------------------------------
 
-type Preset = "30" | "90" | "custom";
+type Preset = "7" | "30" | "90" | "365" | "custom";
 
-export function EvolutionTab({
-  initialStageId,
-}: {
-  /** Etapa já selecionada ao chegar por "Ver evolução desta etapa". */
-  initialStageId?: string;
-}) {
+const PRESETS: { key: Preset; label: string; days: number }[] = [
+  { key: "7", label: "7 dias", days: 7 },
+  { key: "30", label: "30 dias", days: 30 },
+  { key: "90", label: "3 meses", days: 90 },
+  { key: "365", label: "1 ano", days: 365 },
+];
+
+export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
   const sessions = useWorkoutStore((s) => s.sessions);
   const exercises = useWorkoutStore((s) => s.exercises);
   const plans = useWorkoutStore((s) => s.plans);
@@ -48,34 +65,37 @@ export function EvolutionTab({
   const cycles = useCycleStore((s) => s.cycles);
   const blocks = useCycleStore((s) => s.blocks);
   const blockPlans = useCycleStore((s) => s.blockPlans);
-  const cycleGoals = useCycleStore((s) => s.cycleGoals);
+  const blockDays = useCycleStore((s) => s.blockDays);
   const measurements = useCycleStore((s) => s.measurements);
+  const loading = useWorkoutLoading();
 
   const initialStage = initialStageId ? blocks.find((b) => b.id === initialStageId) : undefined;
   const [preset, setPreset] = useState<Preset>(initialStage ? "custom" : "30");
   const [custom, setCustom] = useState<DateRange>(() =>
     initialStage ? { from: initialStage.startDate, to: initialStage.endDate } : rangeOfLastDays(30),
   );
-  const [cycleId, setCycleId] = useState<string>(initialStage?.cycleId ?? "");
-  const [stageId, setStageId] = useState<string>(initialStageId ?? "");
-  const [planLineageId, setPlanLineageId] = useState<string>("");
-  const [muscleGroup, setMuscleGroup] = useState<MuscleGroupFilter | "">("");
+  const [cycleId, setCycleId] = useState(initialStage?.cycleId ?? "");
+  const [stageId, setStageId] = useState(initialStageId ?? "");
+  const [muscle, setMuscle] = useState<MuscleGroup | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [detail, setDetail] = useState<Indicator["key"] | null>(null);
+  const [openExercise, setOpenExercise] = useState<string | null>(null);
+  const overloadRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (initialStageId) setStageId(initialStageId);
+  }, [initialStageId]);
 
   const cycle = cycles.find((c) => c.id === cycleId);
   const stage = blocks.find((b) => b.id === stageId);
-  const scope: DateRange | undefined = stage
-    ? { from: stage.startDate, to: stage.endDate }
-    : undefined;
+  const scope = stage ? { from: stage.startDate, to: stage.endDate } : undefined;
+  const range =
+    preset === "custom"
+      ? custom
+      : rangeOfLastDays(PRESETS.find((p) => p.key === preset)?.days ?? 30);
 
-  const range: DateRange =
-    preset === "custom" ? custom : rangeOfLastDays(preset === "30" ? 30 : 90);
-
-  // Treinos do escopo escolhido: uma etapa filtra pelos treinos DELA, não por
-  // qualquer sessão nas mesmas datas.
-  const scopedPlanLineages = useMemo(() => {
-    if (planLineageId) return [planLineageId];
+  // Uma etapa filtra pelos treinos DELA, não por qualquer sessão nas mesmas
+  // datas.
+  const planLineageIds = useMemo(() => {
     const ids = stage
       ? blockPlans.filter((bp) => bp.blockId === stage.id).map((bp) => bp.planId)
       : cycle
@@ -87,79 +107,102 @@ export function EvolutionTab({
     return [
       ...new Set(ids.map((id) => plans.find((p) => p.id === id)?.lineageId).filter(Boolean)),
     ] as string[];
-  }, [planLineageId, stage, cycle, blocks, blockPlans, plans]);
+  }, [stage, cycle, blocks, blockPlans, plans]);
 
-  const filters: EvolutionFilters = {
-    range,
-    scope,
-    planLineageIds: scopedPlanLineages,
-    muscleGroup: muscleGroup || undefined,
-  };
+  const filters: EvolutionFilters = { range, scope, planLineageIds };
+  const key = JSON.stringify(filters);
   const data = useMemo(
     () => applyFilters(sessions, exercises, plans, filters),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sessions, exercises, plans, JSON.stringify(filters)],
+    [sessions, exercises, plans, key],
   );
-
-  // A comparação usa o intervalo imediatamente anterior, de mesma duração —
-  // mas só quando ele cabe dentro do escopo da etapa. Uma etapa sem histórico
-  // anterior comparável não ganha um número inventado.
   const previous = useMemo(() => {
     const candidate = previousRange(data.effectiveRange);
     if (scope && candidate.from < scope.from) return null;
     return applyFilters(sessions, exercises, plans, { ...filters, range: candidate });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessions, exercises, plans, JSON.stringify(filters), data.effectiveRange.from]);
+  }, [sessions, exercises, plans, key, data.effectiveRange.from]);
 
-  const cards = indicators(
-    data,
-    previous,
-    scope ? "Sem histórico anterior dentro desta etapa" : "Sem comparação disponível",
-  );
+  const stimulus = useMemo(() => muscleStimulus(data.sets), [data.sets]);
+  const progressions = useMemo(() => loadProgressions(data.sets, 5), [data.sets]);
+
+  // Programação histórica: só as etapas do ciclo têm datas fixas. A atribuição
+  // semanal solta é estado ATUAL e não pode dizer o que estava previsto no
+  // passado — sem ela, o card mostra o realizado, sem porcentagem.
+  const plannedCount = useMemo(() => {
+    const relevant = cycle
+      ? blocksForCycle(blocks, cycle.id)
+      : blocks.filter((b) => cycles.some((c) => c.id === b.cycleId));
+    const scoped = stage ? [stage] : relevant;
+    const withDays = scoped.filter((b) => daysOfBlock(blockDays, b.id).some((d) => d.planId));
+    if (withDays.length === 0) return null;
+    return plannedSessionsInRange(
+      withDays,
+      blockDays,
+      data.effectiveRange.from,
+      data.effectiveRange.to,
+    );
+  }, [cycle, stage, blocks, blockDays, cycles, data.effectiveRange]);
+
+  const freq = frequency(data, plannedCount);
+  const vol = volumeWithComparison(data.sets, previous?.sets ?? null);
+  const top = topMuscle(stimulus);
+  const points = attentionPoints(data, progressions, stimulus, freq, todayISO());
 
   const chips: { label: string; onRemove: () => void }[] = [];
   if (cycle)
     chips.push({
-      label: `Planejamento: ${cycle.name}`,
+      label: `Programa: ${cycle.name}`,
       onRemove: () => {
         setCycleId("");
         setStageId("");
       },
     });
-  if (stage)
-    chips.push({
-      label: `Etapa: ${stage.name}`,
-      onRemove: () => setStageId(""),
-    });
-  if (planLineageId) {
-    const label = plans.find((p) => p.lineageId === planLineageId);
-    chips.push({
-      label: `Treino: ${label ? `${label.letter} · ${label.name}` : "selecionado"}`,
-      onRemove: () => setPlanLineageId(""),
-    });
+  if (stage) chips.push({ label: `Etapa: ${stage.name}`, onRemove: () => setStageId("") });
+
+  const scrollToExercises = () =>
+    overloadRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  const openAttention = (point: AttentionPoint) => {
+    if (point.target.kind === "exercicio") {
+      setOpenExercise(point.target.lineageId);
+      return;
+    }
+    if (point.target.kind === "musculo" && point.target.group !== "nao_classificado") {
+      setMuscle(point.target.group as MuscleGroup);
+    }
+    scrollToExercises();
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <SkeletonBlock height={92} />
+        <SkeletonBlock height={96} />
+        <SkeletonBlock height={320} />
+        <SkeletonBlock height={220} />
+      </div>
+    );
   }
-  if (muscleGroup)
-    chips.push({
-      label: `Músculo: ${muscleGroup === UNCLASSIFIED ? "Não classificado" : muscleGroupLabel[muscleGroup]}`,
-      onRemove: () => setMuscleGroup(""),
-    });
+
+  const empty = data.sessions.length === 0;
 
   return (
     <div className="space-y-4">
-      {/* A. período e filtros -------------------------------------------- */}
+      {/* 1. filtros globais ---------------------------------------------- */}
       <section className="card-surface p-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex gap-1">
-            {(["30", "90"] as const).map((p) => (
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 flex-wrap gap-1">
+            {PRESETS.map((p) => (
               <button
-                key={p}
-                onClick={() => setPreset(p)}
-                aria-pressed={preset === p}
+                key={p.key}
+                onClick={() => setPreset(p.key)}
+                aria-pressed={preset === p.key}
                 className={`interactive-press rounded-lg px-2.5 py-1.5 text-[11px] font-semibold ${
-                  preset === p ? "bg-primary/15 text-primary" : "text-muted-foreground"
+                  preset === p.key ? "bg-primary/15 text-primary" : "text-muted-foreground"
                 }`}
               >
-                {p} dias
+                {p.label}
               </button>
             ))}
             <button
@@ -169,14 +212,14 @@ export function EvolutionTab({
                 preset === "custom" ? "bg-primary/15 text-primary" : "text-muted-foreground"
               }`}
             >
-              Personalizado
+              Personalizar
             </button>
           </div>
           <button
             onClick={() => setFilterOpen(true)}
             className="interactive-press flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-semibold"
           >
-            <ListFilter className="h-3.5 w-3.5" /> Filtrar
+            <ListFilter className="h-3.5 w-3.5" /> Filtros
           </button>
         </div>
 
@@ -223,8 +266,7 @@ export function EvolutionTab({
               onClick={() => {
                 setCycleId("");
                 setStageId("");
-                setPlanLineageId("");
-                setMuscleGroup("");
+                setMuscle(null);
               }}
               className="interactive-press text-[10px] font-semibold text-primary underline"
             >
@@ -234,86 +276,62 @@ export function EvolutionTab({
         )}
       </section>
 
-      {/* B. três indicadores --------------------------------------------- */}
-      <div className="grid grid-cols-3 gap-2">
-        {cards.map((card) => (
-          <button
-            key={card.key}
-            onClick={() => setDetail(card.key)}
-            className="card-surface interactive-press p-2.5 text-left"
-          >
-            <p className="text-[9px] font-bold uppercase leading-tight tracking-wider text-muted-foreground">
-              {card.label}
-            </p>
-            <p className="mt-1 font-mono text-2xl font-bold tabular-nums">{card.value}</p>
-            {card.delta !== undefined ? (
-              <p
-                className={`text-[10px] ${card.delta > 0 ? "text-success" : card.delta < 0 ? "text-muted-foreground" : "text-muted-foreground"}`}
-              >
-                {card.delta > 0 ? "+" : ""}
-                {card.delta} vs. anterior
-              </p>
-            ) : (
-              <p className="text-[10px] leading-tight text-muted-foreground">
-                {card.comparisonUnavailableReason}
-              </p>
+      {empty ? (
+        <ModuleCard title="Sem registros neste período">
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Não há treinos concluídos entre {formatDateShortBR(data.effectiveRange.from)} e{" "}
+            {formatDateShortBR(data.effectiveRange.to)}. O período escolhido foi mantido — escolha
+            outro acima ou registre um treino na aba Treino.
+          </p>
+        </ModuleCard>
+      ) : (
+        <>
+          <IndicatorCards
+            frequency={freq}
+            volume={vol}
+            top={top}
+            comparison={previous?.effectiveRange}
+            data={data}
+          />
+
+          <ModuleCard title="Mapa de estímulo">
+            <BodyMap stimulus={stimulus} selected={muscle} onSelect={setMuscle} />
+            {muscle && (
+              <MuscleDetail
+                stimulus={stimulus}
+                muscle={muscle}
+                onSeeExercises={scrollToExercises}
+              />
             )}
-          </button>
-        ))}
-      </div>
-      {cards[0]?.comparison && (
-        <p className="-mt-2 text-[10px] text-muted-foreground">
-          Comparado com {formatDateShortBR(cards[0].comparison.from)} —{" "}
-          {formatDateShortBR(cards[0].comparison.to)}, mesmo escopo.
-        </p>
+          </ModuleCard>
+
+          <div ref={overloadRef} className="scroll-mt-4">
+            <OverloadList data={data} selectedMuscle={muscle} onOpen={setOpenExercise} />
+          </div>
+
+          <ModuleCard title="Distribuição de séries">
+            <RadarDistribution stimulus={stimulus} selected={muscle} onSelect={setMuscle} />
+          </ModuleCard>
+
+          <AttentionCard points={points} onOpen={openAttention} />
+
+          <MeasurementsCard
+            bodyWeights={bodyWeights}
+            measurements={measurements}
+            range={data.effectiveRange}
+          />
+        </>
       )}
 
-      {/* C. evolução por exercício --------------------------------------- */}
-      <ProgressionModule data={data} />
-
-      {/* D. distribuição -------------------------------------------------- */}
-      <DistributionModule
-        data={data}
-        onSelectMuscle={(key) =>
-          setMuscleGroup(key === muscleGroup ? "" : (key as MuscleGroupFilter))
-        }
-        selectedMuscle={muscleGroup || null}
-        onSelectPlan={(lineageId) => setPlanLineageId(lineageId === planLineageId ? "" : lineageId)}
-        selectedPlan={planLineageId || null}
-      />
-
-      {/* E. aprofundamentos ---------------------------------------------- */}
-      <DeepDives
-        data={data}
-        allSessions={sessions}
-        exercises={exercises}
-        plans={plans}
-        bodyWeights={bodyWeights}
-        cycles={cycles}
-        blocks={blocks}
-        cycleGoals={cycleGoals}
-        measurements={measurements}
-        stage={stage}
-        cycle={cycle}
-      />
-
       {filterOpen && (
-        <FilterDrawer
+        <EvolutionFilterSheet
           cycles={cycles}
           blocks={blocks}
-          blockPlans={blockPlans}
-          plans={plans}
-          data={data}
           cycleId={cycleId}
           stageId={stageId}
-          planLineageId={planLineageId}
-          muscleGroup={muscleGroup}
           onChange={(next) => {
             setCycleId(next.cycleId);
             setStageId(next.stageId);
-            setPlanLineageId(next.planLineageId);
-            setMuscleGroup(next.muscleGroup);
-            // Escolher uma etapa passa a usar as datas dela como período.
             const chosen = blocks.find((b) => b.id === next.stageId);
             if (chosen && next.stageId !== stageId) {
               setPreset("custom");
@@ -324,11 +342,58 @@ export function EvolutionTab({
         />
       )}
 
-      {detail === "treinos" && (
-        <SessionListDrawer data={data} plans={plans} onClose={() => setDetail(null)} />
+      {openExercise && (
+        <ExerciseDetailSheet
+          lineageId={openExercise}
+          data={data}
+          onClose={() => setOpenExercise(null)}
+        />
       )}
-      {detail === "dias" && <DaysCalendarDrawer data={data} onClose={() => setDetail(null)} />}
-      {detail === "series" && <SetsByExerciseDrawer data={data} onClose={() => setDetail(null)} />}
+    </div>
+  );
+}
+
+/** Detalhe do músculo selecionado — séries diretas, participação, sessões e
+ * último registro, com caminho para os exercícios que formam o número. */
+function MuscleDetail({
+  stimulus,
+  muscle,
+  onSeeExercises,
+}: {
+  stimulus: ReturnType<typeof muscleStimulus>;
+  muscle: MuscleGroup;
+  onSeeExercises: () => void;
+}) {
+  const info = stimulus.find((s) => s.group === muscle);
+  return (
+    <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
+      <p className="text-sm font-bold">{muscleGroupLabel[muscle]}</p>
+      {!info || info.directSets === 0 ? (
+        <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+          Sem registros neste período. Isso descreve o que foi registrado — não conclui que você
+          deixou de treinar.
+        </p>
+      ) : (
+        <>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {info.directSets} séries diretas · {info.sessions}{" "}
+            {info.sessions === 1 ? "sessão" : "sessões"}
+            {info.lastDate ? ` · último registro em ${formatDateShortBR(info.lastDate)}` : ""}
+          </p>
+          {info.assistedSets > 0 && (
+            <p className="text-[11px] text-muted-foreground">
+              Participou como músculo secundário em outras {info.assistedSets} séries — contadas à
+              parte.
+            </p>
+          )}
+        </>
+      )}
+      <button
+        onClick={onSeeExercises}
+        className="interactive-press mt-2 text-[11px] font-bold text-primary underline"
+      >
+        Ver exercícios deste músculo
+      </button>
     </div>
   );
 }

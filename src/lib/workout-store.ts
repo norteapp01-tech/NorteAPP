@@ -40,6 +40,9 @@ export type Exercise = {
   setTargets?: SetTarget[];
   notes?: string;
   muscleGroup?: MuscleGroup;
+  /** Participam do movimento, mas NÃO recebem a série: somar a série inteira
+   * em cada um inflaria o total de séries registradas. */
+  secondaryMuscles: MuscleGroup[];
   equipment?: ExerciseEquipment;
   order: number;
 };
@@ -92,6 +95,7 @@ export type PlannedExercise = {
   /** Guardados no retrato para que reclassificar a ficha hoje não reescreva a
    * distribuição muscular de meses atrás. */
   muscleGroup?: MuscleGroup;
+  secondaryMuscles?: MuscleGroup[];
   equipment?: ExerciseEquipment;
   order: number;
   setsTarget: number;
@@ -276,6 +280,7 @@ export function toPlannedExercise(exercise: Exercise): PlannedExercise {
     lineageId: exercise.lineageId,
     name: exercise.name,
     muscleGroup: exercise.muscleGroup,
+    secondaryMuscles: exercise.secondaryMuscles,
     equipment: exercise.equipment,
     order: exercise.order,
     setsTarget: exercise.setsTarget,
@@ -730,6 +735,7 @@ function mapExercise(r: Row): Exercise {
     restSeconds: (r.rest_seconds as number) ?? 60,
     notes: (r.notes as string) ?? undefined,
     muscleGroup: (r.muscle_group as MuscleGroup) ?? undefined,
+    secondaryMuscles: (r.secondary_muscles as MuscleGroup[]) ?? [],
     equipment: (r.equipment as ExerciseEquipment) ?? undefined,
     setTargets:
       storedTargets.length > 0
@@ -823,6 +829,14 @@ function invalidate() {
   return queryClient.invalidateQueries({ queryKey: QUERY_KEY, refetchType: "all" });
 }
 
+/** Carregamento REAL da consulta. Inferir "carregando" de arrays vazios
+ * deixaria quem nunca registrou nada preso num esqueleto para sempre. */
+export function useWorkoutLoading(): boolean {
+  const userId = useSupabaseUserId();
+  const { isLoading } = useQuery({ queryKey: QUERY_KEY, queryFn: fetchState, enabled: !!userId });
+  return !userId || isLoading;
+}
+
 export function useWorkoutStore<T>(selector: (s: State) => T): T {
   const userId = useSupabaseUserId();
   const { data } = useQuery({ queryKey: QUERY_KEY, queryFn: fetchState, enabled: !!userId });
@@ -877,6 +891,7 @@ export async function addExercise(
     setTargets?: SetTarget[];
     notes?: string;
     muscleGroup?: MuscleGroup;
+    secondaryMuscles?: MuscleGroup[];
     equipment?: ExerciseEquipment;
   },
 ): Promise<string> {
@@ -899,6 +914,7 @@ export async function addExercise(
         set_targets: input.setTargets ?? null,
         notes: input.notes ?? null,
         muscle_group: input.muscleGroup ?? null,
+        secondary_muscles: input.secondaryMuscles ?? [],
         equipment: input.equipment ?? null,
         order_index: count ?? 0,
       })
@@ -922,6 +938,7 @@ export async function updateExercise(
       | "setTargets"
       | "notes"
       | "muscleGroup"
+      | "secondaryMuscles"
       | "equipment"
     >
   >,
@@ -935,6 +952,7 @@ export async function updateExercise(
   if (patch.setTargets !== undefined) dbPatch.set_targets = patch.setTargets;
   if (patch.notes !== undefined) dbPatch.notes = patch.notes;
   if (patch.muscleGroup !== undefined) dbPatch.muscle_group = patch.muscleGroup;
+  if (patch.secondaryMuscles !== undefined) dbPatch.secondary_muscles = patch.secondaryMuscles;
   if (patch.equipment !== undefined) dbPatch.equipment = patch.equipment;
   unwrap(await supabase.from("workout_exercises").update(dbPatch).eq("id", id).select().single());
   await invalidate();

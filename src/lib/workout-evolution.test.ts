@@ -22,6 +22,12 @@ import {
   rangeOfLastDays,
   resolveSets,
   workoutDistribution,
+  frequency,
+  volume,
+  muscleStimulus,
+  topMuscle,
+  exerciseTrends,
+  attentionPoints,
   UNCLASSIFIED,
 } from "./workout-evolution";
 import type { Exercise, SetLog, WorkoutPlan, WorkoutSession } from "./workout-store";
@@ -41,6 +47,7 @@ function ex(o: Partial<Exercise> = {}): Exercise {
     loadTarget: 20,
     restSeconds: 60,
     order: 0,
+    secondaryMuscles: [],
     muscleGroup: "costas",
     equipment: "barra",
     ...o,
@@ -446,5 +453,189 @@ describe("filtros", () => {
     const [treinos, , series] = indicators(d, null);
     expect(treinos.value).toBe(d.sessions.length);
     expect(series.value).toBe(d.sets.length);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Frequência, volume, estímulo e tendências
+// ---------------------------------------------------------------------------
+
+describe("frequency — só há percentual com programação histórica", () => {
+  const range = { from: "2026-09-01", to: "2026-09-30" };
+  const data = (n: number) =>
+    applyFilters(
+      Array.from({ length: n }, (_, i) =>
+        session(`s${i}`, `2026-09-0${i + 1}`, [{ weight: 20, reps: 10 }]),
+      ),
+      EXERCISES,
+      PLANS,
+      { range },
+    );
+
+  it("sem programação confiável, mostra o realizado e diz por quê", () => {
+    const f = frequency(data(3), null);
+    expect(f.done).toBe(3);
+    expect(f.percent).toBeUndefined();
+    expect(f.reason).toMatch(/programação histórica/i);
+  });
+
+  it("com programação, compara realizado e previsto", () => {
+    const f = frequency(data(3), 4);
+    expect(f.percent).toBe(75);
+    expect(f.planned).toBe(4);
+  });
+
+  it("treino extra não empurra o cumprimento acima de 100%", () => {
+    const f = frequency(data(5), 4);
+    expect(f.percent).toBe(100);
+    expect(f.extra).toBe(1);
+  });
+});
+
+describe("volume — modalidades incompatíveis não entram na mesma conta", () => {
+  it("soma carga × repetições das séries elegíveis", () => {
+    const sets = setsOf([
+      session("s1", "2026-09-01", [
+        { weight: 20, reps: 10 },
+        { weight: 30, reps: 5 },
+      ]),
+    ]);
+    expect(volume(sets)).toMatchObject({ kg: 350, sets: 2, excludedSets: 0 });
+  });
+
+  it("peso corporal e assistido ficam de fora, e isso é reportado", () => {
+    const exercises = [ex({ equipment: "peso_corporal" })];
+    const sets = resolveSets(
+      [session("s1", "2026-09-01", [{ weight: 0, reps: 12 }])],
+      exercises,
+      PLANS,
+    );
+    expect(volume(sets)).toMatchObject({ kg: 0, sets: 0, excludedSets: 1 });
+  });
+});
+
+describe("muscleStimulus — série direta soma, participação não", () => {
+  const exercises = [ex({ muscleGroup: "peito", secondaryMuscles: ["triceps", "ombros"] })];
+
+  it("a série conta uma vez no grupo principal", () => {
+    const sets = resolveSets(
+      [
+        session("s1", "2026-09-01", [
+          { weight: 40, reps: 10 },
+          { weight: 40, reps: 8 },
+        ]),
+      ],
+      exercises,
+      PLANS,
+    );
+    const stimulus = muscleStimulus(sets);
+    const peito = stimulus.find((m) => m.group === "peito")!;
+    expect(peito.directSets).toBe(2);
+    // A soma das séries DIRETAS bate com o total registrado.
+    expect(stimulus.reduce((sum, m) => sum + m.directSets, 0)).toBe(sets.length);
+  });
+
+  it("os secundários aparecem como participação, à parte", () => {
+    const sets = resolveSets(
+      [session("s1", "2026-09-01", [{ weight: 40, reps: 10 }])],
+      exercises,
+      PLANS,
+    );
+    const stimulus = muscleStimulus(sets);
+    const triceps = stimulus.find((m) => m.group === "triceps")!;
+    expect(triceps.directSets).toBe(0);
+    expect(triceps.assistedSets).toBe(1);
+  });
+
+  it("o grupo em destaque ignora o balde de não classificados", () => {
+    const sets = resolveSets(
+      [session("s1", "2026-09-01", [{ weight: 40, reps: 10 }])],
+      [ex({ muscleGroup: undefined })],
+      PLANS,
+    );
+    expect(topMuscle(muscleStimulus(sets))).toBeUndefined();
+  });
+});
+
+describe("exerciseTrends — prioriza repetições com a mesma carga", () => {
+  it("mais repetições com a mesma carga vira o resultado", () => {
+    const sets = setsOf([
+      session("s1", "2026-09-01", [{ weight: 20, reps: 8 }]),
+      session("s2", "2026-09-08", [{ weight: 20, reps: 10 }]),
+    ]);
+    const [t] = exerciseTrends(sets);
+    expect(t.kind).toBe("melhora");
+    expect(t.summary).toBe("+2 repetições com 20 kg");
+  });
+
+  it("sem mudança observável, diz estável — não conclui platô", () => {
+    const sets = setsOf([
+      session("s1", "2026-09-01", [{ weight: 20, reps: 10 }]),
+      session("s2", "2026-09-08", [{ weight: 20, reps: 10 }]),
+    ]);
+    const [t] = exerciseTrends(sets);
+    expect(t.summary).toBe("Estável nas últimas sessões");
+    expect(t.kind).toBe("estavel");
+  });
+
+  it("uma sessão só não gera comparação", () => {
+    const sets = setsOf([session("s1", "2026-09-01", [{ weight: 20, reps: 10 }])]);
+    const [t] = exerciseTrends(sets);
+    expect(t.summary).toBe("Sem comparação");
+    expect(t.spark).toEqual([]);
+  });
+
+  it("carga menor não é rotulada como fadiga nem falta de foco", () => {
+    const sets = setsOf([
+      session("s1", "2026-09-01", [{ weight: 30, reps: 10 }]),
+      session("s2", "2026-09-08", [{ weight: 20, reps: 10 }]),
+    ]);
+    const [t] = exerciseTrends(sets);
+    expect(t.summary).toBe("Estável nas últimas sessões");
+    expect(t.summary).not.toMatch(/fadiga|foco|platô/i);
+  });
+});
+
+describe("attentionPoints — no máximo três, todas verificáveis", () => {
+  const range = { from: "2026-09-01", to: "2026-09-30" };
+  const data = applyFilters(
+    [session("s1", "2026-09-01", [{ weight: 20, reps: 10 }])],
+    EXERCISES,
+    PLANS,
+    { range },
+  );
+
+  it("músculo nunca treinado não vira problema", () => {
+    const points = attentionPoints(data, [], [], frequency(data, null), "2026-09-30");
+    expect(points.every((p) => !/nunca/i.test(p.text))).toBe(true);
+  });
+
+  it("músculo parado há muito tempo vira observação com origem", () => {
+    const stimulus = muscleStimulus(data.sets);
+    const points = attentionPoints(data, [], stimulus, frequency(data, null), "2026-09-30");
+    const stale = points.find((p) => p.target.kind === "musculo");
+    expect(stale?.text).toMatch(/último registro há \d+ dias/);
+  });
+
+  it("nunca passa de três observações", () => {
+    const stimulus = muscleStimulus(data.sets);
+    const progressions = loadProgressions(data.sets);
+    const points = attentionPoints(
+      data,
+      progressions,
+      [
+        ...stimulus,
+        {
+          group: UNCLASSIFIED,
+          label: "Não classificado",
+          directSets: 4,
+          assistedSets: 0,
+          sessions: 1,
+        },
+      ],
+      frequency(data, 4),
+      "2026-09-30",
+    );
+    expect(points.length).toBeLessThanOrEqual(3);
   });
 });

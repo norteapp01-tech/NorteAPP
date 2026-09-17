@@ -118,7 +118,7 @@ export function CyclePage({
 
       <header className="mt-3">
         <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-          Planejamento de treino
+          Programa de treino
         </p>
         <h1 className="mt-1 text-2xl font-bold leading-tight">{cycle.name}</h1>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -144,7 +144,7 @@ export function CyclePage({
               disabled={stages.every((b) => stageState(b, blockPlans, today) === "rascunho")}
               className="interactive-press inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground disabled:opacity-40"
             >
-              <Play className="h-3.5 w-3.5" /> Ativar planejamento
+              <Play className="h-3.5 w-3.5" /> Ativar programa
             </button>
           )}
           {cycle.status === "ativo" && (
@@ -152,7 +152,7 @@ export function CyclePage({
               onClick={() => setConfirmEnd(true)}
               className="interactive-press inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[11px] font-semibold"
             >
-              <Square className="h-3.5 w-3.5" /> Encerrar planejamento
+              <Square className="h-3.5 w-3.5" /> Encerrar programa
             </button>
           )}
         </div>
@@ -177,10 +177,10 @@ export function CyclePage({
 
       {confirmEnd && (
         <div className="mt-4 rounded-xl border border-border bg-surface-2 p-3">
-          <p className="text-sm font-bold">Encerrar o planejamento?</p>
+          <p className="text-sm font-bold">Encerrar o programa?</p>
           <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
             O histórico de treinos fica intacto. O "Plano da semana" volta a ser o que estava
-            valendo antes do planejamento, se você quiser.
+            valendo antes do programa, se você quiser.
           </p>
           <div className="mt-2.5 flex flex-wrap gap-2">
             <button
@@ -271,7 +271,7 @@ export function CyclePage({
             )}
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                Caminho do planejamento
+                Caminho do programa
               </h2>
               <span className="text-[13px] text-muted-foreground">{stages.length} etapas</span>
             </div>
@@ -301,7 +301,7 @@ export function CyclePage({
             ))}
             {stages.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                Este planejamento ainda não tem etapas. Adicione a primeira para montar os treinos.
+                Este programa ainda não tem etapas. Adicione a primeira para montar os treinos.
               </p>
             )}
             <button
@@ -376,8 +376,8 @@ function ActivationPreview({
       <p className="text-sm font-bold">O que passa a valer</p>
       {!current ? (
         <p className="mt-1 text-[11px] text-muted-foreground">
-          Hoje está fora das etapas deste planejamento — nada muda no "Treino de hoje" até a
-          primeira etapa começar
+          Hoje está fora das etapas deste programa — nada muda no "Treino de hoje" até a primeira
+          etapa começar
           {stages[0] ? `, em ${formatDateShortBR(stages[0].startDate)}` : ""}.
         </p>
       ) : (

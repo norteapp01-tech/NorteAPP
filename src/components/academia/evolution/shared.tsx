@@ -64,3 +64,15 @@ export function Bar({
     </button>
   );
 }
+
+/** Placeholder de carregamento — mesma moldura dos cards, sem pulso agressivo. */
+export function SkeletonBlock({ height }: { height: number }) {
+  return (
+    <div
+      className="card-surface animate-pulse"
+      style={{ height }}
+      role="status"
+      aria-label="Carregando"
+    />
+  );
+}

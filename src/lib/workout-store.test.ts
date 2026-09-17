@@ -40,6 +40,7 @@ function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
     loadTarget: 40,
     restSeconds: 90,
     order: 0,
+    secondaryMuscles: [],
     ...overrides,
   };
 }

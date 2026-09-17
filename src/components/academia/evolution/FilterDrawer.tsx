@@ -1,90 +1,39 @@
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { formatDateShortBR } from "@/lib/goals-store";
-import type { WorkoutPlan } from "@/lib/workout-store";
-import {
-  blocksForCycle,
-  plansOfBlock,
-  type BlockPlan,
-  type CycleBlock,
-  type WorkoutCycle,
-} from "@/lib/workout-cycle-store";
-import {
-  muscleGroupLabel,
-  UNCLASSIFIED,
-  type FilteredData,
-  type MuscleGroupFilter,
-} from "@/lib/workout-evolution";
+import { blocksForCycle, type CycleBlock, type WorkoutCycle } from "@/lib/workout-cycle-store";
 
 // ---------------------------------------------------------------------------
-// Gaveta de filtros: planejamento, etapa, treino e grupo muscular.
+// Filtros GLOBAIS secundários: programa e etapa. Ficam numa gaveta à parte do
+// período, e separados da seleção de músculo — que é detalhamento, não filtro
+// global.
 //
-// Nada aqui é obrigatório. A visão geral inclui treinos independentes, e
-// escolher um planejamento é um recorte — não a condição para o painel
-// funcionar.
+// Nada aqui é obrigatório: sem programa escolhido, a página usa todos os
+// treinos registrados, inclusive os que nunca pertenceram a um.
 // ---------------------------------------------------------------------------
 
-export type FilterState = {
-  cycleId: string;
-  stageId: string;
-  planLineageId: string;
-  muscleGroup: MuscleGroupFilter | "";
-};
+export type EvolutionFilterState = { cycleId: string; stageId: string };
 
-export function FilterDrawer({
+export function EvolutionFilterSheet({
   cycles,
   blocks,
-  blockPlans,
-  plans,
-  data,
   cycleId,
   stageId,
-  planLineageId,
-  muscleGroup,
   onChange,
   onClose,
 }: {
   cycles: WorkoutCycle[];
   blocks: CycleBlock[];
-  blockPlans: BlockPlan[];
-  plans: WorkoutPlan[];
-  data: FilteredData;
   cycleId: string;
   stageId: string;
-  planLineageId: string;
-  muscleGroup: MuscleGroupFilter | "";
-  onChange: (next: FilterState) => void;
+  onChange: (next: EvolutionFilterState) => void;
   onClose: () => void;
 }) {
-  const [draft, setDraft] = useState<FilterState>({
-    cycleId,
-    stageId,
-    planLineageId,
-    muscleGroup,
-  });
-
+  const [draft, setDraft] = useState<EvolutionFilterState>({ cycleId, stageId });
   const stages = draft.cycleId ? blocksForCycle(blocks, draft.cycleId) : [];
-  const stage = stages.find((b) => b.id === draft.stageId);
-  // Treinos oferecidos: os da etapa quando há uma; senão, os que realmente
-  // aparecem nos registros do período.
-  const workoutOptions = stage
-    ? plansOfBlock(blockPlans, plans, stage.id).map((p) => ({
-        lineageId: p.lineageId,
-        label: `${p.letter} · ${p.name}`,
-      }))
-    : [
-        ...new Map(
-          data.sessions
-            .filter((s) => s.planLineageId)
-            .map((s) => [s.planLineageId!, s.planLabel ?? "Treino"]),
-        ),
-      ].map(([lineageId, label]) => ({ lineageId, label }));
+  const stage = stages.find((s) => s.id === draft.stageId);
 
-  const muscleOptions = [
-    ...new Set(data.sets.map((s) => s.muscleGroup ?? UNCLASSIFIED)),
-  ] as MuscleGroupFilter[];
-
-  const apply = (next: FilterState) => {
+  const apply = (next: EvolutionFilterState) => {
     setDraft(next);
     onChange(next);
   };
@@ -92,13 +41,11 @@ export function FilterDrawer({
   return (
     <Modal
       onClose={onClose}
-      title="Filtrar"
+      title="Filtros"
       footer={
         <div className="flex gap-2">
           <button
-            onClick={() => {
-              apply({ cycleId: "", stageId: "", planLineageId: "", muscleGroup: "" });
-            }}
+            onClick={() => apply({ cycleId: "", stageId: "" })}
             className="interactive-press flex-1 rounded-xl border border-border py-2.5 text-xs font-semibold"
           >
             Limpar filtros
@@ -114,13 +61,11 @@ export function FilterDrawer({
     >
       <label className="block">
         <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Planejamento
+          Programa
         </span>
         <select
           value={draft.cycleId}
-          onChange={(e) =>
-            apply({ ...draft, cycleId: e.target.value, stageId: "", planLineageId: "" })
-          }
+          onChange={(e) => apply({ cycleId: e.target.value, stageId: "" })}
           className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm outline-none focus:border-primary"
         >
           <option value="">Todos os treinos</option>
@@ -130,86 +75,42 @@ export function FilterDrawer({
             </option>
           ))}
         </select>
-        <span className="mt-1 block text-[11px] text-muted-foreground">
-          Sem planejamento escolhido, a visão inclui também os treinos independentes.
+        <span className="mt-1 block text-[11px] leading-relaxed text-muted-foreground">
+          Sem programa escolhido, a página usa todos os treinos registrados — inclusive os que nunca
+          pertenceram a um programa.
         </span>
       </label>
 
       {stages.length > 0 && (
-        <label className="mt-3 block">
+        <label className="mt-4 block">
           <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Etapa
           </span>
           <select
             value={draft.stageId}
-            onChange={(e) => apply({ ...draft, stageId: e.target.value, planLineageId: "" })}
+            onChange={(e) => apply({ ...draft, stageId: e.target.value })}
             className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm outline-none focus:border-primary"
           >
             <option value="">Todas as etapas</option>
-            {stages.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name} ({formatDateShortBR(b.startDate)} — {formatDateShortBR(b.endDate)})
+            {stages.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} ({formatDateShortBR(s.startDate)} — {formatDateShortBR(s.endDate)})
               </option>
             ))}
           </select>
           {stage && (
-            <span className="mt-1 block text-[11px] text-muted-foreground">
-              O período passa a ser o da etapa: {formatDateShortBR(stage.startDate)} —{" "}
-              {formatDateShortBR(stage.endDate)}. Mudar o período depois continua limitado a este
+            <span className="mt-1 block text-[11px] leading-relaxed text-muted-foreground">
+              O período passa a ser o da etapa. Mudar o período depois continua limitado a este
               intervalo.
             </span>
           )}
         </label>
       )}
 
-      {workoutOptions.length > 0 && (
-        <label className="mt-3 block">
-          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Treino
-          </span>
-          <select
-            value={draft.planLineageId}
-            onChange={(e) => apply({ ...draft, planLineageId: e.target.value })}
-            className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm outline-none focus:border-primary"
-          >
-            <option value="">Todos</option>
-            {workoutOptions.map((w) => (
-              <option key={w.lineageId} value={w.lineageId}>
-                {w.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-
-      {muscleOptions.length > 0 && (
-        <fieldset className="mt-4">
-          <legend className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Grupo muscular
-          </legend>
-          <div className="flex flex-wrap gap-1.5">
-            {muscleOptions.map((key) => (
-              <button
-                key={key}
-                onClick={() =>
-                  apply({ ...draft, muscleGroup: draft.muscleGroup === key ? "" : key })
-                }
-                aria-pressed={draft.muscleGroup === key}
-                className={`interactive-press rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold ${
-                  draft.muscleGroup === key
-                    ? "border-primary bg-primary/15 text-primary"
-                    : "border-border"
-                }`}
-              >
-                {key === UNCLASSIFIED ? "Não classificado" : muscleGroupLabel[key]}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-      )}
-
-      <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
-        O exercício é escolhido dentro do próprio módulo de evolução, na busca do gráfico.
+      <p className="mt-5 text-[11px] leading-relaxed text-muted-foreground">
+        Período, programa e etapa valem para a página inteira. A seleção de músculo, feita no mapa
+        ou no radar, detalha só a lista de exercícios — o corpo continua inteiro para preservar a
+        comparação.
       </p>
     </Modal>
   );

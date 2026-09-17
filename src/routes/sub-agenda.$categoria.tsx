@@ -357,7 +357,7 @@ function AcademiaModule() {
         [
           { key: "treino", label: "Treino" },
           { key: "evolucao", label: "Evolução" },
-          { key: "ciclo", label: "Planejamento" },
+          { key: "ciclo", label: "Programa" },
         ] as const
       }
       value={activeTab}
