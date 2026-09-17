@@ -114,14 +114,15 @@ function SubAgenda() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
-    <div className="px-5 pt-12">
+    <div className={categoria === "academia" ? "academia-page px-5 pt-6" : "px-5 pt-12"}>
       <div className="flex items-center justify-between">
         <Link to="/" className="inline-flex items-center gap-1 text-xs text-muted-foreground">
           <ChevronLeft className="h-4 w-4" /> Hoje
         </Link>
+        {categoria === "academia" && <h1 className="text-xl font-bold">Academia</h1>}
         <AppMenuButton onClick={() => setSettingsOpen(true)} aria-label="Abrir configurações" />
       </div>
-      <header className="mt-3">
+      <header className={categoria === "academia" ? "hidden" : "mt-3"}>
         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
           Sub-agenda · {meta.label}
         </p>
@@ -369,7 +370,7 @@ function AcademiaModule() {
     return (
       <div className="mt-6 space-y-5">
         {tabs}
-        <EvolutionTab initialStageId={search.etapa} />
+        <EvolutionTab initialStageId={search.etapa} onReviewNext={() => setActiveTab("treino")} />
       </div>
     );
   }

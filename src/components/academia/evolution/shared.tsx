@@ -12,9 +12,9 @@ export function ModuleCard({
   children: ReactNode;
 }) {
   return (
-    <section className="card-surface p-4">
+    <section className="evo-card card-surface p-4">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-[13px] font-bold">{title}</h2>
+        <h2 className="evo-title text-[13px] font-bold">{title}</h2>
         {action}
       </div>
       <div className="mt-3">{children}</div>

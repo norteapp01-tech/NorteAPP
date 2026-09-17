@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, ListFilter, X } from "lucide-react";
+import { CalendarDays, ListFilter, X, UserRound, ChartNoAxesColumnIncreasing } from "lucide-react";
 import { formatDateShortBR, todayISO } from "@/lib/goals-store";
 import { useWorkoutLoading, useWorkoutStore, type MuscleGroup } from "@/lib/workout-store";
 import {
@@ -12,22 +12,21 @@ import {
   applyFilters,
   attentionPoints,
   frequency,
+  exerciseTrends,
   loadProgressions,
   muscleGroupLabel,
   muscleStimulus,
-  previousRange,
   rangeOfLastDays,
-  topMuscle,
-  volumeWithComparison,
   type AttentionPoint,
   type DateRange,
   type EvolutionFilters,
 } from "@/lib/workout-evolution";
-import { BodyMap } from "./BodyMap";
+import { BodyMap } from "./AnatomyMap";
 import { RadarDistribution } from "./RadarDistribution";
 import { OverloadList } from "./OverloadList";
 import { AttentionCard } from "./AttentionCard";
-import { IndicatorCards } from "./IndicatorCards";
+import { DashboardIndicators, PerformanceChart } from "./PerformanceDashboard";
+import "./evolution.css";
 import { ExerciseDetailSheet } from "./ExerciseDetailSheet";
 import { MeasurementsCard } from "./MeasurementsCard";
 import { EvolutionFilterSheet } from "./FilterDrawer";
@@ -57,7 +56,14 @@ const PRESETS: { key: Preset; label: string; days: number }[] = [
   { key: "365", label: "1 ano", days: 365 },
 ];
 
-export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
+export function EvolutionTab({
+  initialStageId,
+  onReviewNext,
+}: {
+  initialStageId?: string;
+  onReviewNext?: () => void;
+}) {
+  const [view, setView] = useState<"corpo" | "desempenho">("corpo");
   const sessions = useWorkoutStore((s) => s.sessions);
   const exercises = useWorkoutStore((s) => s.exercises);
   const plans = useWorkoutStore((s) => s.plans);
@@ -116,12 +122,6 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sessions, exercises, plans, key],
   );
-  const previous = useMemo(() => {
-    const candidate = previousRange(data.effectiveRange);
-    if (scope && candidate.from < scope.from) return null;
-    return applyFilters(sessions, exercises, plans, { ...filters, range: candidate });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessions, exercises, plans, key, data.effectiveRange.from]);
 
   const stimulus = useMemo(() => muscleStimulus(data.sets), [data.sets]);
   const progressions = useMemo(() => loadProgressions(data.sets, 5), [data.sets]);
@@ -145,9 +145,18 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
   }, [cycle, stage, blocks, blockDays, cycles, data.effectiveRange]);
 
   const freq = frequency(data, plannedCount);
-  const vol = volumeWithComparison(data.sets, previous?.sets ?? null);
-  const top = topMuscle(stimulus);
-  const points = attentionPoints(data, progressions, stimulus, freq, todayISO());
+  const stablePoints: AttentionPoint[] = exerciseTrends(data.sets)
+    .filter((t) => t.kind === "estavel" && t.spark.length >= 4)
+    .map((t) => ({
+      id: `stable-${t.lineageId}`,
+      tone: "alerta",
+      text: `${t.name} manteve a mesma referência em ${t.spark.length} sessões.`,
+      target: { kind: "exercicio", lineageId: t.lineageId },
+    }));
+  const points = [
+    ...stablePoints,
+    ...attentionPoints(data, progressions, stimulus, freq, todayISO()),
+  ].slice(0, 3);
 
   const chips: { label: string; onRemove: () => void }[] = [];
   if (cycle)
@@ -160,8 +169,19 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
     });
   if (stage) chips.push({ label: `Etapa: ${stage.name}`, onRemove: () => setStageId("") });
 
-  const scrollToExercises = () =>
-    overloadRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const scrollToExercises = () => {
+    setView("desempenho");
+    window.setTimeout(
+      () =>
+        overloadRef.current?.scrollIntoView({
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "instant"
+            : "smooth",
+          block: "start",
+        }),
+      50,
+    );
+  };
 
   const openAttention = (point: AttentionPoint) => {
     if (point.target.kind === "exercicio") {
@@ -188,39 +208,40 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
   const empty = data.sessions.length === 0;
 
   return (
-    <div className="space-y-4">
+    <div className="evolution-dashboard space-y-3 pb-4">
+      <div className="evo-tabs" role="group" aria-label="Visualização da evolução">
+        <button aria-pressed={view === "corpo"} onClick={() => setView("corpo")}>
+          <UserRound size={18} /> Corpo
+        </button>
+        <button aria-pressed={view === "desempenho"} onClick={() => setView("desempenho")}>
+          <ChartNoAxesColumnIncreasing size={18} /> Desempenho
+        </button>
+      </div>
       {/* 1. filtros globais ---------------------------------------------- */}
-      <section className="card-surface p-4">
+      <section>
         <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap gap-1">
-            {PRESETS.map((p) => (
-              <button
-                key={p.key}
-                onClick={() => setPreset(p.key)}
-                aria-pressed={preset === p.key}
-                className={`interactive-press rounded-lg px-2.5 py-1.5 text-[11px] font-semibold ${
-                  preset === p.key ? "bg-primary/15 text-primary" : "text-muted-foreground"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
+          <div className="evo-period w-full">
+            <div className="evo-period-group">
+              {PRESETS.map((p) => (
+                <button
+                  key={p.key}
+                  onClick={() => setPreset(p.key)}
+                  aria-pressed={preset === p.key}
+                  className="interactive-press"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
             <button
               onClick={() => setPreset("custom")}
               aria-pressed={preset === "custom"}
-              className={`interactive-press rounded-lg px-2.5 py-1.5 text-[11px] font-semibold ${
-                preset === "custom" ? "bg-primary/15 text-primary" : "text-muted-foreground"
-              }`}
+              className="evo-custom"
             >
-              Personalizar
+              <CalendarDays size={15} />
+              <span>Personalizar</span>
             </button>
           </div>
-          <button
-            onClick={() => setFilterOpen(true)}
-            className="interactive-press flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-semibold"
-          >
-            <ListFilter className="h-3.5 w-3.5" /> Filtros
-          </button>
         </div>
 
         {preset === "custom" && (
@@ -243,12 +264,17 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
           </div>
         )}
 
-        <p className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-          {formatDateShortBR(data.effectiveRange.from)} —{" "}
-          {formatDateShortBR(data.effectiveRange.to)}
-          {scope && " · limitado pela etapa"}
-        </p>
+        <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
+          <p className="flex items-center gap-1.5">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+            {formatDateShortBR(data.effectiveRange.from)} —{" "}
+            {formatDateShortBR(data.effectiveRange.to)}
+            {scope && " · limitado pela etapa"}
+          </p>
+          <button onClick={() => setFilterOpen(true)} className="flex items-center gap-1 py-1">
+            <ListFilter size={13} /> Filtros
+          </button>
+        </div>
 
         {chips.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -276,7 +302,28 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
         )}
       </section>
 
-      {empty ? (
+      <div>
+        <h2 className="text-[23px] font-bold tracking-tight">
+          {view === "corpo"
+            ? `Seu corpo ${preset === "custom" ? "no período" : `em ${PRESETS.find((p) => p.key === preset)?.label}`}`
+            : "Seu desempenho"}
+        </h2>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          {view === "corpo"
+            ? "Entenda onde você avançou e o que precisa de atenção."
+            : "Veja onde sua força avançou e onde parou."}
+        </p>
+      </div>
+      <DashboardIndicators
+        view={view}
+        data={data}
+        frequency={freq}
+        sessions={sessions}
+        exercises={exercises}
+        plans={plans}
+        onOpen={setOpenExercise}
+      />
+      {empty && (
         <ModuleCard title="Sem registros neste período">
           <p className="text-sm leading-relaxed text-muted-foreground">
             Não há treinos concluídos entre {formatDateShortBR(data.effectiveRange.from)} e{" "}
@@ -284,16 +331,9 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
             outro acima ou registre um treino na aba Treino.
           </p>
         </ModuleCard>
-      ) : (
+      )}
+      {view === "corpo" ? (
         <>
-          <IndicatorCards
-            frequency={freq}
-            volume={vol}
-            top={top}
-            comparison={previous?.effectiveRange}
-            data={data}
-          />
-
           <ModuleCard title="Mapa de estímulo">
             <BodyMap stimulus={stimulus} selected={muscle} onSelect={setMuscle} />
             {muscle && (
@@ -305,15 +345,14 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
             )}
           </ModuleCard>
 
-          <div ref={overloadRef} className="scroll-mt-4">
-            <OverloadList data={data} selectedMuscle={muscle} onOpen={setOpenExercise} />
-          </div>
-
-          <ModuleCard title="Distribuição de séries">
-            <RadarDistribution stimulus={stimulus} selected={muscle} onSelect={setMuscle} />
-          </ModuleCard>
-
-          <AttentionCard points={points} onOpen={openAttention} />
+          <details className="evo-card">
+            <summary className="cursor-pointer text-sm font-semibold">
+              Distribuição de séries
+            </summary>
+            <div className="mt-3">
+              <RadarDistribution stimulus={stimulus} selected={muscle} onSelect={setMuscle} />
+            </div>
+          </details>
 
           <MeasurementsCard
             bodyWeights={bodyWeights}
@@ -321,7 +360,23 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
             range={data.effectiveRange}
           />
         </>
+      ) : (
+        <>
+          <PerformanceChart data={data} selectedMuscle={muscle} onOpen={setOpenExercise} />
+          <div ref={overloadRef} className="scroll-mt-4">
+            {muscle && (
+              <button className="mb-2 text-xs text-primary" onClick={() => setMuscle(null)}>
+                Limpar filtro: {muscleGroupLabel[muscle]} ×
+              </button>
+            )}
+            <OverloadList data={data} selectedMuscle={muscle} onOpen={setOpenExercise} />
+          </div>
+          <AttentionCard points={points} onOpen={openAttention} onReviewNext={onReviewNext} />
+        </>
       )}
+      <p className="text-center text-[10px] text-muted-foreground">
+        Dados baseados nos treinos registrados.
+      </p>
 
       {filterOpen && (
         <EvolutionFilterSheet

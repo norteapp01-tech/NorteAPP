@@ -29,36 +29,67 @@ export function ExerciseDetailSheet({
   data: FilteredData;
   onClose: () => void;
 }) {
+  const equipmentChoices = [
+    ...new Set(data.sets.filter((s) => s.lineageId === lineageId).map((s) => s.equipment)),
+  ];
+  const [chosenEquipment, setChosenEquipment] = useState<string | null>(null);
+  const equipment =
+    equipmentChoices.find((e) => (e ?? "unknown") === chosenEquipment) ?? equipmentChoices[0];
+  const comparableSets = useMemo(
+    () => data.sets.filter((s) => s.lineageId === lineageId && s.equipment === equipment),
+    [data.sets, lineageId, equipment],
+  );
   // Abre no eixo com MAIS sessões comparáveis. Abrir num eixo de um ponto só
   // quando existe outro com vários esconderia a evolução que a pessoa veio ver.
   const bestMode = useMemo<ChartMode>(() => {
-    const top = (m: ChartMode) => availableReferences(data.sets, lineageId, m)[0]?.sessions ?? 0;
+    const top = (m: ChartMode) =>
+      availableReferences(comparableSets, lineageId, m)[0]?.sessions ?? 0;
     return top("repeticoes") > top("carga") ? "repeticoes" : "carga";
-  }, [data.sets, lineageId]);
+  }, [comparableSets, lineageId]);
   const [mode, setMode] = useState<ChartMode | null>(null);
   const [reference, setReference] = useState<number | null>(null);
   const [openPoint, setOpenPoint] = useState<ChartPoint | null>(null);
 
-  const mine = data.sets.filter((s) => s.lineageId === lineageId);
+  const mine = comparableSets;
   const head = mine[0];
   const effectiveMode = mode ?? bestMode;
   const references = useMemo(
-    () => availableReferences(data.sets, lineageId, effectiveMode),
-    [data.sets, lineageId, effectiveMode],
+    () => availableReferences(comparableSets, lineageId, effectiveMode),
+    [comparableSets, lineageId, effectiveMode],
   );
   const effective = references.some((r) => r.value === reference)
     ? reference!
     : (references[0]?.value ?? null);
   const points = useMemo(
     () =>
-      effective !== null ? exerciseChartSeries(data.sets, lineageId, effectiveMode, effective) : [],
-    [data.sets, lineageId, effectiveMode, effective],
+      effective !== null
+        ? exerciseChartSeries(comparableSets, lineageId, effectiveMode, effective)
+        : [],
+    [comparableSets, lineageId, effectiveMode, effective],
   );
 
   if (!head) return null;
 
   return (
     <Modal onClose={onClose} title={head.name}>
+      {equipmentChoices.length > 1 && (
+        <select
+          aria-label="Equipamento do histórico"
+          value={equipment ?? "unknown"}
+          onChange={(e) => {
+            setChosenEquipment(e.target.value);
+            setReference(null);
+            setOpenPoint(null);
+          }}
+          className="mb-3 rounded-lg border border-border bg-surface p-2 text-xs"
+        >
+          {equipmentChoices.map((e) => (
+            <option key={e ?? "unknown"} value={e ?? "unknown"}>
+              {e ? equipmentLabel[e] : "Sem equipamento informado"}
+            </option>
+          ))}
+        </select>
+      )}
       <p className="text-xs text-muted-foreground">
         {head.muscleGroup ? muscleGroupLabel[head.muscleGroup] : "Não classificado"}
         {head.equipment ? ` · ${equipmentLabel[head.equipment]}` : ""}
@@ -118,7 +149,11 @@ export function ExerciseDetailSheet({
           <p className="text-[11px] text-muted-foreground">{formatDateShortBR(points[0].date)}</p>
         </div>
       ) : (
-        <Chart points={points} unit={mode === "carga" ? "kg" : "reps"} onSelect={setOpenPoint} />
+        <Chart
+          points={points}
+          unit={effectiveMode === "carga" ? "kg" : "reps"}
+          onSelect={setOpenPoint}
+        />
       )}
 
       {openPoint && (

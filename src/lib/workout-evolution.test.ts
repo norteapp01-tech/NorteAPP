@@ -591,8 +591,9 @@ describe("exerciseTrends — prioriza repetições com a mesma carga", () => {
       session("s2", "2026-09-08", [{ weight: 20, reps: 10 }]),
     ]);
     const [t] = exerciseTrends(sets);
-    expect(t.summary).toBe("Estável nas últimas sessões");
+    expect(t.summary).toBe("-10 kg em 10 repetições");
     expect(t.summary).not.toMatch(/fadiga|foco|platô/i);
+    expect(t.kind).toBe("queda");
   });
 });
 

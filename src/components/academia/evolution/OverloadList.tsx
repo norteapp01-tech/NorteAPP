@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronRight, Search } from "lucide-react";
+import { ChevronRight, Search, Dumbbell } from "lucide-react";
 import type { MuscleGroup } from "@/lib/workout-store";
 import {
   exerciseTrends,
@@ -17,7 +17,7 @@ import { EmptyNote, ModuleCard } from "./shared";
 // "o melhor": cargas de aparelhos distintos não se comparam.
 // ---------------------------------------------------------------------------
 
-const INITIAL = 5;
+const INITIAL = 3;
 
 type Order = "melhora" | "mais_treinados" | "recentes";
 
@@ -44,7 +44,8 @@ export function OverloadList({
     if (order === "mais_treinados") return b.sessions - a.sessions;
     if (order === "recentes") return b.lastDate.localeCompare(a.lastDate);
     // Melhora registrada primeiro; sem comparação por último.
-    const rank = (t: ExerciseTrend) => (t.kind === "melhora" ? 0 : t.kind === "estavel" ? 1 : 2);
+    const rank = (t: ExerciseTrend) =>
+      t.kind === "melhora" ? 0 : t.kind === "queda" ? 1 : t.kind === "estavel" ? 2 : 3;
     return rank(a) - rank(b) || b.sessions - a.sessions;
   });
 
@@ -52,7 +53,7 @@ export function OverloadList({
 
   return (
     <ModuleCard
-      title="Sobrecarga progressiva"
+      title="Por exercício"
       action={
         <select
           value={order}
@@ -95,10 +96,10 @@ export function OverloadList({
         <ul className="space-y-1.5">
           {visible.map((t) => (
             <li key={`${t.lineageId}-${t.equipment ?? "x"}`}>
-              <button
-                onClick={() => onOpen(t.lineageId)}
-                className="interactive-press flex w-full items-center gap-3 rounded-lg border border-border bg-surface-2 p-2.5 text-left"
-              >
+              <button onClick={() => onOpen(t.lineageId)} className="evo-row interactive-press">
+                <span className="rounded-lg border border-primary/30 bg-primary/5 p-2 text-primary">
+                  <Dumbbell size={18} />
+                </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{t.name}</p>
                   <p className="text-[11px] text-muted-foreground">
@@ -107,13 +108,17 @@ export function OverloadList({
                   </p>
                   <p
                     className={`mt-0.5 text-[12px] font-semibold ${
-                      t.kind === "melhora" ? "text-success" : "text-muted-foreground"
+                      t.kind === "melhora"
+                        ? "text-success"
+                        : t.kind === "queda"
+                          ? "text-destructive"
+                          : "text-muted-foreground"
                     }`}
                   >
                     {t.summary}
                   </p>
                 </div>
-                <Spark values={t.spark} />
+                <Spark values={t.spark} kind={t.kind} />
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
               </button>
             </li>
@@ -129,18 +134,13 @@ export function OverloadList({
           {showAll ? "Ver menos" : `Ver todos os exercícios (${ordered.length})`}
         </button>
       )}
-
-      <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-        Comparações só entre o mesmo exercício e equipamento. Uma carga menor pode ser deload,
-        mudança de amplitude ou de objetivo — não concluímos fadiga nem falta de foco.
-      </p>
     </ModuleCard>
   );
 }
 
 /** Minigráfico das sessões comparáveis. Sem pontos, nada é desenhado — uma
  * linha reta inventada sugeriria medições que não existem. */
-function Spark({ values }: { values: number[] }) {
+function Spark({ values, kind }: { values: number[]; kind: ExerciseTrend["kind"] }) {
   if (values.length < 2) return <span className="w-14 shrink-0" aria-hidden />;
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -153,7 +153,7 @@ function Spark({ values }: { values: number[] }) {
       <polyline
         points={points}
         fill="none"
-        stroke="var(--color-primary)"
+        stroke={kind === "estavel" ? "#eabf45" : kind === "queda" ? "#f87171" : "var(--evo-accent)"}
         strokeWidth="1.6"
         vectorEffect="non-scaling-stroke"
       />

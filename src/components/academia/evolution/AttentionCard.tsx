@@ -49,7 +49,7 @@ export function AttentionCard({
               <li key={point.id}>
                 <button
                   onClick={() => onOpen(point)}
-                  className="interactive-press flex w-full items-start gap-2 rounded-lg border border-border bg-surface-2 p-2.5 text-left"
+                  className="interactive-press flex w-full items-start gap-2 py-1.5 text-left"
                 >
                   <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${tone[point.tone]}`} />
                   <span className="min-w-0 flex-1 text-xs leading-relaxed">{point.text}</span>
@@ -62,16 +62,10 @@ export function AttentionCard({
       )}
 
       {onReviewNext && (
-        <button
-          onClick={onReviewNext}
-          className="interactive-press mt-3 w-full rounded-xl border border-border py-2.5 text-xs font-semibold"
-        >
+        <button onClick={onReviewNext} className="evo-outline interactive-press mt-3">
           {reviewLabel ?? "Revisar próximo treino"}
         </button>
       )}
-      <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-        Nada é alterado no seu programa automaticamente — qualquer ajuste parte de você.
-      </p>
     </ModuleCard>
   );
 }

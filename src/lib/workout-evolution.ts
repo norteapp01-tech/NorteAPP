@@ -885,7 +885,7 @@ export type ExerciseTrend = {
   spark: number[];
   /** Frase objetiva do resultado, ou a ausência honesta dele. */
   summary: string;
-  kind: "melhora" | "estavel" | "sem_comparacao";
+  kind: "melhora" | "estavel" | "queda" | "sem_comparacao";
   reference?: { reps: number; weight?: number };
 };
 
@@ -977,8 +977,10 @@ export function exerciseTrends(sets: ResolvedSet[]): ExerciseTrend[] {
           summary:
             delta > 0
               ? `+${delta} kg em ${reference[0]} repetições`
-              : "Estável nas últimas sessões",
-          kind: delta > 0 ? "melhora" : "estavel",
+              : delta < 0
+                ? `${delta} kg em ${reference[0]} repetições`
+                : "Estável nas últimas sessões",
+          kind: delta > 0 ? "melhora" : delta < 0 ? "queda" : "estavel",
           reference: { reps: reference[0] },
         };
       }
