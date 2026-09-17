@@ -1,3 +1,11 @@
+import { minutesToTime, timeToMinutes } from "@/lib/agenda-time";
+import {
+  DAY_MINUTES,
+  HOUR_HEIGHT,
+  TIMELINE_HEIGHT,
+  initialScrollTop,
+  spanForDay,
+} from "@/lib/agenda-timeline";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   useEffect,
@@ -5,6 +13,7 @@ import {
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
+  useLayoutEffect,
 } from "react";
 import {
   CalendarDays,
@@ -27,6 +36,7 @@ import { categoryMeta } from "@/lib/mock-data";
 import {
   useGoalsStore,
   agendaByDate,
+  addDays,
   linkExecutionToGoal,
   effectiveStatus,
   isGoalComplete,
@@ -90,13 +100,25 @@ function AgendaScreen() {
   const profile = useProfile();
 
   const selectedEvents = eventsByDate[selectedDate] ?? [];
+  // Compromissos de ontem cuja hora final é menor que a inicial: eles seguem
+  // madrugada adentro e precisam aparecer no começo de hoje.
+  const overnightFromPreviousDay = useMemo(() => {
+    const previous = localISO(addDays(new Date(selectedDate + "T00:00:00"), -1));
+    return (eventsByDate[previous] ?? []).filter(
+      (e) => e.startTime && e.endTime && timeToMinutes(e.endTime) <= timeToMinutes(e.startTime),
+    );
+  }, [eventsByDate, selectedDate]);
   const occupiedMinutes = selectedEvents.reduce((sum, event) => {
     if (!event.startTime) return sum; // sem horário escolhido não ocupa um horário real
-    const start = timeToMinutes(event.startTime);
-    const end = timeToMinutes(event.endTime || event.startTime);
-    return sum + Math.max(0, end - start);
+    // Usa a mesma regra da linha do tempo: um compromisso que vira o dia ocupa
+    // só a parte que cai neste dia.
+    const span = spanForDay(event.startTime, event.endTime, "principal");
+    return sum + (span ? span.end - span.start : 0);
   }, 0);
-  const availableMinutes = Math.max(0, 15 * 60 - occupiedMinutes);
+  // A base era 15h, a janela antiga das 07:00 às 22:00. Com a agenda cobrindo
+  // o dia inteiro, contar um compromisso das 02:00 contra um teto de 15h
+  // devolveria um "livres" que não fecha com o que está na tela.
+  const availableMinutes = Math.max(0, DAY_MINUTES - occupiedMinutes);
 
   return (
     <div className="px-5 pt-12">
@@ -147,7 +169,12 @@ function AgendaScreen() {
         </Link>
       </div>
 
-      <DayView date={selectedDate} events={selectedEvents} timeFormat={profile.timeFormat} />
+      <DayView
+        date={selectedDate}
+        events={selectedEvents}
+        overnight={overnightFromPreviousDay}
+        timeFormat={profile.timeFormat}
+      />
 
       <div className="card-surface mt-5 overflow-hidden">
         <button
@@ -418,19 +445,18 @@ function MonthGrid({
             <button
               key={i}
               onClick={() => onSelect(iso)}
+              aria-label={`${c.getDate()}${evts.some((e) => e.status !== "cancelada") ? ", com compromisso" : ""}`}
               className={`aspect-square rounded-lg text-xs font-medium transition-colors ${isSel ? "bg-primary text-primary-foreground" : isToday ? "border border-primary/50 bg-primary/10 text-primary" : "hover:bg-surface-2"}`}
             >
               <div className="flex h-full flex-col items-center justify-center">
                 <span>{c.getDate()}</span>
-                {evts.length > 0 && (
-                  <div className="mt-0.5 flex gap-0.5">
-                    {evts.slice(0, 3).map((_, k) => (
-                      <span
-                        key={k}
-                        className={`h-1 w-1 rounded-full ${isSel ? "bg-primary-foreground" : "bg-primary"}`}
-                      />
-                    ))}
-                  </div>
+                {/* UMA bolinha por dia: ela diz que existe compromisso, não
+                    quantos. Cancelados não contam. */}
+                {evts.some((e) => e.status !== "cancelada") && (
+                  <span
+                    aria-hidden
+                    className={`mt-0.5 h-1 w-1 rounded-full ${isSel ? "bg-primary-foreground" : "bg-primary"}`}
+                  />
                 )}
               </div>
             </button>
@@ -503,54 +529,104 @@ function WeekStrip({
           currentDay={week.findIndex((d) => localISO(d) === localISO(nowDate()))}
           onSelect={(index) => onSelect(localISO(week[index]))}
           primary={(index) => week[index].getDate()}
-          secondary={(index) => {
-            const hasEvents = (eventsByDate[localISO(week[index])] ?? []).length > 0;
-            return hasEvents ? <span className="text-primary">●</span> : "—";
-          }}
         />
       </div>
     </div>
   );
 }
 
+/** Âncora de leitura do dia: agora, o primeiro compromisso, ou 07:00. */
+function anchorMinutesFor(date: string, events: Execution[]): number {
+  if (date === localISO(nowDate())) {
+    const now = nowDate();
+    return now.getHours() * 60 + now.getMinutes();
+  }
+  const starts = events
+    .map((e) => (e.startTime ? timeToMinutes(e.startTime) : null))
+    .filter((n): n is number => n !== null)
+    .sort((a, b) => a - b);
+  return starts[0] ?? 7 * 60;
+}
+
 function DayView({
   date,
   events,
+  overnight,
   timeFormat,
 }: {
   date: string;
   events: Execution[];
+  /** Eventos do dia anterior que atravessaram a meia-noite. */
+  overnight: Execution[];
   timeFormat: TimeFormat;
 }) {
-  const startHour = 7;
-  const endHour = 22;
-  const hourHeight = 52;
-  const hours = Array.from({ length: endHour - startHour + 1 }, (_, i) => startHour + i);
+  const hours = Array.from({ length: 25 }, (_, i) => i);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Guarda para quê dia já posicionamos: reposicionar a cada atualização de
+  // estado faria a tela "pular" enquanto a pessoa consulta os horários.
+  const positioned = useRef<{ date: string; withEvents: boolean } | null>(null);
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const withEvents = events.length > 0;
+    const done = positioned.current;
+    if (done && done.date === date && (done.withEvents || !withEvents)) return;
+    positioned.current = { date, withEvents };
+    el.scrollTop = initialScrollTop(anchorMinutesFor(date, events), el.clientHeight);
+  }, [date, events]);
+
   return (
     <div className="card-surface relative mt-3 overflow-hidden px-3 py-4">
-      <div className="relative ml-14" style={{ height: (endHour - startHour) * hourHeight }}>
-        {hours.map((hour, index) => (
-          <div
-            key={hour}
-            className="absolute right-0 left-0 border-t border-border/50"
-            style={{ top: index * hourHeight }}
-          >
-            <span className="absolute -left-14 -translate-y-1/2 font-mono text-[10px] text-muted-foreground">
-              {formatTime(`${String(hour).padStart(2, "0")}:00`, timeFormat)}
-            </span>
-          </div>
-        ))}
-        {events.map((event) => (
-          <AgendaEventBlock
-            key={`${event.id}-${event.agendaSessionId ?? event.agendaDate}`}
-            event={event}
-            date={date}
-            startHour={startHour}
-            endHour={endHour}
-            hourHeight={hourHeight}
-            timeFormat={timeFormat}
-          />
-        ))}
+      <div
+        ref={scrollRef}
+        role="region"
+        tabIndex={0}
+        aria-label="Linha do tempo do dia, de 00:00 às 24:00"
+        className="overflow-y-auto overscroll-contain"
+        style={{ height: "min(62vh, 620px)" }}
+      >
+        <div className="relative ml-14" style={{ height: TIMELINE_HEIGHT }}>
+          {hours.map((hour) => (
+            <div
+              key={hour}
+              className="absolute right-0 left-0 border-t border-border/50"
+              style={{ top: hour * HOUR_HEIGHT }}
+            >
+              <span className="absolute -left-14 -translate-y-1/2 font-mono text-[10px] text-muted-foreground">
+                {formatTime(`${String(hour % 24).padStart(2, "0")}:00`, timeFormat)}
+              </span>
+            </div>
+          ))}
+          {overnight.map((event) => {
+            const span = spanForDay(event.startTime, event.endTime, "continuacao");
+            if (!span) return null;
+            return (
+              <div
+                key={`cont-${event.id}-${event.agendaSessionId ?? event.agendaDate}`}
+                className="absolute right-1 left-0 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-3 py-2"
+                style={{
+                  top: 0,
+                  height: Math.max(34, (span.end / 60) * HOUR_HEIGHT),
+                }}
+              >
+                <p className="truncate text-xs font-semibold opacity-80">{event.title}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  continua de ontem · até {formatTime(minutesToTime(span.end), timeFormat)}
+                </p>
+              </div>
+            );
+          })}
+          {events.map((event) => (
+            <AgendaEventBlock
+              key={`${event.id}-${event.agendaSessionId ?? event.agendaDate}`}
+              event={event}
+              date={date}
+              hourHeight={HOUR_HEIGHT}
+              timeFormat={timeFormat}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -559,22 +635,21 @@ function DayView({
 function AgendaEventBlock({
   event,
   date,
-  startHour,
-  endHour,
   hourHeight,
   timeFormat,
 }: {
   event: Execution;
   date: string;
-  startHour: number;
-  endHour: number;
   hourHeight: number;
   timeFormat: TimeFormat;
 }) {
-  const initialStart = timeToMinutes(event.startTime || `${String(startHour).padStart(2, "0")}:00`);
-  const initialEnd = timeToMinutes(event.endTime || minutesToTime(initialStart + 60));
+  // Tudo em minutos desde 00:00 — a linha do tempo começa à meia-noite, então
+  // não há mais offset de "hora inicial" para subtrair.
+  const span = spanForDay(event.startTime || "00:00", event.endTime, "principal")!;
+  const initialStart = span.start;
+  const initialEnd = span.end;
   const [start, setStart] = useState(initialStart);
-  const [end, setEnd] = useState(Math.max(initialStart + 15, initialEnd));
+  const [end, setEnd] = useState(Math.min(DAY_MINUTES, Math.max(initialStart + 15, initialEnd)));
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -590,20 +665,39 @@ function AgendaEventBlock({
     end: number;
     moved: boolean;
   } | null>(null);
-  const preview = useRef({ start: initialStart, end: Math.max(initialStart + 15, initialEnd) });
+  const preview = useRef({
+    start: initialStart,
+    end: Math.min(DAY_MINUTES, Math.max(initialStart + 15, initialEnd)),
+  });
+  const blockRef = useRef<HTMLDivElement>(null);
+
+  /** Depois de salvar, traz o compromisso para a vista SÓ se ele saiu dela —
+   * `block: "nearest"` não mexe na rolagem quando já está visível, então a
+   * página não pula à toa. */
+  const revealIfOffscreen = () => {
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    blockRef.current?.scrollIntoView({
+      block: "nearest",
+      behavior: reduced ? "auto" : "smooth",
+    });
+  };
 
   useEffect(() => {
-    const nextStart = timeToMinutes(event.startTime || `${String(startHour).padStart(2, "0")}:00`);
-    const nextEnd = timeToMinutes(event.endTime || minutesToTime(nextStart + 60));
+    const next = spanForDay(event.startTime || "00:00", event.endTime, "principal")!;
+    const nextStart = next.start;
+    const nextEnd = next.end;
     setStart(nextStart);
-    setEnd(Math.max(nextStart + 15, nextEnd));
-    preview.current = { start: nextStart, end: Math.max(nextStart + 15, nextEnd) };
+    const safeEnd = Math.min(DAY_MINUTES, Math.max(nextStart + 15, nextEnd));
+    setEnd(safeEnd);
+    preview.current = { start: nextStart, end: safeEnd };
     setSchedule({
       date,
       startTime: event.startTime || minutesToTime(nextStart),
       endTime: event.endTime || minutesToTime(nextEnd),
     });
-  }, [date, event.endTime, event.startTime, startHour]);
+  }, [date, event.endTime, event.startTime]);
 
   const beginDrag = (mode: "move" | "resize", e: ReactPointerEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -616,8 +710,8 @@ function AgendaEventBlock({
     if (!drag.current) return;
     const delta = Math.round(((e.clientY - drag.current.y) / hourHeight) * 4) * 15;
     if (Math.abs(delta) >= 15) drag.current.moved = true;
-    const min = startHour * 60;
-    const max = endHour * 60;
+    const min = 0;
+    const max = DAY_MINUTES;
     if (drag.current.mode === "move") {
       const duration = drag.current.end - drag.current.start;
       const nextStart = Math.max(min, Math.min(max - duration, drag.current.start + delta));
@@ -664,12 +758,13 @@ function AgendaEventBlock({
     }
   };
 
-  const top = ((start - startHour * 60) / 60) * hourHeight;
+  const top = (start / 60) * hourHeight;
   const height = Math.max(34, ((end - start) / 60) * hourHeight);
 
   return (
     <>
       <div
+        ref={blockRef}
         onPointerDown={(e) => beginDrag("move", e)}
         onPointerMove={moveDrag}
         onPointerUp={finishDrag}
@@ -725,6 +820,7 @@ function AgendaEventBlock({
                       schedule.endTime,
                     );
                     setMenuOpen(false);
+                    requestAnimationFrame(revealIfOffscreen);
                   } finally {
                     setSaving(false);
                   }
@@ -893,17 +989,6 @@ function formatLongDate(iso: string) {
   const date = new Date(iso + "T00:00:00");
   const weekdays = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
   return `${weekdays[date.getDay()]}, ${date.getDate()} de ${monthNames[date.getMonth()].toLowerCase()}`;
-}
-
-function timeToMinutes(time: string) {
-  const [hours, minutes] = time.split(":").map(Number);
-  return hours * 60 + minutes;
-}
-
-function minutesToTime(total: number) {
-  const hours = Math.floor(total / 60);
-  const minutes = total % 60;
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 function formatMinutes(total: number) {

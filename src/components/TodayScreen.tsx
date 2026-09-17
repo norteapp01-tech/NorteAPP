@@ -12,7 +12,7 @@ import { formatTime } from "@/lib/format-utils";
 import { HydrationCard } from "@/components/hydration/HydrationCard";
 import { RemindersCard } from "@/components/RemindersCard";
 import { SubagendasGrid } from "@/components/SubagendasGrid";
-import { DaySummaryCard } from "@/components/DaySummaryCard";
+import { MoodCard } from "@/components/MoodCard";
 import { Modal } from "@/components/ui/modal";
 import { DateField } from "@/components/ui/date-wheel-picker";
 import {
@@ -33,7 +33,6 @@ import {
   redistributeExecution,
   patchExecution,
   streakForTitle,
-  insightsComputed,
   isMissed,
   toISODate,
   addDays,
@@ -87,7 +86,6 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
   const nextTaskId = displayTasks.find((t) => t.status !== "concluida")?.id;
 
   const pendingTasks = tasks.filter((t) => t.status === "planejada");
-  const insight = useMemo(() => insightsComputed(state)[0], [state]);
   const extraTasks = useMemo(() => {
     if (profile.moodDate !== todayISO()) return [];
     return profile.moodExtraExecutionIds
@@ -184,65 +182,6 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
         </div>
         {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
       </header>
-
-      {/* Como você está? — sempre visível, seleção persistida no perfil */}
-      <section className="mt-7 flex items-center justify-between gap-3 border-y border-border/70 py-4">
-        <p className="shrink-0 text-sm font-medium">Como você está?</p>
-        <div className="flex min-w-0 items-center justify-end gap-2">
-          {moodOptions.map((o) => {
-            const selected = todayMood === o.v;
-            return (
-              <button
-                key={o.v}
-                onClick={() => pickMood(o.v)}
-                disabled={savingMood}
-                aria-pressed={selected}
-                aria-label={o.label}
-                className={`mood-control flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors disabled:opacity-60 ${selected ? "border-primary bg-primary/10" : "border-border bg-surface/80 hover:border-muted-foreground"}`}
-              >
-                <span className={`text-xl ${selected ? "" : "opacity-70"}`}>{o.emoji}</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-      {moodPanelFor && (
-        <MoodActionPanel
-          key={moodPanelFor}
-          mood={moodPanelFor}
-          todayTasks={pendingTasks}
-          extraCandidates={extraCandidates}
-          initialExtras={profile.moodExtraExecutionIds}
-          onSaveExtras={async (ids) => {
-            await updateProfile({ moodExtraExecutionIds: ids });
-            setMoodPanelFor(null);
-          }}
-          onMoveTomorrow={async (selected) => {
-            const tomorrow = toISODate(addDays(nowDate(), 1));
-            await Promise.all(
-              selected.map((task) =>
-                updateAgendaSession(
-                  task.id,
-                  task.agendaSessionId,
-                  tomorrow,
-                  task.startTime ?? "09:00",
-                  task.endTime,
-                ),
-              ),
-            );
-            setLastAdjustment({ kind: "move", tasks: selected });
-            setMoodPanelFor(null);
-          }}
-          onRemoveToday={async (selected) => {
-            await Promise.all(
-              selected.map((task) => removeAgendaSession(task.id, task.agendaSessionId)),
-            );
-            setLastAdjustment({ kind: "remove", tasks: selected });
-            setMoodPanelFor(null);
-          }}
-          onClose={() => setMoodPanelFor(null)}
-        />
-      )}
 
       {lastAdjustment && (
         <div className="card-surface mt-3 flex items-center gap-3 border-primary/30 px-4 py-3">
@@ -370,12 +309,71 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
         <SubagendasGrid />
       </div>
 
-      <DaySummaryCard
-        insight={insight}
-        pendingCount={pendingTasks.length}
-        onReorganize={() => setReorganizing(true)}
-        onCloseDay={() => setShowEod(true)}
+      <MoodCard
+        options={moodOptions}
+        value={todayMood}
+        saving={savingMood}
+        onPick={(v) => pickMood(v as EnergyMood)}
       />
+
+      {moodPanelFor && (
+        <MoodActionPanel
+          key={moodPanelFor}
+          mood={moodPanelFor}
+          todayTasks={pendingTasks}
+          extraCandidates={extraCandidates}
+          initialExtras={profile.moodExtraExecutionIds}
+          onSaveExtras={async (ids) => {
+            await updateProfile({ moodExtraExecutionIds: ids });
+            setMoodPanelFor(null);
+          }}
+          onMoveTomorrow={async (selected) => {
+            const tomorrow = toISODate(addDays(nowDate(), 1));
+            await Promise.all(
+              selected.map((task) =>
+                updateAgendaSession(
+                  task.id,
+                  task.agendaSessionId,
+                  tomorrow,
+                  task.startTime ?? "09:00",
+                  task.endTime,
+                ),
+              ),
+            );
+            setLastAdjustment({ kind: "move", tasks: selected });
+            setMoodPanelFor(null);
+          }}
+          onRemoveToday={async (selected) => {
+            await Promise.all(
+              selected.map((task) => removeAgendaSession(task.id, task.agendaSessionId)),
+            );
+            setLastAdjustment({ kind: "remove", tasks: selected });
+            setMoodPanelFor(null);
+          }}
+          onClose={() => setMoodPanelFor(null)}
+        />
+      )}
+
+      {/* "Reorganizar" e "Fechar o dia" viviam só dentro do antigo "Resumo do
+          dia". O resumo saiu (ele já existe no Espelho), mas estas duas AÇÕES
+          não existem em nenhum outro lugar do app — ficam aqui, discretas. */}
+      <div className="mt-3 flex items-center justify-center gap-4">
+        <button
+          onClick={() => setReorganizing(true)}
+          className="min-h-11 text-xs font-semibold text-muted-foreground hover:text-primary"
+        >
+          Reorganizar meu dia
+        </button>
+        <span aria-hidden className="text-muted-foreground/40">
+          ·
+        </span>
+        <button
+          onClick={() => setShowEod(true)}
+          className="min-h-11 text-xs font-semibold text-muted-foreground hover:text-primary"
+        >
+          Fechar o dia
+        </button>
+      </div>
 
       {focus && (
         <FocusModal

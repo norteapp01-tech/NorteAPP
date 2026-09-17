@@ -326,6 +326,21 @@
   }
 }
 
+/* Gaveta que abre no próprio card (accordion). `grid-template-rows` de 0fr a
+ * 1fr anima a altura real do conteúdo sem precisar medi-la em JS — e a regra
+ * global de redução de movimento zera a duração, virando troca instantânea. */
+.drawer-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-state) var(--ease-out);
+}
+.drawer-collapse[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.drawer-collapse > div {
+  overflow: hidden;
+}
+
 /* Prisma de duas faces (cronômetro da Academia). A perspectiva é curta de
  * propósito: o bloco tem ~80px e um valor grande daria a impressão de a face
  * "voar" para fora do painel. `preserve-3d` no miolo e `backface-visibility`
