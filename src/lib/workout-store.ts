@@ -53,6 +53,8 @@ export type Exercise = {
 export type MuscleGroup =
   | "peito"
   | "costas"
+  | "trapezio"
+  | "lombar"
   | "ombros"
   | "biceps"
   | "triceps"

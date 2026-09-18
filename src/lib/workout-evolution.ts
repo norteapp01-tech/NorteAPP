@@ -28,6 +28,8 @@ import type {
 export const muscleGroupLabel: Record<MuscleGroup, string> = {
   peito: "Peito",
   costas: "Costas",
+  trapezio: "Trapézio",
+  lombar: "Lombar",
   ombros: "Ombros",
   biceps: "Bíceps",
   triceps: "Tríceps",
