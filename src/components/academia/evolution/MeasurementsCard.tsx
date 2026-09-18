@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { formatDateShortBR } from "@/lib/goals-store";
 import type { BodyWeightEntry } from "@/lib/workout-store";
 import type { BodyMeasurement } from "@/lib/workout-cycle-store";
@@ -17,14 +17,10 @@ export function MeasurementsCard({
   bodyWeights,
   measurements,
   range,
-  bare = false,
 }: {
   bodyWeights: BodyWeightEntry[];
   measurements: BodyMeasurement[];
   range: DateRange;
-  /** Dentro de uma gaveta o card vira conteúdo solto: nada de card dentro de
-   * card. */
-  bare?: boolean;
 }) {
   const series = useMemo(() => {
     const out = new Map<
@@ -52,14 +48,7 @@ export function MeasurementsCard({
   }, [bodyWeights, measurements, range]);
 
   const [selected, setSelected] = useState<string>("");
-  if (series.length === 0) {
-    return bare ? (
-      <p className="evo-note">
-        Nenhuma medição registrada neste período. Nada aqui é estimado a partir das cargas de
-        treino.
-      </p>
-    ) : null;
-  }
+  if (series.length === 0) return null;
 
   const current = series.find((s) => s.key === selected) ?? series[0];
   const first = current.points[0];
@@ -67,37 +56,26 @@ export function MeasurementsCard({
   const delta =
     current.points.length > 1 ? Math.round((last.value - first.value) * 10) / 10 : undefined;
 
-  const picker =
-    series.length > 1 ? (
-      <select
-        value={current.key}
-        onChange={(e) => setSelected(e.target.value)}
-        aria-label="Medida"
-        className="rounded-md border border-border bg-surface px-1.5 py-1 text-[10px] outline-none focus:border-primary"
-      >
-        {series.map((s) => (
-          <option key={s.key} value={s.key}>
-            {s.label}
-          </option>
-        ))}
-      </select>
-    ) : undefined;
-
-  const Shell = bare
-    ? ({ children }: { children: ReactNode }) => (
-        <div>
-          {picker && <div className="mb-2 flex justify-end">{picker}</div>}
-          {children}
-        </div>
-      )
-    : ({ children }: { children: ReactNode }) => (
-        <ModuleCard title="Medidas corporais" action={picker}>
-          {children}
-        </ModuleCard>
-      );
-
   return (
-    <Shell>
+    <ModuleCard
+      title="Medidas corporais"
+      action={
+        series.length > 1 ? (
+          <select
+            value={current.key}
+            onChange={(e) => setSelected(e.target.value)}
+            aria-label="Medida"
+            className="rounded-md border border-border bg-surface px-1.5 py-1 text-[10px] outline-none focus:border-primary"
+          >
+            {series.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        ) : undefined
+      }
+    >
       {current.points.length === 1 ? (
         <EmptyNote>
           Um registro no período: {first.value} {current.unit} em {formatDateShortBR(first.date)}.
@@ -141,7 +119,7 @@ export function MeasurementsCard({
         Só medições registradas por você, com data. Nada aqui é estimado a partir das cargas de
         treino.
       </p>
-    </Shell>
+    </ModuleCard>
   );
 }
 
