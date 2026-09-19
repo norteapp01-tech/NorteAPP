@@ -17,11 +17,14 @@ import {
   muscleGroupLabel,
   muscleStimulus,
   rangeOfLastDays,
+  resolveSets,
   type AttentionPoint,
   type DateRange,
   type EvolutionFilters,
 } from "@/lib/workout-evolution";
 import { BodyMap } from "./AnatomyMap";
+import { muscleProgress, progressLabel } from "@/lib/workout-map";
+import { RepetitionProfile } from "./RepetitionProfile";
 import { RadarDistribution } from "./RadarDistribution";
 import { OverloadList } from "./OverloadList";
 import { AttentionCard } from "./AttentionCard";
@@ -124,6 +127,11 @@ export function EvolutionTab({
   );
 
   const stimulus = useMemo(() => muscleStimulus(data.sets), [data.sets]);
+  const progress = useMemo(() => muscleProgress(data.sets), [data.sets]);
+  const allSets = useMemo(
+    () => resolveSets(sessions, exercises, plans),
+    [sessions, exercises, plans],
+  );
   const progressions = useMemo(() => loadProgressions(data.sets, 5), [data.sets]);
 
   // Programação histórica: só as etapas do ciclo têm datas fixas. A atribuição
@@ -314,15 +322,24 @@ export function EvolutionTab({
             : "Veja onde sua força avançou e onde parou."}
         </p>
       </div>
-      <DashboardIndicators
-        view={view}
-        data={data}
-        frequency={freq}
-        sessions={sessions}
-        exercises={exercises}
-        plans={plans}
-        onOpen={setOpenExercise}
-      />
+      {view === "desempenho" && (
+        <DashboardIndicators
+          view={view}
+          data={data}
+          frequency={freq}
+          sessions={sessions}
+          exercises={exercises}
+          plans={plans}
+          onOpen={setOpenExercise}
+        />
+      )}
+      {view === "corpo" && (
+        <div className="evo-frequency">
+          <span>Constância no período</span>
+          <strong>{freq.done} treinos registrados</strong>
+          {freq.planned !== undefined && <span>{freq.planned} programados</span>}
+        </div>
+      )}
       {empty && (
         <ModuleCard title="Sem registros neste período">
           <p className="text-sm leading-relaxed text-muted-foreground">
@@ -334,18 +351,26 @@ export function EvolutionTab({
       )}
       {view === "corpo" ? (
         <>
-          <ModuleCard title="Mapa de estímulo">
-            <BodyMap stimulus={stimulus} selected={muscle} onSelect={setMuscle} />
+          <section className="evo-map-section">
+            <h2 className="evo-title mb-4">Seu mapa de treino</h2>
+            <BodyMap
+              stimulus={stimulus}
+              selected={muscle}
+              onSelect={setMuscle}
+              progress={progress}
+            />
             {muscle && (
-              <MuscleDetail
-                stimulus={stimulus}
-                muscle={muscle}
-                onSeeExercises={scrollToExercises}
-              />
+              <MuscleDetail stimulus={stimulus} muscle={muscle} progress={progress.get(muscle)} />
             )}
-          </ModuleCard>
+          </section>
+          <OverloadList
+            key={`exercises-${muscle ?? "all"}`}
+            data={data}
+            selectedMuscle={muscle}
+            onOpen={setOpenExercise}
+          />
 
-          <details className="evo-card">
+          <details className="evo-open-section">
             <summary className="cursor-pointer text-sm font-semibold">
               Distribuição de séries
             </summary>
@@ -353,6 +378,12 @@ export function EvolutionTab({
               <RadarDistribution stimulus={stimulus} selected={muscle} onSelect={setMuscle} />
             </div>
           </details>
+          <RepetitionProfile
+            key={`profile-${muscle ?? "all"}`}
+            sets={data.sets}
+            muscle={muscle}
+            onOpen={setOpenExercise}
+          />
 
           <MeasurementsCard
             bodyWeights={bodyWeights}
@@ -399,8 +430,10 @@ export function EvolutionTab({
 
       {openExercise && (
         <ExerciseDetailSheet
+          key={openExercise}
           lineageId={openExercise}
           data={data}
+          allSets={allSets}
           onClose={() => setOpenExercise(null)}
         />
       )}
@@ -413,15 +446,15 @@ export function EvolutionTab({
 function MuscleDetail({
   stimulus,
   muscle,
-  onSeeExercises,
+  progress,
 }: {
   stimulus: ReturnType<typeof muscleStimulus>;
   muscle: MuscleGroup;
-  onSeeExercises: () => void;
+  progress?: ReturnType<typeof muscleProgress> extends Map<MuscleGroup, infer T> ? T : never;
 }) {
   const info = stimulus.find((s) => s.group === muscle);
   return (
-    <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
+    <div className="evo-muscle-summary" aria-live="polite">
       <p className="text-sm font-bold">{muscleGroupLabel[muscle]}</p>
       {!info || info.directSets === 0 ? (
         <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
@@ -443,12 +476,13 @@ function MuscleDetail({
           )}
         </>
       )}
-      <button
-        onClick={onSeeExercises}
-        className="interactive-press mt-2 text-[11px] font-bold text-primary underline"
-      >
-        Ver exercícios deste músculo
-      </button>
+      <p className="mt-2 text-xs">
+        {progressLabel[progress?.state ?? "insuficiente"]}
+        <span className="text-muted-foreground">
+          {" "}
+          · {progress?.comparable ?? 0} de {progress?.total ?? 0} exercícios comparáveis
+        </span>
+      </p>
     </div>
   );
 }

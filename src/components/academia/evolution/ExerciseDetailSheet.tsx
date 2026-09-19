@@ -9,6 +9,7 @@ import {
   type ChartMode,
   type ChartPoint,
   type FilteredData,
+  type ResolvedSet,
 } from "@/lib/workout-evolution";
 
 // ---------------------------------------------------------------------------
@@ -23,18 +24,20 @@ import {
 export function ExerciseDetailSheet({
   lineageId,
   data,
+  allSets,
   onClose,
 }: {
   lineageId: string;
   data: FilteredData;
+  allSets: ResolvedSet[];
   onClose: () => void;
 }) {
   const equipmentChoices = [
     ...new Set(data.sets.filter((s) => s.lineageId === lineageId).map((s) => s.equipment)),
   ];
   const [chosenEquipment, setChosenEquipment] = useState<string | null>(null);
-  const equipment =
-    equipmentChoices.find((e) => (e ?? "unknown") === chosenEquipment) ?? equipmentChoices[0];
+  const equipmentIndex = equipmentChoices.findIndex((e) => (e ?? "unknown") === chosenEquipment);
+  const equipment = equipmentChoices[equipmentIndex < 0 ? 0 : equipmentIndex];
   const comparableSets = useMemo(
     () => data.sets.filter((s) => s.lineageId === lineageId && s.equipment === equipment),
     [data.sets, lineageId, equipment],
@@ -70,6 +73,25 @@ export function ExerciseDetailSheet({
 
   if (!head) return null;
 
+  const lifetime = allSets.filter((s) => s.lineageId === lineageId && s.equipment === equipment);
+  const recordPoints = lifetime
+    .filter(
+      (s) =>
+        effective !== null &&
+        (effectiveMode === "carga" ? s.reps === effective : s.weight === effective),
+    )
+    .map((s) => ({ date: s.date, value: effectiveMode === "carga" ? s.weight : s.reps }));
+  const assisted = equipment === "assistido";
+  const record = [...recordPoints].sort((a, b) =>
+    assisted && effectiveMode === "carga" ? a.value - b.value : b.value - a.value,
+  )[0];
+  const sessionCount = new Set(mine.map((s) => s.sessionId)).size;
+  const dates = [...new Set(mine.map((s) => s.date))].sort();
+  const first = points[0];
+  const last = points.at(-1);
+  const delta =
+    first && last && points.length > 1 ? Math.round((last.value - first.value) * 100) / 100 : null;
+
   return (
     <Modal onClose={onClose} title={head.name}>
       {equipmentChoices.length > 1 && (
@@ -94,6 +116,25 @@ export function ExerciseDetailSheet({
         {head.muscleGroup ? muscleGroupLabel[head.muscleGroup] : "Não classificado"}
         {head.equipment ? ` · ${equipmentLabel[head.equipment]}` : ""}
       </p>
+      <div className="evo-detail-stats">
+        <div>
+          <span>Frequência</span>
+          <strong>{sessionCount} sessões</strong>
+          <small>{dates.length} dias no período</small>
+        </div>
+        <div>
+          <span>
+            {assisted && effectiveMode === "carga" ? "Menor assistência" : "Melhor registro"}
+          </span>
+          <strong>
+            {record ? `${record.value} ${effectiveMode === "carga" ? "kg" : "reps"}` : "—"}
+          </strong>
+          <small>
+            {record ? `${formatDateShortBR(record.date)} · histórico completo` : "Sem referência"}
+          </small>
+        </div>
+      </div>
+      <h3 className="mt-5 text-base font-semibold">Sua progressão</h3>
 
       <div className="mt-3 flex items-center gap-1.5">
         {(
@@ -107,6 +148,7 @@ export function ExerciseDetailSheet({
             onClick={() => {
               setMode(key);
               setReference(null);
+              setOpenPoint(null);
             }}
             aria-pressed={effectiveMode === key}
             className={`interactive-press rounded-lg px-2.5 py-1 text-[11px] font-semibold ${
@@ -118,7 +160,10 @@ export function ExerciseDetailSheet({
         ))}
         <select
           value={effective ?? ""}
-          onChange={(e) => setReference(Number(e.target.value))}
+          onChange={(e) => {
+            setReference(Number(e.target.value));
+            setOpenPoint(null);
+          }}
           aria-label={effectiveMode === "carga" ? "Número de repetições" : "Carga"}
           className="ml-auto rounded-md border border-border bg-surface px-2 py-1 text-[11px] outline-none focus:border-primary"
         >
@@ -134,6 +179,15 @@ export function ExerciseDetailSheet({
         {effectiveMode === "carga"
           ? `Carga registrada com exatamente ${effective} repetições.`
           : `Repetições registradas com exatamente ${effective} kg.`}
+      </p>
+      <p className="mt-2 text-sm font-medium">
+        {delta === null
+          ? "Mais registros comparáveis mostrarão sua evolução."
+          : `${delta > 0 ? "+" : ""}${delta} ${effectiveMode === "carga" ? "kg" : "reps"} · ${points.length} sessões comparáveis`}
+      </p>
+      <p className="mt-1 text-[11px] text-muted-foreground">
+        O melhor registro usa a mesma referência e equipamento, mesmo fora do período. Carga
+        assistida não representa força levantada; variações de técnica e amplitude não são medidas.
       </p>
 
       {points.length === 0 ? (
@@ -186,6 +240,26 @@ export function ExerciseDetailSheet({
           </ul>
         </div>
       )}
+      <details className="evo-detail-history mt-5">
+        <summary className="cursor-pointer py-3 text-sm font-semibold">
+          Histórico completo do período · {sessionCount} sessões
+        </summary>
+        {[...new Set(mine.map((s) => s.sessionId))].reverse().map((id) => {
+          const rows = mine
+            .filter((s) => s.sessionId === id)
+            .sort((a, b) => a.setIndex - b.setIndex);
+          return (
+            <div key={id} className="border-t border-border py-3">
+              <p className="text-xs font-semibold">
+                {formatDateShortBR(rows[0].date)} · {rows[0].planLabel}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {rows.map((s) => `${s.weight} kg × ${s.reps} reps`).join(" · ")}
+              </p>
+            </div>
+          );
+        })}
+      </details>
     </Modal>
   );
 }
@@ -205,7 +279,7 @@ function Chart({
   const span = max - min || 1;
   const W = 300;
   const H = 150;
-  const x = (i: number) => (i / (points.length - 1)) * W;
+  const x = (i: number) => 12 + (i / (points.length - 1)) * (W - 24);
   const y = (v: number) => H - ((v - min) / span) * (H - 26) - 13;
 
   return (
@@ -213,7 +287,7 @@ function Chart({
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="h-40 w-full"
-        role="img"
+        role="group"
         aria-label={`Evolução em ${unit}: ${points.map((p) => `${formatDateShortBR(p.date)} ${p.value}`).join(", ")}`}
       >
         <polyline
@@ -261,24 +335,29 @@ function Chart({
         <span>{formatDateShortBR(points.at(-1)!.date)}</span>
       </div>
       {/* Alternativa em lista: nada importante depende do gráfico. */}
-      <ul className="mt-2 space-y-0.5">
-        {points.map((p) => (
-          <li key={`row-${p.sessionId}`}>
-            <button
-              onClick={() => onSelect(p)}
-              className="interactive-press flex w-full items-center justify-between gap-2 rounded-md px-1.5 py-1 text-[11px]"
-            >
-              <span className="text-muted-foreground">{formatDateShortBR(p.date)}</span>
-              <span className="min-w-0 flex-1 truncate text-left text-muted-foreground">
-                {p.planLabel}
-              </span>
-              <span className="font-mono font-semibold tabular-nums">
-                {p.value} {unit}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      <details className="mt-3">
+        <summary className="cursor-pointer text-xs text-muted-foreground">
+          Ver valores do gráfico
+        </summary>
+        <ul className="mt-2 space-y-0.5">
+          {points.map((p) => (
+            <li key={`row-${p.sessionId}`}>
+              <button
+                onClick={() => onSelect(p)}
+                className="interactive-press flex w-full items-center justify-between gap-2 rounded-md px-1.5 py-1 text-[11px]"
+              >
+                <span className="text-muted-foreground">{formatDateShortBR(p.date)}</span>
+                <span className="min-w-0 flex-1 truncate text-left text-muted-foreground">
+                  {p.planLabel}
+                </span>
+                <span className="font-mono font-semibold tabular-nums">
+                  {p.value} {unit}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </details>
     </div>
   );
 }

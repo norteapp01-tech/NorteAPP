@@ -1,5 +1,5 @@
 .evolution-dashboard {
-  --evo-accent: #00df98;
+  --evo-accent: #80e780;
   --evo-panel: #101415;
   --evo-line: #343b3e;
   color: var(--foreground);
@@ -150,7 +150,160 @@
   display: block;
 }
 .academia-page [role="tab"][aria-selected="true"] {
-  color: #00df98;
+  color: var(--color-primary);
+}
+
+/* Norte: quiet graphite controls, open black sections, color for the data. */
+.evolution-dashboard .evo-tabs button[aria-pressed="true"],
+.evolution-dashboard .evo-period-group button[aria-pressed="true"] {
+  color: var(--evo-accent);
+  background: var(--evo-panel);
+  border-color: var(--evo-line);
+}
+.evolution-dashboard .evo-card {
+  background: var(--evo-panel);
+  border-radius: 20px;
+  padding: 18px;
+}
+.evolution-dashboard .evo-map-section {
+  padding: 20px 0 6px;
+}
+.evolution-dashboard .evo-map-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+.evolution-dashboard .evo-map-controls button {
+  min-height: 40px;
+  font-size: 12px;
+  padding: 0 12px;
+}
+.evolution-dashboard .evo-body-stage {
+  height: 430px;
+  max-width: 360px;
+  background: #000;
+  border-radius: 18px;
+  margin: 12px auto;
+}
+.evolution-dashboard .evo-map-legend {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 11px;
+  color: var(--color-muted-foreground);
+}
+.evolution-dashboard .evo-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.evolution-dashboard .evo-map-legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.evolution-dashboard .evo-map-method {
+  font-size: 11px;
+  color: var(--color-muted-foreground);
+  margin-top: 12px;
+  line-height: 1.7;
+}
+.evolution-dashboard .evo-map-method summary {
+  cursor: pointer;
+  padding: 6px 0;
+}
+.evolution-dashboard .evo-muscle-summary {
+  padding: 16px 0 6px;
+  border-top: 1px solid var(--evo-line);
+  margin-top: 16px;
+}
+.evolution-dashboard .evo-frequency {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px 12px;
+  font-size: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--evo-line);
+}
+.evolution-dashboard .evo-frequency > span {
+  color: var(--color-muted-foreground);
+}
+.evolution-dashboard .evo-open-section {
+  border-top: 1px solid var(--evo-line);
+  padding: 20px 0;
+}
+.evolution-dashboard .evo-open-section > summary {
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+}
+.evolution-dashboard .evo-open-section > summary > span {
+  display: block;
+  margin-top: 4px;
+}
+.evolution-dashboard .evo-profile-bar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  font-size: 12px;
+  padding: 14px 0;
+}
+.evolution-dashboard .evo-profile-bar[aria-expanded="true"] {
+  color: var(--evo-accent);
+}
+.evolution-dashboard .evo-track {
+  grid-column: 1 / -1;
+  height: 6px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--evo-line);
+}
+.evolution-dashboard .evo-track i {
+  display: block;
+  height: 100%;
+  background: var(--evo-accent);
+  border-radius: inherit;
+}
+.evolution-dashboard .evo-profile-exercises {
+  font-size: 12px;
+  padding: 8px 12px;
+  border-left: 2px solid var(--evo-line);
+}
+.evolution-dashboard .evo-profile-exercises button {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 0;
+  text-align: left;
+}
+.evo-detail-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 18px;
+}
+.evo-detail-stats > div {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 16px;
+  padding: 14px;
+}
+.evo-detail-stats span,
+.evo-detail-stats small {
+  display: block;
+  font-size: 11px;
+  color: var(--color-muted-foreground);
+}
+.evo-detail-stats strong {
+  display: block;
+  font-size: 20px;
+  margin: 6px 0;
 }
 .academia-page [role="tab"] {
   height: 44px;

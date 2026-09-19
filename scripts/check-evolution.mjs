@@ -89,7 +89,9 @@ await page.route("**/*", async (route) => {
   return route.continue();
 });
 try {
-  await page.goto("http://127.0.0.1:5173/sub-agenda/academia?aba=evolucao");
+  await page.goto(
+    `${process.env.APP_URL ?? "http://127.0.0.1:8080"}/sub-agenda/academia?aba=evolucao`,
+  );
   await page.getByRole("button", { name: "Corpo", exact: true }).waitFor();
   await page.screenshot({ path: "/tmp/norte-corpo.png", fullPage: true });
   assert.equal(
@@ -99,9 +101,33 @@ try {
   );
   await page.getByRole("button", { name: "Costas", exact: true }).click();
   await page.getByRole("group", { name: "Mapa muscular: costas" }).waitFor();
+  await page.screenshot({ path: "/tmp/norte-evolution-back.png", fullPage: true });
+  assert.equal(await page.getByRole("button", { name: /Trapézio · região superior/ }).count(), 2);
+  assert.equal(await page.getByRole("button", { name: /Lombar · eretores/ }).count(), 2);
   await page.getByRole("button", { name: "Frente", exact: true }).click();
   await page.getByLabel("Selecionar músculo", { exact: true }).selectOption("peito");
-  await page.getByRole("button", { name: "Ver exercícios deste músculo" }).click();
+  await page.getByRole("heading", { name: "Por exercício", exact: true }).waitFor();
+  assert.equal(
+    await page.getByRole("button", { name: "Corpo", exact: true }).getAttribute("aria-pressed"),
+    "true",
+  );
+  await page.getByRole("button", { name: "Progressão", exact: true }).click();
+  await page.getByRole("button", { name: /Supino reto.*sessões/ }).click();
+  await page.getByRole("heading", { name: "Sua progressão" }).waitFor();
+  await page.getByText("Melhor registro", { exact: true }).waitFor();
+  await page.screenshot({ path: "/tmp/norte-exercise-analysis.png", fullPage: true });
+  await page.keyboard.press("Escape");
+  await page.getByText("Perfil de repetições", { exact: false }).first().click();
+  await page.getByRole("button", { name: /6–12 repetições/ }).click();
+  await page.screenshot({ path: "/tmp/norte-corpo-selected.png", fullPage: true });
+  await page.setViewportSize({ width: 320, height: 740 });
+  assert.equal(
+    await page.locator("body").evaluate((el) => el.scrollWidth > innerWidth),
+    false,
+    "Loaded dashboard fits at 320px",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Desempenho", exact: true }).click();
   await page.getByRole("heading", { name: "Evolução de força", exact: true }).waitFor();
   await page.getByRole("button", { name: /Limpar filtro: Peito/ }).click();
   await page.evaluate(() => scrollTo(0, 0));
