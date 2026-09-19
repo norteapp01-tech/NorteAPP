@@ -1,15 +1,20 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, Footprints, PersonStanding, Bike } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarDays,
+  ChevronRight,
+  Footprints,
+  PersonStanding,
+  Bike,
+} from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { useGoalsStore, todayISO, formatDateBR } from "@/lib/goals-store";
 import { useProfile } from "@/lib/profile-store";
 import { formatTime } from "@/lib/format-utils";
 import {
   useSportStore,
-  weekSummary,
-  weeklyDistanceSeries,
   lastActivities,
   fetchActivityPoints,
   formatDistanceKm,
@@ -20,30 +25,52 @@ import {
   type SportActivity,
   type SportModality,
 } from "@/lib/sport-store";
+import {
+  nextPlannedSportActivity,
+  plannedTargetLabel,
+  weekConsistency,
+  weeklyMetricsSeries,
+} from "@/lib/sport-analytics";
 import { RoutePreview } from "./RoutePreview";
 import { ActivityDetailModal } from "./ActivityDetailModal";
 import { WeeklyGoalsPanel } from "./WeeklyGoalsPanel";
+import { MetricCarousel } from "./MetricCarousel";
+import { HistoryScreen } from "./HistoryScreen";
+import "./esportes.css";
+
+// ---------------------------------------------------------------------------
+// Visão geral — um painel leve que responde cinco perguntas, nesta ordem:
+// começo agora? estou mantendo a constância? qual é a próxima? como está
+// evoluindo? o que fiz por último?
+//
+// O histórico não é mais uma aba: ele abre em tela cheia a partir de "Ver
+// todas", porque é consulta, não uma das duas visões principais.
+// ---------------------------------------------------------------------------
 
 const modalityIcon = { corrida: Footprints, caminhada: PersonStanding, ciclismo: Bike } as const;
+const ANALYSIS_WEEKS = 4;
 
-function ProgressBar({ value, max }: { value: number; max: number }) {
-  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
-  return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
-      <div
-        className="h-full rounded-full bg-primary transition-all duration-300 motion-reduce:transition-none"
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  );
-}
+const nextLabel: Record<SportModality, string> = {
+  corrida: "PRÓXIMA CORRIDA",
+  caminhada: "PRÓXIMA CAMINHADA",
+  ciclismo: "PRÓXIMA PEDALADA",
+};
+
+const freeLabel: Record<SportModality, string> = {
+  corrida: "Corrida livre",
+  caminhada: "Caminhada livre",
+  ciclismo: "Pedalada livre",
+};
+
+const WEEKDAY_SHORT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 export function OverviewTab({
   modality,
-  onOpenHistory,
+  onOpenPlanning,
 }: {
   modality: SportModality;
-  onOpenHistory: (period?: "semana") => void;
+  /** Leva à aba Planejamento — o histórico deixou de ser aba. */
+  onOpenPlanning: () => void;
 }) {
   const navigate = useNavigate();
   const profile = useProfile();
@@ -52,14 +79,23 @@ export function OverviewTab({
   const executions = useGoalsStore((s) => s.executions);
   const [goalEditOpen, setGoalEditOpen] = useState(false);
   const [detailActivity, setDetailActivity] = useState<SportActivity | null>(null);
-  const [expandedWeek, setExpandedWeek] = useState<number | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const today = todayISO();
   const goal = weeklyGoals.find((g) => g.modality === modality);
-  const week = weekSummary(activities, modality, today);
-  const series = weeklyDistanceSeries(activities, modality, 4, today);
+  const consistency = useMemo(
+    () => weekConsistency(activities, goal, modality, today),
+    [activities, goal, modality, today],
+  );
+  const series = useMemo(
+    () => weeklyMetricsSeries(activities, modality, ANALYSIS_WEEKS, today),
+    [activities, modality, today],
+  );
+  const next = useMemo(
+    () => nextPlannedSportActivity(executions, modality, today),
+    [executions, modality, today],
+  );
   const [mostRecent] = lastActivities(activities, modality, 1);
-  const maxSeriesM = Math.max(1, ...series.map((w) => w.distanceM));
 
   const { data: recentPoints } = useQuery({
     queryKey: ["sport-activity-points", mostRecent?.id],
@@ -67,218 +103,160 @@ export function OverviewTab({
     enabled: !!mostRecent && mostRecent.source === "gravado",
   });
 
-  const todayPlanned = executions.find(
-    (e) =>
-      e.category === "esportes" &&
-      e.sportModality === modality &&
-      e.status === "planejada" &&
-      e.agendaDate === today,
-  );
-
+  const todayPlanned = next?.isToday ? next : null;
   const Icon = modalityIcon[modality];
 
+  const startFree = () => navigate({ to: "/esportes/gravar", search: { modalidade: modality } });
+  const startPlanned = () =>
+    navigate({
+      to: "/esportes/gravar",
+      search: { modalidade: modality, execucao: todayPlanned!.execution.id },
+    });
+
   return (
-    <div className="space-y-5">
-      {/* Ação principal */}
-      {todayPlanned ? (
-        <div className="card-surface p-4">
-          <p className="text-base font-bold">{todayPlanned.title}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {todayPlanned.startTime &&
-              `${formatTime(todayPlanned.startTime, profile.timeFormat)} · `}
-            {todayPlanned.sportTargetDistanceM
-              ? `Objetivo: ${(todayPlanned.sportTargetDistanceM / 1000).toFixed(1)}km`
-              : todayPlanned.sportTargetDurationS
-                ? `Objetivo: ${formatDurationClock(todayPlanned.sportTargetDurationS)}`
-                : "Sem objetivo definido"}
+    <div className="esportes-overview space-y-6">
+      {/* 1. início da atividade — solto no fundo preto, sem card ------------ */}
+      <section className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] tracking-wide">
+            <span className="font-bold" style={{ color: "var(--sp-title)" }}>
+              ATIVIDADE
+            </span>{" "}
+            <span style={{ color: "var(--sp-muted)" }}>DE HOJE</span>
           </p>
-          <button
-            onClick={() =>
-              navigate({
-                to: "/esportes/gravar",
-                search: { modalidade: modality, execucao: todayPlanned.id },
-              })
-            }
-            className="interactive-press mt-3 w-full rounded-2xl bg-primary py-3.5 text-sm font-bold text-primary-foreground"
-          >
-            Iniciar treino
-          </button>
-          <button
-            onClick={() => navigate({ to: "/esportes/gravar", search: { modalidade: modality } })}
-            className="mt-2 w-full text-center text-xs font-semibold text-muted-foreground hover:text-primary"
-          >
-            Atividade livre
-          </button>
+          <h2 className="sp-start-title mt-1.5 break-words">
+            {todayPlanned ? todayPlanned.execution.title : freeLabel[modality]}
+          </h2>
+          <p className="mt-1.5 text-[15px]" style={{ color: "var(--sp-muted)" }}>
+            {todayPlanned
+              ? [
+                  todayPlanned.startTime && formatTime(todayPlanned.startTime, profile.timeFormat),
+                  plannedTargetLabel(todayPlanned.execution),
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "Quando estiver pronto, comece."
+              : "Quando estiver pronto, comece."}
+          </p>
         </div>
-      ) : (
+        <div className="flex shrink-0 flex-col items-center gap-2">
+          <button
+            onClick={todayPlanned ? startPlanned : startFree}
+            className="sp-play interactive-press"
+            aria-label={modalityActionLabel[modality]}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden>
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </button>
+          <span className="text-[13px] font-semibold" style={{ color: "var(--sp-accent)" }}>
+            {modalityActionLabel[modality]}
+          </span>
+        </div>
+      </section>
+
+      {/* Atividade livre continua a um toque quando hoje tem treino marcado. */}
+      {todayPlanned && (
         <button
-          onClick={() => navigate({ to: "/esportes/gravar", search: { modalidade: modality } })}
-          className="interactive-press flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-bold text-primary-foreground"
+          onClick={startFree}
+          className="-mt-3 block w-full text-left text-[12px] font-semibold"
+          style={{ color: "var(--sp-muted)" }}
         >
-          {modalityActionLabel[modality]}
+          Ou começar uma atividade livre
         </button>
       )}
 
-      {/* Sua semana */}
-      <div className="card-surface p-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Sua semana
-          </h3>
+      <div className="sp-rule" />
+
+      {/* 2. sua semana ---------------------------------------------------- */}
+      <section>
+        <h3 className="sp-section-title">Sua semana</h3>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <ConsistencyCard
+            done={consistency.done}
+            target={consistency.target}
+            onSetGoal={() => setGoalEditOpen(true)}
+          />
+          <NextActivityCard
+            modality={modality}
+            next={next}
+            timeFormat={profile.timeFormat}
+            onOpenPlanning={onOpenPlanning}
+          />
+        </div>
+      </section>
+
+      {/* 3. evolução ------------------------------------------------------ */}
+      <section>
+        <h3 className="sp-section-title">Evolução</h3>
+        <div className="mt-3">
+          <MetricCarousel series={series} modality={modality} weeks={ANALYSIS_WEEKS} />
+        </div>
+      </section>
+
+      {/* 4. atividade recente --------------------------------------------- */}
+      <section>
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="sp-section-title">Atividade recente</h3>
           <button
-            onClick={() => setGoalEditOpen(true)}
-            className="text-[11px] font-semibold text-primary"
+            onClick={() => setHistoryOpen(true)}
+            className="interactive-press flex items-center gap-1 text-[13px] font-medium"
+            style={{ color: "var(--sp-muted)" }}
           >
-            {goal ? "Editar meta" : "Definir meta"}
+            Ver todas <ArrowRight size={14} />
           </button>
         </div>
-        <div className="mt-3">
-          {goal ? (
-            <button
-              onClick={() => onOpenHistory("semana")}
-              className="block w-full space-y-3 text-left"
-            >
-              {goal.targetSessions !== undefined && (
-                <div>
-                  <div className="flex items-baseline justify-between">
-                    <p className="text-xs font-semibold">Atividades</p>
-                    <p className="font-mono text-sm">
-                      {week.sessions}
-                      <span className="text-muted-foreground">/{goal.targetSessions}</span>
-                    </p>
-                  </div>
-                  <ProgressBar value={week.sessions} max={goal.targetSessions} />
-                </div>
-              )}
-              {goal.targetDistanceM !== undefined && (
-                <div>
-                  <div className="flex items-baseline justify-between">
-                    <p className="text-xs font-semibold">Distância</p>
-                    <p className="font-mono text-sm">
-                      {(week.distanceM / 1000).toFixed(1)}
-                      <span className="text-muted-foreground">
-                        /{(goal.targetDistanceM / 1000).toFixed(0)}km
-                      </span>
-                    </p>
-                  </div>
-                  <ProgressBar value={week.distanceM} max={goal.targetDistanceM} />
-                </div>
-              )}
-            </button>
-          ) : (
-            <button
-              onClick={() => onOpenHistory("semana")}
-              className="flex w-full items-center justify-between text-left"
-            >
-              <div>
-                <p className="font-mono text-2xl font-bold">{week.sessions}</p>
-                <p className="text-[10px] uppercase text-muted-foreground">
-                  atividades · {(week.distanceM / 1000).toFixed(1)}km esta semana
-                </p>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </button>
-          )}
-        </div>
-      </div>
 
-      {/* Última atividade */}
-      <div>
-        <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-          Última atividade
-        </h3>
         {mostRecent ? (
           <button
             onClick={() => setDetailActivity(mostRecent)}
-            className="card-surface interactive-press flex w-full items-center gap-3 p-4 text-left"
+            className="interactive-press mt-3 flex w-full items-center gap-3 text-left"
           >
             {mostRecent.source === "manual" ? (
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-surface-2">
-                <Icon className="h-6 w-6 text-primary" strokeWidth={1.8} />
+              <div
+                className="flex h-[70px] w-[104px] shrink-0 items-center justify-center rounded-xl"
+                style={{ background: "var(--sp-card)" }}
+              >
+                <Icon className="h-6 w-6" style={{ color: "var(--sp-accent)" }} strokeWidth={1.8} />
               </div>
             ) : (
               <RoutePreview
                 points={recentPoints ?? []}
                 hideRoute={mostRecent.privacyHideRoute}
                 hideStartEnd={mostRecent.privacyHideStartEnd}
-                className="h-16 w-16 shrink-0"
+                className="h-[70px] w-[104px] shrink-0"
               />
             )}
             <div className="min-w-0 flex-1">
-              <p className="text-lg font-bold text-primary">
+              <p className="text-[21px] font-bold" style={{ color: "var(--sp-accent)" }}>
                 {formatDistanceKm(mostRecent.distanceM)}
               </p>
-              <p className="truncate text-xs text-muted-foreground">
+              <p className="truncate text-[13px]" style={{ color: "var(--sp-muted)" }}>
                 {formatDateBR(mostRecent.startedAt.slice(0, 10))} ·{" "}
-                {formatDurationClock(mostRecent.activeDurationS)} ·{" "}
-                {modality === "ciclismo"
-                  ? formatSpeedKmh(mostRecent.avgSpeedKmh ?? null)
-                  : formatPace(mostRecent.avgPaceSPerKm ?? null)}
+                {formatDurationClock(mostRecent.activeDurationS)}
               </p>
             </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="shrink-0 text-[13px] font-medium" style={{ color: "var(--sp-title)" }}>
+              {modality === "ciclismo"
+                ? formatSpeedKmh(mostRecent.avgSpeedKmh ?? null)
+                : formatPace(mostRecent.avgPaceSPerKm ?? null)}
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0" style={{ color: "var(--sp-muted)" }} />
           </button>
         ) : (
-          <p className="text-sm text-muted-foreground">Nenhuma atividade registrada ainda.</p>
+          <p className="mt-3 text-[13px]" style={{ color: "var(--sp-muted)" }}>
+            Nenhuma atividade registrada ainda. A primeira aparece aqui assim que você concluir uma.
+          </p>
         )}
-      </div>
+      </section>
 
-      {/* Evolução */}
-      {series.some((w) => w.distanceM > 0) && (
-        <div>
-          <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Evolução — últimas 4 semanas
-          </h3>
-          <div className="card-surface p-4">
-            <div className="flex items-end justify-between gap-3" style={{ height: 72 }}>
-              {series.map((w, i) => {
-                const heightPct = Math.max(4, (w.distanceM / maxSeriesM) * 100);
-                return (
-                  <button
-                    key={w.weekStartIso}
-                    onClick={() => setExpandedWeek((v) => (v === i ? null : i))}
-                    aria-label={`Semana de ${formatDateBR(w.weekStartIso)}`}
-                    className="flex h-full flex-1 flex-col items-center justify-end"
-                  >
-                    <div
-                      className={`w-full rounded-t-md transition-all duration-300 motion-reduce:transition-none ${
-                        expandedWeek === i
-                          ? "bg-primary"
-                          : w.isCurrent
-                            ? "bg-primary/40"
-                            : "bg-primary/70"
-                      }`}
-                      style={{ height: `${heightPct}%` }}
-                    />
-                  </button>
-                );
-              })}
-            </div>
-            {expandedWeek !== null && (
-              <div className="mt-3 rounded-lg bg-surface-2 p-2.5 text-center text-xs">
-                <p className="font-semibold">
-                  {formatDateBR(series[expandedWeek].weekStartIso)} –{" "}
-                  {formatDateBR(series[expandedWeek].weekEndIso)}
-                  {series[expandedWeek].isCurrent && (
-                    <span className="ml-1 font-normal text-muted-foreground">(em andamento)</span>
-                  )}
-                </p>
-                <p className="mt-0.5 text-muted-foreground">
-                  {(series[expandedWeek].distanceM / 1000).toFixed(1)}km ·{" "}
-                  {series[expandedWeek].sessions} atividade
-                  {series[expandedWeek].sessions === 1 ? "" : "s"}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <div className="sp-rule" />
 
       <button
-        onClick={() => onOpenHistory()}
-        className="block w-full text-center text-xs font-semibold text-muted-foreground hover:text-primary"
+        onClick={onOpenPlanning}
+        className="interactive-press flex w-full items-center justify-end gap-1.5 text-[14px] font-medium"
+        style={{ color: "var(--sp-title)" }}
       >
-        Ver histórico completo
+        Planejar próxima atividade <ArrowRight size={16} />
       </button>
 
       {goalEditOpen && (
@@ -289,6 +267,160 @@ export function OverviewTab({
       {detailActivity && (
         <ActivityDetailModal activity={detailActivity} onClose={() => setDetailActivity(null)} />
       )}
+      {historyOpen && <HistoryScreen modality={modality} onClose={() => setHistoryOpen(false)} />}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Card 1 — consistência
+// ---------------------------------------------------------------------------
+
+const RING = 34;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING;
+
+function ConsistencyCard({
+  done,
+  target,
+  onSetGoal,
+}: {
+  done: number;
+  target?: number;
+  onSetGoal: () => void;
+}) {
+  // Sem meta não existe denominador: o card mostra o realizado e oferece
+  // definir a meta, em vez de inventar um "de 3".
+  const pct = target && target > 0 ? Math.min(1, done / target) : 0;
+
+  return (
+    <div className="sp-card flex flex-col items-center justify-center gap-2 px-3 py-4">
+      <div className="relative" style={{ width: 84, height: 84 }}>
+        <svg viewBox="0 0 84 84" className="h-full w-full -rotate-90">
+          <circle cx="42" cy="42" r={RING} fill="none" stroke="var(--sp-grid)" strokeWidth="8" />
+          {target !== undefined && (
+            <circle
+              cx="42"
+              cy="42"
+              r={RING}
+              fill="none"
+              stroke="var(--sp-accent)"
+              strokeWidth="8"
+              strokeLinecap="round"
+              strokeDasharray={RING_CIRCUMFERENCE}
+              strokeDashoffset={RING_CIRCUMFERENCE * (1 - pct)}
+            />
+          )}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <p className="text-[22px] font-bold leading-none" style={{ color: "var(--sp-title)" }}>
+            {target !== undefined ? `${done}/${target}` : done}
+          </p>
+          <p className="mt-0.5 text-[10px]" style={{ color: "var(--sp-muted)" }}>
+            atividades
+          </p>
+        </div>
+      </div>
+      {target !== undefined ? (
+        <p className="text-[11px]" style={{ color: "var(--sp-muted)" }}>
+          meta semanal
+        </p>
+      ) : (
+        <button
+          onClick={onSetGoal}
+          className="interactive-press text-[11px] font-semibold"
+          style={{ color: "var(--sp-accent)" }}
+        >
+          Definir meta semanal
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Card 2 — próxima atividade
+// ---------------------------------------------------------------------------
+
+function NextActivityCard({
+  modality,
+  next,
+  timeFormat,
+  onOpenPlanning,
+}: {
+  modality: SportModality;
+  next: ReturnType<typeof nextPlannedSportActivity>;
+  timeFormat: "12h" | "24h";
+  onOpenPlanning: () => void;
+}) {
+  const Icon = modalityIcon[modality];
+
+  if (!next) {
+    return (
+      <div className="sp-card flex flex-col justify-between gap-2 p-3.5">
+        <p className="text-[10px] font-semibold tracking-wide" style={{ color: "var(--sp-muted)" }}>
+          {nextLabel[modality]}
+        </p>
+        <p className="text-[15px] font-bold leading-snug" style={{ color: "var(--sp-title)" }}>
+          Nenhuma {modality === "ciclismo" ? "pedalada" : modality} planejada
+        </p>
+        <button
+          onClick={onOpenPlanning}
+          className="interactive-press flex items-center gap-1 text-[13px] font-semibold"
+          style={{ color: "var(--sp-accent)" }}
+        >
+          Planejar {modality === "ciclismo" ? "pedalada" : modality} <ArrowRight size={14} />
+        </button>
+      </div>
+    );
+  }
+
+  const date = new Date(next.dateIso + "T12:00:00");
+  // Dentro da própria semana o dia já identifica sozinho ("Sáb"); repetir a
+  // data aí só fazia a linha quebrar em duas e empurrar o resto do card.
+  const daysAhead = Math.round(
+    (date.getTime() - new Date(todayISO() + "T12:00:00").getTime()) / 86_400_000,
+  );
+  const when = next.isToday
+    ? "Hoje"
+    : daysAhead <= 6
+      ? WEEKDAY_SHORT[date.getDay()]
+      : `${WEEKDAY_SHORT[date.getDay()]}, ${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}`;
+  const time = next.startTime ? formatTime(next.startTime, timeFormat) : null;
+  const target = plannedTargetLabel(next.execution);
+
+  return (
+    <div className="sp-card flex flex-col justify-between gap-1.5 p-3.5">
+      <p className="text-[10px] font-semibold tracking-wide" style={{ color: "var(--sp-muted)" }}>
+        {nextLabel[modality]}
+      </p>
+      <div className="flex items-start gap-2">
+        <span className="relative mt-0.5 shrink-0" aria-hidden>
+          <CalendarDays size={26} strokeWidth={1.6} style={{ color: "var(--sp-muted)" }} />
+          <Icon
+            size={12}
+            strokeWidth={2}
+            className="absolute left-1/2 top-[13px] -translate-x-1/2"
+            style={{ color: "var(--sp-title)" }}
+          />
+        </span>
+        <div className="min-w-0">
+          <p className="text-[17px] font-bold leading-tight" style={{ color: "var(--sp-title)" }}>
+            {[when, time].filter(Boolean).join(", ")}
+          </p>
+          {/* Duas linhas em vez de cortar: "Corrida leve · 5 ..." escondia
+              justamente o objetivo do treino. */}
+          <p className="line-clamp-2 text-[12px] leading-snug" style={{ color: "var(--sp-muted)" }}>
+            {[next.execution.title, target].filter(Boolean).join(" · ")}
+          </p>
+        </div>
+      </div>
+      <button
+        onClick={onOpenPlanning}
+        className="interactive-press flex items-center gap-1 text-[13px] font-semibold"
+        style={{ color: "var(--sp-accent)" }}
+      >
+        Ver planejamento <ArrowRight size={14} />
+      </button>
     </div>
   );
 }

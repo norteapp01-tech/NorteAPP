@@ -4,6 +4,7 @@ import { X, Volume2, VolumeX, Camera, Share2 } from "lucide-react";
 import { MapboxRouteMap } from "@/components/esportes/MapboxRouteMap";
 import { RoutePicker, type RouteSelection } from "@/components/esportes/RoutePicker";
 import { RoutePreview } from "@/components/esportes/RoutePreview";
+import { SaveRouteCard } from "@/components/esportes/SaveRouteCard";
 import { ShareActivitySheet } from "@/components/esportes/ShareActivitySheet";
 import { useSportRecorder } from "@/lib/sport-recorder-context";
 import { supabase } from "@/lib/supabase/client";
@@ -31,6 +32,7 @@ import {
   type EffortLevel,
 } from "@/lib/sport-store";
 import { formatChangeDistanceM } from "@/lib/sport-route-geometry";
+import { useSportRoutes } from "@/lib/sport-routes-data";
 
 const OFF_ROUTE_THRESHOLD_M = 40;
 const CHANGE_ALERT_RADIUS_M = 60;
@@ -60,16 +62,19 @@ export const Route = createFileRoute("/esportes/gravar")({
   head: () => ({ meta: [{ title: "Gravar atividade — Norte" }] }),
   validateSearch: (
     s: Record<string, unknown>,
-  ): { modalidade: SportModality; execucao?: string } => ({
+  ): { modalidade: SportModality; execucao?: string; rota?: string } => ({
     modalidade:
       s.modalidade === "caminhada" || s.modalidade === "ciclismo" ? s.modalidade : "corrida",
     execucao: typeof s.execucao === "string" ? s.execucao : undefined,
+    // Abrir já apontado para uma rota salva: o traço aparece como referência
+    // no mapa e a atividade nasce vinculada a ela.
+    rota: typeof s.rota === "string" ? s.rota : undefined,
   }),
   component: GravarPage,
 });
 
 function GravarPage() {
-  const { modalidade, execucao } = Route.useSearch();
+  const { modalidade, execucao, rota } = Route.useSearch();
   const navigate = useNavigate();
   const recorder = useSportRecorder();
   const [discardConfirm, setDiscardConfirm] = useState(false);
@@ -77,6 +82,18 @@ function GravarPage() {
   const [finishedData, setFinishedData] = useState<ReturnType<typeof recorder.finish>>(null);
   const [routeSelection, setRouteSelection] = useState<RouteSelection | null>(null);
   const alertedChangeIndexRef = useRef<number | null>(null);
+  const preselectedRoutes = useSportRoutes(modalidade);
+
+  // Vindo de "Correr esta rota", a rota já chega escolhida. Só na primeira
+  // vez: trocar a seleção depois é decisão de quem está na tela.
+  const preselectedRef = useRef(false);
+  useEffect(() => {
+    if (!rota || preselectedRef.current) return;
+    const found = preselectedRoutes.find((r) => r.id === rota);
+    if (!found) return;
+    preselectedRef.current = true;
+    setRouteSelection({ id: found.id, points: found.points, guidanceMode: "livre" });
+  }, [rota, preselectedRoutes]);
 
   const activeModality = recorder.modality ?? modalidade;
   const isBusy = recorder.status === "recording" || recorder.status === "paused";
@@ -426,6 +443,10 @@ function FinishForm({
     }
   };
 
+  // Nome sugerido da rota: curto e editável — o título da atividade traz o
+  // dia da semana, que não descreve um percurso.
+  const finalRouteTitle = `Rota de ${(distanceM / 1000).toFixed(1).replace(".", ",")} km`;
+
   if (savedActivity) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-background px-6 text-center">
@@ -435,6 +456,18 @@ function FinishForm({
         <div>
           <p className="text-lg font-bold">Atividade salva</p>
           <p className="mt-1 text-sm text-muted-foreground">{savedActivity.title}</p>
+        </div>
+        {/* Salvar o percurso fica ao lado do fluxo de conclusão, nunca no
+            caminho dele: o botão "Concluir" continua logo abaixo. */}
+        <div className="w-full max-w-xs">
+          <SaveRouteCard
+            activityId={savedActivity.id}
+            modality={data.modality}
+            points={data.points}
+            distanceM={distanceM}
+            defaultTitle={finalRouteTitle}
+            startedFromRouteId={data.routeId}
+          />
         </div>
         <div className="flex w-full max-w-xs flex-col gap-2">
           <button
