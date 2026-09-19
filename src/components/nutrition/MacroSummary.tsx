@@ -1,42 +1,50 @@
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { macroProgress, type DailyGoals } from "@/lib/nutrition-store";
-
-const rows: { key: keyof DailyGoals; label: string; unit: string }[] = [
+const rows = [
+  { key: "calories", label: "Calorias", unit: "kcal" },
   { key: "protein", label: "Proteína", unit: "g" },
   { key: "carbs", label: "Carboidratos", unit: "g" },
   { key: "fat", label: "Gorduras", unit: "g" },
-  { key: "calories", label: "Calorias", unit: "kcal" },
-];
-
-/** "Seu dia" — 4 cards compactos, cada um com uma barra finíssima colada na base, sem gráfico separado. */
+] as const;
 export function MacroSummary({ totals, goals }: { totals: DailyGoals; goals: DailyGoals }) {
+  const [open, setOpen] = useState(true);
+  const configured = rows.filter(({ key }) => goals[key] > 0);
+  const reached = configured.filter(
+    ({ key }) => totals[key] >= goals[key] * 0.9 && totals[key] <= goals[key] * 1.1,
+  ).length;
   return (
-    <div>
-      <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-        Seu dia
-      </h3>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        {rows.map(({ key, label, unit }) => {
-          const progress = macroProgress(totals[key], goals[key]);
-          return (
-            <div
-              key={key}
-              className="relative overflow-hidden rounded-xl border border-border bg-surface-2 p-3"
-            >
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-              <p className="mt-1 text-sm font-bold">
-                {progress.label}
-                <span className="text-[10px] font-normal text-muted-foreground"> {unit}</span>
-              </p>
-              <div className="absolute inset-x-0 bottom-0 h-0.5 bg-surface">
-                <div
-                  className="progress-fill h-full bg-primary"
-                  style={{ width: `${progress.pct}%` }}
-                />
-              </div>
+    <section className="nutrition-panel nutrition-goals">
+      <button
+        className="nutrition-drawer-heading"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls="nutrition-daily-goals"
+      >
+        <h3>Metas de hoje</h3>
+        <span>
+          {reached} de {configured.length} na faixa
+        </span>
+        <ChevronDown size={18} style={{ transform: open ? "rotate(180deg)" : undefined }} />
+      </button>
+      {open && (
+        <div id="nutrition-daily-goals">
+          {rows.map(({ key, label, unit }) => (
+            <div className="nutrition-macro-row" key={key}>
+              <span>{label}</span>
+              <progress
+                aria-label={label}
+                max={100}
+                value={macroProgress(totals[key], goals[key]).pct}
+              />
+              <span>
+                <strong>{Math.round(totals[key]).toLocaleString("pt-BR")}</strong> /{" "}
+                {goals[key].toLocaleString("pt-BR")} <small>{unit}</small>
+              </span>
             </div>
-          );
-        })}
-      </div>
-    </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

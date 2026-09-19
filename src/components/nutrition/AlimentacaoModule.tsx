@@ -23,6 +23,8 @@ import {
   type NutritionState,
 } from "@/lib/nutrition-store";
 import { MacroSummary } from "./MacroSummary";
+import { NutritionAnalysis } from "./NutritionAnalysis";
+import "./nutrition.css";
 import { MealDetailSheet } from "./MealDetailSheet";
 import { Modal } from "@/components/ui/modal";
 import { UnderlineTabs, WeekdaySelector } from "@/components/ui/app-design-system";
@@ -46,17 +48,18 @@ const statusMeta: Record<MealStatus, { icon: typeof Check; className: string }> 
 
 export function AlimentacaoModule() {
   const state = useNutritionStore((s) => s);
-  const [tab, setTab] = useState<"today" | "plan">("today");
+  const [tab, setTab] = useState<"today" | "analysis" | "plan">("today");
   const [openMeal, setOpenMeal] = useState<Meal | null>(null);
   const date = todayISO();
   const totals = dailyTotals(state.logs, date);
 
   return (
-    <div className="mt-6 space-y-5">
+    <div className="nutrition-module mt-6 space-y-5">
       <UnderlineTabs
         items={
           [
             { key: "today", label: "Hoje" },
+            { key: "analysis", label: "Análise" },
             { key: "plan", label: "Plano alimentar" },
           ] as const
         }
@@ -65,6 +68,8 @@ export function AlimentacaoModule() {
       />
       {tab === "today" ? (
         <TodayTab state={state} totals={totals} onOpenMeal={setOpenMeal} />
+      ) : tab === "analysis" ? (
+        <NutritionAnalysis state={state} />
       ) : (
         <PlanTab state={state} />
       )}
@@ -84,15 +89,22 @@ function TodayTab({
 }) {
   const weekday = nowDate().getDay();
   const meals = mealsForWeekday(state.meals, weekday);
+  const completed = meals.filter((meal) =>
+    logForMealOnDate(state.logs, meal.id, todayISO()),
+  ).length;
+  const next = meals.find((meal) => !logForMealOnDate(state.logs, meal.id, todayISO()));
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">Hoje, {todayLabel}</p>
       <MacroSummary totals={totals} goals={state.goals} />
       <section>
-        <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-          Refeições de hoje
-        </h3>
-        <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-surface">
+        <div className="nutrition-section-heading">
+          <h3>Refeições de hoje</h3>
+          <span>
+            {completed} de {meals.length} concluídas
+          </span>
+        </div>
+        <div className="nutrition-timeline">
           {meals.length === 0 ? (
             <div className="p-5 text-sm text-muted-foreground">
               Nada planejado para hoje. Use a aba{" "}
@@ -109,9 +121,11 @@ function TodayTab({
                 <button
                   key={meal.id}
                   onClick={() => onOpenMeal(meal)}
-                  className="flex w-full items-center gap-3 border-b border-border p-4 text-left last:border-b-0"
+                  className={`nutrition-meal ${next?.id === meal.id ? "is-next" : ""} ${log ? "is-complete" : ""}`}
                 >
-                  <Icon className={`h-5 w-5 shrink-0 ${meta.className}`} />
+                  <span className="nutrition-meal-status">
+                    <Icon className={`h-5 w-5 shrink-0 ${meta.className}`} />
+                  </span>
                   <span className="w-11 font-mono text-xs text-muted-foreground">
                     {assignment?.time ?? meal.time}
                   </span>
@@ -121,6 +135,7 @@ function TodayTab({
                       {log?.description ?? planned?.description ?? "Escolher uma opção"}
                     </span>
                   </span>
+                  {next?.id === meal.id && <span className="nutrition-next-label">Próxima</span>}
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </button>
               );
