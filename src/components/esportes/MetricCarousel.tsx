@@ -101,15 +101,15 @@ export function MetricCarousel({
         <div className="sp-prism">
           <div
             className="sp-prism-stage"
-            style={{ transform: `translateZ(-67px) rotateX(${index * 120}deg)` }}
+            style={{ transform: `translateZ(-49px) rotateX(${index * 120}deg)` }}
           >
             {METRIC_FACES.map((key, i) => (
               <div
                 key={key}
                 className="sp-prism-face"
                 data-active={key === face}
-                // 232px de altura → raio = 232 / (2·tan60°) ≈ 67px.
-                style={{ transform: `rotateX(${-i * 120}deg) translateZ(67px)` }}
+                // 170px de altura → raio = 170 / (2·tan60°) ≈ 49px.
+                style={{ transform: `rotateX(${-i * 120}deg) translateZ(49px)` }}
                 aria-hidden={key !== face}
                 inert={key !== face}
               >
@@ -270,7 +270,7 @@ function Face({
             onPick={setPicked}
           />
           <p
-            className="mt-1 min-h-[26px] text-[10px] leading-snug"
+            className="mt-1 min-h-[22px] text-[10px] leading-snug"
             style={{ color: "var(--sp-muted)" }}
           >
             {chosen ? describeWeek(chosen, face, modality) : "Toque num ponto para ver a semana."}
@@ -310,10 +310,10 @@ function describeWeek(w: WeeklyMetrics, face: MetricFace, modality: SportModalit
 // ---------------------------------------------------------------------------
 
 const W = 280;
-const H = 108;
+const H = 82;
 const PAD_LEFT = 34;
-const PAD_BOTTOM = 18;
-const PAD_TOP = 8;
+const PAD_BOTTOM = 17;
+const PAD_TOP = 7;
 /** Folga à direita para o último rótulo do eixo caber inteiro. */
 const PAD_RIGHT = 20;
 
@@ -366,7 +366,7 @@ function Chart({
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
-      className="sp-chart mt-3 w-full"
+      className="sp-chart mt-2 w-full"
       role="img"
       aria-label={`${face}: ${points.map((p) => `${formatDateShortBR(p.w.weekStartIso)} ${axisLabel(p.v)}`).join(", ")}`}
     >

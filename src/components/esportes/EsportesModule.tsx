@@ -68,20 +68,20 @@ export function EsportesModule() {
   const Icon = modalityIcon[modality];
 
   return (
-    <div className="mt-6 space-y-5">
+    <div className="esportes-module mt-5 space-y-4">
       <div className="flex items-center justify-between">
         <button
           onClick={() => setModalityDrawerOpen(true)}
-          className="interactive-press flex items-center gap-1.5 rounded-full border border-border bg-surface-2 px-3 py-1.5 text-sm font-semibold"
+          className="interactive-press flex h-10 items-center gap-2 rounded-full border border-border bg-surface-2 px-4 text-[15px] font-semibold"
         >
-          <Icon className="h-4 w-4 text-primary" strokeWidth={1.8} />
+          <Icon className="h-[18px] w-[18px] text-primary" strokeWidth={1.8} />
           {modalityLabel[modality]}
-          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </button>
         <button
           onClick={() => setSettingsOpen(true)}
           aria-label="Configurações da modalidade"
-          className="interactive-press flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface-2 text-muted-foreground hover:text-primary"
+          className="interactive-press flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface-2 text-muted-foreground hover:text-primary"
         >
           <Settings className="h-[18px] w-[18px]" strokeWidth={1.8} />
         </button>
@@ -96,6 +96,7 @@ export function EsportesModule() {
         }
         value={activeTab}
         onChange={setActiveTab}
+        className="esportes-tabs"
       />
 
       {activeTab === "visao_geral" && (

@@ -112,17 +112,30 @@ function SubAgenda() {
   const { categoria } = Route.useParams();
   const meta = categoryMeta[categoria] ?? categoryMeta.generico;
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const usesCompactHeader = categoria === "academia" || categoria === "esportes";
 
   return (
-    <div className={categoria === "academia" ? "academia-page px-5 pt-6" : "px-5 pt-12"}>
-      <div className="flex items-center justify-between">
+    <div
+      className={
+        categoria === "academia"
+          ? "academia-page px-5 pt-6"
+          : categoria === "esportes"
+            ? "esportes-page px-5 pt-6"
+            : "px-5 pt-12"
+      }
+    >
+      <div className="relative flex h-11 items-center justify-between">
         <Link to="/" className="inline-flex items-center gap-1 text-xs text-muted-foreground">
           <ChevronLeft className="h-4 w-4" /> Hoje
         </Link>
-        {categoria === "academia" && <h1 className="text-xl font-bold">Academia</h1>}
+        {usesCompactHeader && (
+          <h1 className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-xl font-bold tracking-[-0.02em]">
+            {meta.label}
+          </h1>
+        )}
         <AppMenuButton onClick={() => setSettingsOpen(true)} aria-label="Abrir configurações" />
       </div>
-      <header className={categoria === "academia" ? "hidden" : "mt-3"}>
+      <header className={usesCompactHeader ? "hidden" : "mt-3"}>
         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
           Sub-agenda · {meta.label}
         </p>

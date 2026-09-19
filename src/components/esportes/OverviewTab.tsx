@@ -114,9 +114,9 @@ export function OverviewTab({
     });
 
   return (
-    <div className="esportes-overview space-y-6">
+    <div className="esportes-overview space-y-5">
       {/* 1. início da atividade — solto no fundo preto, sem card ------------ */}
-      <section className="flex items-start justify-between gap-4">
+      <section className="sp-start flex items-center justify-between gap-4">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] tracking-wide">
             <span className="font-bold" style={{ color: "var(--sp-title)" }}>
@@ -127,7 +127,7 @@ export function OverviewTab({
           <h2 className="sp-start-title mt-1.5 break-words">
             {todayPlanned ? todayPlanned.execution.title : freeLabel[modality]}
           </h2>
-          <p className="mt-1.5 text-[15px]" style={{ color: "var(--sp-muted)" }}>
+          <p className="mt-1.5 text-[14px] leading-snug" style={{ color: "var(--sp-muted)" }}>
             {todayPlanned
               ? [
                   todayPlanned.startTime && formatTime(todayPlanned.startTime, profile.timeFormat),
@@ -170,7 +170,7 @@ export function OverviewTab({
       {/* 2. sua semana ---------------------------------------------------- */}
       <section>
         <h3 className="sp-section-title">Sua semana</h3>
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="mt-2.5 grid grid-cols-2 gap-3">
           <ConsistencyCard
             done={consistency.done}
             target={consistency.target}
@@ -188,7 +188,7 @@ export function OverviewTab({
       {/* 3. evolução ------------------------------------------------------ */}
       <section>
         <h3 className="sp-section-title">Evolução</h3>
-        <div className="mt-3">
+        <div className="mt-1.5">
           <MetricCarousel series={series} modality={modality} weeks={ANALYSIS_WEEKS} />
         </div>
       </section>
@@ -209,7 +209,7 @@ export function OverviewTab({
         {mostRecent ? (
           <button
             onClick={() => setDetailActivity(mostRecent)}
-            className="interactive-press mt-3 flex w-full items-center gap-3 text-left"
+            className="sp-recent-row interactive-press mt-2 flex w-full items-center gap-3 text-left"
           >
             {mostRecent.source === "manual" ? (
               <div
@@ -243,7 +243,10 @@ export function OverviewTab({
             <ChevronRight className="h-4 w-4 shrink-0" style={{ color: "var(--sp-muted)" }} />
           </button>
         ) : (
-          <p className="mt-3 text-[13px]" style={{ color: "var(--sp-muted)" }}>
+          <p
+            className="sp-recent-row mt-2 text-[13px] leading-relaxed"
+            style={{ color: "var(--sp-muted)" }}
+          >
             Nenhuma atividade registrada ainda. A primeira aparece aqui assim que você concluir uma.
           </p>
         )}
@@ -293,7 +296,7 @@ function ConsistencyCard({
   const pct = target && target > 0 ? Math.min(1, done / target) : 0;
 
   return (
-    <div className="sp-card flex flex-col items-center justify-center gap-2 px-3 py-4">
+    <div className="sp-card sp-week-card flex flex-col items-center justify-center gap-1.5 px-3 py-3">
       <div className="relative" style={{ width: 84, height: 84 }}>
         <svg viewBox="0 0 84 84" className="h-full w-full -rotate-90">
           <circle cx="42" cy="42" r={RING} fill="none" stroke="var(--sp-grid)" strokeWidth="8" />
@@ -356,7 +359,7 @@ function NextActivityCard({
 
   if (!next) {
     return (
-      <div className="sp-card flex flex-col justify-between gap-2 p-3.5">
+      <div className="sp-card sp-week-card flex flex-col justify-between gap-2 p-3.5">
         <p className="text-[10px] font-semibold tracking-wide" style={{ color: "var(--sp-muted)" }}>
           {nextLabel[modality]}
         </p>
@@ -389,7 +392,7 @@ function NextActivityCard({
   const target = plannedTargetLabel(next.execution);
 
   return (
-    <div className="sp-card flex flex-col justify-between gap-1.5 p-3.5">
+    <div className="sp-card sp-week-card flex flex-col justify-between gap-1.5 p-3.5">
       <p className="text-[10px] font-semibold tracking-wide" style={{ color: "var(--sp-muted)" }}>
         {nextLabel[modality]}
       </p>
