@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Fecha em duas etapas.
@@ -134,6 +134,67 @@ export function Modal({
           </div>
           <div className="mt-3 min-h-0 flex-1 overflow-y-auto">{children}</div>
           {footer && <div className="mt-4 shrink-0">{footer}</div>}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  );
+}
+
+/**
+ * Tela cheia sobreposta — para conteúdo que é uma PÁGINA, não um diálogo
+ * curto: histórico completo, por exemplo.
+ *
+ * Mesma base do Modal (Radix Dialog), então Escape, trava de rolagem do fundo,
+ * foco inicial e trap de Tab vêm de graça e se comportam igual ao resto do app.
+ * O que muda é só a moldura: ocupa a tela inteira, respeita a safe area e traz
+ * um cabeçalho com voltar, título e uma ação opcional à direita.
+ */
+export function FullScreenSheet({
+  onClose,
+  title,
+  action,
+  children,
+}: {
+  onClose: () => void;
+  title: ReactNode;
+  /** Ação à direita do cabeçalho (ex.: registrar manualmente). */
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  const { open, requestClose, onAnimationEnd } = useExitBeforeUnmount(onClose);
+
+  return (
+    <DialogPrimitive.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) requestClose();
+      }}
+    >
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-background data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+        <DialogPrimitive.Content
+          onAnimationEnd={onAnimationEnd}
+          className="fixed inset-0 z-50 flex flex-col bg-background outline-none duration-(--dur-state) data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom"
+          style={{
+            paddingTop: "env(safe-area-inset-top)",
+            paddingBottom: "env(safe-area-inset-bottom)",
+          }}
+        >
+          <div className="flex shrink-0 items-center gap-2 px-4 py-3">
+            <DialogPrimitive.Close
+              aria-label="Voltar"
+              className="-m-2 shrink-0 rounded-full p-2 text-foreground transition-colors hover:bg-surface-2"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </DialogPrimitive.Close>
+            <DialogPrimitive.Title className="min-w-0 flex-1 truncate text-lg font-bold">
+              {title}
+            </DialogPrimitive.Title>
+            {action}
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-8">
+            {children}
+          </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
