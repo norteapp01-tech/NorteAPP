@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Plus, Library, BarChart3, CalendarClock, ChevronDown } from "lucide-react";
+import { Plus, Library, CalendarClock, ChevronDown } from "lucide-react";
 import { useGoalsStore } from "@/lib/goals-store";
 import {
   useReadingStore,
@@ -24,9 +24,11 @@ import { ReadingLibrary } from "./ReadingLibrary";
 import { BookDetails } from "./BookDetails";
 import { ReadingNotebookPreview, ReadingNotebook } from "./ReadingNotebook";
 import { ReadingNoteEditor } from "./ReadingNoteEditor";
-import { ReadingStats, ReadingResurfaceCard } from "./ReadingStats";
+import { ReadingResurfaceCard } from "./ReadingStats";
 import { MissedTargetAdjustment } from "./MissedTargetAdjustment";
 import { BookCover } from "./BookCover";
+import { ReadingWeek } from "./ReadingWeek";
+import "./reading.css";
 
 type Modal =
   | { type: "readingMode"; book: Book; sessionId: string }
@@ -96,7 +98,7 @@ export function LeituraModule() {
   };
 
   return (
-    <div className="mt-6 space-y-5">
+    <div className="reading-module mt-6 space-y-5">
       {missedTarget && (
         <MissedTargetAdjustment
           target={missedTarget}
@@ -159,7 +161,9 @@ export function LeituraModule() {
         </Card>
       )}
 
+      <ReadingWeek />
       <ReadingNotebookPreview
+        compact
         onOpenFull={() => setModal({ type: "notebook" })}
         onAddNote={() => selectedBook && setModal({ type: "note", book: selectedBook })}
       />
@@ -187,19 +191,6 @@ export function LeituraModule() {
         </div>
         <details className="group py-3">
           <summary className="flex cursor-pointer list-none items-center gap-3">
-            <BarChart3 className="h-5 w-5 text-muted-foreground" />
-            <div className="flex-1">
-              <p className="text-sm font-semibold">Sua leitura</p>
-              <p className="text-xs text-muted-foreground">Ritmo, sessões e livros concluídos</p>
-            </div>
-            <ChevronDown className="h-4 w-4 text-muted-foreground group-open:rotate-180" />
-          </summary>
-          <div className="mt-3">
-            <ReadingStats />
-          </div>
-        </details>
-        <details className="group py-3">
-          <summary className="flex cursor-pointer list-none items-center gap-3">
             <CalendarClock className="h-5 w-5 text-muted-foreground" />
             <div className="flex-1">
               <p className="text-sm font-semibold">Rotina de leitura</p>
@@ -219,11 +210,14 @@ export function LeituraModule() {
       </div>
 
       {resurfaceCandidate && (
-        <ReadingResurfaceCard
-          note={resurfaceCandidate}
-          bookTitle={state.books.find((b) => b.id === resurfaceCandidate.bookId)?.title ?? ""}
-          onOpenNotebook={() => setModal({ type: "notebook", bookId: resurfaceCandidate.bookId })}
-        />
+        <details className="reading-revisit">
+          <summary>Relembrar uma anotação</summary>
+          <ReadingResurfaceCard
+            note={resurfaceCandidate}
+            bookTitle={state.books.find((b) => b.id === resurfaceCandidate.bookId)?.title ?? ""}
+            onOpenNotebook={() => setModal({ type: "notebook", bookId: resurfaceCandidate.bookId })}
+          />
+        </details>
       )}
 
       {modal?.type === "readingMode" && (

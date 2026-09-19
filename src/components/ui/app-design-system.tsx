@@ -76,6 +76,7 @@ export function WeekdaySelector({
   onSelect,
   primary,
   secondary,
+  completed,
 }: {
   items?: readonly { day: number; label: string }[];
   selectedDay?: number;
@@ -83,6 +84,7 @@ export function WeekdaySelector({
   onSelect: (day: number) => void;
   primary: (day: number) => ReactNode;
   secondary?: (day: number) => ReactNode;
+  completed?: (day: number) => boolean;
 }) {
   return (
     <div className="grid grid-cols-7 gap-1.5">
@@ -95,6 +97,7 @@ export function WeekdaySelector({
             onClick={() => onSelect(day)}
             aria-pressed={selected}
             aria-current={current ? "date" : undefined}
+            data-completed={completed?.(day) || undefined}
             className={cn(
               // Selecionado e "hoje" eram desenhados igual, então numa semana
               // em que você escolhe outro dia apareciam dois chips idênticos

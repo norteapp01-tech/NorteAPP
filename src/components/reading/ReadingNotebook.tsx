@@ -27,9 +27,11 @@ function positionText(
 export function ReadingNotebookPreview({
   onOpenFull,
   onAddNote,
+  compact = false,
 }: {
   onOpenFull: () => void;
   onAddNote: () => void;
+  compact?: boolean;
 }) {
   const state = useReadingStore((s) => s);
   const [query, setQuery] = useState("");
@@ -40,6 +42,31 @@ export function ReadingNotebookPreview({
         .slice(0, 3)
         .map((n) => ({ ...n, bookTitle: state.books.find((b) => b.id === n.bookId)?.title ?? "" }));
 
+  if (compact)
+    return (
+      <section className="reading-notebook-compact">
+        <div className="reading-section-heading">
+          <h3>Caderno</h3>
+          <button onClick={onAddNote}>
+            <Plus size={16} /> Anotação
+          </button>
+        </div>
+        {results[0] ? (
+          <button className="reading-note-preview" onClick={onOpenFull}>
+            <StickyNote size={20} />
+            <span>
+              <small>Última anotação · {results[0].bookTitle}</small>
+              <span>{results[0].content}</span>
+            </span>
+          </button>
+        ) : (
+          <p className="reading-muted">Guarde uma ideia da sua próxima leitura.</p>
+        )}
+        <button className="reading-text-link" onClick={onOpenFull}>
+          <Search size={17} /> Abrir caderno →
+        </button>
+      </section>
+    );
   return (
     <Card title="Caderno de leitura">
       <div className="-mt-1 mb-3 flex justify-end">
