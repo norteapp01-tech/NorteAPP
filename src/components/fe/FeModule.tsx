@@ -1,33 +1,29 @@
 import { useState } from "react";
-import { HojeTab } from "./HojeTab";
+import { FaithRecords } from "./FaithRecords";
 import { OracaoTab } from "./OracaoTab";
-import { CadernoTab } from "./CadernoTab";
+import { JornadaTab } from "./JornadaTab";
+import { LogReadingSheet } from "./LogReadingSheet";
+import "./faith.css";
 import { UnderlineTabs } from "@/components/ui/app-design-system";
 
-type Tab = "presenca" | "oracoes" | "caderno";
+type Tab = "registros" | "oracoes" | "biblia";
 const tabs: { key: Tab; label: string }[] = [
-  { key: "presenca", label: "Presença" },
+  { key: "registros", label: "Registros" },
   { key: "oracoes", label: "Orações" },
-  { key: "caderno", label: "Caderno" },
+  { key: "biblia", label: "Bíblia" },
 ];
 
 export function FeModule() {
-  const [tab, setTab] = useState<Tab>("presenca");
+  const [tab, setTab] = useState<Tab>("registros");
+  const [reading, setReading] = useState(false);
   return (
-    <div className="mt-6">
-      <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-        Um espaço para lembrar, buscar e agradecer.
-      </p>
-      <UnderlineTabs items={tabs} value={tab} onChange={setTab} className="mt-4" />
+    <div className="faith-module mt-6">
+      <UnderlineTabs items={tabs} value={tab} onChange={setTab} />
       <div className="mt-6 pb-12">
-        {tab === "presenca" && (
-          <HojeTab
-            onOpenPrayer={() => setTab("oracoes")}
-            onOpenNotebook={() => setTab("caderno")}
-          />
-        )}
+        {tab === "registros" && <FaithRecords onOpenPrayer={() => setTab("oracoes")} />}
         {tab === "oracoes" && <OracaoTab />}
-        {tab === "caderno" && <CadernoTab />}
+        {tab === "biblia" && <JornadaTab onOpenLogReading={() => setReading(true)} />}
+        {reading && <LogReadingSheet onClose={() => setReading(false)} />}
       </div>
     </div>
   );

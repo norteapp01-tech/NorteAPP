@@ -112,7 +112,9 @@ function SubAgenda() {
   const { categoria } = Route.useParams();
   const meta = categoryMeta[categoria] ?? categoryMeta.generico;
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const usesCompactHeader = ["academia", "esportes", "alimentacao", "leitura"].includes(categoria);
+  const usesCompactHeader = ["academia", "esportes", "alimentacao", "leitura", "fe"].includes(
+    categoria,
+  );
 
   return (
     <div
@@ -125,7 +127,9 @@ function SubAgenda() {
               ? "nutrition-page px-5 pt-6"
               : categoria === "leitura"
                 ? "reading-page px-5 pt-6"
-                : "px-5 pt-12"
+                : categoria === "fe"
+                  ? "faith-page px-5 pt-6"
+                  : "px-5 pt-12"
       }
     >
       <div className="relative flex h-11 items-center justify-between">
