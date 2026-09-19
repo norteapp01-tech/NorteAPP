@@ -23,6 +23,8 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // Conta já existente para esse provedor: precisa de ESCOLHA, não de erro.
+  const [existingAccount, setExistingAccount] = useState<"google" | "apple" | null>(null);
 
   async function finishIfVerified() {
     const { data, error: authError } = await supabase.auth.getUser();
@@ -77,6 +79,7 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
   async function oauth(provider: "google" | "apple") {
     setBusy(true);
     setError("");
+    setExistingAccount(null);
     try {
       sessionStorage.setItem("norte-onboarding-stage", "account");
       const { error: linkError } = await supabase.auth.linkIdentity({
@@ -84,13 +87,42 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
         options: { redirectTo: `${window.location.origin}/?onboarding=account` },
       });
       if (linkError) throw linkError;
-    } catch {
-      setError(
-        "Não foi possível conectar esse provedor. Tente novamente ou crie sua conta com e-mail.",
-      );
+    } catch (e) {
+      // "Essa conta Google já é de alguém" não é falha de conexão: é uma conta
+      // que já existe. O erro genérico escondia isso e deixava a pessoa sem
+      // saída nenhuma — nem vincular, nem entrar.
+      const code = (e as { code?: string; message?: string } | null)?.code ?? "";
+      const message = (e as { message?: string } | null)?.message ?? "";
+      if (
+        code === "identity_already_exists" ||
+        /already\s+(been\s+)?linked|already exists/i.test(message)
+      ) {
+        setExistingAccount(provider);
+      } else {
+        setError(
+          "Não foi possível conectar esse provedor. Tente novamente ou crie sua conta com e-mail.",
+        );
+      }
     } finally {
       setBusy(false);
     }
+  }
+
+  /**
+   * Assume a conta que já existe.
+   *
+   * Isso ENCERRA a sessão anônima deste dispositivo — o que foi criado aqui sem
+   * conta fica para trás. Por isso é uma escolha explícita, nunca automática.
+   */
+  async function signInExisting(provider: "google" | "apple") {
+    setBusy(true);
+    setError("");
+    const { error: signInError } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/` },
+    });
+    if (signInError) setError("Não foi possível abrir o login. Tente novamente.");
+    setBusy(false);
   }
 
   async function register(event: React.FormEvent) {
@@ -305,6 +337,25 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
                   {busy ? "Verificando…" : "Concluir minha conta"}
                 </button>
               </form>
+            )}
+            {existingAccount && (
+              <div
+                role="alert"
+                className="rounded-xl border border-border bg-surface-2 p-3 text-sm"
+              >
+                <p className="font-semibold">Essa conta já tem um Norte.</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Você pode entrar nela agora. O que você montou neste aparelho sem conta não vai
+                  junto — ele fica neste dispositivo.
+                </p>
+                <button
+                  onClick={() => void signInExisting(existingAccount)}
+                  disabled={busy}
+                  className="mt-3 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                >
+                  Entrar na minha conta
+                </button>
+              </div>
             )}
             {error && (
               <p role="alert" className="text-sm text-destructive">

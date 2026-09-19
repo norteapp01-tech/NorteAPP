@@ -179,7 +179,39 @@ export function SignInScreen({
         >
           Entrar
         </button>
+
+        {/* Quem criou a conta com Google NÃO tem identidade de e-mail: para
+            essas contas o formulário acima nunca vai funcionar, por mais
+            correta que seja a senha. Sem este botão elas ficavam sem nenhuma
+            porta de entrada. */}
+        <div className="flex items-center gap-3 pt-1">
+          <span className="h-px flex-1 bg-border" />
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">ou</span>
+          <span className="h-px flex-1 bg-border" />
+        </div>
+        <button
+          onClick={() => void signInWithGoogle(setError)}
+          className="w-full rounded-xl border border-border py-3 text-sm font-semibold"
+        >
+          Continuar com Google
+        </button>
       </div>
     </div>
   );
+}
+
+/**
+ * Entra numa conta que já existe.
+ *
+ * Diferente de `linkIdentity` (usado no cadastro, que PRENDE o provedor à
+ * sessão anônima atual), aqui a intenção é a oposta: assumir a conta que já
+ * tem aquele provedor. Chamar `linkIdentity` para quem já tem conta devolve
+ * `identity_already_exists` e não há como avançar dali.
+ */
+export async function signInWithGoogle(onError: (message: string) => void) {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: `${window.location.origin}/` },
+  });
+  if (error) onError("Não foi possível abrir o login do Google. Tente novamente.");
 }
