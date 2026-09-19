@@ -226,7 +226,7 @@ function RootComponent() {
   if (pathname === "/" && manualLogin)
     return (
       <SignInScreen
-        subtitle="Entre com seu e-mail e senha pra continuar de onde parou."
+        subtitle="Use o mesmo jeito que você criou a conta pra continuar de onde parou."
         onBack={() => setManualLogin(false)}
         onSuccess={() => {
           setManualLogin(false);

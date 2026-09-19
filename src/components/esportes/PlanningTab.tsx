@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { WeekdaySelector } from "@/components/ui/app-design-system";
-import { SavedRoutesSection } from "./SavedRoutes";
 import { weekdayLabels } from "@/components/sub-agenda-shared";
 import { Modal } from "@/components/ui/modal";
 import { startOfWeekLocal } from "@/lib/format-utils";
@@ -173,8 +172,6 @@ export function PlanningTab({ modality }: { modality: SportModality }) {
           </button>
         </div>
       </div>
-
-      <SavedRoutesSection modality={modality} />
 
       {addingOpen && (
         <ActivityFormModal

@@ -1,3 +1,5 @@
+import type { GeoPoint } from "@/lib/sport-store";
+
 /** Traçado simples em SVG, sem depender de nenhum provedor de mapa — usado
  * no detalhe/histórico, onde só precisamos mostrar a forma do percurso, não
  * um mapa navegável de verdade (isso fica só na gravação ao vivo). Nunca
@@ -8,9 +10,7 @@ export function RoutePreview({
   hideStartEnd,
   className,
 }: {
-  /** Só lat/lng: serve tanto para pontos de GPS quanto para o traço de uma
-   * rota salva, que não tem tempo nem precisão. */
-  points: { lat: number; lng: number }[];
+  points: GeoPoint[];
   hideRoute?: boolean;
   hideStartEnd?: boolean;
   className?: string;
@@ -38,7 +38,7 @@ export function RoutePreview({
   const pad = 8;
   const size = 100;
 
-  const toXY = (p: { lat: number; lng: number }) => {
+  const toXY = (p: GeoPoint) => {
     const x = pad + ((p.lng - minLng) / spanLng) * (size - pad * 2);
     // Latitude cresce pra cima; SVG cresce pra baixo — inverte o eixo Y.
     const y = pad + (1 - (p.lat - minLat) / spanLat) * (size - pad * 2);

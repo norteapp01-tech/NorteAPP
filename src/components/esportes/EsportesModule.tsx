@@ -10,7 +10,6 @@ import {
   Map as MapIcon,
   Satellite,
   Layers,
-  Settings,
 } from "lucide-react";
 import { UnderlineTabs } from "@/components/ui/app-design-system";
 import { Modal } from "@/components/ui/modal";
@@ -24,6 +23,7 @@ import {
 } from "@/lib/sport-store";
 import { OverviewTab } from "./OverviewTab";
 import { PlanningTab } from "./PlanningTab";
+import { HistoryTab } from "./HistoryTab";
 import { WeeklyGoalsPanel } from "./WeeklyGoalsPanel";
 
 const MODALITY_STORAGE_KEY = "norte:esportes:modality";
@@ -35,9 +35,7 @@ function loadLastModality(): SportModality {
   return saved === "corrida" || saved === "caminhada" || saved === "ciclismo" ? saved : "corrida";
 }
 
-/** O histórico saiu das abas: agora abre em tela cheia por "Ver todas", na
- * Visão geral. Sobraram as duas visões que de fato competem pela atenção. */
-type Tab = "visao_geral" | "planejamento";
+type Tab = "visao_geral" | "planejamento" | "historico";
 
 const mapStyleIcon = {
   escuro: Moon,
@@ -52,7 +50,18 @@ export function EsportesModule() {
   const [modalityDrawerOpen, setModalityDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("visao_geral");
+  const [historyInitialPeriod, setHistoryInitialPeriod] = useState<"semana" | undefined>(undefined);
   const [mapStyle, setMapStyle] = useState<MapStyle>(loadMapStyle);
+
+  const changeTab = (tab: Tab) => {
+    if (activeTab === "historico" && tab !== "historico") setHistoryInitialPeriod(undefined);
+    setActiveTab(tab);
+  };
+
+  const openHistory = (period?: "semana") => {
+    setHistoryInitialPeriod(period);
+    setActiveTab("historico");
+  };
 
   const selectMapStyle = (style: MapStyle) => {
     setMapStyle(style);
@@ -80,10 +89,9 @@ export function EsportesModule() {
         </button>
         <button
           onClick={() => setSettingsOpen(true)}
-          aria-label="Configurações da modalidade"
-          className="interactive-press flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface-2 text-muted-foreground hover:text-primary"
+          className="text-xs font-semibold text-muted-foreground hover:text-primary"
         >
-          <Settings className="h-[18px] w-[18px]" strokeWidth={1.8} />
+          Configurações
         </button>
       </div>
 
@@ -92,16 +100,20 @@ export function EsportesModule() {
           [
             { key: "visao_geral", label: "Visão geral" },
             { key: "planejamento", label: "Planejamento" },
+            { key: "historico", label: "Histórico" },
           ] as const
         }
         value={activeTab}
-        onChange={setActiveTab}
+        onChange={changeTab}
       />
 
       {activeTab === "visao_geral" && (
-        <OverviewTab modality={modality} onOpenPlanning={() => setActiveTab("planejamento")} />
+        <OverviewTab modality={modality} onOpenHistory={openHistory} />
       )}
       {activeTab === "planejamento" && <PlanningTab modality={modality} />}
+      {activeTab === "historico" && (
+        <HistoryTab modality={modality} initialPeriod={historyInitialPeriod} />
+      )}
 
       {modalityDrawerOpen && (
         <Modal title="Modalidade" onClose={() => setModalityDrawerOpen(false)}>
