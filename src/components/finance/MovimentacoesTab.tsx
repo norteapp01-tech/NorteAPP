@@ -63,7 +63,7 @@ export function MovimentacoesTab({
         />
       </div>
 
-      <div className="flex gap-1.5">
+      <div className="norte-segmented">
         {(
           [
             ["all", "Todos"],
@@ -71,11 +71,7 @@ export function MovimentacoesTab({
             ["income", "Entradas"],
           ] as [Filter, string][]
         ).map(([f, label]) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${filter === f ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
-          >
+          <button key={f} aria-pressed={filter === f} onClick={() => setFilter(f)} className="px-3">
             {label}
           </button>
         ))}

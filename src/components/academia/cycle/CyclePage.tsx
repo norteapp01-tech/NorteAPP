@@ -63,7 +63,7 @@ export function CyclePage({
   const cycle = cycles.find((c) => c.id === cycleId);
   if (!cycle) {
     return (
-      <div className="px-5 pt-12">
+      <div className="norte-page">
         <Link to={backTo} className="inline-flex items-center gap-1 text-xs text-muted-foreground">
           <ChevronLeft className="h-4 w-4" /> {backLabel}
         </Link>
@@ -120,7 +120,7 @@ export function CyclePage({
         <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
           Programa de treino
         </p>
-        <h1 className="mt-1 text-2xl font-bold leading-tight">{cycle.name}</h1>
+        <h1 className="norte-page-title mt-3">{cycle.name}</h1>
         <p className="mt-1 text-xs text-muted-foreground">
           {formatDateShortBR(cycle.startDate)} — {formatDateShortBR(cycle.endDate)} ·{" "}
           {progress.totalDays} dias · {stages.length} etapas
@@ -270,9 +270,7 @@ export function CyclePage({
               </div>
             )}
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                Caminho do programa
-              </h2>
+              <h2 className="norte-section-title">Caminho do programa</h2>
               <span className="text-[13px] text-muted-foreground">{stages.length} etapas</span>
             </div>
             {stages.map((block, index) => (

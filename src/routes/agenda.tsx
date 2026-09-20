@@ -121,10 +121,10 @@ function AgendaScreen() {
   const availableMinutes = Math.max(0, DAY_MINUTES - occupiedMinutes);
 
   return (
-    <div className="px-5 pt-12">
+    <div className="norte-page">
       <header className="relative min-h-24 pr-14">
         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Agenda</p>
-        <h1 className="mt-1 text-3xl font-bold">Seus compromissos</h1>
+        <h1 className="norte-page-title mt-2">Seus compromissos</h1>
         <p className="mt-2 text-sm text-muted-foreground">Seu tempo, com clareza.</p>
         <AppMenuButton
           onClick={() => setSettingsOpen(true)}
@@ -159,7 +159,7 @@ function AgendaScreen() {
       </p>
 
       <div className="mt-6 flex items-center justify-between">
-        <h2 className="text-base font-semibold">{formatLongDate(selectedDate)}</h2>
+        <h2 className="norte-section-title">{formatLongDate(selectedDate)}</h2>
         <Link
           to="/criar"
           search={{ modo: "agenda" }}

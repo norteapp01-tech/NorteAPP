@@ -35,7 +35,7 @@ export function OracaoTab() {
 
       <section>
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-bold">Em oração</h3>
+          <h3 className="norte-section-title mb-3">Em oração</h3>
           <span className="text-xs text-muted-foreground">{active.length}</span>
         </div>
         {active.length === 0 ? (

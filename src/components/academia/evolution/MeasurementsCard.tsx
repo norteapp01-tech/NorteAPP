@@ -132,12 +132,14 @@ function Line({ points, unit }: { points: { date: string; value: number }[]; uni
   const H = 80;
   return (
     <svg
+      data-norte-chart="line"
       viewBox={`0 0 ${W} ${H}`}
       className="mt-3 h-20 w-full"
       role="img"
       aria-label={points.map((p) => `${formatDateShortBR(p.date)} ${p.value} ${unit}`).join(", ")}
     >
       <polyline
+        data-series="true"
         points={points
           .map(
             (p, i) =>

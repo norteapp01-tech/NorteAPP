@@ -1,14 +1,14 @@
 .faith-module,
 .faith-records {
-  --faith-panel: #141b1e;
-  --faith-border: #2b3539;
-  --faith-muted: #aeb8c4;
+  --faith-panel: var(--surface);
+  --faith-border: var(--border);
+  --faith-muted: var(--muted-foreground);
 }
 :root[data-theme="light"] .faith-module,
 :root[data-theme="light"] .faith-records {
-  --faith-panel: #f1f4f3;
-  --faith-border: #d5dcd9;
-  --faith-muted: #616c73;
+  --faith-panel: var(--surface);
+  --faith-border: var(--border);
+  --faith-muted: var(--muted-foreground);
 }
 .faith-records {
   display: flex;
@@ -16,15 +16,15 @@
   gap: 24px;
 }
 .faith-records h2 {
-  font-size: 20px;
-  font-weight: 650;
+  font-size: var(--norte-section-size);
+  font-weight: var(--norte-title-weight);
   letter-spacing: -0.02em;
   line-height: 1.25;
 }
 .faith-capture {
   background: var(--faith-panel);
   border: 1px solid var(--faith-border);
-  border-radius: 14px;
+  border-radius: var(--norte-card-radius);
   padding: 18px 14px;
 }
 .faith-capture > p {
@@ -119,7 +119,7 @@
 }
 .faith-record.is-featured {
   background: var(--faith-panel);
-  border-radius: 12px;
+  border-radius: var(--norte-card-radius);
   border-bottom: 0;
 }
 .faith-record.is-featured small > span {

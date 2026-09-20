@@ -135,7 +135,7 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
   };
 
   return (
-    <div className="px-5 pt-11">
+    <div className="norte-page today-page">
       <header className="relative">
         {onOpenChat && (
           <button
@@ -154,11 +154,11 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
               month: "short",
             })}
           </p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">
+          <h1 className="norte-page-title mt-2">
             {greeting()}
             {profile.displayName ? `, ${profile.displayName}` : ""}.
           </h1>
-          <p className="mt-1 pr-32 text-sm text-muted-foreground text-balance-tight">
+          <p className="mt-2 text-sm text-muted-foreground text-balance-tight">
             {pendingTasks.some((t) => isMissed(t))
               ? "Tem coisa atrasada aí embaixo. Encara."
               : "Hoje é dia de seguir o plano."}
@@ -169,7 +169,7 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
           aria-label="Configurações"
           className="absolute -right-2 -top-2"
         />
-        <div className="absolute right-0 bottom-0 flex w-28 flex-col items-end gap-1">
+        <div className="mt-4 flex items-center gap-3">
           <span className="text-xs font-medium text-muted-foreground">
             {done} de {total} concluídas
           </span>
@@ -219,7 +219,7 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
       )}
 
       <div className="mt-7 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Tarefas de hoje</h2>
+        <h2 className="norte-section-title">Tarefas de hoje</h2>
         <span className="text-xs text-muted-foreground">
           {done} de {total}
         </span>
@@ -303,7 +303,7 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
 
       {/* Minha rotina */}
       <div className="mt-7">
-        <h2 className="text-lg font-semibold">Minha rotina</h2>
+        <h2 className="norte-section-title">Minha rotina</h2>
       </div>
       <div className="mt-3">
         <SubagendasGrid />

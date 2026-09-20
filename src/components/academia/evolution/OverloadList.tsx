@@ -149,8 +149,9 @@ function Spark({ values, kind }: { values: number[]; kind: ExerciseTrend["kind"]
     .map((v, i) => `${(i / (values.length - 1)) * 54},${20 - ((v - min) / span) * 16}`)
     .join(" ");
   return (
-    <svg viewBox="0 0 54 22" className="h-6 w-14 shrink-0" aria-hidden>
+    <svg data-norte-chart="line" viewBox="0 0 54 22" className="h-6 w-14 shrink-0" aria-hidden>
       <polyline
+        data-series="true"
         points={points}
         fill="none"
         stroke={kind === "estavel" ? "#eabf45" : kind === "queda" ? "#f87171" : "var(--evo-accent)"}

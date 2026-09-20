@@ -1,3 +1,4 @@
+import { chartTheme } from "@/components/ui/norte-chart-theme";
 import { useMemo, useState } from "react";
 import { ChartNoAxesColumnIncreasing, TrendingUp, TriangleAlert, Info } from "lucide-react";
 import {
@@ -253,17 +254,12 @@ export function PerformanceChart({
               <XAxis
                 dataKey="date"
                 tickFormatter={(d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`}
-                tick={{ fontSize: 9, fill: "#939da8" }}
+                tick={chartTheme.tick}
                 minTickGap={22}
               />
-              <YAxis tick={{ fontSize: 9, fill: "#939da8" }} domain={["auto", "auto"]} />
+              <YAxis tick={chartTheme.tick} domain={["auto", "auto"]} />
               <Tooltip
-                contentStyle={{
-                  background: "var(--evo-panel)",
-                  border: "1px solid var(--evo-line)",
-                  borderRadius: 8,
-                  fontSize: 12,
-                }}
+                contentStyle={chartTheme.tooltip}
                 formatter={(v: number) => [
                   `${v} ${unit}`,
                   mode === "estimativa" ? "Força estimada" : "Registro",
@@ -274,8 +270,8 @@ export function PerformanceChart({
                 dataKey="value"
                 stroke="var(--evo-accent)"
                 strokeWidth={2}
-                dot={{ r: 4, fill: "var(--evo-accent)" }}
-                activeDot={{ r: 6 }}
+                dot={chartTheme.dot}
+                activeDot={chartTheme.activeDot}
                 isAnimationActive={false}
               />
             </LineChart>

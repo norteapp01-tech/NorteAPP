@@ -285,12 +285,14 @@ function Chart({
   return (
     <div className="mt-3">
       <svg
+        data-norte-chart="line"
         viewBox={`0 0 ${W} ${H}`}
         className="h-40 w-full"
         role="group"
         aria-label={`Evolução em ${unit}: ${points.map((p) => `${formatDateShortBR(p.date)} ${p.value}`).join(", ")}`}
       >
         <polyline
+          data-series="true"
           points={points.map((p, i) => `${x(i)},${y(p.value)}`).join(" ")}
           fill="none"
           stroke="var(--color-primary)"

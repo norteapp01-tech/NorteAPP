@@ -10,7 +10,14 @@ import {
 } from "@/lib/finance-store";
 import { Card } from "@/components/sub-agenda-shared";
 
-const COLORS = ["#73e37a", "#56b968", "#8ba694", "#6c7c72", "#4e5952", "#343b37"];
+const COLORS = [
+  "var(--primary)",
+  "var(--chart-secondary)",
+  "var(--muted-foreground)",
+  "var(--chart-category-4)",
+  "var(--chart-category-5)",
+  "var(--chart-category-6)",
+];
 
 export function ResumoTab({
   month,
@@ -61,10 +68,10 @@ export function ResumoTab({
             onClick={() => onOpenMovements()}
             className="flex items-center gap-1 text-xs font-semibold text-primary"
           >
-            Ver lançamentos <ChevronRight className="h-3.5 w-3.5" />
+            Lançamentos <ChevronRight className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="mt-4 grid grid-cols-3 gap-2">
+        <div className="finance-facts mt-4 grid grid-cols-3 gap-2">
           <Fact label="Entrou" value={income} icon={<ArrowUpRight />} />
           <Fact label="Objetivos" value={directed} icon={<Target />} />
           <Fact label="Sem destino" value={unallocated} icon={<ArrowDownRight />} />
@@ -84,7 +91,7 @@ export function ResumoTab({
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-5">
+            <div className="finance-distribution flex items-center gap-5">
               <Donut
                 items={breakdown}
                 selected={selected}
@@ -151,7 +158,7 @@ export function ResumoTab({
 
       <section>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-base font-bold">Sonhos e objetivos</h2>
+          <h2 className="norte-section-title">Sonhos e objetivos</h2>
           <button onClick={onOpenObjetivos} className="text-xs text-muted-foreground">
             ver todos
           </button>
@@ -179,9 +186,9 @@ function Fact({ label, value, icon }: { label: string; value: number; icon: Reac
     <div className="rounded-xl border border-border bg-surface px-3 py-3">
       <div className="flex items-center gap-1 text-muted-foreground [&_svg]:h-3 [&_svg]:w-3">
         {icon}
-        <span className="text-[9px] uppercase tracking-wide">{label}</span>
+        <span className="text-[11px] font-medium">{label}</span>
       </div>
-      <p className="mt-1 truncate text-xs font-bold">{formatBRL(value)}</p>
+      <p className="mt-1 text-sm font-semibold">{formatBRL(value)}</p>
     </div>
   );
 }
@@ -199,17 +206,17 @@ function Donut({
   return (
     <div className="relative h-32 w-32 shrink-0">
       <svg
-        viewBox="0 0 120 120"
+        viewBox="0 0 100 100"
         className="h-full w-full -rotate-90"
         aria-label="Distribuição de gastos por categoria"
       >
         <circle
-          cx="60"
-          cy="60"
-          r="45"
+          cx="50"
+          cy="50"
+          r="42"
           fill="none"
           stroke="currentColor"
-          strokeWidth="12"
+          strokeWidth="8"
           className="text-surface-2"
         />
         {items.map((item, index) => {
@@ -219,12 +226,22 @@ function Donut({
           return (
             <circle
               key={item.category}
-              cx="60"
-              cy="60"
-              r="45"
+              cx="50"
+              cy="50"
+              r="42"
               fill="none"
               stroke={COLORS[index]}
-              strokeWidth={selected === item.category ? 15 : 12}
+              strokeWidth={selected === item.category ? 10 : 8}
+              role="button"
+              tabIndex={0}
+              aria-label={`${item.category}: ${item.pct}%`}
+              aria-pressed={selected === item.category}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelect(item.category);
+                }
+              }}
               pathLength="100"
               strokeDasharray={`${size} ${101 - size}`}
               strokeDashoffset={-start}

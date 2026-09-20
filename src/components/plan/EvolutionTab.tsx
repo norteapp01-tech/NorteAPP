@@ -1,3 +1,5 @@
+import { chartTheme } from "@/components/ui/norte-chart-theme";
+import { ProgressRing as NorteProgressRing } from "@/components/ui/progress-ring";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Flame, TrendingUp } from "lucide-react";
 import {
@@ -218,14 +220,14 @@ function EvolutionLine({ data }: { data: ProgressPoint[] }) {
           <XAxis
             dataKey="date"
             tickFormatter={(d: string) => d.slice(5).split("-").reverse().join("/")}
-            tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+            tick={chartTheme.tick}
             axisLine={{ stroke: "var(--border)" }}
             tickLine={false}
             minTickGap={24}
           />
           <YAxis
             domain={[0, 100]}
-            tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+            tick={chartTheme.tick}
             axisLine={false}
             tickLine={false}
             width={32}
@@ -236,7 +238,7 @@ function EvolutionLine({ data }: { data: ProgressPoint[] }) {
               if (!active || !payload?.length) return null;
               const p = payload[0].payload as ProgressPoint;
               return (
-                <div className="card-surface px-2.5 py-1.5 text-[11px] shadow-lg">
+                <div className="norte-chart-tooltip">
                   <p className="font-semibold">{p.pct}%</p>
                   <p className="text-muted-foreground">
                     {p.date.slice(5).split("-").reverse().join("/")}
@@ -247,12 +249,12 @@ function EvolutionLine({ data }: { data: ProgressPoint[] }) {
             cursor={{ stroke: "var(--border)" }}
           />
           <Line
-            type="monotone"
+            type="linear"
             dataKey="pct"
             stroke="var(--primary)"
             strokeWidth={2}
-            dot={{ r: 3, fill: "var(--primary)", strokeWidth: 0 }}
-            activeDot={{ r: 4 }}
+            dot={chartTheme.dot}
+            activeDot={chartTheme.activeDot}
           />
         </LineChart>
       </ResponsiveContainer>
@@ -261,29 +263,9 @@ function EvolutionLine({ data }: { data: ProgressPoint[] }) {
 }
 
 function ProgressRing({ pct, pace }: { pct: number; pace: "ahead" | "ontrack" | "behind" }) {
-  const r = 34;
-  const c = 2 * Math.PI * r;
-  const stroke =
+  const color =
     pace === "behind" ? "var(--danger)" : pace === "ahead" ? "var(--warning)" : "var(--primary)";
-  return (
-    <div className="relative h-20 w-20 shrink-0">
-      <svg viewBox="0 0 80 80" className="h-20 w-20 -rotate-90">
-        <circle cx="40" cy="40" r={r} fill="none" stroke="var(--surface-2)" strokeWidth="8" />
-        <circle
-          cx="40"
-          cy="40"
-          r={r}
-          fill="none"
-          stroke={stroke}
-          strokeWidth="8"
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={c * (1 - pct / 100)}
-          className="progress-fill"
-        />
-      </svg>
-    </div>
-  );
+  return <NorteProgressRing value={pct} label="Progresso do plano" size={80} color={color} />;
 }
 
 function PaceBar({

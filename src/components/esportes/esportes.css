@@ -7,12 +7,12 @@
 --------------------------------------------------------------------------- */
 
 .esportes-overview {
-  --sp-card: #15191b;
-  --sp-card-border: #2b3235;
-  --sp-accent: #68e878;
-  --sp-title: #f1f3f2;
-  --sp-muted: #969da2;
-  --sp-grid: #293034;
+  --sp-card: var(--surface);
+  --sp-card-border: var(--border);
+  --sp-accent: var(--primary);
+  --sp-title: var(--foreground);
+  --sp-muted: var(--muted-foreground);
+  --sp-grid: var(--chart-grid);
   padding-bottom: 4px;
 }
 
@@ -32,13 +32,13 @@
 .esportes-overview .sp-card {
   background: var(--sp-card);
   border: 1px solid var(--sp-card-border);
-  border-radius: 17px;
+  border-radius: var(--norte-card-radius);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025);
 }
 
 .esportes-overview .sp-section-title {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--norte-section-size);
+  font-weight: var(--norte-title-weight);
   letter-spacing: -0.01em;
   color: var(--sp-title);
 }
@@ -110,7 +110,7 @@
   position: absolute;
   inset: 0;
   backface-visibility: hidden;
-  border-radius: 16px;
+  border-radius: var(--norte-card-radius);
   background: var(--sp-card);
   border: 1px solid var(--sp-card-border);
   padding: 11px 13px 8px;
@@ -238,12 +238,12 @@
 
 .light .esportes-overview,
 [data-theme="light"] .esportes-overview {
-  --sp-card: #f3f5f4;
-  --sp-card-border: #dfe4e2;
-  --sp-accent: #17904a;
-  --sp-title: #12201a;
-  --sp-muted: #5e6a64;
-  --sp-grid: #dfe4e2;
+  --sp-card: var(--surface);
+  --sp-card-border: var(--border);
+  --sp-accent: var(--primary);
+  --sp-title: var(--foreground);
+  --sp-muted: var(--muted-foreground);
+  --sp-grid: var(--chart-grid);
 }
 .light .esportes-overview .sp-play,
 [data-theme="light"] .esportes-overview .sp-play {

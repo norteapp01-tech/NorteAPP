@@ -1,5 +1,6 @@
+import { ProgressRing } from "@/components/ui/progress-ring";
 import { Link } from "@tanstack/react-router";
-import { useState, type ComponentType, type CSSProperties } from "react";
+import { useState, type ComponentType } from "react";
 import {
   Activity,
   AlertCircle,
@@ -64,15 +65,13 @@ export function MirrorDashboard() {
   const attention = procrastinated[0];
 
   return (
-    <main className="px-5 pb-5 pt-10">
+    <main className="norte-page mirror-page">
       <header className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[.2em] text-muted-foreground">
             Espelho
           </p>
-          <h1 className="mt-2 text-[30px] font-bold leading-tight tracking-tight">
-            Seu ritmo, com clareza.
-          </h1>
+          <h1 className="norte-page-title mt-2">Seu ritmo, com clareza.</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
             Um reflexo honesto da sua {range === "dia" ? "rotina" : range}.
           </p>
@@ -99,22 +98,13 @@ export function MirrorDashboard() {
           Ritmo da {range}
         </p>
         <div className="mt-4 flex items-center gap-6">
-          <div
-            role="progressbar"
-            aria-valuenow={kpis.cumprimento}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="Cumprimento da semana"
-            className="progress-ring relative grid h-28 w-28 shrink-0 place-items-center rounded-full"
-            style={{ "--progress-angle": `${kpis.cumprimento * 3.6}deg` } as CSSProperties}
+          <ProgressRing
+            value={kpis.resolved ? kpis.cumprimento : null}
+            label={`Cumprimento da ${range}`}
+            size={104}
           >
-            <div className="grid h-[94px] w-[94px] place-items-center rounded-full bg-surface">
-              <b className="text-3xl">
-                {kpis.cumprimento}
-                <span className="text-lg">%</span>
-              </b>
-            </div>
-          </div>
+            <strong>{kpis.resolved ? `${kpis.cumprimento}%` : "—"}</strong>
+          </ProgressRing>
           <div>
             <p className="text-xl font-bold">
               {kpis.daysWithActivity} de {kpis.totalDays} dias ativos
@@ -138,7 +128,7 @@ export function MirrorDashboard() {
 
       <section className="mt-6">
         <div className="flex items-end justify-between">
-          <h2 className="text-lg font-bold">Áreas da sua vida</h2>
+          <h2 className="norte-section-title">Áreas da sua vida</h2>
           <span className="text-xs text-muted-foreground">
             Histórico e tendências <ChevronRight className="inline h-3.5 w-3.5" />
           </span>
@@ -187,7 +177,7 @@ export function MirrorDashboard() {
       </section>
 
       <section className="mt-6">
-        <h2 className="text-lg font-bold">O que o espelho mostra</h2>
+        <h2 className="norte-section-title">O que o espelho mostra</h2>
         <div className="card-surface mt-3 divide-y divide-border px-4">
           <Insight
             icon={TrendingUp}
@@ -224,7 +214,7 @@ export function MirrorDashboard() {
 
       <section className="mt-6">
         <div className="flex items-end justify-between">
-          <h2 className="text-lg font-bold">Planos</h2>
+          <h2 className="norte-section-title">Planos</h2>
           <p className="text-xs text-muted-foreground">
             {onTrack} no ritmo · {behind} atrasados
           </p>

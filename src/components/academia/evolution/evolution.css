@@ -1,7 +1,7 @@
 .evolution-dashboard {
-  --evo-accent: #80e780;
-  --evo-panel: #101415;
-  --evo-line: #343b3e;
+  --evo-accent: var(--primary);
+  --evo-panel: var(--surface);
+  --evo-line: var(--border);
   color: var(--foreground);
 }
 .evolution-dashboard .evo-tabs {
@@ -20,7 +20,7 @@
   font-size: 14px;
   color: var(--muted-foreground);
   border: 1px solid transparent;
-  border-radius: 11px;
+  border-radius: var(--norte-control-radius);
 }
 .evolution-dashboard .evo-tabs button[aria-pressed="true"] {
   color: var(--evo-accent);
@@ -28,16 +28,16 @@
   background: linear-gradient(110deg, #00df9820, #00df9808);
 }
 .evolution-dashboard .evo-card {
-  background: linear-gradient(125deg, #141819, #0d1011);
+  background: var(--surface);
   border: 1px solid var(--evo-line);
-  border-radius: 14px;
+  border-radius: var(--norte-card-radius);
   padding: 14px;
 }
 .evolution-dashboard .evo-title {
   font-size: 18px;
   line-height: 1.25;
-  font-weight: 700;
-  letter-spacing: -0.025em;
+  font-weight: var(--norte-title-weight);
+  letter-spacing: -0.02em;
 }
 .evolution-dashboard .evo-kpis {
   display: grid;
@@ -58,7 +58,7 @@
 .evolution-dashboard .evo-kpi small {
   display: block;
   font-size: 9px;
-  color: #a8afb9;
+  color: var(--muted-foreground);
 }
 .evolution-dashboard .evo-kpi strong {
   display: block;
@@ -89,8 +89,8 @@
 .evolution-dashboard .evo-period-group button {
   flex: 1;
   white-space: nowrap;
-  font-size: 11px;
-  min-height: 38px;
+  font-size: 12px;
+  min-height: 40px;
   border-radius: 9px;
 }
 .evolution-dashboard .evo-period-group button[aria-pressed="true"] {
@@ -162,7 +162,7 @@
 }
 .evolution-dashboard .evo-card {
   background: var(--evo-panel);
-  border-radius: 20px;
+  border-radius: var(--norte-card-radius);
   padding: 18px;
 }
 .evolution-dashboard .evo-map-section {
@@ -331,7 +331,7 @@
 }
 [data-theme="light"] .evolution-dashboard .evo-kpi small,
 [data-theme="light"] .evolution-dashboard .evo-kpi span {
-  color: #52605a;
+  color: var(--muted-foreground);
 }
 .evolution-dashboard .evo-body-stage [role="button"]:focus-visible {
   outline: none;
@@ -366,13 +366,13 @@
 }
 .light .evolution-dashboard,
 [data-theme="light"] .evolution-dashboard {
-  --evo-accent: #08773e;
-  --evo-panel: #f4f7f5;
-  --evo-line: #d4dcd7;
+  --evo-accent: var(--primary);
+  --evo-panel: var(--surface);
+  --evo-line: var(--border);
 }
 .light .evolution-dashboard .evo-card,
 [data-theme="light"] .evolution-dashboard .evo-card {
-  background: linear-gradient(120deg, #ffffff, #edf2ef);
+  background: var(--surface);
 }
 .light .evolution-dashboard .evo-kpi small,
 .light .evolution-dashboard .evo-kpi span {

@@ -63,7 +63,7 @@ function CreateScreen() {
   const [mode, setMode] = useState<Mode>(search.modo ?? "escolha");
 
   return (
-    <div className="px-5 pt-12">
+    <div className="norte-page">
       <div className="flex items-center justify-between">
         <button
           onClick={() => (mode === "escolha" ? nav({ to: "/" }) : setMode("escolha"))}
@@ -82,9 +82,7 @@ function CreateScreen() {
       {mode === "escolha" && (
         <div className="mt-10 space-y-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-balance-tight">
-              O que você quer criar?
-            </h1>
+            <h1 className="norte-page-title mt-3">O que você quer criar?</h1>
             <p className="mt-2 text-sm text-muted-foreground text-balance-tight">
               Plano é o que você quer construir. Agenda é o que tem hora marcada.
             </p>

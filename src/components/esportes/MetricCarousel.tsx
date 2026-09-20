@@ -365,6 +365,7 @@ function Chart({
 
   return (
     <svg
+      data-norte-chart="line"
       viewBox={`0 0 ${W} ${H}`}
       className="sp-chart mt-2 w-full"
       role="img"
@@ -385,10 +386,11 @@ function Chart({
       ))}
 
       <polyline
+        data-series="true"
         points={points.map((p) => `${x(p.i)},${y(p.v)}`).join(" ")}
         fill="none"
         stroke={face === "frequencia" ? "var(--sp-title)" : "var(--sp-accent)"}
-        strokeWidth={face === "volume" ? 1.8 : 2.2}
+        strokeWidth={2}
         strokeOpacity={face === "volume" ? 0.8 : 1}
         vectorEffect="non-scaling-stroke"
       />

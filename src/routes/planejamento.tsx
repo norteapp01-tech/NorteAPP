@@ -62,13 +62,13 @@ function PlanScreen() {
   );
 
   return (
-    <div className="px-5 pt-12">
+    <div className="norte-page">
       <div className="flex items-start justify-between gap-3">
         <header className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Plano
           </p>
-          <h1 className="mt-1 text-3xl font-bold">Do sonho ao próximo passo</h1>
+          <h1 className="norte-page-title mt-2">Do sonho ao próximo passo</h1>
           <p className="mt-2 text-sm text-muted-foreground text-balance-tight">
             Transforme seus planos em próximas ações.
           </p>

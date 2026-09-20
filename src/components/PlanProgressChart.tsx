@@ -2,9 +2,9 @@ import { Link } from "@tanstack/react-router";
 import { useGoalsStore, goalProgress, goalPace, isGoalComplete } from "@/lib/goals-store";
 
 const paceColor: Record<string, string> = {
-  ahead: "oklch(0.82 0.16 85)",
-  ontrack: "oklch(0.82 0.18 145)",
-  behind: "oklch(0.7 0.2 25)",
+  ahead: "var(--warning)",
+  ontrack: "var(--primary)",
+  behind: "var(--danger)",
 };
 
 const ticks = [0, 20, 40, 60, 80, 100];
@@ -27,9 +27,7 @@ export function PlanProgressChart() {
 
   return (
     <div>
-      <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-        Progresso dos meus planos
-      </h2>
+      <h2 className="norte-section-title">Progresso dos meus planos</h2>
       <div className="mt-3 flex gap-4 text-[11px]">
         <Legend color={paceColor.ontrack} label="No ritmo" />
         <Legend color={paceColor.behind} label="Atrasado" />

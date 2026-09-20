@@ -1,3 +1,4 @@
+import { ProgressRing } from "@/components/ui/progress-ring";
 import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -279,9 +280,6 @@ export function OverviewTab({
 // Card 1 — consistência
 // ---------------------------------------------------------------------------
 
-const RING = 34;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING;
-
 function ConsistencyCard({
   done,
   target,
@@ -297,32 +295,14 @@ function ConsistencyCard({
 
   return (
     <div className="sp-card sp-week-card flex flex-col items-center justify-center gap-1.5 px-3 py-3">
-      <div className="relative" style={{ width: 84, height: 84 }}>
-        <svg viewBox="0 0 84 84" className="h-full w-full -rotate-90">
-          <circle cx="42" cy="42" r={RING} fill="none" stroke="var(--sp-grid)" strokeWidth="8" />
-          {target !== undefined && (
-            <circle
-              cx="42"
-              cy="42"
-              r={RING}
-              fill="none"
-              stroke="var(--sp-accent)"
-              strokeWidth="8"
-              strokeLinecap="round"
-              strokeDasharray={RING_CIRCUMFERENCE}
-              strokeDashoffset={RING_CIRCUMFERENCE * (1 - pct)}
-            />
-          )}
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <p className="text-[22px] font-bold leading-none" style={{ color: "var(--sp-title)" }}>
-            {target !== undefined ? `${done}/${target}` : done}
-          </p>
-          <p className="mt-0.5 text-[10px]" style={{ color: "var(--sp-muted)" }}>
-            atividades
-          </p>
-        </div>
-      </div>
+      <ProgressRing
+        value={target && target > 0 ? pct * 100 : null}
+        label="Meta semanal de atividades"
+        size={88}
+      >
+        <strong>{target !== undefined ? `${done}/${target}` : done}</strong>
+        <small>atividades</small>
+      </ProgressRing>
       {target !== undefined ? (
         <p className="text-[11px]" style={{ color: "var(--sp-muted)" }}>
           meta semanal

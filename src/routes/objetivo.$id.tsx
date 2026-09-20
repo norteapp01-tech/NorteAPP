@@ -51,7 +51,7 @@ export const Route = createFileRoute("/objetivo/$id")({
   }),
   component: GoalDetail,
   notFoundComponent: () => (
-    <div className="px-5 pt-12">
+    <div className="norte-page">
       <p className="text-sm text-muted-foreground">Planejamento não encontrado.</p>
       <Link to="/planejamento" className="mt-4 inline-block text-sm text-primary">
         ← voltar ao plano
@@ -167,7 +167,7 @@ export function GoalDetail() {
   }
 
   return (
-    <div className="px-5 pt-12 pb-10">
+    <div className="norte-page pb-10">
       <PlanHeader
         goal={goal}
         allSteps={allSteps}
@@ -212,9 +212,7 @@ export function GoalDetail() {
 
           {orphanExecutions.length > 0 && (
             <div>
-              <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                Ações sem etapa
-              </h2>
+              <h2 className="norte-section-title">Ações sem etapa</h2>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Contam como avanço do plano, mas ainda não pertencem a nenhuma etapa.
               </p>

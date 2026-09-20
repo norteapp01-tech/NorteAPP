@@ -34,7 +34,7 @@ export function PlanejamentoTab() {
 
       {rows.length > 0 && (
         <section className="space-y-2">
-          <h3 className="text-sm font-bold">Seus planejamentos</h3>
+          <h3 className="norte-section-title mb-3">Seus planejamentos</h3>
           {rows.map(({ plan, objective }) => (
             <PlanRow
               key={plan.id}
@@ -49,7 +49,7 @@ export function PlanejamentoTab() {
 
       <section className="space-y-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold">Começar um planejamento</h3>
+          <h3 className="norte-section-title mb-3">Começar um planejamento</h3>
           {withoutPlan.length > 0 && (
             <span className="text-[10px] text-muted-foreground">
               {withoutPlan.length} objetivo{withoutPlan.length === 1 ? "" : "s"}

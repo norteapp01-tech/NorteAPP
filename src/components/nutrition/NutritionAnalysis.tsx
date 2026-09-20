@@ -1,3 +1,5 @@
+import { chartTheme } from "@/components/ui/norte-chart-theme";
+import { ProgressRing } from "@/components/ui/progress-ring";
 import { useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
@@ -43,7 +45,7 @@ export function NutritionAnalysis({ state }: { state: NutritionState }) {
         <h2>Sua análise</h2>
         <p>Entenda seus padrões, sem complicação.</p>
       </div>
-      <div className="nutrition-period" aria-label="Período da análise">
+      <div className="norte-segmented" aria-label="Período da análise">
         {[7, 30, 90].map((n) => (
           <button
             key={n}
@@ -65,18 +67,9 @@ export function NutritionAnalysis({ state }: { state: NutritionState }) {
           </button>
         </div>
         <div className="nutrition-consistency">
-          <div className="nutrition-ring">
-            <svg viewBox="0 0 100 100" aria-hidden="true">
-              <circle cx="50" cy="50" r="42" />
-              <circle
-                cx="50"
-                cy="50"
-                r="42"
-                strokeDasharray={`${(data.current.pct ?? 0) * 2.639} 264`}
-              />
-            </svg>
+          <ProgressRing value={data.current.pct} label="Consistência alimentar" size={100}>
             <strong>{data.current.pct === null ? "—" : data.current.pct + "%"}</strong>
-          </div>
+          </ProgressRing>
           <div>
             <strong>
               {data.current.matched} de {data.current.recorded} dias
@@ -166,12 +159,12 @@ export function NutritionAnalysis({ state }: { state: NutritionState }) {
                   dataKey="date"
                   tickFormatter={(v) => format(parseISO(v), "d MMM", { locale: ptBR })}
                   minTickGap={40}
-                  tick={{ fill: "var(--nutrition-muted)", fontSize: 10 }}
+                  tick={chartTheme.tick}
                   tickLine={false}
                 />
                 <YAxis
                   domain={[0, (max: number) => Math.max(max, goal) * 1.25 || 100]}
-                  tick={{ fill: "var(--nutrition-muted)", fontSize: 10 }}
+                  tick={chartTheme.tick}
                   tickLine={false}
                   axisLine={false}
                 />
@@ -193,20 +186,15 @@ export function NutritionAnalysis({ state }: { state: NutritionState }) {
                     format(parseISO(String(v)), "d 'de' MMMM", { locale: ptBR })
                   }
                   formatter={(v) => [`${v} ${metric.unit}`, metric.label]}
-                  contentStyle={{
-                    background: "var(--nutrition-panel)",
-                    border: "1px solid var(--nutrition-border)",
-                    borderRadius: 12,
-                    color: "var(--nutrition-text)",
-                  }}
+                  contentStyle={chartTheme.tooltip}
                 />
                 <Line
                   type="linear"
                   dataKey="value"
                   stroke="var(--nutrition-green)"
                   strokeWidth={2}
-                  dot={{ r: 3 }}
-                  activeDot={{ r: 5 }}
+                  dot={chartTheme.dot}
+                  activeDot={chartTheme.activeDot}
                   connectNulls={false}
                   isAnimationActive={false}
                 />

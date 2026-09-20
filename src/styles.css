@@ -1,6 +1,7 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import "./brand.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -51,11 +52,11 @@
   --radius: 1rem;
   --background: #000000;
   --foreground: oklch(0.98 0 0);
-  --surface: #191e20;
+  --surface: #151a1c;
   --surface-2: #242a2d;
-  --card: #191e20;
+  --card: #151a1c;
   --card-foreground: oklch(0.98 0 0);
-  --popover: #191e20;
+  --popover: #151a1c;
   --popover-foreground: oklch(0.98 0 0);
   --primary: #87ed85;
   --primary-foreground: oklch(0.15 0.02 150);
@@ -70,10 +71,10 @@
   --success: oklch(0.82 0.18 145);
   --warning: oklch(0.82 0.16 85);
   --danger: oklch(0.7 0.2 25);
-  --border: #353d40;
+  --border: #30383c;
   --input: oklch(0.27 0.008 260);
   --ring: oklch(0.82 0.18 145);
-  --action-green: #72e877;
+  --action-green: #87ed85;
   --action-ink: #06260d;
   --surface-sheen: linear-gradient(145deg, #ffffff03, #0000000a);
   --surface-shadow: inset 0 1px 0 #ffffff05;
@@ -142,7 +143,7 @@
 @utility card-surface {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: var(--norte-card-radius);
   background-image: var(--surface-sheen);
   box-shadow: var(--surface-shadow);
   backdrop-filter: blur(var(--glass-blur));

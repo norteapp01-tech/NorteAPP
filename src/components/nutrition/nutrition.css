@@ -1,18 +1,18 @@
 .nutrition-module {
-  --nutrition-panel: #11181b;
-  --nutrition-border: #2a373c;
-  --nutrition-muted: #adbcc8;
-  --nutrition-text: #f4f6f7;
-  --nutrition-green: #79ec7a;
+  --nutrition-panel: var(--surface);
+  --nutrition-border: var(--border);
+  --nutrition-muted: var(--muted-foreground);
+  --nutrition-text: var(--foreground);
+  --nutrition-green: var(--primary);
   color: var(--nutrition-text);
 }
 :root[data-theme="light"] .nutrition-module,
 .light .nutrition-module {
-  --nutrition-panel: #f2f5f4;
-  --nutrition-border: #d6ddda;
-  --nutrition-muted: #59656a;
-  --nutrition-text: #111918;
-  --nutrition-green: #257a39;
+  --nutrition-panel: var(--surface);
+  --nutrition-border: var(--border);
+  --nutrition-muted: var(--muted-foreground);
+  --nutrition-text: var(--foreground);
+  --nutrition-green: var(--primary);
 }
 .nutrition-module h2 {
   font-size: 24px;
@@ -20,14 +20,14 @@
   letter-spacing: -0.025em;
 }
 .nutrition-module h3 {
-  font-size: 18px;
-  font-weight: 650;
+  font-size: var(--norte-section-size);
+  font-weight: var(--norte-title-weight);
   letter-spacing: -0.02em;
 }
 .nutrition-panel {
   background: var(--nutrition-panel);
   border: 1px solid var(--nutrition-border);
-  border-radius: 16px;
+  border-radius: var(--norte-card-radius);
   padding: 18px;
 }
 .nutrition-section-heading {
@@ -160,23 +160,6 @@
   line-height: 1.5;
   margin-top: 4px;
 }
-.nutrition-period {
-  display: flex;
-  border: 1px solid var(--nutrition-border);
-  border-radius: 24px;
-  padding: 3px;
-}
-.nutrition-period button {
-  flex: 1;
-  border-radius: 20px;
-  padding: 8px 4px;
-  font-size: 13px;
-  color: var(--nutrition-muted);
-}
-.nutrition-period button[aria-pressed="true"] {
-  background: var(--nutrition-border);
-  color: var(--nutrition-text);
-}
 .nutrition-consistency {
   display: flex;
   align-items: center;
@@ -185,34 +168,6 @@
 }
 .nutrition-consistency > div:last-child > strong {
   font-size: 16px;
-}
-.nutrition-ring {
-  position: relative;
-  width: 100px;
-  height: 100px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-}
-.nutrition-ring svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg);
-}
-.nutrition-ring circle {
-  fill: none;
-  stroke: var(--nutrition-border);
-  stroke-width: 9;
-}
-.nutrition-ring circle:last-child {
-  stroke: var(--nutrition-green);
-  stroke-linecap: round;
-}
-.nutrition-ring strong {
-  font-size: 26px;
-  letter-spacing: -0.03em;
 }
 .nutrition-comparison {
   display: flex;
@@ -227,10 +182,14 @@
   color: var(--nutrition-muted);
 }
 .nutrition-chart-panel {
-  padding: 16px 12px 10px;
+  padding: 20px 0;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
 }
 .nutrition-chart-panel h3 {
-  font-size: 16px;
+  font-size: var(--norte-section-size);
 }
 .nutrition-flip-controls {
   display: flex;

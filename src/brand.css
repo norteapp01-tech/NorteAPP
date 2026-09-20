@@ -1,0 +1,224 @@
+/* Norte UI contract. Semantic tokens, not route-specific palettes.
+   Colored states remain semantic; charts never override anatomy or route maps. */
+:root {
+  --norte-card-radius: 20px;
+  --norte-control-radius: 12px;
+  --norte-card-padding: 18px;
+  --norte-section-gap: 24px;
+  --norte-section-size: 18px;
+  --norte-page-size: 28px;
+  --norte-title-weight: 600;
+  --chart-primary: var(--primary);
+  --chart-secondary: var(--foreground);
+  --chart-grid: var(--border);
+  --chart-track: var(--surface-2);
+  --chart-line-width: 2;
+  --chart-category-4: #88aaa2;
+  --chart-category-5: #9c9db8;
+  --chart-category-6: #bcab84;
+}
+.norte-app {
+  font-variant-numeric: tabular-nums;
+}
+.norte-page {
+  padding: 28px 20px 20px;
+}
+.norte-page-title {
+  font-size: var(--norte-page-size);
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+.norte-view-title {
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+.norte-section-title {
+  font-size: var(--norte-section-size);
+  font-weight: var(--norte-title-weight);
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+  color: var(--foreground);
+  text-transform: none;
+}
+.norte-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.norte-app :where(h1, h2, h3) {
+  text-wrap: balance;
+}
+.norte-app :where(p) {
+  overflow-wrap: break-word;
+}
+.norte-routine-header {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 64px;
+  align-items: center;
+  min-height: 44px;
+}
+.norte-routine-header h1 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  text-align: center;
+}
+.norte-routine-header > button {
+  justify-self: end;
+}
+.norte-routine-header > a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.norte-tabs {
+  min-width: 0;
+}
+.norte-tabs > button {
+  min-height: 48px;
+  height: auto;
+  padding: 12px 6px;
+  font-size: 13px;
+  line-height: 1.3;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.norte-tabs > button[aria-selected="true"] {
+  color: var(--foreground);
+}
+.norte-weekdays {
+  gap: 6px;
+}
+.norte-weekdays > button {
+  border-radius: var(--norte-control-radius);
+  padding: 10px 2px;
+  min-height: 64px;
+}
+.norte-weekdays > button > span:first-child {
+  font-size: 11px;
+}
+.norte-weekdays > button[data-completed="true"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+.norte-weekdays > button[data-completed="true"] > span {
+  color: var(--primary-foreground);
+}
+.norte-segmented {
+  display: flex;
+  gap: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--norte-control-radius);
+  padding: 3px;
+}
+.norte-segmented > button {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  border-radius: 9px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.norte-segmented > button[aria-pressed="true"] {
+  background: var(--surface-2);
+  color: var(--foreground);
+  font-weight: 600;
+}
+.norte-progress-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.norte-progress-ring > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.norte-progress-ring-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.2;
+}
+.norte-progress-ring-label > strong {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+.norte-progress-ring-label > small {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 3px;
+}
+/* Recharts style stays shared even inside portalled exercise/detail dialogs. */
+.recharts-cartesian-axis-tick-value {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  fill: var(--muted-foreground);
+}
+.recharts-cartesian-grid line {
+  stroke: var(--chart-grid);
+  stroke-dasharray: 3 5;
+  stroke-opacity: 0.6;
+}
+.recharts-line-curve {
+  stroke-width: var(--chart-line-width);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+[data-norte-chart="line"] [data-series] {
+  stroke-width: var(--chart-line-width);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+[data-norte-chart="line"] text {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  fill: var(--muted-foreground);
+}
+.norte-chart-tooltip {
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: var(--norte-control-radius);
+  padding: 10px 12px;
+  color: var(--foreground);
+  font-size: 12px;
+  box-shadow: var(--surface-shadow);
+}
+.finance-module .finance-facts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.finance-module .finance-facts p {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+@media (max-width: 360px) {
+  .norte-page {
+    padding-inline: 16px;
+  }
+  .norte-tabs > button {
+    font-size: 12px;
+    padding-inline: 3px;
+  }
+  .finance-module .finance-facts {
+    grid-template-columns: 1fr;
+  }
+  .finance-distribution {
+    flex-direction: column;
+  }
+  .finance-distribution > div:last-child {
+    width: 100%;
+  }
+}

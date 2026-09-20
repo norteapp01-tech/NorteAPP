@@ -28,9 +28,7 @@ export function SavedRoutesSection({ modality }: { modality: SportModality }) {
 
   return (
     <section>
-      <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-        Rotas salvas
-      </h3>
+      <h3 className="norte-section-title mb-3">Rotas salvas</h3>
       {routes.length === 0 ? (
         <p className="text-sm leading-relaxed text-muted-foreground">
           Nenhuma rota salva ainda. Ao concluir uma atividade gravada você pode salvar o percurso
@@ -151,9 +149,7 @@ export function RouteDetailSheet({ route, onClose }: { route: SportRoute; onClos
       ) : (
         <>
           <div className="mt-5 flex items-center justify-between gap-2">
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-              Evolução
-            </h3>
+            <h3 className="norte-section-title mb-3">Evolução</h3>
             <div className="flex gap-1">
               {(["tempo", "ritmo"] as const).map((key) => (
                 <button
@@ -179,9 +175,7 @@ export function RouteDetailSheet({ route, onClose }: { route: SportRoute; onClos
             <TrendChart runs={stats.runs} mode={mode} />
           )}
 
-          <h3 className="mt-5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Execuções
-          </h3>
+          <h3 className="norte-section-title mb-3">Execuções</h3>
           <ul className="mt-2 space-y-1">
             {[...stats.runs].reverse().map((run) => (
               <li
@@ -236,6 +230,7 @@ function TrendChart({ runs, mode }: { runs: RouteRun[]; mode: "tempo" | "ritmo" 
   return (
     <div className="mt-2">
       <svg
+        data-norte-chart="line"
         viewBox={`0 0 ${W} ${H}`}
         className="h-24 w-full"
         role="img"
@@ -247,6 +242,7 @@ function TrendChart({ runs, mode }: { runs: RouteRun[]; mode: "tempo" | "ritmo" 
           .join(", ")}`}
       >
         <polyline
+          data-series="true"
           points={usable.map((_, i) => `${x(i)},${y(vs[i])}`).join(" ")}
           fill="none"
           stroke="var(--color-primary)"

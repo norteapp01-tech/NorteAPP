@@ -42,14 +42,36 @@ export function UnderlineTabs<T extends string>({
   const slotWidth = 100 / Math.max(1, items.length);
 
   return (
-    <div className={cn("relative flex border-b border-border", className)} role="tablist">
-      {items.map((item) => {
+    <div
+      className={cn("norte-tabs relative flex border-b border-border", className)}
+      role="tablist"
+    >
+      {items.map((item, index) => {
         const active = item.key === value;
         return (
           <button
             key={item.key}
             role="tab"
             aria-selected={active}
+            tabIndex={active ? 0 : -1}
+            onKeyDown={(event) => {
+              const next =
+                event.key === "ArrowRight"
+                  ? (index + 1) % items.length
+                  : event.key === "ArrowLeft"
+                    ? (index - 1 + items.length) % items.length
+                    : event.key === "Home"
+                      ? 0
+                      : event.key === "End"
+                        ? items.length - 1
+                        : -1;
+              if (next < 0) return;
+              event.preventDefault();
+              onChange(items[next].key);
+              event.currentTarget.parentElement
+                ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+                [next]?.focus();
+            }}
             onClick={() => onChange(item.key)}
             className={cn(
               "interactive-press relative h-[52px] flex-1 px-2 text-[13px] font-semibold transition-colors",
@@ -87,7 +109,7 @@ export function WeekdaySelector({
   completed?: (day: number) => boolean;
 }) {
   return (
-    <div className="grid grid-cols-7 gap-1.5">
+    <div className="norte-weekdays grid grid-cols-7 gap-1.5">
       {items.map(({ day, label }) => {
         const current = day === currentDay;
         const selected = day === selectedDay;

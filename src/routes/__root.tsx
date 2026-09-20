@@ -262,7 +262,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <div
-        className={`mx-auto min-h-screen max-w-md bg-background ${isFullScreenRoute ? "" : "pb-28"}`}
+        className={`norte-app mx-auto min-h-screen max-w-md bg-background ${isFullScreenRoute ? "" : "pb-28"}`}
       >
         <AuthGate>
           <SportRecorderProvider>

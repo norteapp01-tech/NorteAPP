@@ -112,59 +112,23 @@ function SubAgenda() {
   const { categoria } = Route.useParams();
   const meta = categoryMeta[categoria] ?? categoryMeta.generico;
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const usesCompactHeader = ["academia", "esportes", "alimentacao", "leitura", "fe"].includes(
-    categoria,
-  );
+  const pageClasses: Record<string, string> = {
+    academia: "academia-page",
+    esportes: "esportes-page",
+    alimentacao: "nutrition-page",
+    leitura: "reading-page",
+    fe: "faith-page",
+    financas: "finance-page",
+  };
 
   return (
-    <div
-      className={
-        categoria === "academia"
-          ? "academia-page px-5 pt-6"
-          : categoria === "esportes"
-            ? "esportes-page px-5 pt-6"
-            : categoria === "alimentacao"
-              ? "nutrition-page px-5 pt-6"
-              : categoria === "leitura"
-                ? "reading-page px-5 pt-6"
-                : categoria === "fe"
-                  ? "faith-page px-5 pt-6"
-                  : "px-5 pt-12"
-      }
-    >
-      <div className="relative flex h-11 items-center justify-between">
-        <Link to="/" className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+    <div className={`norte-page ${pageClasses[categoria] ?? ""}`}>
+      <header className="norte-routine-header">
+        <Link to="/" className="gap-1 text-xs text-muted-foreground">
           <ChevronLeft className="h-4 w-4" /> Hoje
         </Link>
-        {usesCompactHeader && (
-          <h1 className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-xl font-bold tracking-[-0.02em]">
-            {meta.label}
-          </h1>
-        )}
+        <h1>{meta.label}</h1>
         <AppMenuButton onClick={() => setSettingsOpen(true)} aria-label="Abrir configurações" />
-      </div>
-      <header className={usesCompactHeader ? "hidden" : "mt-3"}>
-        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-          Sub-agenda · {meta.label}
-        </p>
-        <h1 className="mt-1 flex items-center gap-3 text-3xl font-bold">
-          {categoria === "academia" ? (
-            <Dumbbell className="h-8 w-8 text-primary" strokeWidth={1.8} />
-          ) : categoria === "esportes" ? (
-            <Footprints className="h-8 w-8 text-primary" strokeWidth={1.8} />
-          ) : categoria === "leitura" ? (
-            <BookOpen className="h-8 w-8 text-primary" strokeWidth={1.8} />
-          ) : categoria === "alimentacao" ? (
-            <Salad className="h-8 w-8 text-primary" strokeWidth={1.8} />
-          ) : categoria === "financas" ? (
-            <CircleDollarSign className="h-8 w-8 text-primary" strokeWidth={1.8} />
-          ) : categoria === "fe" ? (
-            <HandHeart className="h-8 w-8 text-primary" strokeWidth={1.8} />
-          ) : (
-            <CategoryIcon category={categoria} className="h-8 w-8 text-primary" />
-          )}
-          {meta.label}
-        </h1>
       </header>
 
       {categoria !== "leitura" &&

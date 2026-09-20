@@ -1,3 +1,4 @@
+import { chartTheme } from "@/components/ui/norte-chart-theme";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { TrendingUp } from "lucide-react";
 
@@ -12,7 +13,7 @@ function TooltipCard({ active, payload }: { active?: boolean; payload?: { payloa
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
   return (
-    <div className="card-surface px-2.5 py-1.5 text-[11px] shadow-lg">
+    <div className="norte-chart-tooltip">
       <p className="font-semibold">{p.maxWeight}kg</p>
       <p className="text-muted-foreground">{shortDate(p.date)}</p>
     </div>
@@ -39,13 +40,13 @@ export function ExerciseEvolutionChart({ series }: { series: Point[] }) {
           <XAxis
             dataKey="date"
             tickFormatter={shortDate}
-            tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+            tick={chartTheme.tick}
             axisLine={{ stroke: "var(--border)" }}
             tickLine={false}
             minTickGap={20}
           />
           <YAxis
-            tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+            tick={chartTheme.tick}
             axisLine={false}
             tickLine={false}
             width={32}
@@ -53,12 +54,12 @@ export function ExerciseEvolutionChart({ series }: { series: Point[] }) {
           />
           <Tooltip content={<TooltipCard />} cursor={{ stroke: "var(--border)" }} />
           <Line
-            type="monotone"
+            type="linear"
             dataKey="maxWeight"
             stroke="var(--primary)"
             strokeWidth={2}
-            dot={{ r: 3, fill: "var(--primary)", strokeWidth: 0 }}
-            activeDot={{ r: 4 }}
+            dot={chartTheme.dot}
+            activeDot={chartTheme.activeDot}
           />
         </LineChart>
       </ResponsiveContainer>

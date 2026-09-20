@@ -311,7 +311,7 @@ export function EvolutionTab({
       </section>
 
       <div>
-        <h2 className="text-[23px] font-bold tracking-tight">
+        <h2 className="norte-view-title">
           {view === "corpo"
             ? `Seu corpo ${preset === "custom" ? "no período" : `em ${PRESETS.find((p) => p.key === preset)?.label}`}`
             : "Seu desempenho"}

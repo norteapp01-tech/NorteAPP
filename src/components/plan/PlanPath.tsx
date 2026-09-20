@@ -60,9 +60,7 @@ export function PlanPath({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-          Caminho do plano
-        </h2>
+        <h2 className="norte-section-title mb-3">Caminho do plano</h2>
         {ordered.length > 0 && (
           <span className="text-[13px] text-muted-foreground">
             {ordered.length} {ordered.length === 1 ? "etapa" : "etapas"}

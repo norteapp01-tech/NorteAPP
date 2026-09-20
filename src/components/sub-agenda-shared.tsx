@@ -9,9 +9,7 @@ export const weekVisualOrder = [1, 2, 3, 4, 5, 6, 0];
 export function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="card-surface p-4">
-      <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-        {title}
-      </h3>
+      <h3 className="norte-section-title">{title}</h3>
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -26,15 +24,14 @@ export function Sparkline({ values }: { values: number[] }) {
     .map((v, i) => `${(i / (values.length - 1 || 1)) * 100},${100 - ((v - min) / range) * 80 - 10}`)
     .join(" ");
   return (
-    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-20 w-full">
-      <defs>
-        <linearGradient id="sl" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.4" />
-          <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <polyline points={`0,100 ${pts} 100,100`} fill="url(#sl)" stroke="none" />
+    <svg
+      data-norte-chart="line"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      className="h-20 w-full"
+    >
       <polyline
+        data-series="true"
         points={pts}
         fill="none"
         stroke="var(--primary)"

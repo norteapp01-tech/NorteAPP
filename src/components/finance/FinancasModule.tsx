@@ -11,8 +11,8 @@ import { UnderlineTabs } from "@/components/ui/app-design-system";
 type Tab = "resumo" | "movimentacoes" | "planejamento" | "objetivos";
 const tabs: { key: Tab; label: string }[] = [
   { key: "resumo", label: "Visão" },
-  { key: "movimentacoes", label: "Movimentações" },
-  { key: "planejamento", label: "Planejamento" },
+  { key: "movimentacoes", label: "Registros" },
+  { key: "planejamento", label: "Planejar" },
   { key: "objetivos", label: "Objetivos" },
 ];
 
@@ -28,21 +28,28 @@ export function FinancasModule() {
   };
 
   return (
-    <div className="relative mt-6">
+    <div className="finance-module relative mt-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1">
           <button
+            aria-label="Mês anterior"
             onClick={() => setMonth((m) => addMonths(m, -1))}
-            className="text-muted-foreground"
+            className="grid h-11 w-11 place-items-center text-muted-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="min-w-24 text-center text-xs font-semibold capitalize">
-            {monthLabel(month)}
+          <span
+            className="whitespace-nowrap text-center text-xs font-semibold"
+            title={monthLabel(month)}
+          >
+            {new Intl.DateTimeFormat("pt-BR", { month: "short", year: "numeric" })
+              .format(new Date(month + "-01T12:00:00"))
+              .replace(" de ", " ")}
           </span>
           <button
+            aria-label="Próximo mês"
             onClick={() => setMonth((m) => addMonths(m, 1))}
-            className="text-muted-foreground"
+            className="grid h-11 w-11 place-items-center text-muted-foreground"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -57,7 +64,7 @@ export function FinancasModule() {
 
       <UnderlineTabs items={tabs} value={tab} onChange={setTab} className="mt-3" />
 
-      <div className="mt-5 pb-24">
+      <div className="mt-5 pb-4">
         {tab === "resumo" && (
           <ResumoTab
             month={month}

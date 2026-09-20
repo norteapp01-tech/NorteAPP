@@ -1,17 +1,17 @@
 .reading-module {
-  --reading-panel: #151a1c;
-  --reading-line: #30383c;
-  --reading-muted: #aab2bc;
+  --reading-panel: var(--surface);
+  --reading-line: var(--border);
+  --reading-muted: var(--muted-foreground);
 }
 :root[data-theme="light"] .reading-module {
-  --reading-panel: #f1f4f3;
-  --reading-line: #d6ddda;
-  --reading-muted: #626b73;
+  --reading-panel: var(--surface);
+  --reading-line: var(--border);
+  --reading-muted: var(--muted-foreground);
 }
 .reading-hero > * {
   background: var(--reading-panel);
   border: 1px solid var(--reading-line);
-  border-radius: 18px;
+  border-radius: var(--norte-card-radius);
   padding: 20px;
 }
 .reading-hero-actions {
@@ -54,7 +54,7 @@
 }
 .reading-section-heading h3 {
   font-size: 18px;
-  font-weight: 650;
+  font-weight: var(--norte-title-weight);
   letter-spacing: -0.02em;
 }
 .reading-section-heading button,
@@ -71,14 +71,14 @@
 }
 .reading-week-days {
   border: 1px solid var(--reading-line);
-  border-radius: 16px;
+  border-radius: var(--norte-card-radius);
   padding: 12px;
   background: var(--reading-panel);
 }
 .reading-week-days button {
   min-height: 66px;
   padding: 10px 2px;
-  border-radius: 14px;
+  border-radius: var(--norte-control-radius);
 }
 .reading-week-days button[data-completed="true"] {
   background: var(--primary);
