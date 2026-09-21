@@ -26,7 +26,7 @@ import { TimerBlock } from "./TimerBlock";
 // dados — não existe estado paralelo pra divergir.
 // ---------------------------------------------------------------------------
 
-const PANEL_MAX_WIDTH = 340;
+const PANEL_MAX_WIDTH = 380;
 const EDGE = 8;
 
 export function QuickSetPanel({
@@ -169,30 +169,30 @@ export function QuickSetPanel({
     <section
       role="dialog"
       aria-label="Controle rápido do treino"
-      className="card-surface pointer-events-auto absolute flex flex-col overflow-hidden shadow-2xl"
+      className="card-surface pointer-events-auto absolute flex flex-col overflow-hidden rounded-[22px] shadow-2xl"
       style={style}
     >
-      <header className="flex items-center gap-1 border-b border-border px-2 py-2">
+      <header className="flex items-center gap-1 border-b border-border px-2 py-2.5">
         <button
           onClick={() => step(-1)}
           disabled={planned.length < 2}
           aria-label="Exercício anterior"
-          className="interactive-press flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground disabled:opacity-30"
+          className="interactive-press flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground disabled:opacity-30"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
         <div className="min-w-0 flex-1 text-center">
-          <p className="truncate text-sm font-bold">{current?.name ?? "Treino"}</p>
-          <p className="text-[10px] text-muted-foreground">
-            {plan ? `${plan.letter} · ` : ""}
-            {planned.length > 0 ? `${index + 1} de ${planned.length}` : "sem exercícios"}
+          <p className="truncate text-sm font-semibold">{current?.name ?? "Treino"}</p>
+          <p className="text-xs text-muted-foreground">
+            {plan ? `Treino ${plan.letter} · ` : ""}
+            {planned.length > 0 ? `exercício ${index + 1} de ${planned.length}` : "sem exercícios"}
           </p>
         </div>
         <button
           onClick={() => step(1)}
           disabled={planned.length < 2}
           aria-label="Próximo exercício"
-          className="interactive-press flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground disabled:opacity-30"
+          className="interactive-press flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground disabled:opacity-30"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -200,13 +200,13 @@ export function QuickSetPanel({
           onClick={onClose}
           aria-label="Minimizar painel"
           title="Minimizar — o treino continua correndo"
-          className="interactive-press flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground"
+          className="interactive-press flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground"
         >
           <X className="h-4 w-4" />
         </button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         {confirmFinish ? (
           <FinishConfirmation
             partial={planned.filter((p) => {
@@ -237,7 +237,7 @@ export function QuickSetPanel({
                 <button
                   onClick={() => setShowDone((v) => !v)}
                   aria-expanded={showDone}
-                  className="interactive-press flex w-full items-center justify-center gap-1 rounded-lg py-1 text-[11px] text-muted-foreground"
+                  className="interactive-press flex min-h-9 w-full items-center justify-center gap-1 rounded-lg py-1 text-xs text-muted-foreground"
                 >
                   <ChevronUp
                     className={`h-3.5 w-3.5 transition-transform ${showDone ? "" : "rotate-180"}`}
@@ -249,7 +249,7 @@ export function QuickSetPanel({
                     {doneSets.map((s) => (
                       <li
                         key={`${s.setIndex}-${s.weight}-${s.reps}`}
-                        className="flex items-center gap-1.5 rounded-lg border border-success/30 bg-success/5 px-2 py-1"
+                        className="flex items-center gap-1.5 border-b border-border px-2 py-2 last:border-b-0"
                       >
                         <span className="w-10 shrink-0 text-[10px] text-muted-foreground">
                           Série {s.setIndex + 1}
@@ -314,13 +314,13 @@ export function QuickSetPanel({
             ) : (
               current && (
                 <>
-                  <p className="text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <p className="text-center text-sm font-semibold text-foreground">
                     Série {setIndex + 1} de {Math.max(current.setsTarget, setIndex + 1)}
                   </p>
-                  <div className="mt-2 flex items-end justify-center gap-2">
+                  <div className="mt-4 flex items-end justify-center gap-2">
                     <label className="flex-1">
-                      <span className="mb-1 block text-center text-[10px] text-muted-foreground">
-                        peso (kg)
+                      <span className="mb-1.5 block text-center text-xs text-muted-foreground">
+                        Peso (kg)
                       </span>
                       <input
                         type="number"
@@ -329,12 +329,12 @@ export function QuickSetPanel({
                         onChange={(e) =>
                           setDraft({ key: draftKey, weight: e.target.value, reps: values.reps })
                         }
-                        className="w-full rounded-xl border border-border bg-surface px-2 py-2.5 text-center font-mono text-lg font-bold tabular-nums outline-none focus:border-primary"
+                        className="w-full min-w-0 rounded-2xl border border-border bg-surface-quiet px-2 py-3 text-center font-mono text-xl font-bold tabular-nums outline-none focus:border-primary"
                       />
                     </label>
                     <label className="flex-1">
-                      <span className="mb-1 block text-center text-[10px] text-muted-foreground">
-                        reps
+                      <span className="mb-1.5 block text-center text-xs text-muted-foreground">
+                        Repetições
                       </span>
                       <input
                         type="number"
@@ -343,14 +343,14 @@ export function QuickSetPanel({
                         onChange={(e) =>
                           setDraft({ key: draftKey, weight: values.weight, reps: e.target.value })
                         }
-                        className="w-full rounded-xl border border-border bg-surface px-2 py-2.5 text-center font-mono text-lg font-bold tabular-nums outline-none focus:border-primary"
+                        className="w-full min-w-0 rounded-2xl border border-border bg-surface-quiet px-2 py-3 text-center font-mono text-xl font-bold tabular-nums outline-none focus:border-primary"
                       />
                     </label>
                     <button
                       onClick={confirmSet}
                       disabled={setAction.pending}
                       aria-label={`Registrar série ${setIndex + 1}`}
-                      className="interactive-press flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-40"
+                      className="interactive-press flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground disabled:opacity-40"
                     >
                       <Check className="h-6 w-6" strokeWidth={3} />
                     </button>
@@ -386,19 +386,19 @@ export function QuickSetPanel({
       </div>
 
       {!confirmFinish && (
-        <footer className="flex items-center gap-1 border-t border-border px-2 py-1.5">
+        <footer className="flex items-center gap-2 border-t border-border px-4 py-3">
           <button
             onClick={() => {
               onClose();
               void navigate({ to: "/sub-agenda/$categoria", params: { categoria: "academia" } });
             }}
-            className="interactive-press flex-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-muted-foreground"
+            className="interactive-press min-h-11 flex-1 rounded-xl px-2 py-2 text-xs font-semibold text-muted-foreground"
           >
             Abrir treino
           </button>
           <button
             onClick={() => setConfirmFinish(true)}
-            className="interactive-press flex-1 rounded-lg bg-primary px-2 py-1.5 text-[11px] font-bold text-primary-foreground"
+            className="interactive-press min-h-11 flex-1 rounded-xl border border-border px-2 py-2 text-xs font-semibold text-foreground"
           >
             Finalizar treino
           </button>

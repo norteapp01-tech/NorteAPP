@@ -321,6 +321,13 @@ function AcademiaModule() {
   const liveIsToday = liveSession?.date === todayISO();
   const livePlan = plans.find((p) => p.id === liveSession?.planId);
   const livePlanned = liveSession ? sessionPlanned(liveSession, exercises) : [];
+  const liveCompletedCount = livePlanned.filter(
+    (p) =>
+      exerciseCompletionState(
+        liveSession?.exerciseLogs.find((l) => l.exerciseId === p.exerciseId),
+        p,
+      ) === "concluido",
+  ).length;
   const todayExercises = todayPlan ? exercisesForPlan(exercises, todayPlan.id) : [];
   const openExercise = exercises.find((e) => e.id === openExerciseId);
   const openPlanned = livePlanned.find((p) => p.exerciseId === openExerciseId);
@@ -372,11 +379,12 @@ function AcademiaModule() {
   return (
     <div className="mt-6 space-y-5">
       {tabs}
-      <Card title="Plano da semana">
-        <div className="-mt-1 mb-3 flex justify-end">
+      <section className="academia-week-card card-surface p-4">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="norte-section-title">Plano da semana</h2>
           <button
             onClick={() => setShowRoutineConfig(true)}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary"
+            className="interactive-press flex min-h-11 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
           >
             <CalendarClock className="h-4 w-4" /> Horários
           </button>
@@ -402,165 +410,201 @@ function AcademiaModule() {
           }}
         />
         {currentBlockDays && programming.block && (
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Semana definida pela etapa{" "}
-            <span className="font-semibold text-foreground">{programming.block.name}</span> — toque
-            para editar no ciclo.
-          </p>
+          <button
+            onClick={() => setActiveTab("ciclo")}
+            className="interactive-press mt-4 flex min-h-11 w-full items-center justify-between gap-2 border-t border-border pt-3 text-left text-xs text-muted-foreground"
+          >
+            <span>
+              Etapa atual ·{" "}
+              <strong className="font-semibold text-foreground">{programming.block.name}</strong>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0" />
+          </button>
         )}
-      </Card>
+      </section>
 
-      <Card
-        featured={Boolean(todayPlan || liveSession)}
-        quiet={!todayPlan && !liveSession}
-        title={
-          liveSession && livePlan
-            ? `Treino em andamento — ${livePlan.letter} · ${livePlan.name}`
-            : todayPlan
-              ? `Treino de hoje — ${todayPlan.letter} · ${todayPlan.name}`
-              : "Treino de hoje"
-        }
-      >
-        <ProgrammingSource programming={programming} />
-
-        {!todayPlan && !liveSession && (
-          <p className="text-sm text-muted-foreground">
-            {programming.source === "descanso"
-              ? "Descanso programado pelo ciclo."
-              : "Hoje é dia de descanso."}
-          </p>
-        )}
-
-        {/* Treino em andamento — pode ser o de hoje ou um aberto em outro dia
-            e nunca finalizado, que antes sumia da tela sem jeito de retomar. */}
-        {liveSession && (
+      <section className="academia-workout-card card-surface p-4">
+        {liveSession ? (
           <>
-            {!liveIsToday && (
-              <p className="mb-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-[11px] text-warning">
-                Treino {livePlan ? `${livePlan.letter} ` : ""}de {formatDateBR(liveSession.date)}{" "}
-                ainda está aberto. Retome pra continuar ou finalize pra fechar o registro.
-              </p>
-            )}
-            <p className="text-xs font-semibold text-primary">
-              {
-                livePlanned.filter(
-                  (p) =>
-                    exerciseCompletionState(
-                      liveSession.exerciseLogs.find((l) => l.exerciseId === p.exerciseId),
-                      p,
-                    ) === "concluido",
-                ).length
-              }{" "}
-              de {livePlanned.length} exercícios concluídos ·{" "}
-              {formatDurationClock(sessionElapsedSeconds(liveSession))}
-              {liveSession.pausedAt ? " (pausado)" : ""}
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
+              Em andamento · {formatDurationClock(sessionElapsedSeconds(liveSession))}
+              {liveSession.pausedAt ? " · pausado" : ""}
             </p>
-            <ul className="mt-2.5 space-y-2">
-              {livePlanned.map((p) => {
-                const log = liveSession.exerciseLogs.find((l) => l.exerciseId === p.exerciseId);
-                const state = exerciseCompletionState(log, p);
-                return (
-                  <li key={p.exerciseId}>
-                    <button
-                      onClick={() => {
-                        gym.select(p.exerciseId);
-                        setOpenExerciseId(p.exerciseId);
-                      }}
-                      className={`flex w-full items-center justify-between gap-2 rounded-lg border p-3 text-left transition-colors ${
-                        state === "concluido"
-                          ? "border-success/40 bg-success/10"
-                          : state === "parcial"
-                            ? "border-warning/40 bg-warning/5 hover:border-primary/40"
-                            : "border-border bg-surface-2 hover:border-primary/40"
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{p.name}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {log?.sets.length ?? 0}/{p.setsTarget} séries · meta {p.loadTarget}kg
-                        </p>
-                      </div>
-                      {state === "concluido" ? (
-                        <Check className="check-enter h-4 w-4 shrink-0 text-success" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-            <button
-              onClick={() => gym.setPanelOpen(true)}
-              className="interactive-press mt-3 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
-            >
-              Abrir controle do treino
-            </button>
+            <h2 className="mt-2 text-xl font-bold leading-tight">
+              {livePlan ? `${livePlan.letter} · ${livePlan.name}` : "Treino em andamento"}
+            </h2>
           </>
+        ) : (
+          <h2 className="norte-section-title">
+            {todayPlan ? `${todayPlan.letter} · ${todayPlan.name}` : "Treino de hoje"}
+          </h2>
         )}
+        <div className="mt-3">
+          <ProgrammingSource programming={programming} />
 
-        {/* Sem treino em andamento: a sessão só nasce por um toque explícito em
+          {!todayPlan && !liveSession && (
+            <p className="text-sm text-muted-foreground">
+              {programming.source === "descanso"
+                ? "Descanso programado pelo ciclo."
+                : "Hoje é dia de descanso."}
+            </p>
+          )}
+
+          {/* Treino em andamento — pode ser o de hoje ou um aberto em outro dia
+            e nunca finalizado, que antes sumia da tela sem jeito de retomar. */}
+          {liveSession && (
+            <>
+              {!liveIsToday && (
+                <p className="mb-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-[11px] text-warning">
+                  Treino {livePlan ? `${livePlan.letter} ` : ""}de {formatDateBR(liveSession.date)}{" "}
+                  ainda está aberto. Retome pra continuar ou finalize pra fechar o registro.
+                </p>
+              )}
+              <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                <span>
+                  {liveCompletedCount} de {livePlanned.length} exercícios concluídos
+                </span>
+                {livePlanned.length > 0 && (
+                  <span>{Math.round((liveCompletedCount / livePlanned.length) * 100)}%</span>
+                )}
+              </div>
+              <div
+                role="progressbar"
+                aria-label="Progresso do treino"
+                aria-valuenow={liveCompletedCount}
+                aria-valuemin={0}
+                aria-valuemax={livePlanned.length}
+                className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2"
+              >
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{
+                    width: `${livePlanned.length ? (liveCompletedCount / livePlanned.length) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+              <button
+                onClick={() => gym.setPanelOpen(true)}
+                className="interactive-press mt-4 min-h-12 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
+              >
+                Abrir controle do treino
+              </button>
+              <ul className="academia-exercise-list mt-4 divide-y divide-border border-t border-border">
+                {livePlanned.map((p, exerciseIndex) => {
+                  const log = liveSession.exerciseLogs.find((l) => l.exerciseId === p.exerciseId);
+                  const state = exerciseCompletionState(log, p);
+                  const next =
+                    state !== "concluido" &&
+                    livePlanned.slice(0, exerciseIndex).every(
+                      (prior) =>
+                        exerciseCompletionState(
+                          liveSession.exerciseLogs.find((l) => l.exerciseId === prior.exerciseId),
+                          prior,
+                        ) === "concluido",
+                    );
+                  return (
+                    <li key={p.exerciseId}>
+                      <button
+                        onClick={() => {
+                          gym.select(p.exerciseId);
+                          setOpenExerciseId(p.exerciseId);
+                        }}
+                        className="interactive-press flex min-h-16 w-full items-center gap-3 py-3 text-left hover:text-primary"
+                      >
+                        <span
+                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs ${state === "concluido" ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground"}`}
+                        >
+                          {state === "concluido" ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            exerciseIndex + 1
+                          )}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">{p.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {log?.sets.length ?? 0}/{p.setsTarget} séries · meta {p.loadTarget} kg
+                          </p>
+                        </div>
+                        {next && (
+                          <span className="shrink-0 rounded-full bg-surface-2 px-2 py-1 text-[10px] text-muted-foreground">
+                            Próximo
+                          </span>
+                        )}
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+
+          {/* Sem treino em andamento: a sessão só nasce por um toque explícito em
             "Iniciar treino". Tocar num exercício aqui só mostra o que está
             planejado — não começa nada por acidente. */}
-        {!liveSession && todayPlan && todayDoneSession?.status !== "concluido" && (
-          <>
-            <p className="text-xs text-muted-foreground">{todayExercises.length} exercícios</p>
-            <ul className="mt-2.5 space-y-2">
-              {todayExercises.map((ex) => (
-                <li
-                  key={ex.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface-2 p-3"
+          {!liveSession && todayPlan && todayDoneSession?.status !== "concluido" && (
+            <>
+              <p className="text-xs text-muted-foreground">{todayExercises.length} exercícios</p>
+              <ul className="mt-4 divide-y divide-border border-t border-border">
+                {todayExercises.map((ex, exerciseIndex) => (
+                  <li key={ex.id} className="flex min-h-16 items-center gap-3 py-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-xs text-muted-foreground">
+                      {exerciseIndex + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">{ex.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {ex.setsTarget}x{ex.repsTarget} · {ex.loadTarget} kg
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {todayExercises.length === 0 ? (
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Esse treino ainda não tem exercícios — adicione em "Treinos cadastrados".
+                </p>
+              ) : (
+                <button
+                  onClick={() =>
+                    startAction.run(async () => {
+                      await startSession(todayPlan.id);
+                      gym.setPanelOpen(true);
+                    })
+                  }
+                  disabled={startAction.pending}
+                  className="interactive-press mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{ex.name}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {ex.setsTarget}x{ex.repsTarget} · {ex.loadTarget}kg
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            {todayExercises.length === 0 ? (
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                Esse treino ainda não tem exercícios — adicione em "Treinos cadastrados".
-              </p>
-            ) : (
-              <button
-                onClick={() =>
-                  startAction.run(async () => {
-                    await startSession(todayPlan.id);
-                    gym.setPanelOpen(true);
-                  })
-                }
-                disabled={startAction.pending}
-                className="interactive-press mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
-              >
-                <Play className="h-4 w-4" />
-                {startAction.pending ? "Iniciando…" : "Iniciar treino"}
-              </button>
-            )}
-            {startAction.error && (
-              <InlineError
-                message={startAction.error}
-                onRetry={startAction.clearError}
-                className="mt-2"
-              />
-            )}
-          </>
-        )}
+                  <Play className="h-4 w-4" />
+                  {startAction.pending ? "Iniciando…" : "Iniciar treino"}
+                </button>
+              )}
+              {startAction.error && (
+                <InlineError
+                  message={startAction.error}
+                  onRetry={startAction.clearError}
+                  className="mt-2"
+                />
+              )}
+            </>
+          )}
 
-        {!liveSession && todayDoneSession?.status === "concluido" && (
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Check className="check-enter h-4 w-4 shrink-0 text-success" /> Treino concluído hoje —{" "}
-            <button
-              onClick={() => setSummarySessionId(todayDoneSession.id)}
-              className="-my-2 rounded px-1 py-2 font-medium text-primary decoration-2 underline decoration-dotted underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success"
-            >
-              ver resumo
-            </button>
-          </div>
-        )}
-      </Card>
+          {!liveSession && todayDoneSession?.status === "concluido" && (
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Check className="check-enter h-4 w-4 shrink-0 text-success" /> Treino concluído hoje
+              —{" "}
+              <button
+                onClick={() => setSummarySessionId(todayDoneSession.id)}
+                className="-my-2 rounded px-1 py-2 font-medium text-primary decoration-2 underline decoration-dotted underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success"
+              >
+                ver resumo
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
 
       <PlanManagerCard />
 
