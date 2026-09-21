@@ -69,11 +69,14 @@
   border-top: 1px solid var(--reading-line);
   padding-top: 20px;
 }
+/* Fica discreto de propósito: o card do livro em andamento (.reading-hero),
+ * logo acima, já é o destaque da tela — repetir o mesmo tom aqui era a
+ * mesma mancha se repetindo dobrada. */
 .reading-week-days {
-  border: 1px solid var(--reading-line);
+  border: 1px solid var(--color-border-quiet);
   border-radius: var(--norte-card-radius);
   padding: 12px;
-  background: var(--reading-panel);
+  background: var(--color-surface-quiet);
 }
 .reading-week-days button {
   min-height: 66px;

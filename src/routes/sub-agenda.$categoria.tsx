@@ -411,6 +411,7 @@ function AcademiaModule() {
       </Card>
 
       <Card
+        quiet
         title={
           liveSession && livePlan
             ? `Treino em andamento — ${livePlan.letter} · ${livePlan.name}`
@@ -579,7 +580,7 @@ function AcademiaModule() {
         </button>
       </details>
 
-      <Card title="Peso corporal">
+      <Card quiet title="Peso corporal">
         <div className="flex items-end justify-between">
           <div>
             <p className="font-mono text-3xl font-bold">
@@ -1267,7 +1268,7 @@ function GenericoModule({ categoria }: { categoria: string }) {
 
   return (
     <div className="mt-6 space-y-5">
-      <Card title="Próxima sessão">
+      <Card quiet title="Próxima sessão">
         {next ? (
           <>
             <p className="text-xs text-muted-foreground">{next.agendaDate ? "Quando" : "Prazo"}</p>
@@ -1293,7 +1294,7 @@ function GenericoModule({ categoria }: { categoria: string }) {
           <p className="text-sm text-muted-foreground">Nada planejado nessa categoria ainda.</p>
         )}
       </Card>
-      <Card title="Anotações livres">
+      <Card quiet title="Anotações livres">
         <textarea
           placeholder="Escreva qualquer coisa que importe pra essa categoria..."
           className="min-h-32 w-full resize-none rounded-lg border border-border bg-surface-2 p-3 text-sm outline-none focus:border-primary"

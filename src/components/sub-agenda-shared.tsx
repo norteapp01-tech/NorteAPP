@@ -6,9 +6,20 @@ export const weekdayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 export const weekVisualLabels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 export const weekVisualOrder = [1, 2, 3, 4, 5, 6, 0];
 
-export function Card({ title, children }: { title: string; children: ReactNode }) {
+export function Card({
+  title,
+  children,
+  quiet = false,
+}: {
+  title: string;
+  children: ReactNode;
+  /** Card de apoio na mesma tela de um card principal — mesmo formato, tom
+   * quase imperceptível sobre o preto, pra não repetir o mesmo destaque em
+   * toda seção da tela. */
+  quiet?: boolean;
+}) {
   return (
-    <section className="card-surface p-4">
+    <section className={`${quiet ? "card-surface-quiet" : "card-surface"} p-4`}>
       <h3 className="norte-section-title">{title}</h3>
       <div className="mt-3">{children}</div>
     </section>

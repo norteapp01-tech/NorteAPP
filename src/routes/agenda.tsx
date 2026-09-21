@@ -176,7 +176,10 @@ function AgendaScreen() {
         timeFormat={profile.timeFormat}
       />
 
-      <div className="card-surface mt-5 overflow-hidden">
+      {/* Fica discreto de propósito: o DayView acima já é o card principal
+          da tela, e repetir o mesmo tom aqui era a mesma mancha verde-cinza
+          se repetindo logo abaixo. */}
+      <div className="card-surface-quiet mt-5 overflow-hidden">
         <button
           onClick={() => setDetailsOpen((open) => !open)}
           className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left"

@@ -334,7 +334,7 @@ function NextActivityCard({
 
   if (!next) {
     return (
-      <div className="sp-card sp-week-card flex flex-col justify-between gap-2 p-3.5">
+      <div className="sp-card sp-card--quiet sp-week-card flex flex-col justify-between gap-2 p-3.5">
         <p className="text-[10px] font-semibold tracking-wide" style={{ color: "var(--sp-muted)" }}>
           {nextLabel[modality]}
         </p>
@@ -367,7 +367,7 @@ function NextActivityCard({
   const target = plannedTargetLabel(next.execution);
 
   return (
-    <div className="sp-card sp-week-card flex flex-col justify-between gap-1.5 p-3.5">
+    <div className="sp-card sp-card--quiet sp-week-card flex flex-col justify-between gap-1.5 p-3.5">
       <p className="text-[10px] font-semibold tracking-wide" style={{ color: "var(--sp-muted)" }}>
         {nextLabel[modality]}
       </p>

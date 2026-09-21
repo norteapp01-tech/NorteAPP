@@ -53,6 +53,7 @@ export function OverloadList({
 
   return (
     <ModuleCard
+      quiet
       title="Por exercício"
       action={
         <select

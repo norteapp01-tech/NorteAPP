@@ -35,6 +35,8 @@
   --color-danger: var(--danger);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-surface-quiet: var(--surface-quiet);
+  --color-border-quiet: var(--border-quiet);
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -54,6 +56,13 @@
   --foreground: oklch(0.98 0 0);
   --surface: #151a1c;
   --surface-2: #242a2d;
+  /* Segundo tom de card, mais próximo do fundo preto — para o módulo que não
+   * precisa disputar atenção com o card principal da tela ficar quase
+   * imperceptível em vez de repetir a mesma mancha cinza-esverdeada em toda
+   * seção. Metade da luminância de --surface, mas não preto puro: ainda
+   * precisa se ler como um card, não como um buraco na página. */
+  --surface-quiet: #0b0e0f;
+  --border-quiet: #1f2427;
   --card: #151a1c;
   --card-foreground: oklch(0.98 0 0);
   --popover: #151a1c;
@@ -87,6 +96,10 @@
   --foreground: #101412;
   --surface: #f8faf9ef;
   --surface-2: #eaf0ed;
+  /* No claro o fundo já é quase branco — o card "quiet" some nele de vez,
+   * ficando só a borda muito discreta pra ainda se ler como um card. */
+  --surface-quiet: #f8faf9;
+  --border-quiet: #edf2ef;
   --card: #f8faf9ef;
   --card-foreground: #101412;
   --popover: #f8faf9fa;
@@ -154,6 +167,18 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   box-shadow: inset 0 1px 0 #ffffff05;
+}
+
+/* Mesmo card, um tom mais discreto. Usado no módulo que não precisa chamar
+ * tanta atenção quanto o card principal da mesma tela — nunca no único card
+ * de uma tela, onde não haveria nada pra ele recuar em relação a. */
+@utility card-surface-quiet {
+  background-color: var(--color-surface-quiet);
+  border: 1px solid var(--color-border-quiet);
+  border-radius: var(--norte-card-radius);
+  background-image: var(--surface-sheen);
+  box-shadow: var(--surface-shadow);
+  backdrop-filter: blur(var(--glass-blur));
 }
 
 /* Shared material for cards authored with utility classes, including dialogs. */
@@ -298,7 +323,9 @@
   }
 
   button.card-surface,
-  a.card-surface {
+  a.card-surface,
+  button.card-surface-quiet,
+  a.card-surface-quiet {
     transition:
       transform var(--dur-press) var(--ease-out),
       opacity var(--dur-press) var(--ease-out),
@@ -308,7 +335,9 @@
   /* `:not(:disabled)` igual ao `.interactive-press` — um card-botão
    * desabilitado não deve reagir como se estivesse disponível. */
   button.card-surface:active:not(:disabled),
-  a.card-surface:active {
+  a.card-surface:active,
+  button.card-surface-quiet:active:not(:disabled),
+  a.card-surface-quiet:active {
     transform: scale(0.99);
   }
 

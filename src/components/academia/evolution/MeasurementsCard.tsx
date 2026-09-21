@@ -58,6 +58,7 @@ export function MeasurementsCard({
 
   return (
     <ModuleCard
+      quiet
       title="Medidas corporais"
       action={
         series.length > 1 ? (

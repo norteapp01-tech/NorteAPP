@@ -6,13 +6,18 @@ export function ModuleCard({
   title,
   action,
   children,
+  quiet = false,
 }: {
   title: string;
   action?: ReactNode;
   children: ReactNode;
+  /** Card de apoio, ao lado de outro que já carrega o destaque da tela
+   * (o mapa corporal, o gráfico de força) — mesmo formato, tom quase
+   * imperceptível sobre o preto. */
+  quiet?: boolean;
 }) {
   return (
-    <section className="evo-card card-surface p-4">
+    <section className={`evo-card ${quiet ? "card-surface-quiet" : "card-surface"} p-4`}>
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="evo-title text-[13px] font-bold">{title}</h2>
         {action}

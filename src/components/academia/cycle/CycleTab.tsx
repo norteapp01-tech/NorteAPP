@@ -173,7 +173,7 @@ export function CycleTab() {
       )}
 
       {drafts.length > 0 && (
-        <Card title="Rascunhos">
+        <Card quiet title="Rascunhos">
           <ul className="space-y-2">
             {drafts.map((cycle) => (
               <li key={cycle.id}>

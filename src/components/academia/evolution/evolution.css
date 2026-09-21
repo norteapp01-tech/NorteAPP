@@ -27,9 +27,9 @@
   border-color: var(--evo-accent);
   background: linear-gradient(110deg, #00df9820, #00df9808);
 }
+/* Cor e borda vêm de .card-surface / .card-surface-quiet, aplicada junto no
+ * mesmo elemento — .evo-card cuida só do espaçamento próprio da Evolução. */
 .evolution-dashboard .evo-card {
-  background: var(--surface);
-  border: 1px solid var(--evo-line);
   border-radius: var(--norte-card-radius);
   padding: 14px;
 }
@@ -161,7 +161,6 @@
   border-color: var(--evo-line);
 }
 .evolution-dashboard .evo-card {
-  background: var(--evo-panel);
   border-radius: var(--norte-card-radius);
   padding: 18px;
 }
@@ -369,10 +368,6 @@
   --evo-accent: var(--primary);
   --evo-panel: var(--surface);
   --evo-line: var(--border);
-}
-.light .evolution-dashboard .evo-card,
-[data-theme="light"] .evolution-dashboard .evo-card {
-  background: var(--surface);
 }
 .light .evolution-dashboard .evo-kpi small,
 .light .evolution-dashboard .evo-kpi span {

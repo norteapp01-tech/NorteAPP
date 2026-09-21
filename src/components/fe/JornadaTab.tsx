@@ -61,7 +61,7 @@ export function JornadaTab({ onOpenLogReading }: { onOpenLogReading: () => void 
         </button>
       </Card>
 
-      <Card title="Meu ritmo de leitura">
+      <Card quiet title="Meu ritmo de leitura">
         <p className="text-xs text-muted-foreground">Quero separar um momento para a Palavra</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {frequencyOptions.map((o) => (
@@ -76,7 +76,7 @@ export function JornadaTab({ onOpenLogReading }: { onOpenLogReading: () => void 
         </div>
       </Card>
 
-      <Card title="Versículos que quero carregar comigo">
+      <Card quiet title="Versículos que quero carregar comigo">
         {verses.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nenhum versículo guardado ainda.</p>
         ) : (
@@ -111,7 +111,7 @@ export function JornadaTab({ onOpenLogReading }: { onOpenLogReading: () => void 
         )}
       </Card>
 
-      <Card title="Histórico de leitura">
+      <Card quiet title="Histórico de leitura">
         {history.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nada registrado ainda.</p>
         ) : (

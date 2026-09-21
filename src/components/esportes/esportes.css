@@ -35,6 +35,13 @@
   border-radius: var(--norte-card-radius);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025);
 }
+/* Card de apoio ao lado de outro que já carrega o destaque da seção (ex.:
+ * "Próxima corrida" ao lado de "Consistência") — mesmo formato, tom quase
+ * imperceptível sobre o preto. */
+.esportes-overview .sp-card--quiet {
+  background: var(--color-surface-quiet);
+  border-color: var(--color-border-quiet);
+}
 
 .esportes-overview .sp-section-title {
   font-size: var(--norte-section-size);

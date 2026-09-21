@@ -35,7 +35,7 @@ export function AttentionCard({
   reviewLabel?: string;
 }) {
   return (
-    <ModuleCard title="Pontos de atenção">
+    <ModuleCard quiet title="Pontos de atenção">
       {points.length === 0 ? (
         <EmptyNote>
           Sem observações verificáveis neste período. Isso não significa que algo esteja errado —
