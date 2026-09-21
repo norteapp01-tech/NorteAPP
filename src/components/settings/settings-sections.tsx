@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTheme, setTheme } from "@/lib/theme";
 import { ProfileEditor } from "@/components/settings/ProfileEditor";
 import { SubscriptionSection } from "@/components/settings/SubscriptionSection";
@@ -19,6 +19,13 @@ import {
   changeEmail,
   changePassword,
 } from "@/lib/supabase/client";
+import { hasPushSubscription } from "@/lib/reminders-store";
+import {
+  isPushSupported,
+  pushPermission,
+  registerPush,
+  unregisterPush,
+} from "@/lib/push-notifications";
 
 function SectionHeader({ icon: Icon, title }: { icon: typeof User; title: string }) {
   return (
@@ -436,15 +443,82 @@ const notifRows: {
   { key: "notifyReminders", label: "Lembretes importantes" },
 ];
 
+function PushToggle() {
+  const [subscribed, setSubscribed] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const supported = isPushSupported();
+  const permission = pushPermission();
+
+  useEffect(() => {
+    if (!supported) return;
+    hasPushSubscription()
+      .then(setSubscribed)
+      .catch(() => setSubscribed(false));
+  }, [supported]);
+
+  if (!supported) {
+    return (
+      <p className="p-3.5 text-xs text-muted-foreground">
+        Este navegador não suporta notificações push.
+      </p>
+    );
+  }
+
+  const toggle = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      if (subscribed) {
+        await unregisterPush();
+        setSubscribed(false);
+      } else {
+        const result = await registerPush();
+        if (!result.ok) {
+          setError(result.reason ?? "Não foi possível ativar.");
+          return;
+        }
+        setSubscribed(true);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-between p-3.5">
+      <span>
+        <span className="block text-sm">Notificações push</span>
+        <span className="block text-xs text-muted-foreground">
+          {permission === "denied"
+            ? "Bloqueadas nas permissões do navegador"
+            : "Avisos de lembretes com hora marcada"}
+        </span>
+        {error && <span className="block text-xs text-danger">{error}</span>}
+      </span>
+      <button
+        disabled={busy || permission === "denied" || subscribed === null}
+        onClick={toggle}
+        className={`h-6 w-10 shrink-0 rounded-full transition-colors disabled:opacity-40 ${subscribed ? "bg-primary" : "bg-surface-2"}`}
+      >
+        <span
+          className={`block h-5 w-5 rounded-full bg-background transition-transform ${subscribed ? "translate-x-[18px]" : "translate-x-0.5"}`}
+        />
+      </button>
+    </div>
+  );
+}
+
 function NotificationsSection() {
   const profile = useProfile();
 
   return (
     <section>
       <SectionHeader icon={Bell} title="Notificações" />
-      <p className="mt-1 text-[11px] text-muted-foreground">
-        Push ainda não está implementado — estas preferências já ficam salvas pra quando estiver.
-      </p>
+      <div className="mt-2 card-surface divide-y divide-border">
+        <PushToggle />
+      </div>
+      <p className="mt-3 text-[11px] text-muted-foreground">Por tipo de aviso:</p>
       <div className="mt-2 card-surface divide-y divide-border">
         {notifRows.map((r) => (
           <div key={r.key} className="flex items-center justify-between p-3.5">

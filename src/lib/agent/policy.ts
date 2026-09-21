@@ -67,7 +67,20 @@ const schemas: Record<string, z.ZodType<Record<string, unknown>>> = {
   consultar_financas: z.object({}),
   consultar_dia: z.object({}),
   consultar_agenda: z.object({}),
-  criar_lembrete: z.object({ text: z.string().trim().min(1).max(240), date: isoDate }),
+  criar_lembrete: z.object({
+    text: z.string().trim().min(1).max(240),
+    date: isoDate,
+    time: hhmm.optional(),
+    relatedExecutionId: z.string().uuid().optional(),
+    offsetMinutesBefore: z.number().int().min(0).max(10_080).optional(),
+  }),
+  gerenciar_lembrete: z.object({
+    reminderId: z.string().uuid(),
+    action: z.enum(["concluir", "remover", "editar"]),
+    text: z.string().trim().min(1).max(240).optional(),
+    date: isoDate.optional(),
+    time: hhmm.optional(),
+  }),
   criar_execucao: z.object({
     title: z.string().trim().min(1).max(240),
     dueDate: isoDate,

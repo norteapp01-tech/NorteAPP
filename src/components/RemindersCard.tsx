@@ -378,7 +378,11 @@ function ReminderRow({ reminder: r }: { reminder: Reminder }) {
         <p className={`truncate text-sm ${r.done ? "text-muted-foreground line-through" : ""}`}>
           {r.text}
         </p>
-        <p className="text-[10px] text-muted-foreground">{formatRelativeDate(r.date)}</p>
+        <p className="text-[10px] text-muted-foreground">
+          {formatRelativeDate(r.date)}
+          {r.remindAt &&
+            ` · ${new Date(r.remindAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`}
+        </p>
       </div>
       {!r.done && (
         <button

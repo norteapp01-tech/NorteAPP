@@ -38,6 +38,10 @@ import {
 import {
   fetchState as fetchRemindersState,
   createReminder,
+  updateReminder,
+  toggleReminder,
+  removeReminder,
+  hasPushSubscription,
   todayReminders,
   overdueReminders,
 } from "../reminders-store";
@@ -196,14 +200,47 @@ export const AGENT_TOOLS = [
     type: "function" as const,
     function: {
       name: "criar_lembrete",
-      description: "Cria um lembrete pontual pra uma data. Ação reversível, execute direto.",
+      description:
+        "Cria um lembrete pontual pra uma data, com hora opcional. Ação reversível, execute direto. Pra 'me lembra 1h antes do dentista', primeiro consulte a agenda pra achar o executionId do compromisso, então informe relatedExecutionId e offsetMinutesBefore (não invente time nesse caso — deixe o app calcular a partir do horário real do compromisso).",
       parameters: {
         type: "object",
         properties: {
           text: { type: "string" },
           date: { type: "string", description: "Data no formato YYYY-MM-DD" },
+          time: {
+            type: "string",
+            description: "HH:MM, só se a pessoa deu um horário explícito (sem ser 'antes de X')",
+          },
+          relatedExecutionId: {
+            type: "string",
+            description:
+              "id do compromisso, de consultar_agenda/consultar_dia, se o pedido for relativo a ele",
+          },
+          offsetMinutesBefore: {
+            type: "number",
+            description: "minutos antes do horário do compromisso referenciado; 0 = na hora exata",
+          },
         },
         required: ["text", "date"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "gerenciar_lembrete",
+      description:
+        "Conclui, remove ou edita um lembrete já existente, pelo id retornado por consultar_dia.",
+      parameters: {
+        type: "object",
+        properties: {
+          reminderId: { type: "string" },
+          action: { type: "string", enum: ["concluir", "remover", "editar"] },
+          text: { type: "string", description: "Só para action=editar" },
+          date: { type: "string", description: "YYYY-MM-DD, só para action=editar" },
+          time: { type: "string", description: "HH:MM, só para action=editar" },
+        },
+        required: ["reminderId", "action"],
       },
     },
   },
@@ -559,7 +596,16 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
         ...todayReminders(remindersState, today),
       ];
       const remText = rem.length
-        ? rem.map((r) => `${r.text} (${r.date})`).join("; ")
+        ? rem
+            .map(
+              (r) =>
+                `[${r.id}] ${r.text} (${r.date}${
+                  r.remindAt
+                    ? ` às ${new Date(r.remindAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+                    : ""
+                })`,
+            )
+            .join("; ")
         : "nenhum lembrete pendente";
       return JSON.stringify({
         card: "agenda",
@@ -571,8 +617,67 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
     }
 
     case "criar_lembrete": {
-      await createReminder({ text: args.text as string, date: args.date as string });
-      return `Lembrete criado: "${args.text}" pra ${args.date}.`;
+      const relatedExecutionId = args.relatedExecutionId as string | undefined;
+      const offsetMinutes = args.offsetMinutesBefore as number | undefined;
+      let remindAt: string | undefined;
+      if (relatedExecutionId) {
+        const state = await fetchGoalsState();
+        const exec = state.executions.find((e) => e.id === relatedExecutionId);
+        if (!exec?.agendaDate || !exec?.startTime)
+          throw new Error(
+            "Esse compromisso não tem hora marcada — consulte a agenda de novo antes de criar o lembrete.",
+          );
+        remindAt = new Date(
+          new Date(`${exec.agendaDate}T${exec.startTime}:00`).getTime() -
+            (offsetMinutes ?? 0) * 60_000,
+        ).toISOString();
+      } else if (args.time) {
+        remindAt = new Date(`${args.date}T${args.time}:00`).toISOString();
+      }
+      const id = await createReminder({
+        text: args.text as string,
+        date: args.date as string,
+        remindAt,
+        relatedExecutionId,
+        offsetMinutes,
+      });
+      const timeLabel = remindAt
+        ? ` às ${new Date(remindAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+        : "";
+      const summary = `Lembrete criado: "${args.text}" pra ${args.date}${timeLabel}.`;
+      if (remindAt && !(await hasPushSubscription())) {
+        return JSON.stringify({
+          card: "notifications",
+          id,
+          description: `${summary} Ative notificações pra receber o aviso no horário certo.`,
+          summary,
+        });
+      }
+      return summary;
+    }
+
+    case "gerenciar_lembrete": {
+      const reminders = await fetchRemindersState();
+      const reminder = reminders.find((r) => r.id === args.reminderId);
+      if (!reminder)
+        throw new Error("Lembrete não encontrado. Consulte consultar_dia de novo pra pegar o id.");
+      const action = args.action as "concluir" | "remover" | "editar";
+      if (action === "concluir") {
+        await toggleReminder(reminder.id, reminder.done);
+        return `Lembrete concluído.`;
+      }
+      if (action === "remover") {
+        await removeReminder(reminder.id);
+        return `Lembrete removido.`;
+      }
+      const nextDate = (args.date as string | undefined) ?? reminder.date;
+      const nextTime = args.time as string | undefined;
+      await updateReminder(reminder.id, {
+        text: args.text as string | undefined,
+        date: args.date as string | undefined,
+        remindAt: nextTime ? new Date(`${nextDate}T${nextTime}:00`).toISOString() : undefined,
+      });
+      return `Lembrete atualizado.`;
     }
 
     case "criar_execucao": {

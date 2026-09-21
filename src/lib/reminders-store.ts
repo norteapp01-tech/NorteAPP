@@ -18,6 +18,14 @@ export type Reminder = {
   done: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Momento exato de disparo (timestamptz ISO) — só presente em lembretes com hora.
+   * Quem resolve esse valor é quem chama createReminder (ex.: a partir de uma
+   * execução + offset); a store nunca recalcula sozinha. */
+  remindAt?: string;
+  relatedExecutionId?: string;
+  offsetMinutes?: number;
+  /** Preenchido pela Edge Function dispatch-reminders quando o push é enviado. */
+  notifiedAt?: string;
 };
 
 type Row = Record<string, unknown>;
@@ -35,6 +43,10 @@ function mapReminder(r: Row): Reminder {
     done: r.done as boolean,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
+    remindAt: (r.remind_at as string | null) ?? undefined,
+    relatedExecutionId: (r.related_execution_id as string | null) ?? undefined,
+    offsetMinutes: (r.offset_minutes as number | null) ?? undefined,
+    notifiedAt: (r.notified_at as string | null) ?? undefined,
   };
 }
 
@@ -146,12 +158,26 @@ export function formatRelativeDate(iso: string, todayIso = todayISO()): string {
 // Mutations
 // ---------------------------------------------------------------------------
 
-export async function createReminder(input: { text: string; date: string }): Promise<string> {
+export async function createReminder(input: {
+  text: string;
+  date: string;
+  /** Momento exato (ISO), já resolvido pelo chamador — ver comentário do tipo Reminder. */
+  remindAt?: string;
+  relatedExecutionId?: string;
+  offsetMinutes?: number;
+}): Promise<string> {
   const userId = await ensureSession();
   const row = unwrap<{ id: string }>(
     await supabase
       .from("reminders")
-      .insert({ user_id: userId, text: input.text, date: input.date })
+      .insert({
+        user_id: userId,
+        text: input.text,
+        date: input.date,
+        remind_at: input.remindAt,
+        related_execution_id: input.relatedExecutionId,
+        offset_minutes: input.offsetMinutes,
+      })
       .select()
       .single(),
   );
@@ -183,11 +209,16 @@ export async function toggleReminder(id: string, currentlyDone: boolean) {
 
 export async function updateReminder(
   id: string,
-  patch: { text?: string; date?: string },
+  patch: { text?: string; date?: string; remindAt?: string | null },
 ): Promise<void> {
   const dbPatch: Row = {};
   if (patch.text !== undefined) dbPatch.text = patch.text;
   if (patch.date !== undefined) dbPatch.date = patch.date;
+  if (patch.remindAt !== undefined) {
+    dbPatch.remind_at = patch.remindAt;
+    // Muda o horário -> ainda não avisamos por esse novo horário.
+    dbPatch.notified_at = null;
+  }
   unwrap(await supabase.from("reminders").update(dbPatch).eq("id", id).select().single());
   await invalidate();
 }
@@ -195,4 +226,40 @@ export async function updateReminder(
 export async function removeReminder(id: string): Promise<void> {
   await supabase.from("reminders").delete().eq("id", id);
   await invalidate();
+}
+
+// ---------------------------------------------------------------------------
+// Push (Web Push) — inscrições por dispositivo. Ver src/lib/push-notifications.ts
+// pro fluxo de permissão/registro do service worker; aqui é só a persistência.
+// ---------------------------------------------------------------------------
+
+export async function savePushSubscription(sub: {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}): Promise<void> {
+  const userId = await ensureSession();
+  unwrap(
+    await supabase
+      .from("push_subscriptions")
+      .upsert(
+        { user_id: userId, endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
+        { onConflict: "user_id,endpoint" },
+      )
+      .select()
+      .single(),
+  );
+}
+
+export async function removePushSubscription(endpoint: string): Promise<void> {
+  await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
+}
+
+export async function hasPushSubscription(): Promise<boolean> {
+  const userId = await ensureSession();
+  const { count } = await supabase
+    .from("push_subscriptions")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
+  return (count ?? 0) > 0;
 }

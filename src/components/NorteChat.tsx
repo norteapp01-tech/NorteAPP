@@ -15,6 +15,8 @@ const labels: Record<string, [string, string]> = {
   registrar_transacao: ["Movimentação", "/sub-agenda/financas"],
   consultar_financas: ["Finanças", "/sub-agenda/financas"],
   registrar_refeicao: ["Confirmar refeição", "/sub-agenda/alimentacao"],
+  criar_lembrete: ["Lembrete", "/agenda"],
+  gerenciar_lembrete: ["Lembrete", "/agenda"],
 };
 function domain(name: string, area?: unknown): [string, string] {
   if (labels[name]) return labels[name];

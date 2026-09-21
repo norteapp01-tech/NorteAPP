@@ -1,7 +1,8 @@
 import { useState, type CSSProperties } from "react";
-import { CalendarDays, ChevronRight, Wallet, Utensils, Route, Check } from "lucide-react";
+import { CalendarDays, ChevronRight, Wallet, Utensils, Route, Check, BellRing } from "lucide-react";
 import { correctTransaction } from "@/lib/finance-store";
 import { executeTool } from "@/lib/agent/tools";
+import { registerPush } from "@/lib/push-notifications";
 
 type Item = {
   actions?: string[];
@@ -35,7 +36,11 @@ export type CardData = {
 export function parseCard(result: string): CardData | null {
   try {
     const d = JSON.parse(result);
-    return ["finance", "appointment", "agenda", "plan", "nutrition"].includes(d.card) ? d : null;
+    return ["finance", "appointment", "agenda", "plan", "nutrition", "notifications"].includes(
+      d.card,
+    )
+      ? d
+      : null;
   } catch {
     return null;
   }
@@ -69,8 +74,20 @@ export function AgentCard({
   const financial = data.card === "finance",
     plan = data.card === "plan",
     nutrition = data.card === "nutrition",
-    agenda = data.card === "agenda";
-  const Icon = financial ? Wallet : plan ? Route : nutrition ? Utensils : CalendarDays;
+    agenda = data.card === "agenda",
+    notifications = data.card === "notifications";
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushDone, setPushDone] = useState(false);
+  const [pushError, setPushError] = useState("");
+  const Icon = financial
+    ? Wallet
+    : plan
+      ? Route
+      : nutrition
+        ? Utensils
+        : notifications
+          ? BellRing
+          : CalendarDays;
   const title = financial
     ? "Movimentação registrada"
     : plan
@@ -79,9 +96,11 @@ export function AgentCard({
         : "Planejamento criado"
       : nutrition
         ? "Refeição registrada"
-        : agenda
-          ? data.title
-          : "Compromisso marcado";
+        : notifications
+          ? "Lembrete com hora marcada"
+          : agenda
+            ? data.title
+            : "Compromisso marcado";
   const breakdown = value.breakdown || [];
   const total = breakdown.reduce((sum, c) => sum + c.amount, 0);
   const categoryAmount = breakdown.find((c) => c.category === selected)?.amount ?? 0;
@@ -265,6 +284,37 @@ export function AgentCard({
               </div>
             ))}
           </div>
+        </>
+      )}
+      {notifications && (
+        <>
+          <p className="text-sm text-muted-foreground">
+            {data.description ?? "Ative as notificações pra ser avisado no horário certo."}
+          </p>
+          {pushDone ? (
+            <p className="mt-3 flex items-center gap-1.5 text-sm text-primary">
+              <Check size={16} /> Notificações ativadas.
+            </p>
+          ) : (
+            <button
+              disabled={pushBusy}
+              onClick={async () => {
+                setPushBusy(true);
+                setPushError("");
+                try {
+                  const result = await registerPush();
+                  if (result.ok) setPushDone(true);
+                  else setPushError(result.reason ?? "Não foi possível ativar.");
+                } finally {
+                  setPushBusy(false);
+                }
+              }}
+              className="interactive-press mt-3 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              {pushBusy ? "Ativando…" : "Ativar notificações"}
+            </button>
+          )}
+          {pushError && <p className="mt-2 text-xs text-danger">{pushError}</p>}
         </>
       )}
       {editing && (
