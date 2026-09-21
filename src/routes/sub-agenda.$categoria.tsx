@@ -362,7 +362,7 @@ function AcademiaModule() {
     return (
       <div className="mt-6 space-y-5">
         {tabs}
-        <EvolutionTab initialStageId={search.etapa} onReviewNext={() => setActiveTab("treino")} />
+        <EvolutionTab initialStageId={search.etapa} />
       </div>
     );
   }
@@ -379,50 +379,6 @@ function AcademiaModule() {
   return (
     <div className="mt-6 space-y-5">
       {tabs}
-      <section className="academia-week-card card-surface p-4">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="norte-section-title">Plano da semana</h2>
-          <button
-            onClick={() => setShowRoutineConfig(true)}
-            className="interactive-press flex min-h-11 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <CalendarClock className="h-4 w-4" /> Horários
-          </button>
-        </div>
-        {/* Com uma etapa vigente, a semana é a DELA. Continuar mostrando a
-            atribuição antiga aqui e a do ciclo no card de hoje colocaria duas
-            programações na mesma tela sem dizer qual manda. */}
-        <WeekdaySelector
-          onSelect={currentBlockDays ? () => setActiveTab("ciclo") : setPickerDay}
-          primary={(weekday) => {
-            if (currentBlockDays) {
-              const day = currentBlockDays.find((d) => d.weekday === weekday);
-              return plans.find((p) => p.id === day?.planId)?.letter ?? "—";
-            }
-            return plans.find((p) => p.id === weeklyAssignment[weekday])?.letter ?? "—";
-          }}
-          secondary={(weekday) => {
-            if (currentBlockDays) {
-              return currentBlockDays.find((d) => d.weekday === weekday)?.startTime ?? "—";
-            }
-            const routine = gymRoutines.find((r) => r.weekday === weekday);
-            return routine ? formatTime(routine.time, profile.timeFormat) : "—";
-          }}
-        />
-        {currentBlockDays && programming.block && (
-          <button
-            onClick={() => setActiveTab("ciclo")}
-            className="interactive-press mt-4 flex min-h-11 w-full items-center justify-between gap-2 border-t border-border pt-3 text-left text-xs text-muted-foreground"
-          >
-            <span>
-              Etapa atual ·{" "}
-              <strong className="font-semibold text-foreground">{programming.block.name}</strong>
-            </span>
-            <ChevronRight className="h-4 w-4 shrink-0" />
-          </button>
-        )}
-      </section>
-
       <section className="academia-workout-card card-surface p-4">
         {liveSession ? (
           <>
@@ -605,6 +561,55 @@ function AcademiaModule() {
           )}
         </div>
       </section>
+
+      <details className="academia-week-card card-surface group p-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+          <h2 className="norte-section-title">Plano da semana</h2>
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="mt-4">
+          <div className="mb-4 flex items-center justify-end gap-3">
+            <button
+              onClick={() => setShowRoutineConfig(true)}
+              className="interactive-press flex min-h-11 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <CalendarClock className="h-4 w-4" /> Horários
+            </button>
+          </div>
+          {/* Com uma etapa vigente, a semana é a DELA. Continuar mostrando a
+              atribuição antiga aqui e a do ciclo no card de hoje colocaria duas
+              programações na mesma tela sem dizer qual manda. */}
+          <WeekdaySelector
+            onSelect={currentBlockDays ? () => setActiveTab("ciclo") : setPickerDay}
+            primary={(weekday) => {
+              if (currentBlockDays) {
+                const day = currentBlockDays.find((d) => d.weekday === weekday);
+                return plans.find((p) => p.id === day?.planId)?.letter ?? "—";
+              }
+              return plans.find((p) => p.id === weeklyAssignment[weekday])?.letter ?? "—";
+            }}
+            secondary={(weekday) => {
+              if (currentBlockDays) {
+                return currentBlockDays.find((d) => d.weekday === weekday)?.startTime ?? "—";
+              }
+              const routine = gymRoutines.find((r) => r.weekday === weekday);
+              return routine ? formatTime(routine.time, profile.timeFormat) : "—";
+            }}
+          />
+          {currentBlockDays && programming.block && (
+            <button
+              onClick={() => setActiveTab("ciclo")}
+              className="interactive-press mt-4 flex min-h-11 w-full items-center justify-between gap-2 border-t border-border pt-3 text-left text-xs text-muted-foreground"
+            >
+              <span>
+                Etapa atual ·{" "}
+                <strong className="font-semibold text-foreground">{programming.block.name}</strong>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0" />
+            </button>
+          )}
+        </div>
+      </details>
 
       <PlanManagerCard />
 

@@ -1,8 +1,6 @@
-import { useState } from "react";
-import { Search, Quote, Lightbulb, StickyNote, Plus, ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Search, Quote, Lightbulb, StickyNote, Plus } from "lucide-react";
 import { useReadingStore, searchReadingNotes, type ReadingNoteType } from "@/lib/reading-store";
-import { Card } from "@/components/sub-agenda-shared";
-import { Modal } from "@/components/ui/modal";
 
 const typeMeta: Record<ReadingNoteType, { label: string; icon: typeof Quote }> = {
   quote: { label: "Frase", icon: Quote },
@@ -23,101 +21,13 @@ function positionText(
   return "";
 }
 
-/** Preview leve na home: busca + poucos itens recentes/relevantes. */
-export function ReadingNotebookPreview({
-  onOpenFull,
-  onAddNote,
-  compact = false,
-}: {
-  onOpenFull: () => void;
-  onAddNote: () => void;
-  compact?: boolean;
-}) {
-  const state = useReadingStore((s) => s);
-  const [query, setQuery] = useState("");
-  const results = query.trim()
-    ? searchReadingNotes(state, query).slice(0, 4)
-    : [...state.notes]
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-        .slice(0, 3)
-        .map((n) => ({ ...n, bookTitle: state.books.find((b) => b.id === n.bookId)?.title ?? "" }));
-
-  if (compact)
-    return (
-      <section className="reading-notebook-compact">
-        <div className="reading-section-heading">
-          <h3>Caderno</h3>
-          <button onClick={onAddNote}>
-            <Plus size={16} /> Anotação
-          </button>
-        </div>
-        {results[0] ? (
-          <button className="reading-note-preview" onClick={onOpenFull}>
-            <StickyNote size={20} />
-            <span>
-              <small>Última anotação · {results[0].bookTitle}</small>
-              <span>{results[0].content}</span>
-            </span>
-          </button>
-        ) : (
-          <p className="reading-muted">Guarde uma ideia da sua próxima leitura.</p>
-        )}
-        <button className="reading-text-link" onClick={onOpenFull}>
-          <Search size={17} /> Abrir caderno →
-        </button>
-      </section>
-    );
-  return (
-    <Card title="Caderno de leitura">
-      <div className="-mt-1 mb-3 flex justify-end">
-        <button
-          onClick={onAddNote}
-          className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground hover:border-primary/50"
-        >
-          <Plus className="h-3.5 w-3.5 text-primary" /> Nova anotação
-        </button>
-      </div>
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2">
-        <Search className="h-3.5 w-3.5 text-muted-foreground" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Busque uma frase, ideia ou assunto..."
-          className="w-full bg-transparent text-xs outline-none"
-        />
-      </div>
-      <div className="mt-3 space-y-2">
-        {results.length === 0 && (
-          <p className="text-xs text-muted-foreground">
-            {query.trim() ? "Nada encontrado." : "Ainda não há nada registrado."}
-          </p>
-        )}
-        {results.map((n) => {
-          const Icon = typeMeta[n.type].icon;
-          return (
-            <div key={n.id} className="rounded-lg bg-surface-2 p-2.5">
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                <Icon className="h-3 w-3" /> {typeMeta[n.type].label} · {n.bookTitle}
-              </div>
-              <p className="mt-1 line-clamp-2 text-xs italic">"{n.content}"</p>
-            </div>
-          );
-        })}
-      </div>
-      <button onClick={onOpenFull} className="mt-3 text-xs text-primary">
-        Abrir caderno <ChevronRight className="inline h-3.5 w-3.5" />
-      </button>
-    </Card>
-  );
-}
-
-/** Tela cheia com filtros — Todos/Frases/Insights/Notas, Livro, Tags. */
-export function ReadingNotebook({
-  onClose,
+/** Aba dedicada ao caderno — busca, filtro por tipo, seleção de livro por toque e tags. */
+export function ReadingNotebookTab({
   initialBookId,
+  onAddNote,
 }: {
-  onClose: () => void;
   initialBookId?: string;
+  onAddNote: () => void;
 }) {
   const state = useReadingStore((s) => s);
   const [query, setQuery] = useState("");
@@ -125,6 +35,11 @@ export function ReadingNotebook({
   const [bookFilter, setBookFilter] = useState<string>(initialBookId ?? "all");
   const [tagFilter, setTagFilter] = useState<string>("all");
 
+  useEffect(() => {
+    if (initialBookId) setBookFilter(initialBookId);
+  }, [initialBookId]);
+
+  const booksWithNotes = state.books.filter((b) => state.notes.some((n) => n.bookId === b.id));
   const allTags = Array.from(new Set(state.notes.flatMap((n) => n.tags))).sort();
 
   let results = query.trim()
@@ -137,11 +52,10 @@ export function ReadingNotebook({
   if (tagFilter !== "all") results = results.filter((n) => n.tags.includes(tagFilter));
 
   return (
-    <Modal onClose={onClose} title="Caderno de leitura">
+    <div className="reading-notebook-tab">
       <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2">
         <Search className="h-4 w-4 text-muted-foreground" />
         <input
-          autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Busque uma frase, ideia ou assunto..."
@@ -149,7 +63,7 @@ export function ReadingNotebook({
         />
       </div>
 
-      <div className="mt-2 flex gap-1.5 overflow-x-auto">
+      <div className="mt-3 flex gap-1.5 overflow-x-auto">
         {(["all", "quote", "insight", "note"] as const).map((t) => (
           <button
             key={t}
@@ -167,35 +81,63 @@ export function ReadingNotebook({
         ))}
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        <select
-          value={bookFilter}
-          onChange={(e) => setBookFilter(e.target.value)}
-          className="rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-xs"
+      {booksWithNotes.length > 0 && (
+        <div className="mt-3">
+          <p className="mb-1.5 text-[10px] uppercase text-muted-foreground">Selecionar livro</p>
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            <button
+              onClick={() => setBookFilter("all")}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold ${bookFilter === "all" ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
+            >
+              Todos os livros
+            </button>
+            {booksWithNotes.map((b) => (
+              <button
+                key={b.id}
+                onClick={() => setBookFilter(b.id)}
+                className={`shrink-0 max-w-[9rem] truncate rounded-full px-3 py-1.5 text-[11px] font-semibold ${bookFilter === b.id ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
+              >
+                {b.title}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {allTags.length > 0 && (
+        <div className="mt-2">
+          <select
+            value={tagFilter}
+            onChange={(e) => setTagFilter(e.target.value)}
+            className="rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-xs"
+          >
+            <option value="all">Todas as tags</option>
+            {allTags.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <div className="-mt-1 mb-1 mt-3 flex justify-end">
+        <button
+          onClick={onAddNote}
+          className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground hover:border-primary/50"
         >
-          <option value="all">Todos os livros</option>
-          {state.books.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.title}
-            </option>
-          ))}
-        </select>
-        <select
-          value={tagFilter}
-          onChange={(e) => setTagFilter(e.target.value)}
-          className="rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-xs"
-        >
-          <option value="all">Todas as tags</option>
-          {allTags.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+          <Plus className="h-3.5 w-3.5 text-primary" /> Nova anotação
+        </button>
       </div>
 
-      <div className="mt-3 space-y-2">
-        {results.length === 0 && <p className="text-sm text-muted-foreground">Nada encontrado.</p>}
+      <div className="mt-2 space-y-2">
+        {results.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            {query.trim() || bookFilter !== "all" || typeFilter !== "all" || tagFilter !== "all"
+              ? "Nada encontrado."
+              : "Ainda não há nada registrado."}
+          </p>
+        )}
         {results.map((n) => {
           const book = state.books.find((b) => b.id === n.bookId);
           const Icon = typeMeta[n.type].icon;
@@ -220,6 +162,6 @@ export function ReadingNotebook({
           );
         })}
       </div>
-    </Modal>
+    </div>
   );
 }

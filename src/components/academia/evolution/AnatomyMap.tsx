@@ -287,29 +287,6 @@ export function BodyMap({
           </span>
         ))}
       </div>
-      <select
-        className="mt-4 w-full"
-        aria-label="Selecionar músculo"
-        value={selected ?? ""}
-        onChange={(e) => onSelect((e.target.value || null) as MuscleGroup | null)}
-      >
-        <option value="">Todos os músculos</option>
-        {Object.entries(muscleGroupLabel).map(([g, l]) => (
-          <option key={g} value={g}>
-            {l}
-          </option>
-        ))}
-      </select>
-      <details className="evo-map-method">
-        <summary>Como ler este mapa</summary>
-        <p>
-          {mode === "volume"
-            ? "Cores relativas ao grupo com mais séries diretas no período. Não indicam recuperação nem estímulo fisiológico medido."
-            : "Cada exercício exige ao menos três sessões comparáveis. Usamos a referência mais frequente de carga ou repetições; resultados divergentes aparecem como mistos. Técnica e amplitude não são medidas pelo app."}{" "}
-          As divisões mostram a anatomia; os dados continuam por grupo muscular. Trapézio, lombar e
-          dorsais usam o grupo Costas, sem atribuir isolamento a cada região.
-        </p>
-      </details>
     </div>
   );
 }
