@@ -26,7 +26,7 @@ import { TimerPrism, type TimerFace } from "./TimerPrism";
 // Girar é só olhar para o outro lado: nunca pausa, reinicia nem altera tempo.
 // ---------------------------------------------------------------------------
 
-const BLOCK_HEIGHT = 74;
+const BLOCK_HEIGHT = 96;
 
 /** O mesmo botão, no mesmo lugar, dizendo o que vai fazer AGORA — "Iniciar"
  * num descanso pausado mentiria sobre o que acontece ao tocar. */
@@ -70,10 +70,10 @@ export function TimerBlock({
   };
 
   return (
-    <div className="mt-2">
-      <div className="mb-1 flex items-center justify-between gap-2">
+    <div className="mt-4">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <FaceToggle face={face} onChange={onChangeFace} />
-        <span className="text-[10px] text-muted-foreground">arraste para virar</span>
+        <span className="text-[10px] text-muted-foreground">deslize para virar</span>
       </div>
 
       <TimerPrism
@@ -83,11 +83,11 @@ export function TimerBlock({
         descanso={
           <FaceShell tone={rest.status === "fim" ? "done" : "normal"}>
             <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Descanso</p>
+              <p className="text-[11px] text-muted-foreground">Descanso</p>
               <button
                 onClick={() => setEditing(true)}
                 aria-label={`Ajustar o tempo de descanso, agora ${formatDurationClock(rest.remaining)}`}
-                className={`interactive-press -ml-1 rounded px-1 font-mono text-xl font-bold tabular-nums ${rest.status === "fim" ? "text-success" : ""}`}
+                className={`interactive-press -ml-1 rounded px-1 font-mono text-2xl font-bold tabular-nums ${rest.status === "fim" ? "text-success" : ""}`}
               >
                 {formatDurationClock(rest.remaining)}
               </button>
@@ -115,10 +115,10 @@ export function TimerBlock({
         treino={
           <FaceShell tone="normal">
             <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Treino</p>
+              <p className="text-[11px] text-muted-foreground">Treino</p>
               {/* Sem botão para ajustar: é a duração da sessão, não um tempo
                   configurável. */}
-              <p className="font-mono text-xl font-bold tabular-nums">
+              <p className="font-mono text-2xl font-bold tabular-nums">
                 {formatDurationClock(elapsed)}
               </p>
             </div>
@@ -157,8 +157,8 @@ export function TimerBlock({
 function FaceShell({ tone, children }: { tone: "normal" | "done"; children: React.ReactNode }) {
   return (
     <div
-      className={`flex h-full items-center gap-2 rounded-xl border px-2.5 ${
-        tone === "done" ? "border-success bg-success/10" : "border-border bg-surface-2"
+      className={`flex h-full items-center gap-2 rounded-2xl border px-3 ${
+        tone === "done" ? "border-primary/50 bg-surface-2" : "border-border bg-surface-2"
       }`}
     >
       {children}
@@ -180,7 +180,7 @@ function IconButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="interactive-press flex h-9 w-9 items-center justify-center rounded-lg border border-border text-foreground"
+      className="interactive-press flex h-10 w-10 items-center justify-center rounded-full border border-border text-foreground"
     >
       {children}
     </button>
@@ -194,15 +194,15 @@ function FaceToggle({ face, onChange }: { face: TimerFace; onChange: (f: TimerFa
     <div
       role="group"
       aria-label="Qual cronômetro mostrar"
-      className="flex rounded-lg border border-border p-0.5"
+      className="flex rounded-full border border-border p-0.5"
     >
       {(["descanso", "treino"] as const).map((option) => (
         <button
           key={option}
           onClick={() => onChange(option)}
           aria-pressed={face === option}
-          className={`interactive-press rounded-md px-2 py-0.5 text-[10px] font-semibold capitalize ${
-            face === option ? "bg-primary/15 text-primary" : "text-muted-foreground"
+          className={`interactive-press rounded-full px-3 py-1 text-[11px] font-semibold capitalize ${
+            face === option ? "bg-surface-2 text-foreground" : "text-muted-foreground"
           }`}
         >
           {option}
