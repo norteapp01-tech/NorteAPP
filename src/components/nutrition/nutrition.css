@@ -233,14 +233,34 @@
   scrollbar-width: thin;
   scrollbar-color: var(--nutrition-border) transparent;
 }
+/* Giro de prisma, igual ao card de Esportes: a face nova entra girando da
+   aresta, não desbotando. A direção segue o gesto — subir traz a próxima de
+   baixo, descer traz a anterior de cima —, senão o movimento contradiz a mão.
+   O eixo fica na aresta (não no centro) para parecer uma face virando, e não
+   um cartão inclinando. */
 .nutrition-chart-face {
-  animation: nutrition-face-in 0.22s ease-out;
-  transform-origin: center;
+  animation: nutrition-face-down 0.34s cubic-bezier(0.22, 0.8, 0.3, 1);
+  transform-origin: center top;
+  backface-visibility: hidden;
 }
-@keyframes nutrition-face-in {
+.nutrition-chart-face[data-direction="-1"] {
+  animation-name: nutrition-face-up;
+  transform-origin: center bottom;
+}
+@keyframes nutrition-face-down {
   from {
-    opacity: 0.3;
-    transform: perspective(700px) rotateX(12deg);
+    opacity: 0;
+    transform: perspective(700px) rotateX(-82deg);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(700px) rotateX(0);
+  }
+}
+@keyframes nutrition-face-up {
+  from {
+    opacity: 0;
+    transform: perspective(700px) rotateX(82deg);
   }
   to {
     opacity: 1;

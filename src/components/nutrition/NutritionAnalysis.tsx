@@ -29,6 +29,8 @@ import { Modal } from "@/components/ui/modal";
 export function NutritionAnalysis({ state }: { state: NutritionState }) {
   const [days, setDays] = useState(30);
   const [index, setIndex] = useState(0);
+  // Direção da última troca: decide de que aresta a face nova entra girando.
+  const [direction, setDirection] = useState(1);
   const [details, setDetails] = useState(false);
   const [help, setHelp] = useState(false);
   const start = useRef<number | null>(null);
@@ -37,7 +39,10 @@ export function NutritionAnalysis({ state }: { state: NutritionState }) {
   const metric = nutritionMetrics[index];
   const goal = state.goals[metric.key];
   const average = averageNutrient(data.points, metric.key);
-  const change = (direction: number) => setIndex((i) => (i + direction + 4) % 4);
+  const change = (delta: number) => {
+    setDirection(delta);
+    setIndex((i) => (i + delta + 4) % 4);
+  };
   const points = data.points.map((p) => ({ date: p.date, value: p.totals?.[metric.key] ?? null }));
   return (
     <div className="nutrition-analysis">
@@ -125,7 +130,11 @@ export function NutritionAnalysis({ state }: { state: NutritionState }) {
           <select
             aria-label="Nutriente"
             value={index}
-            onChange={(e) => setIndex(Number(e.target.value))}
+            onChange={(e) => {
+              const next = Number(e.target.value);
+              setDirection(next >= index ? 1 : -1);
+              setIndex(next);
+            }}
           >
             {nutritionMetrics.map((m, i) => (
               <option key={m.key} value={i}>
@@ -146,6 +155,7 @@ export function NutritionAnalysis({ state }: { state: NutritionState }) {
           <div
             key={metric.key}
             className="nutrition-chart-face"
+            data-direction={direction}
             style={{ width: `max(100%, ${days * 24}px)`, height: 190 }}
           >
             <ResponsiveContainer width="100%" height="100%">

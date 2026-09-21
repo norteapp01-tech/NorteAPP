@@ -29,7 +29,6 @@ import {
 // no título e por teclado — o gesto é um atalho, nunca o único caminho.
 // ---------------------------------------------------------------------------
 
-const HINT_KEY = "norte:esportes:carrosselHintVisto";
 /** Deslocamento mínimo para virar a face: abaixo disso é toque, não arrasto. */
 const DRAG_THRESHOLD_PX = 28;
 
@@ -43,22 +42,12 @@ export function MetricCarousel({
   weeks: number;
 }) {
   const [face, setFace] = useState<MetricFace>("ritmo");
-  const [hintVisible, setHintVisible] = useState(false);
-  const railRef = useRef<HTMLDivElement>(null);
+  const prismRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ startY: number; committed: boolean; captured: boolean } | null>(null);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    setHintVisible(window.localStorage.getItem(HINT_KEY) !== "1");
-  }, []);
-
-  const change = (next: MetricFace) => {
-    setFace(next);
-    if (hintVisible) {
-      setHintVisible(false);
-      window.localStorage.setItem(HINT_KEY, "1");
-    }
-  };
+  // "Deslize para trocar" agora fica sempre visível ao lado das setas, como
+  // na Alimentação — não é mais uma dica que some depois do primeiro uso.
+  const change = (next: MetricFace) => setFace(next);
 
   const step = (direction: 1 | -1) => change(rotateFace(face, direction));
 
@@ -75,108 +64,106 @@ export function MetricCarousel({
     const dy = e.clientY - state.startY;
     if (Math.abs(dy) < DRAG_THRESHOLD_PX) return;
     if (!state.captured) {
-      railRef.current?.setPointerCapture(e.pointerId);
-      state.captured = true;
+      // A captura só serve para o gesto continuar valendo se o dedo sair do
+      // card. Ela pode falhar (ponteiro já solto, ponteiro que o navegador
+      // não reconhece mais) e, antes, a exceção subia daqui e abortava a
+      // troca de face — o arrasto simplesmente não fazia nada.
+      try {
+        prismRef.current?.setPointerCapture(e.pointerId);
+        state.captured = true;
+      } catch {
+        state.captured = false;
+      }
     }
     // Arrastar para CIMA avança para a próxima métrica.
     state.committed = true;
     step(dy < 0 ? 1 : -1);
   };
   const endDrag = (e: React.PointerEvent) => {
-    if (drag.current?.captured) railRef.current?.releasePointerCapture(e.pointerId);
+    if (drag.current?.captured) {
+      try {
+        prismRef.current?.releasePointerCapture(e.pointerId);
+      } catch {
+        /* O ponteiro já pode ter sido liberado pelo navegador. */
+      }
+    }
     drag.current = null;
   };
 
   const index = METRIC_FACES.indexOf(face);
 
   return (
-    <div>
-      {/* Nomes das faces vizinhas, acima e abaixo: é o que torna visível que
-          existe algo antes e depois sem precisar do gesto para descobrir. */}
-      <button onClick={() => step(-1)} aria-hidden tabIndex={-1} className="sp-prism-peek">
-        {metricFaceLabel(rotateFace(face, -1), modality)}
-      </button>
-
-      <div className="flex items-stretch gap-1">
-        <div className="sp-prism">
-          <div
-            className="sp-prism-stage"
-            style={{ transform: `translateZ(-49px) rotateX(${index * 120}deg)` }}
-          >
-            {METRIC_FACES.map((key, i) => (
-              <div
-                key={key}
-                className="sp-prism-face"
-                data-active={key === face}
-                // 170px de altura → raio = 170 / (2·tan60°) ≈ 49px.
-                style={{ transform: `rotateX(${-i * 120}deg) translateZ(49px)` }}
-                aria-hidden={key !== face}
-                inert={key !== face}
-              >
-                <Face
-                  face={key}
-                  series={series}
-                  modality={modality}
-                  weeks={weeks}
-                  onTitleClick={() => step(1)}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Faixa de controle — o gesto vive aqui. */}
+    <section className="sp-chart-panel">
+      {/* Mesmo arranjo da Alimentação: título à esquerda, setas e "Deslize
+          para trocar" no alto à direita. Antes os controles ficavam numa
+          faixa lateral, que ocupava largura do gráfico e não dizia o que
+          fazia. */}
+      <div className="sp-chart-heading">
+        <h3>Evolução</h3>
         <div
-          ref={railRef}
-          className="sp-prism-rail"
-          role="group"
-          aria-label="Trocar a análise"
+          className="sp-flip-controls"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
         >
-          <button
-            onClick={() => step(-1)}
-            aria-label="Análise anterior"
-            className="interactive-press"
-          >
-            <ChevronUp size={20} />
-          </button>
-          <div className="sp-prism-dots" role="tablist" aria-orientation="vertical">
-            {METRIC_FACES.map((key) => (
-              <button
-                key={key}
-                role="tab"
-                aria-current={key === face}
-                aria-selected={key === face}
-                aria-label={metricFaceLabel(key, modality)}
-                onClick={() => change(key)}
-              />
-            ))}
+          <div>
+            <button onClick={() => step(-1)} aria-label="Análise anterior">
+              <ChevronUp size={18} />
+            </button>
+            <button onClick={() => step(1)} aria-label="Próxima análise">
+              <ChevronDown size={18} />
+            </button>
           </div>
-          <button
-            onClick={() => step(1)}
-            aria-label="Próxima análise"
-            className="interactive-press"
-          >
-            <ChevronDown size={20} />
-          </button>
+          <span>
+            Deslize
+            <br />
+            para trocar
+          </span>
         </div>
       </div>
 
-      <button onClick={() => step(1)} aria-hidden tabIndex={-1} className="sp-prism-peek">
-        {metricFaceLabel(rotateFace(face, 1), modality)}
-      </button>
+      {/* O arrasto também vale no próprio card: era o que faltava — só a seta
+          trocava a face, e ninguém descobre uma seta de 18px. */}
+      <div
+        ref={prismRef}
+        className="sp-prism"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+      >
+        <div
+          className="sp-prism-stage"
+          style={{ transform: `translateZ(-49px) rotateX(${index * 120}deg)` }}
+        >
+          {METRIC_FACES.map((key, i) => (
+            <div
+              key={key}
+              className="sp-prism-face"
+              data-active={key === face}
+              // 170px de altura → raio = 170 / (2·tan60°) ≈ 49px.
+              style={{ transform: `rotateX(${-i * 120}deg) translateZ(49px)` }}
+              aria-hidden={key !== face}
+              inert={key !== face}
+            >
+              <Face
+                face={key}
+                series={series}
+                modality={modality}
+                weeks={weeks}
+                onTitleClick={() => step(1)}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
 
-      <p className="mt-1 text-center text-[11px]" style={{ color: "var(--sp-muted)" }}>
-        {hintVisible ? "Deslize para trocar a análise" : " "}
-      </p>
       {/* O leitor de tela precisa saber que a face mudou, não só vê-la girar. */}
       <p className="sr-only" role="status">
         Análise atual: {metricFaceLabel(face, modality)}
       </p>
-    </div>
+    </section>
   );
 }
 

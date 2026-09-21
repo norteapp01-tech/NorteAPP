@@ -110,10 +110,11 @@
   position: absolute;
   inset: 0;
   backface-visibility: hidden;
-  border-radius: var(--norte-card-radius);
-  background: var(--sp-card);
-  border: 1px solid var(--sp-card-border);
-  padding: 11px 13px 8px;
+  /* Fundo da página, não um card: é o que a Alimentação faz. Opaco de
+     propósito — transparente deixaria as faces vizinhas aparecerem por trás
+     no meio do giro. */
+  background: var(--background);
+  padding: 4px 0 0;
   overflow: hidden;
 }
 /* Faces que não estão de frente perdem nitidez, mas continuam legíveis como
@@ -142,48 +143,54 @@
   }
 }
 
-/* Faixa de controle: é aqui, e só aqui, que o gesto vertical é capturado.
-   O resto da página continua rolando normalmente. */
-.esportes-overview .sp-prism-rail {
-  width: 36px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+/* O gesto vertical vive no próprio card e nos controles do topo. `touch-action:
+   none` só nessas duas áreas: fora delas a página rola normalmente. */
+.esportes-overview .sp-prism {
   touch-action: none;
   cursor: grab;
-  align-self: stretch;
 }
-.esportes-overview .sp-prism-rail:active {
+.esportes-overview .sp-prism:active {
   cursor: grabbing;
 }
-.esportes-overview .sp-prism-rail button {
+
+/* Cabeçalho do gráfico — mesmo arranjo da Alimentação. */
+.esportes-overview .sp-chart-panel {
+  padding: 18px 0 4px;
+  border-top: 1px solid var(--sp-card-border);
+}
+.esportes-overview .sp-chart-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.esportes-overview .sp-chart-heading h3 {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--sp-title);
+}
+.esportes-overview .sp-flip-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  touch-action: none;
+}
+.esportes-overview .sp-flip-controls > div {
+  display: flex;
+}
+.esportes-overview .sp-flip-controls button {
+  display: grid;
+  place-items: center;
   width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: 28px;
   color: var(--sp-muted);
-  border-radius: 8px;
 }
-.esportes-overview .sp-prism-dots {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  align-items: center;
-}
-.esportes-overview .sp-prism-dots button {
-  width: 7px;
-  height: 7px;
-  min-width: 7px;
-  border-radius: 999px;
-  background: var(--sp-grid);
-  padding: 0;
-}
-.esportes-overview .sp-prism-dots button[aria-current="true"] {
-  background: var(--sp-accent);
+.esportes-overview .sp-flip-controls span {
+  font-size: 9px;
+  line-height: 1.15;
+  color: var(--sp-muted);
 }
 
 .esportes-overview .sp-metric-value {
@@ -264,16 +271,65 @@
   }
 }
 
-/* Rótulo da face vizinha — pista visual de que há mais análises, sem ocupar
-   espaço de conteúdo. */
-.esportes-overview .sp-prism-peek {
-  display: block;
-  width: calc(100% - 44px);
-  text-align: left;
-  padding: 0 13px;
+/* --- seletor de modalidade ----------------------------------------------
+   As três lado a lado. A selecionada é a única com fundo; as outras ficam
+   só com a borda sobre o preto, para o contraste fazer o trabalho de dizer
+   qual está valendo sem precisar de check nem de cor extra. */
+.esportes-module .esportes-modalities {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.esportes-module .esportes-modalities button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  height: 40px;
+  /* Medido: a 390px sobram 97px por chip e "Caminhada" precisa de 66px de
+     texto. Ícone 13 + gap 3 + padding 10 + borda 2 deixa 69px — cabe com
+     folga de 3px, e é o que impede a reticência. */
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--foreground);
+  /* 12px é o maior tamanho em que "Caminhada" cabe inteiro nos três chips a
+     390px sem reticências — o rótulo cortado era pior que o texto menor. */
   font-size: 12px;
   font-weight: 600;
-  color: var(--sp-muted);
-  opacity: 0.55;
-  line-height: 1.35;
+}
+.esportes-module .esportes-modalities button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.esportes-module .esportes-modalities button svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+.esportes-module .esportes-modalities button[aria-checked="true"] {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+.esportes-module .esportes-modalities button[aria-checked="true"] svg {
+  color: var(--primary);
+}
+
+/* Abaixo disso nem 12px cabe com o ícone: o nome da modalidade importa mais
+   que a figura, então o ícone é o que sai. */
+@media (max-width: 370px) {
+  .esportes-module .esportes-modalities button {
+    gap: 0;
+    padding: 0 3px;
+  }
+  .esportes-module .esportes-modalities button svg {
+    display: none;
+  }
 }

@@ -1,16 +1,15 @@
 import { useState } from "react";
 import {
-  ChevronDown,
   Footprints,
   PersonStanding,
   Bike,
-  Check,
   Moon,
   Sun,
   Map as MapIcon,
   Satellite,
   Layers,
   Settings,
+  Check,
 } from "lucide-react";
 import { UnderlineTabs } from "@/components/ui/app-design-system";
 import { Modal } from "@/components/ui/modal";
@@ -49,7 +48,6 @@ const mapStyleIcon = {
 
 export function EsportesModule() {
   const [modality, setModality] = useState<SportModality>(loadLastModality);
-  const [modalityDrawerOpen, setModalityDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("visao_geral");
   const [mapStyle, setMapStyle] = useState<MapStyle>(loadMapStyle);
@@ -62,26 +60,37 @@ export function EsportesModule() {
   const selectModality = (m: SportModality) => {
     setModality(m);
     window.localStorage.setItem(MODALITY_STORAGE_KEY, m);
-    setModalityDrawerOpen(false);
   };
-
-  const Icon = modalityIcon[modality];
 
   return (
     <div className="esportes-module mt-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setModalityDrawerOpen(true)}
-          className="interactive-press flex h-10 items-center gap-2 rounded-full border border-border bg-surface-2 px-4 text-[15px] font-semibold"
-        >
-          <Icon className="h-[18px] w-[18px] text-primary" strokeWidth={1.8} />
-          {modalityLabel[modality]}
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-        </button>
+      {/* As três modalidades lado a lado. Antes era um botão só que abria um
+          modal: para trocar de corrida para ciclismo eram três toques e uma
+          tela por cima. Agora a escolha inteira está visível, e a selecionada
+          se distingue pelo fundo — as outras ficam só com a borda. */}
+      <div className="flex items-center gap-2">
+        <div className="esportes-modalities" role="radiogroup" aria-label="Modalidade">
+          {(Object.keys(modalityLabel) as SportModality[]).map((m) => {
+            const OptIcon = modalityIcon[m];
+            const selected = m === modality;
+            return (
+              <button
+                key={m}
+                role="radio"
+                aria-checked={selected}
+                onClick={() => selectModality(m)}
+                className="interactive-press"
+              >
+                <OptIcon strokeWidth={1.8} aria-hidden />
+                <span>{modalityLabel[m]}</span>
+              </button>
+            );
+          })}
+        </div>
         <button
           onClick={() => setSettingsOpen(true)}
           aria-label="Configurações da modalidade"
-          className="interactive-press flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface-2 text-muted-foreground hover:text-primary"
+          className="interactive-press flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-2 text-muted-foreground hover:text-primary"
         >
           <Settings className="h-[18px] w-[18px]" strokeWidth={1.8} />
         </button>
@@ -103,27 +112,6 @@ export function EsportesModule() {
         <OverviewTab modality={modality} onOpenPlanning={() => setActiveTab("planejamento")} />
       )}
       {activeTab === "planejamento" && <PlanningTab modality={modality} />}
-
-      {modalityDrawerOpen && (
-        <Modal title="Modalidade" onClose={() => setModalityDrawerOpen(false)}>
-          <div className="space-y-2">
-            {(Object.keys(modalityLabel) as SportModality[]).map((m) => {
-              const OptIcon = modalityIcon[m];
-              return (
-                <button
-                  key={m}
-                  onClick={() => selectModality(m)}
-                  className="card-surface flex w-full items-center gap-3 p-3 text-left hover:border-primary/40"
-                >
-                  <OptIcon className="h-5 w-5 text-primary" strokeWidth={1.8} />
-                  <span className="flex-1 text-sm font-semibold">{modalityLabel[m]}</span>
-                  {m === modality && <Check className="h-4 w-4 text-primary" />}
-                </button>
-              );
-            })}
-          </div>
-        </Modal>
-      )}
 
       {settingsOpen && (
         <Modal title="Configurações" onClose={() => setSettingsOpen(false)}>

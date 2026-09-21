@@ -187,12 +187,7 @@ export function OverviewTab({
       </section>
 
       {/* 3. evolução ------------------------------------------------------ */}
-      <section>
-        <h3 className="sp-section-title">Evolução</h3>
-        <div className="mt-1.5">
-          <MetricCarousel series={series} modality={modality} weeks={ANALYSIS_WEEKS} />
-        </div>
-      </section>
+      <MetricCarousel series={series} modality={modality} weeks={ANALYSIS_WEEKS} />
 
       {/* 4. atividade recente --------------------------------------------- */}
       <section>
