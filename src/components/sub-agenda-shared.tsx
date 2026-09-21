@@ -10,16 +10,19 @@ export function Card({
   title,
   children,
   quiet = false,
+  featured = false,
 }: {
   title: string;
   children: ReactNode;
-  /** Card de apoio na mesma tela de um card principal — mesmo formato, tom
-   * quase imperceptível sobre o preto, pra não repetir o mesmo destaque em
-   * toda seção da tela. */
+  /** Grafite discreto para conteúdo de apoio. */
   quiet?: boolean;
+  /** Leve tom verde reservado ao card principal, no máximo um por visão. */
+  featured?: boolean;
 }) {
   return (
-    <section className={`${quiet ? "card-surface-quiet" : "card-surface"} p-4`}>
+    <section
+      className={`${featured ? "card-surface-featured" : quiet ? "card-surface-quiet" : "card-surface"} p-4`}
+    >
       <h3 className="norte-section-title">{title}</h3>
       <div className="mt-3">{children}</div>
     </section>

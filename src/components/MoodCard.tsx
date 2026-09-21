@@ -49,13 +49,13 @@ export function MoodCard({
   };
 
   return (
-    <section className="card-surface mt-5 overflow-hidden">
+    <section className="card-surface-quiet mt-5 overflow-hidden">
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex min-h-16 w-full items-center gap-4 p-4 text-left hover:border-primary/40"
+        className="flex min-h-16 w-full items-center gap-4 p-4 text-left"
       >
-        <SmilePlus className="h-6 w-6 shrink-0 text-primary" strokeWidth={1.75} />
+        <SmilePlus className="h-6 w-6 shrink-0 text-muted-foreground" strokeWidth={1.75} />
         <div className="min-w-0 flex-1">
           <p className="text-base font-medium">Como você está?</p>
           <p className="text-[11px] text-muted-foreground">Registre como está se sentindo hoje</p>

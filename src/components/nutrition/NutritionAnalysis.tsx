@@ -64,7 +64,7 @@ export function NutritionAnalysis({ state }: { state: NutritionState }) {
           </button>
         ))}
       </div>
-      <section className="nutrition-panel">
+      <section className="nutrition-panel nutrition-featured">
         <div className="nutrition-section-heading">
           <h3>Consistência</h3>
           <button aria-label="Como a consistência é calculada" onClick={() => setHelp(true)}>

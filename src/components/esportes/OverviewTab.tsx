@@ -149,7 +149,7 @@ export function OverviewTab({
               <path d="M8 5v14l11-7z" />
             </svg>
           </button>
-          <span className="text-[13px] font-semibold" style={{ color: "var(--sp-accent)" }}>
+          <span className="text-[13px] font-medium" style={{ color: "var(--sp-title)" }}>
             {modalityActionLabel[modality]}
           </span>
         </div>
@@ -212,7 +212,7 @@ export function OverviewTab({
                 className="flex h-[70px] w-[104px] shrink-0 items-center justify-center rounded-xl"
                 style={{ background: "var(--sp-card)" }}
               >
-                <Icon className="h-6 w-6" style={{ color: "var(--sp-accent)" }} strokeWidth={1.8} />
+                <Icon className="h-6 w-6" style={{ color: "var(--sp-muted)" }} strokeWidth={1.8} />
               </div>
             ) : (
               <RoutePreview
@@ -223,7 +223,7 @@ export function OverviewTab({
               />
             )}
             <div className="min-w-0 flex-1">
-              <p className="text-[21px] font-bold" style={{ color: "var(--sp-accent)" }}>
+              <p className="text-[21px] font-semibold" style={{ color: "var(--sp-title)" }}>
                 {formatDistanceKm(mostRecent.distanceM)}
               </p>
               <p className="truncate text-[13px]" style={{ color: "var(--sp-muted)" }}>
@@ -289,7 +289,7 @@ function ConsistencyCard({
   const pct = target && target > 0 ? Math.min(1, done / target) : 0;
 
   return (
-    <div className="sp-card sp-week-card flex flex-col items-center justify-center gap-1.5 px-3 py-3">
+    <div className="sp-card sp-card--featured sp-week-card flex flex-col items-center justify-center gap-1.5 px-3 py-3">
       <ProgressRing
         value={target && target > 0 ? pct * 100 : null}
         label="Meta semanal de atividades"
@@ -305,8 +305,8 @@ function ConsistencyCard({
       ) : (
         <button
           onClick={onSetGoal}
-          className="interactive-press text-[11px] font-semibold"
-          style={{ color: "var(--sp-accent)" }}
+          className="interactive-press min-h-11 text-[11px] font-medium"
+          style={{ color: "var(--sp-muted)" }}
         >
           Definir meta semanal
         </button>
@@ -343,8 +343,8 @@ function NextActivityCard({
         </p>
         <button
           onClick={onOpenPlanning}
-          className="interactive-press flex items-center gap-1 text-[13px] font-semibold"
-          style={{ color: "var(--sp-accent)" }}
+          className="interactive-press min-h-11 flex items-center gap-1 text-[13px] font-medium"
+          style={{ color: "var(--sp-muted)" }}
         >
           Planejar {modality === "ciclismo" ? "pedalada" : modality} <ArrowRight size={14} />
         </button>
@@ -394,8 +394,8 @@ function NextActivityCard({
       </div>
       <button
         onClick={onOpenPlanning}
-        className="interactive-press flex items-center gap-1 text-[13px] font-semibold"
-        style={{ color: "var(--sp-accent)" }}
+        className="interactive-press min-h-11 flex items-center gap-1 text-[13px] font-medium"
+        style={{ color: "var(--sp-muted)" }}
       >
         Ver planejamento <ArrowRight size={14} />
       </button>

@@ -14,8 +14,10 @@ Uma experiência contínua entre Hoje, Agenda, Plano, Espelho e rotinas. Harmoni
 
 ## Material e hierarquia
 
-- Fundo preto; superfície principal grafite `#151a1c`; superfície secundária `#242a2d`; borda `#30383c`.
-- Verde `#87ed85` para ações/progresso. No tema claro, usar o verde escuro semântico, nunca o verde claro como texto sobre branco.
+- Fundo preto; cards padrão em grafite neutro `#191a1c`, apoio em `#131416`, controles em `#26282b`; bordas neutras `#333639`/`#2b2d30`. Superfícies escuras planas, sem brilho decorativo.
+- `card-surface-featured` (`#151e1a`) é opt-in: no máximo um card principal por visão. A maioria deve continuar neutra, incluindo lembretes, hidratação e humor.
+- Verde `#87ed85` para ação principal, seleção e progresso com dados. Ícones decorativos, navegação secundária e estados vazios ficam cinza. Bordas verdes indicam seleção/etapa atual, não decoram todos os cards. Rotinas na Hoje preservam os ícones de marca em verde.
+- No tema claro, usar o verde escuro semântico, nunca o verde claro como texto sobre branco.
 - Branco para conteúdo principal; cinza para contexto. Avisos e perdas mantêm cores semânticas e rótulos; não dependem só da cor.
 - Cards principais com raio de 20px; controles e itens internos com 12px. Espaçamento interno regular de 18px, compacto de 12–16px; separação de seções em 24px.
 - Seções secundárias e gráficos podem ficar diretamente no fundo, com divisórias discretas. Não colocar uma caixa em volta de cada informação.
@@ -40,6 +42,7 @@ Uma experiência contínua entre Hoje, Agenda, Plano, Espelho e rotinas. Harmoni
 - Botão padrão com 44px; componentes compactos respeitam contexto. Cor nunca é a única indicação de seleção.
 - No mobile estreito, preservar rótulos legíveis: Finanças usa “Registros” e “Planejar”; legenda financeira empilha abaixo do anel.
 - Respeitar tema claro/escuro e redução de movimento. Dados, filtros e estados vazios continuam funcionais.
+- Detalhes secundários podem usar `norte-disclosure`: resumo visível, seta, teclado nativo e conteúdo recolhido fora da navegação por Tab. Gastos recentes abre ao selecionar uma categoria; trocar de mês limpa esse filtro. Extras de hoje usa a mesma gaveta. Não esconder a ação do dia nem o gráfico principal.
 
 ## Verificação
 

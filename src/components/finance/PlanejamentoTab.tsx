@@ -63,8 +63,8 @@ export function PlanejamentoTab() {
             search={{ modo: "planejamento", financeGoalId: objective.id }}
             className="card-surface flex items-center gap-3 p-4"
           >
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10">
-              <Target className="h-5 w-5 text-primary" />
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-2">
+              <Target className="h-5 w-5 text-muted-foreground" />
             </span>
             <span className="min-w-0 flex-1">
               <strong className="block truncate text-sm">{objective.name}</strong>
@@ -72,7 +72,7 @@ export function PlanejamentoTab() {
                 Meta de {formatBRL(objective.targetAmount)}
               </span>
             </span>
-            <span className="flex items-center gap-1 text-xs font-semibold text-primary">
+            <span className="norte-secondary-action flex items-center gap-1 text-xs">
               Planejar <ArrowRight className="h-3.5 w-3.5" />
             </span>
           </Link>
@@ -88,7 +88,7 @@ export function PlanejamentoTab() {
 
       {rows.length === 0 && withoutPlan.length === 0 && (
         <div className="rounded-xl border border-border bg-surface p-4">
-          <CalendarRange className="h-5 w-5 text-primary" />
+          <CalendarRange className="h-5 w-5 text-muted-foreground" />
           <p className="mt-3 text-sm font-semibold">Você ainda não tem um objetivo financeiro</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
             Crie primeiro um objetivo com valor e prazo. Depois, volte aqui para dividi-lo em

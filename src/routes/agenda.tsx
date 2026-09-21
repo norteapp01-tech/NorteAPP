@@ -772,7 +772,7 @@ function AgendaEventBlock({
         onPointerMove={moveDrag}
         onPointerUp={finishDrag}
         onPointerCancel={finishDrag}
-        className={`absolute right-1 left-0 z-10 touch-none select-none rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-left shadow-sm ${saving ? "opacity-60" : "cursor-grab active:cursor-grabbing"}`}
+        className={`absolute right-1 left-0 z-10 touch-none select-none rounded-xl border border-border bg-surface px-3 py-2 text-left shadow-sm ${saving ? "opacity-60" : "cursor-grab active:cursor-grabbing"}`}
         style={{ top, height }}
         role="button"
         tabIndex={0}
@@ -791,7 +791,7 @@ function AgendaEventBlock({
           className="absolute right-0 bottom-0 left-0 flex h-4 touch-none items-end justify-center pb-1"
           aria-label="Ajustar duração"
         >
-          <span className="h-0.5 w-8 rounded-full bg-primary/60" />
+          <span className="h-0.5 w-8 rounded-full bg-muted-foreground/50" />
         </div>
       </div>
 

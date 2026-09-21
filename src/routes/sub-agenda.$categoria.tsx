@@ -411,7 +411,8 @@ function AcademiaModule() {
       </Card>
 
       <Card
-        quiet
+        featured={Boolean(todayPlan || liveSession)}
+        quiet={!todayPlan && !liveSession}
         title={
           liveSession && livePlan
             ? `Treino em andamento — ${livePlan.letter} · ${livePlan.name}`
@@ -607,7 +608,7 @@ function AcademiaModule() {
                 setWeightDraft(currentWeight !== undefined ? String(currentWeight) : "");
                 setShowWeightInput(true);
               }}
-              className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
+              className="min-h-11 rounded-lg border border-border px-4 py-2 text-xs font-medium text-foreground"
             >
               + registrar
             </button>
@@ -733,7 +734,7 @@ function WeekdayPlanPicker({
             onClick={() => onPick(p.id)}
             className="card-surface flex w-full items-center gap-3 p-3 text-left hover:border-primary/40"
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-sm font-bold text-primary">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-sm font-semibold text-muted-foreground">
               {p.letter}
             </span>
             <div className="min-w-0 flex-1">
@@ -776,7 +777,7 @@ function PlanManagerCard() {
                   onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
                   className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-sm font-bold text-primary">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-sm font-semibold text-muted-foreground">
                     {p.letter}
                   </span>
                   <div className="min-w-0 flex-1">

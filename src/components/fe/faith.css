@@ -22,8 +22,8 @@
   line-height: 1.25;
 }
 .faith-capture {
-  background: var(--faith-panel);
-  border: 1px solid var(--faith-border);
+  background: var(--surface-featured);
+  border: 1px solid var(--border-featured);
   border-radius: var(--norte-card-radius);
   padding: 18px 14px;
 }
@@ -123,7 +123,7 @@
   border-bottom: 0;
 }
 .faith-record.is-featured small > span {
-  color: var(--primary);
+  color: var(--faith-muted);
 }
 .faith-memory {
   display: flex;
@@ -135,7 +135,7 @@
   margin-top: 16px;
 }
 .faith-memory > svg {
-  color: var(--primary);
+  color: var(--faith-muted);
   flex-shrink: 0;
 }
 .faith-memory small {
@@ -152,7 +152,7 @@
   overflow: hidden;
 }
 .faith-link {
-  color: var(--primary);
+  color: var(--faith-muted);
   font-size: 12px;
 }
 .faith-navigation {

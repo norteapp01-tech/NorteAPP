@@ -83,11 +83,11 @@ export function RemindersCard({ compact = false }: { compact?: boolean }) {
           onFocus={pauseThenResume}
           onPointerDown={pauseThenResume}
           onClick={() => setShowModal(true)}
-          className="flex min-h-24 min-w-0 flex-1 items-center gap-3 rounded-xl border border-border bg-surface p-3.5 text-left"
+          className="card-surface-quiet flex min-h-24 min-w-0 flex-1 items-center gap-2 p-3.5 text-left"
         >
-          <Bell className="h-7 w-7 shrink-0 text-primary" strokeWidth={1.75} />
+          <Bell className="h-6 w-6 shrink-0 text-muted-foreground" strokeWidth={1.75} />
           <span className="min-w-0 flex-1">
-            <span className="block text-[10px] font-semibold uppercase tracking-wider text-primary">
+            <span className="block whitespace-nowrap text-[11px] font-medium text-muted-foreground">
               Lembrete
             </span>
             {current ? (

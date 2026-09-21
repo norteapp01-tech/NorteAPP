@@ -21,14 +21,11 @@ export function HydrationCard({ className = "" }: { className?: string }) {
       <button
         onClick={() => setOpen(true)}
         aria-label="Registrar água"
-        // Ao lado do card de lembretes, que fica no tom principal — os dois
-        // juntos com o mesmo verde-cinza repetiam a mancha logo no topo da
-        // Hoje. Só a cor muda aqui, o resto do card é idêntico.
-        className={`flex min-h-24 items-center gap-3 rounded-xl border border-[var(--border-quiet)] bg-[var(--surface-quiet)] p-3.5 text-left ${className}`}
+        className={`card-surface-quiet flex min-h-24 min-w-0 items-center gap-2 p-3.5 text-left ${className}`}
       >
-        <Droplet className="h-7 w-7 shrink-0 text-primary" strokeWidth={1.75} />
+        <Droplet className="h-6 w-6 shrink-0 text-muted-foreground" strokeWidth={1.75} />
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+          <p className="whitespace-nowrap text-[11px] font-medium text-muted-foreground">
             Hidratação
           </p>
           <p className="mt-1 text-lg font-bold leading-tight">

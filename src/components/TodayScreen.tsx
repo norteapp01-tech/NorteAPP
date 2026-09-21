@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { nowDate } from "@/lib/test-clock";
-import { Check, X, Sparkles, CalendarClock, Compass } from "lucide-react";
+import { Check, X, Sparkles, CalendarClock, Compass, ChevronDown } from "lucide-react";
 import { AppMenuButton } from "@/components/ui/app-design-system";
 import { InlineError } from "@/components/ui/inline-error";
 import { useAsyncAction } from "@/hooks/use-async-action";
@@ -141,13 +141,13 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
           <button
             aria-label="Conversar com o Norte"
             onClick={onOpenChat}
-            className="absolute right-10 -top-2 flex h-10 w-10 items-center justify-center text-primary"
+            className="absolute right-10 -top-2 flex h-10 w-10 items-center justify-center text-muted-foreground"
           >
             <Compass size={22} />
           </button>
         )}
-        <div className="pr-12">
-          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+        <div>
+          <p className="pr-20 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
             {nowDate().toLocaleDateString("pt-BR", {
               weekday: "long",
               day: "2-digit",
@@ -184,7 +184,7 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
       </header>
 
       {lastAdjustment && (
-        <div className="card-surface mt-3 flex items-center gap-3 border-primary/30 px-4 py-3">
+        <div className="card-surface-quiet mt-3 flex items-center gap-3 px-4 py-3">
           <p className="min-w-0 flex-1 text-xs text-muted-foreground">
             Dia ajustado · {lastAdjustment.tasks.length}{" "}
             {lastAdjustment.kind === "move" ? "movida(s) para amanhã" : "retirada(s) de hoje"}
@@ -225,7 +225,9 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
         </span>
       </div>
 
-      <ul className="card-surface mt-3 divide-y divide-border overflow-hidden">
+      <ul
+        className={`${tasks.length ? "card-surface-featured" : "card-surface"} mt-3 divide-y divide-border overflow-hidden`}
+      >
         {displayTasks.map((t) => {
           const cat = categoryMeta[t.category] ?? categoryMeta.generico;
           const missed = isMissed(t);
@@ -280,20 +282,23 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
       </ul>
 
       {extraTasks.length > 0 && (
-        <section className="card-surface mt-4 overflow-hidden border-primary/30">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <div>
-              <h2 className="text-sm font-semibold">Extras de hoje</h2>
-              <p className="text-[11px] text-muted-foreground">Se sobrar energia, você adianta.</p>
-            </div>
-            <span className="text-xs font-semibold text-primary">{extraTasks.length}</span>
-          </div>
-          <div className="divide-y divide-border">
+        <details className="norte-disclosure card-surface-quiet mt-4 overflow-hidden">
+          <summary className="px-4 py-3">
+            <span className="flex-1">
+              <span className="block text-sm font-medium">Extras de hoje</span>
+              <span className="block text-[11px] text-muted-foreground">
+                Se sobrar energia, você adianta.
+              </span>
+            </span>
+            <span className="text-xs text-muted-foreground">{extraTasks.length}</span>
+            <ChevronDown size={16} aria-hidden />
+          </summary>
+          <div className="divide-y divide-border border-t border-border">
             {extraTasks.map((task) => (
               <ExtraTaskRow key={task.id} id={task.id} title={task.title} dueDate={task.dueDate} />
             ))}
           </div>
-        </section>
+        </details>
       )}
 
       <div className="mt-4 flex items-stretch gap-3">
@@ -532,7 +537,7 @@ function MoodActionPanel({
   };
 
   return (
-    <section className="card-surface mt-3 space-y-4 border-primary/30 bg-primary/5 p-4">
+    <section className="card-surface mt-3 space-y-4 p-4">
       <div className="flex items-start gap-3">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15">
           <Sparkles className="h-4 w-4 text-primary" />

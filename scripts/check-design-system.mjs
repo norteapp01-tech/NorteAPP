@@ -68,7 +68,9 @@ const tables = {
     {
       id: "b1",
       title: "Hábitos Atômicos",
-      author: "James Clear",
+      authors: ["James Clear"],
+      format: "physical",
+      progress_mode: "pages",
       total_pages: 320,
       current_page: 188,
       status: "reading",
@@ -87,6 +89,46 @@ const tables = {
     },
   ],
 };
+tables.sport_activities = Array.from({ length: 8 }, (_, i) => {
+  const date = new Date();
+  date.setDate(date.getDate() - i * 3);
+  return {
+    id: `run-${i}`,
+    modality: "corrida",
+    source: "manual",
+    title: "Corrida no parque",
+    started_at: date.toISOString(),
+    ended_at: date.toISOString(),
+    active_duration_s: 1800 + i * 60,
+    total_duration_s: 1800 + i * 60,
+    distance_m: 5000,
+    avg_pace_s_per_km: 360 + i * 12,
+    avg_speed_kmh: 10,
+    created_at: date.toISOString(),
+    updated_at: date.toISOString(),
+  };
+});
+const tomorrowDate = new Date();
+tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+const tomorrow = tomorrowDate.toLocaleDateString("en-CA");
+tables.profiles = { mood_date: day, mood_extra_execution_ids: ["extra"], water_goal_ml: 2000 };
+tables.executions = [
+  {
+    id: "today-task",
+    title: "Preparar a semana",
+    due_date: day,
+    agenda_date: day,
+    start_time: "18:00",
+  },
+  { id: "extra", title: "Revisar minhas anotações", due_date: tomorrow },
+].map((task) => ({
+  ...task,
+  category: "generico",
+  status: "planejada",
+  weight: "media",
+  rigid: false,
+  created_at: new Date().toISOString(),
+}));
 tables.transactions = tables.transactions.map((t) => ({
   ...t,
   created_at: new Date().toISOString(),
@@ -134,7 +176,9 @@ const routes = [
   ["leitura", "/sub-agenda/leitura"],
   ["fe", "/sub-agenda/fe"],
   ["criar", "/criar"],
-];
+].filter(
+  ([name]) => !process.env.AUDIT_ROUTES || process.env.AUDIT_ROUTES.split(",").includes(name),
+);
 async function check(name) {
   assert.equal(
     await page.locator("body").evaluate((el) => el.scrollWidth > innerWidth),
@@ -172,7 +216,44 @@ try {
         await page.getByRole("button", { name: "Próximo nutriente", exact: true }).click();
         assert.equal(await page.getByLabel("Nutriente", { exact: true }).inputValue(), "1");
       }
+      if (name === "hoje") {
+        const extras = page.locator("details").filter({ hasText: "Extras de hoje" });
+        assert.equal(await extras.getAttribute("open"), null);
+        await extras.locator("summary").focus();
+        await page.keyboard.press("Enter");
+        await extras.getByText("Revisar minhas anotações", { exact: true }).waitFor();
+        await extras.locator("summary").click();
+        await extras
+          .getByText("Revisar minhas anotações", { exact: true })
+          .waitFor({ state: "hidden" });
+      }
       if (name === "financas") {
+        const recent = page.locator("details").filter({ hasText: "Gastos recentes" });
+        assert.equal(await recent.getAttribute("open"), null, "Recent expenses starts collapsed");
+        assert.equal(await recent.getByText("Mercado", { exact: true }).isVisible(), false);
+        await recent.locator("summary").focus();
+        await page.keyboard.press("Enter");
+        await recent.getByText("Mercado", { exact: true }).waitFor();
+        await recent.locator("summary").click();
+        await recent.getByText("Mercado", { exact: true }).waitFor({ state: "hidden" });
+        await page
+          .locator(".finance-distribution button")
+          .filter({ hasText: "Alimentação" })
+          .click();
+        await recent.getByText("Mercado", { exact: true }).waitFor();
+        assert.equal(await recent.getByText("Transporte", { exact: true }).count(), 0);
+        await check(`${theme}-finance-category-drawer`);
+        await recent.getByRole("button", { name: "Limpar filtro" }).click();
+        await recent.getByText("Transporte", { exact: true }).waitFor();
+        await page.getByRole("button", { name: "Próximo mês", exact: true }).click();
+        await page.getByText("O gráfico começa com o primeiro gasto").waitFor();
+        await page.getByRole("button", { name: "Mês anterior", exact: true }).click();
+        await recent.locator("summary").waitFor();
+        assert.equal(
+          await recent.getAttribute("open"),
+          null,
+          "Month change resets drawer and category",
+        );
         await page.getByRole("tab", { name: "Visão", exact: true }).focus();
         await page.keyboard.press("ArrowRight");
         assert.equal(
@@ -188,7 +269,7 @@ try {
   }
   assert.deepEqual(errors, [], "No runtime errors");
   console.log(
-    `PASS: 11 routes, both themes, 320/390px, charts and keyboard tabs. Screenshots: ${out}`,
+    `PASS: ${routes.length} routes, both themes, 320/390px, charts, keyboard tabs and disclosure interactions. Screenshots: ${out}`,
   );
 } catch (error) {
   console.error(errors);

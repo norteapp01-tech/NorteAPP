@@ -49,8 +49,10 @@ export function NextActionCard({
 
   if (action.kind !== "action") {
     return (
-      <div className="card-surface border-l-2 border-l-primary p-5">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-primary">Próximo passo</p>
+      <div className="card-surface-featured border-l-2 border-l-primary p-5">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          Próximo passo
+        </p>
         <p className="mt-2 text-[15px] font-medium text-balance-tight">
           Defina o primeiro passo deste plano
         </p>
@@ -92,8 +94,10 @@ export function NextActionCard({
   };
 
   return (
-    <div className="card-surface border-l-2 border-l-primary p-5">
-      <p className="text-[11px] font-bold uppercase tracking-wider text-primary">Próximo passo</p>
+    <div className="card-surface-featured border-l-2 border-l-primary p-5">
+      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        Próximo passo
+      </p>
       <div className="mt-2.5 flex items-start gap-3">
         <button
           disabled={completing}

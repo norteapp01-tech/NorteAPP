@@ -81,7 +81,7 @@ export function ContinueReadingCard({
           <div className="mt-3 space-y-0.5 text-[11px] text-muted-foreground">
             {target && (
               <>
-                <p className="text-primary">{todayLine(book, target.plannedAmount)}</p>
+                <p className="text-muted-foreground">{todayLine(book, target.plannedAmount)}</p>
                 <p>{milestoneLine(book, progress.current, target.plannedAmount)}</p>
               </>
             )}
@@ -90,7 +90,7 @@ export function ContinueReadingCard({
         ) : (
           <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
             <p>Configure sua rotina para distribuir sua leitura.</p>
-            <button onClick={onOpenRoutineSetup} className="shrink-0 font-semibold text-primary">
+            <button onClick={onOpenRoutineSetup} className="norte-secondary-action shrink-0">
               configurar rotina
             </button>
           </div>

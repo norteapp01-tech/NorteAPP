@@ -1,5 +1,5 @@
-import { useMemo, useState, type ReactElement } from "react";
-import { ArrowDownRight, ArrowUpRight, ChevronRight, Target } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactElement } from "react";
+import { ArrowDownRight, ArrowUpRight, ChevronDown, ChevronRight, Target } from "lucide-react";
 import {
   useFinanceStore,
   transactionsForMonth,
@@ -45,6 +45,15 @@ export function ResumoTab({
   const unallocated = income - expenses - directed;
   const breakdown = categoryBreakdown(state.transactions, month).slice(0, 6);
   const [selected, setSelected] = useState<string | null>(null);
+  const [recentOpen, setRecentOpen] = useState(false);
+  useEffect(() => {
+    setSelected(null);
+    setRecentOpen(false);
+  }, [month]);
+  const selectCategory = (category: string) => {
+    setSelected((current) => (current === category ? null : category));
+    setRecentOpen(true);
+  };
   const visible = monthTransactions
     .filter((t) => t.type === "expense" && (!selected || t.category === selected))
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -66,7 +75,7 @@ export function ResumoTab({
           </div>
           <button
             onClick={() => onOpenMovements()}
-            className="flex items-center gap-1 text-xs font-semibold text-primary"
+            className="norte-secondary-action flex min-h-11 items-center gap-1 text-xs"
           >
             Lançamentos <ChevronRight className="h-3.5 w-3.5" />
           </button>
@@ -81,7 +90,7 @@ export function ResumoTab({
         </p>
       </section>
 
-      <Card title="Para onde foi seu dinheiro">
+      <Card featured title="Para onde foi seu dinheiro">
         {breakdown.length === 0 ? (
           <div className="py-5 text-center">
             <p className="text-sm font-semibold">O gráfico começa com o primeiro gasto</p>
@@ -92,20 +101,13 @@ export function ResumoTab({
         ) : (
           <>
             <div className="finance-distribution flex items-center gap-5">
-              <Donut
-                items={breakdown}
-                selected={selected}
-                onSelect={(category) =>
-                  setSelected((current) => (current === category ? null : category))
-                }
-              />
+              <Donut items={breakdown} selected={selected} onSelect={selectCategory} />
               <div className="min-w-0 flex-1 space-y-1">
                 {breakdown.map((item, index) => (
                   <button
                     key={item.category}
-                    onClick={() =>
-                      setSelected((current) => (current === item.category ? null : item.category))
-                    }
+                    onClick={() => selectCategory(item.category)}
+                    aria-pressed={selected === item.category}
                     className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left ${selected === item.category ? "bg-primary/10" : ""}`}
                   >
                     <span className="flex min-w-0 items-center gap-2 text-xs font-medium">
@@ -120,15 +122,26 @@ export function ResumoTab({
                 ))}
               </div>
             </div>
-            <div className="mt-4 border-t border-border pt-3">
+            <details
+              className="norte-disclosure mt-4 border-t border-border"
+              open={recentOpen}
+              onToggle={(event) => setRecentOpen(event.currentTarget.open)}
+            >
+              <summary>
+                <span>Gastos recentes</span>
+                <span className="min-w-0 truncate text-xs text-muted-foreground">
+                  {selected ??
+                    `${monthTransactions.filter((t) => t.type === "expense").length} registros`}
+                </span>
+                <ChevronDown size={16} aria-hidden />
+              </summary>
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold">{selected ?? "Gastos recentes"}</p>
                 {selected && (
                   <button
                     onClick={() => setSelected(null)}
-                    className="text-[10px] text-muted-foreground"
+                    className="norte-secondary-action min-h-11 text-xs"
                   >
-                    limpar filtro
+                    Limpar filtro
                   </button>
                 )}
               </div>
@@ -147,11 +160,11 @@ export function ResumoTab({
               </ul>
               <button
                 onClick={() => onOpenMovements(selected ?? undefined)}
-                className="mt-2 text-xs font-semibold text-primary"
+                className="norte-secondary-action mt-2 flex min-h-11 items-center gap-2 text-xs"
               >
-                Ver todas as movimentações
+                Ver todas as movimentações <ChevronRight size={14} aria-hidden />
               </button>
-            </div>
+            </details>
           </>
         )}
       </Card>
@@ -277,7 +290,11 @@ function GoalRow({ goal, onClick }: { goal: FinancialGoal; onClick: () => void }
             {formatBRL(goal.savedAmount)} de {formatBRL(goal.targetAmount)}
           </p>
         </div>
-        <span className="text-sm font-bold text-primary">{pct}%</span>
+        <span
+          className={`text-sm font-semibold ${pct > 0 ? "text-primary" : "text-muted-foreground"}`}
+        >
+          {pct}%
+        </span>
       </div>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
         <div className="progress-fill h-full bg-primary" style={{ width: `${pct}%` }} />

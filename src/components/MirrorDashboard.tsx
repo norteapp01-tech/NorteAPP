@@ -93,7 +93,7 @@ export function MirrorDashboard() {
         onChange={setRange}
       />
 
-      <section className="card-surface mt-4 p-5">
+      <section className="card-surface-featured mt-4 p-5">
         <p className="text-[11px] font-semibold uppercase tracking-[.16em] text-muted-foreground">
           Ritmo da {range}
         </p>
@@ -148,7 +148,10 @@ export function MirrorDashboard() {
                   className={`p-4 ${i % 2 === 0 ? "border-r border-border" : ""} ${i < areas.length - 2 ? "border-b border-border" : ""}`}
                 >
                   <div className="flex gap-3">
-                    <Icon className="mt-0.5 h-6 w-6 shrink-0 text-primary" strokeWidth={1.8} />
+                    <Icon
+                      className="mt-0.5 h-6 w-6 shrink-0 text-muted-foreground"
+                      strokeWidth={1.8}
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs text-muted-foreground">
                         {categoryMeta[a.category]?.label ?? a.category}
@@ -181,7 +184,7 @@ export function MirrorDashboard() {
         <div className="card-surface mt-3 divide-y divide-border px-4">
           <Insight
             icon={TrendingUp}
-            tone="text-primary"
+            tone={strongest ? "text-primary" : "text-muted-foreground"}
             label="Ponto forte"
             title={
               strongest
@@ -196,7 +199,7 @@ export function MirrorDashboard() {
           />
           <Insight
             icon={AlertCircle}
-            tone="text-danger"
+            tone={attention ? "text-danger" : "text-muted-foreground"}
             label="Merece atenção"
             title={
               attention
@@ -236,7 +239,9 @@ export function MirrorDashboard() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{g.title}</p>
                     <p
-                      className={pace === "behind" ? "text-xs text-danger" : "text-xs text-primary"}
+                      className={
+                        pace === "behind" ? "text-xs text-danger" : "text-xs text-muted-foreground"
+                      }
                     >
                       {pace === "behind" ? "Atrasado" : pace === "ahead" ? "Adiantado" : "No prazo"}
                     </p>

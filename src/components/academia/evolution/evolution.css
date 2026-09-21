@@ -25,7 +25,7 @@
 .evolution-dashboard .evo-tabs button[aria-pressed="true"] {
   color: var(--evo-accent);
   border-color: var(--evo-accent);
-  background: linear-gradient(110deg, #00df9820, #00df9808);
+  background: var(--surface-2);
 }
 /* Cor e borda vêm de .card-surface / .card-surface-quiet, aplicada junto no
  * mesmo elemento — .evo-card cuida só do espaçamento próprio da Evolução. */
@@ -52,7 +52,7 @@
 .evolution-dashboard .evo-kpi svg {
   width: 21px;
   height: 21px;
-  color: var(--evo-accent);
+  color: var(--muted-foreground);
   margin-bottom: 7px;
 }
 .evolution-dashboard .evo-kpi small {
@@ -70,7 +70,7 @@
 .evolution-dashboard .evo-kpi span {
   display: block;
   font-size: 10px;
-  color: #a8afb9;
+  color: var(--muted-foreground);
   line-height: 1.4;
 }
 .evolution-dashboard .evo-period {
@@ -94,8 +94,8 @@
   border-radius: 9px;
 }
 .evolution-dashboard .evo-period-group button[aria-pressed="true"] {
-  background: var(--evo-accent);
-  color: #001a11;
+  background: var(--surface-2);
+  color: var(--foreground);
 }
 .evolution-dashboard .evo-custom {
   display: flex;
@@ -131,8 +131,8 @@
 }
 .evolution-dashboard .evo-outline {
   width: 100%;
-  border: 1px solid var(--evo-accent);
-  color: var(--evo-accent);
+  border: 1px solid var(--evo-line);
+  color: var(--foreground);
   border-radius: 8px;
   padding: 9px;
   font-size: 12px;
@@ -156,8 +156,8 @@
 /* Norte: quiet graphite controls, open black sections, color for the data. */
 .evolution-dashboard .evo-tabs button[aria-pressed="true"],
 .evolution-dashboard .evo-period-group button[aria-pressed="true"] {
-  color: var(--evo-accent);
-  background: var(--evo-panel);
+  color: var(--foreground);
+  background: var(--surface-2);
   border-color: var(--evo-line);
 }
 .evolution-dashboard .evo-card {

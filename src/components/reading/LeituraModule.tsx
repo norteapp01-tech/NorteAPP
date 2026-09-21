@@ -150,7 +150,7 @@ export function LeituraModule() {
                       await startReading(b.id);
                       setModal({ type: "bookDetails", bookId: b.id });
                     }}
-                    className="shrink-0 text-[11px] font-semibold text-primary"
+                    className="norte-secondary-action shrink-0 text-[11px]"
                   >
                     começar
                   </button>
@@ -186,7 +186,7 @@ export function LeituraModule() {
             onClick={() => setModal({ type: "addBook" })}
             className="grid h-9 w-9 place-items-center rounded-lg border border-border"
           >
-            <Plus className="h-4 w-4 text-primary" />
+            <Plus className="h-4 w-4 text-muted-foreground" />
           </button>
         </div>
         <details className="group py-3">
@@ -201,7 +201,7 @@ export function LeituraModule() {
           {selectedBook && (
             <button
               onClick={() => setModal({ type: "routine", book: selectedBook })}
-              className="mt-3 ml-8 text-xs font-semibold text-primary"
+              className="norte-secondary-action mt-3 ml-8 text-xs"
             >
               Configurar rotina
             </button>

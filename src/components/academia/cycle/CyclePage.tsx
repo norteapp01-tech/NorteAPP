@@ -313,7 +313,7 @@ export function CyclePage({
                 })
               }
               disabled={action.pending}
-              className="interactive-press mt-2 flex h-12 w-fit items-center gap-1.5 rounded-2xl border border-primary/50 px-4 text-sm font-semibold text-primary hover:bg-primary/5 disabled:opacity-40"
+              className="interactive-press mt-2 flex h-12 w-fit items-center gap-1.5 rounded-2xl border border-border px-4 text-sm font-medium text-foreground hover:bg-surface-2 disabled:opacity-40"
             >
               <Plus className="h-4 w-4" /> Nova etapa
             </button>

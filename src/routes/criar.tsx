@@ -112,14 +112,14 @@ function CreateScreen() {
             className="card-surface flex w-full items-start gap-4 p-5 text-left transition-colors hover:border-primary/50"
           >
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/15">
-              <CalendarDays className="h-6 w-6 text-primary" />
+              <CalendarDays className="h-6 w-6 text-muted-foreground" />
             </div>
             <div>
               <p className="font-bold">Adicionar à Agenda</p>
               <p className="mt-1 text-xs text-muted-foreground text-balance-tight">
                 Algo pontual, com hora marcada. Ex: "Reunião segunda às 14h", "Médico sexta".
               </p>
-              <p className="mt-2 text-[11px] font-semibold text-primary">
+              <p className="mt-2 text-[11px] font-medium text-muted-foreground">
                 3 campos · 15s · pode vincular a um plano
               </p>
             </div>

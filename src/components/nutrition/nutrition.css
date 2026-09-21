@@ -41,6 +41,10 @@
   color: var(--nutrition-muted);
   white-space: nowrap;
 }
+.nutrition-panel.nutrition-featured {
+  background: var(--surface-featured);
+  border-color: var(--border-featured);
+}
 .nutrition-drawer-heading {
   width: 100%;
   display: flex;
@@ -181,6 +185,9 @@
 .nutrition-comparison span {
   color: var(--nutrition-muted);
 }
+.nutrition-comparison:not(:has(svg)) {
+  color: var(--nutrition-muted);
+}
 .nutrition-chart-panel {
   padding: 20px 0;
   background: transparent;
@@ -305,8 +312,9 @@
 }
 .nutrition-detail-link {
   margin-top: 14px;
+  min-height: 44px;
   padding: 5px 0;
-  color: var(--nutrition-green);
+  color: var(--nutrition-muted);
   font-size: 13px;
 }
 .nutrition-empty {

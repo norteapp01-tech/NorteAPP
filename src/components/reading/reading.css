@@ -9,8 +9,8 @@
   --reading-muted: var(--muted-foreground);
 }
 .reading-hero > * {
-  background: var(--reading-panel);
-  border: 1px solid var(--reading-line);
+  background: var(--surface-featured);
+  border: 1px solid var(--border-featured);
   border-radius: var(--norte-card-radius);
   padding: 20px;
 }
@@ -21,7 +21,7 @@
   margin-top: 20px;
 }
 .reading-hero .bg-gradient-to-br {
-  background: #252b2e;
+  background: var(--surface-2);
   border: 1px solid var(--reading-line);
   box-shadow: none;
 }
@@ -62,7 +62,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--primary);
+  color: var(--reading-muted);
   font-size: 12px;
 }
 .reading-week {

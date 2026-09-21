@@ -37,6 +37,8 @@
   --color-surface-2: var(--surface-2);
   --color-surface-quiet: var(--surface-quiet);
   --color-border-quiet: var(--border-quiet);
+  --color-surface-featured: var(--surface-featured);
+  --color-border-featured: var(--border-featured);
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -54,18 +56,16 @@
   --radius: 1rem;
   --background: #000000;
   --foreground: oklch(0.98 0 0);
-  --surface: #151a1c;
-  --surface-2: #242a2d;
-  /* Segundo tom de card, mais próximo do fundo preto — para o módulo que não
-   * precisa disputar atenção com o card principal da tela ficar quase
-   * imperceptível em vez de repetir a mesma mancha cinza-esverdeada em toda
-   * seção. Metade da luminância de --surface, mas não preto puro: ainda
-   * precisa se ler como um card, não como um buraco na página. */
-  --surface-quiet: #0b0e0f;
-  --border-quiet: #1f2427;
-  --card: #151a1c;
+  /* Grafite neutro é o padrão. O leve tom verde é opt-in para a âncora da tela. */
+  --surface: #191a1c;
+  --surface-2: #26282b;
+  --surface-quiet: #131416;
+  --border-quiet: #2b2d30;
+  --surface-featured: #151e1a;
+  --border-featured: #303c35;
+  --card: #191a1c;
   --card-foreground: oklch(0.98 0 0);
-  --popover: #151a1c;
+  --popover: #191a1c;
   --popover-foreground: oklch(0.98 0 0);
   --primary: #87ed85;
   --primary-foreground: oklch(0.15 0.02 150);
@@ -80,13 +80,13 @@
   --success: oklch(0.82 0.18 145);
   --warning: oklch(0.82 0.16 85);
   --danger: oklch(0.7 0.2 25);
-  --border: #30383c;
+  --border: #333639;
   --input: oklch(0.27 0.008 260);
   --ring: oklch(0.82 0.18 145);
   --action-green: #87ed85;
   --action-ink: #06260d;
-  --surface-sheen: linear-gradient(145deg, #ffffff03, #0000000a);
-  --surface-shadow: inset 0 1px 0 #ffffff05;
+  --surface-sheen: none;
+  --surface-shadow: none;
   --glass-blur: 0px;
   --overlay: rgb(0 0 0 / 72%);
 }
@@ -100,6 +100,8 @@
    * ficando só a borda muito discreta pra ainda se ler como um card. */
   --surface-quiet: #f8faf9;
   --border-quiet: #edf2ef;
+  --surface-featured: #eef5ef;
+  --border-featured: #d7e4d9;
   --card: #f8faf9ef;
   --card-foreground: #101412;
   --popover: #f8faf9fa;
@@ -169,9 +171,15 @@
   box-shadow: inset 0 1px 0 #ffffff05;
 }
 
-/* Mesmo card, um tom mais discreto. Usado no módulo que não precisa chamar
- * tanta atenção quanto o card principal da mesma tela — nunca no único card
- * de uma tela, onde não haveria nada pra ele recuar em relação a. */
+@utility card-surface-featured {
+  background-color: var(--surface-featured);
+  border: 1px solid var(--border-featured);
+  border-radius: var(--norte-card-radius);
+  background-image: var(--surface-sheen);
+  box-shadow: var(--surface-shadow);
+}
+
+/* Grafite discreto, com contorno legível, para conteúdo de apoio. */
 @utility card-surface-quiet {
   background-color: var(--color-surface-quiet);
   border: 1px solid var(--color-border-quiet);

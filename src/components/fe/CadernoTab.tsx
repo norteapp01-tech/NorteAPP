@@ -104,7 +104,7 @@ export function CadernoTab() {
       </div>
       {visible.length === 0 ? (
         <div className="py-8 text-center">
-          <BookOpen className="mx-auto h-6 w-6 text-primary" />
+          <BookOpen className="mx-auto h-6 w-6 text-muted-foreground" />
           <p className="mt-3 text-sm font-semibold">Seu caderno começa aqui</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Registre um estudo, uma experiência ou uma reflexão.
@@ -129,8 +129,8 @@ export function CadernoTab() {
                 }}
                 className="flex w-full items-center gap-3 rounded-xl border border-border p-3 text-left"
               >
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10">
-                  <Icon className="h-5 w-5 text-primary" />
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-surface-2">
+                  <Icon className="h-5 w-5 text-muted-foreground" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <strong className="block text-sm">{title}</strong>
@@ -163,7 +163,7 @@ function EntryCard({ entry }: { entry: NotebookEntry }) {
   return (
     <article className="card-surface p-4">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
+        <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
           {label}
         </span>
         <time className="text-[10px] text-muted-foreground">
