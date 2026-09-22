@@ -16,7 +16,7 @@ import { Home, Plus, BarChart3, CalendarDays, CalendarRange } from "lucide-react
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthGate, SignInScreen } from "../components/AuthGate";
-import { hasLinkedAccount } from "../lib/supabase/client";
+import { hasLinkedAccount, supabase } from "../lib/supabase/client";
 import { SportRecorderProvider } from "../lib/sport-recorder-context";
 import { ActiveRecordingBar } from "../components/esportes/ActiveRecordingBar";
 import { GymSessionProvider } from "../lib/gym-session-context";
@@ -177,6 +177,7 @@ function RootComponent() {
   const [entered, setEntered] = useState(false);
   const [demo, setDemo] = useState(false);
   const [manualLogin, setManualLogin] = useState(false);
+  const [recovering, setRecovering] = useState(false);
 
   function markEntered() {
     try {
@@ -209,6 +210,9 @@ function RootComponent() {
 
   useEffect(() => {
     try {
+      const authReturn = new URLSearchParams(window.location.search).get("auth");
+      if (authReturn === "login") setManualLogin(true);
+      if (authReturn === "recovery") setRecovering(true);
       if (new URLSearchParams(window.location.search).get("onboarding") === "account") {
         sessionStorage.setItem("norte-onboarding-stage", "account");
       }
@@ -223,16 +227,101 @@ function RootComponent() {
     }
   }, []);
 
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setRecovering(true);
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("auth") !== "login") return;
+    let cancelled = false;
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (cancelled || !data.session || data.session.user.is_anonymous) return;
+        try {
+          localStorage.setItem("norte_has_account", "1");
+        } catch {
+          /* Continue in this tab even when storage is unavailable. */
+        }
+        const url = new URL(window.location.href);
+        url.searchParams.delete("auth");
+        window.history.replaceState(
+          window.history.state,
+          "",
+          `${url.pathname}${url.search}${url.hash}`,
+        );
+        setManualLogin(false);
+        setDemo(false);
+        markEntered();
+      })
+      .catch(() => {
+        /* Keep the login panel available if the callback could not be verified. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function closeRecovery() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("auth");
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+    setRecovering(false);
+  }
+
+  function enterDemo() {
+    resetDemoConversation();
+    try {
+      sessionStorage.setItem("norte-onboarding-stage", "demo");
+    } catch {
+      /* Keep the in-memory choice. */
+    }
+    setDemo(true);
+  }
+
+  if (pathname === "/" && recovering)
+    return (
+      <>
+        <WelcomeScreen onEnter={enterDemo} onLogin={() => setManualLogin(true)} />
+        <SignInScreen
+          recovery
+          showBackdrop={false}
+          onBack={() => {
+            closeRecovery();
+            setManualLogin(true);
+          }}
+          onSuccess={() => {
+            closeRecovery();
+            setManualLogin(false);
+            setDemo(false);
+            markEntered();
+          }}
+        />
+      </>
+    );
+
   if (pathname === "/" && manualLogin)
     return (
-      <SignInScreen
-        subtitle="Use o mesmo jeito que você criou a conta pra continuar de onde parou."
-        onBack={() => setManualLogin(false)}
-        onSuccess={() => {
-          setManualLogin(false);
-          markEntered();
-        }}
-      />
+      <>
+        <WelcomeScreen onEnter={enterDemo} onLogin={() => setManualLogin(true)} />
+        <SignInScreen
+          showBackdrop={false}
+          subtitle="Use o mesmo método com que criou sua conta para continuar de onde parou."
+          onBack={() => setManualLogin(false)}
+          onSuccess={() => {
+            setManualLogin(false);
+            setDemo(false);
+            markEntered();
+          }}
+        />
+      </>
     );
   if (pathname === "/" && demo)
     return (
@@ -243,20 +332,7 @@ function RootComponent() {
       </QueryClientProvider>
     );
   if (pathname === "/" && !entered)
-    return (
-      <WelcomeScreen
-        onEnter={() => {
-          resetDemoConversation();
-          try {
-            sessionStorage.setItem("norte-onboarding-stage", "demo");
-          } catch {
-            /* Keep the in-memory choice. */
-          }
-          setDemo(true);
-        }}
-        onLogin={() => setManualLogin(true)}
-      />
-    );
+    return <WelcomeScreen onEnter={enterDemo} onLogin={() => setManualLogin(true)} />;
   const isFullScreenRoute = pathname === "/esportes/gravar";
 
   return (
