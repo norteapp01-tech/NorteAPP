@@ -2,6 +2,7 @@ import { agentStep } from "./chat.functions";
 import { runAgentTurnWith, type ChatTurn } from "./orchestrator";
 import { executeTool } from "./tools";
 import { getAccessToken } from "@/lib/supabase/client";
+import { getAppTimeZone } from "@/lib/app-time-zone";
 
 export type { ChatTurn } from "./orchestrator";
 
@@ -10,8 +11,9 @@ export type { ChatTurn } from "./orchestrator";
  * consumo real de IA em nome de quem está conversando (ver usage-ledger.server.ts). */
 export async function runAgentTurn(history: ChatTurn[], userMessage: string): Promise<ChatTurn> {
   const accessToken = await getAccessToken();
+  const timeZone = getAppTimeZone() ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   return runAgentTurnWith(history, userMessage, {
-    step: (input) => agentStep({ data: { ...input.data, accessToken } }),
+    step: (input) => agentStep({ data: { ...input.data, accessToken, timeZone } }),
     execute: executeTool,
   });
 }

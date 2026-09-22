@@ -333,6 +333,13 @@ function RootComponent() {
     );
   if (pathname === "/" && !entered)
     return <WelcomeScreen onEnter={enterDemo} onLogin={() => setManualLogin(true)} />;
+  if (["/privacidade", "/termos", "/excluir-conta"].includes(pathname)) {
+    return (
+      <div className="norte-app mx-auto min-h-screen max-w-md bg-background">
+        <Outlet />
+      </div>
+    );
+  }
   const isFullScreenRoute = pathname === "/esportes/gravar";
 
   return (

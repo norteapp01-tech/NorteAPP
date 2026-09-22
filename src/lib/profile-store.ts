@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, useSupabaseUserId, ensureSession } from "./supabase/client";
 import { queryClient } from "./query-client";
 import { nowDate } from "./test-clock";
+import { isValidTimeZone, setAppTimeZone } from "./app-time-zone";
 
 // ---------------------------------------------------------------------------
 // Perfil — uma linha por usuário (Perfil + Preferências + Notificações, tudo
@@ -18,6 +19,7 @@ export type Profile = {
   waterGoalMl: number;
   timeFormat: TimeFormat;
   weekStart: WeekStart;
+  timeZone: string | null;
   notifyAgenda: boolean;
   notifyPlans: boolean;
   notifyRoutines: boolean;
@@ -37,6 +39,7 @@ const DEFAULT_PROFILE: Profile = {
   waterGoalMl: 2000,
   timeFormat: "24h",
   weekStart: "monday",
+  timeZone: null,
   notifyAgenda: true,
   notifyPlans: true,
   notifyRoutines: true,
@@ -56,6 +59,7 @@ function mapProfile(r: Row): Profile {
     waterGoalMl: (r.water_goal_ml as number) ?? 2000,
     timeFormat: (r.time_format as TimeFormat) ?? "24h",
     weekStart: (r.week_start as WeekStart) ?? "monday",
+    timeZone: (r.time_zone as string) ?? null,
     notifyAgenda: (r.notify_agenda as boolean) ?? true,
     notifyPlans: (r.notify_plans as boolean) ?? true,
     notifyRoutines: (r.notify_routines as boolean) ?? true,
@@ -79,7 +83,9 @@ async function fetchProfile(): Promise<Profile> {
     .select()
     .single();
   if (error) throw new Error(error.message);
-  return mapProfile(data);
+  const profile = mapProfile(data);
+  setAppTimeZone(profile.timeZone);
+  return profile;
 }
 
 const QUERY_KEY = ["profile"] as const;
@@ -111,6 +117,7 @@ export async function updateProfile(patch: {
   waterGoalMl?: number;
   timeFormat?: TimeFormat;
   weekStart?: WeekStart;
+  timeZone?: string | null;
   notifyAgenda?: boolean;
   notifyPlans?: boolean;
   notifyRoutines?: boolean;
@@ -127,6 +134,11 @@ export async function updateProfile(patch: {
   if (patch.waterGoalMl !== undefined) dbPatch.water_goal_ml = patch.waterGoalMl;
   if (patch.timeFormat !== undefined) dbPatch.time_format = patch.timeFormat;
   if (patch.weekStart !== undefined) dbPatch.week_start = patch.weekStart;
+  if (patch.timeZone !== undefined) {
+    if (patch.timeZone && !isValidTimeZone(patch.timeZone))
+      throw new Error("Fuso horário inválido.");
+    dbPatch.time_zone = patch.timeZone;
+  }
   if (patch.notifyAgenda !== undefined) dbPatch.notify_agenda = patch.notifyAgenda;
   if (patch.notifyPlans !== undefined) dbPatch.notify_plans = patch.notifyPlans;
   if (patch.notifyRoutines !== undefined) dbPatch.notify_routines = patch.notifyRoutines;
@@ -140,6 +152,7 @@ export async function updateProfile(patch: {
     .from("profiles")
     .upsert({ user_id: userId, ...dbPatch }, { onConflict: "user_id" });
   if (error) throw new Error(error.message);
+  if (patch.timeZone !== undefined) setAppTimeZone(patch.timeZone);
   // `refetchType: "all"` — mesmo motivo documentado em goals-store.ts: sem
   // isso, um updateProfile disparado por uma tela sem useProfile() montado
   // deixaria a query marcada como stale mas sem refetch de verdade.

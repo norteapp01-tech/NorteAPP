@@ -4,6 +4,7 @@ import { supabase } from "./supabase/client";
 import { queryClient } from "./query-client";
 import { useSupabaseUserId, ensureSession } from "./supabase/client";
 import { nowDate, nowMs } from "./test-clock";
+import { dateAndTimeInZone, getAppTimeZone, isValidTimeZone } from "./app-time-zone";
 
 // ---------------------------------------------------------------------------
 // Norte — fonte única de verdade, agora persistida no Supabase.
@@ -169,10 +170,14 @@ export function daysBetweenISO(a: string, b: string): number {
   return Math.round((db - da) / 86400000);
 }
 export function todayISO() {
+  const zone = getAppTimeZone();
+  if (zone && isValidTimeZone(zone)) return dateAndTimeInZone(nowDate(), zone).date;
   return toISODate(nowDate());
 }
 export function nowHM() {
   const d = nowDate();
+  const zone = getAppTimeZone();
+  if (zone && isValidTimeZone(zone)) return dateAndTimeInZone(d, zone).time;
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 /** "YYYY-MM-DD" -> "DD/MM/YYYY" por split de string — nunca passa por `Date`,

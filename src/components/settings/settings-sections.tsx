@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useTheme, setTheme } from "@/lib/theme";
 import { ProfileEditor } from "@/components/settings/ProfileEditor";
 import { SubscriptionSection } from "@/components/settings/SubscriptionSection";
+import { TimeZonePicker } from "@/components/settings/TimeZonePicker";
+import { PrivacyPolicy, TermsOfUse } from "@/components/settings/LegalDocuments";
+import { deleteAccountPermanently, resetAccountContent } from "@/lib/account-management";
 import {
   User,
   ShieldCheck,
@@ -10,10 +13,10 @@ import {
   Lock,
   CreditCard,
   CircleHelp,
+  FileText,
 } from "lucide-react";
 import { useProfile, updateProfile, type TimeFormat, type WeekStart } from "@/lib/profile-store";
 import {
-  supabase,
   useAuthUser,
   upgradeToEmailAccount,
   changeEmail,
@@ -57,6 +60,13 @@ export const settingsSections = [
   },
   { key: "notificacoes", label: "Notificações", icon: Bell, Component: NotificationsSection },
   { key: "privacidade", label: "Dados e privacidade", icon: Lock, Component: DataPrivacySection },
+  {
+    key: "politica-privacidade",
+    label: "Política de Privacidade",
+    icon: ShieldCheck,
+    Component: PrivacyPolicy,
+  },
+  { key: "termos-uso", label: "Termos de Uso", icon: FileText, Component: TermsOfUse },
   { key: "ajuda", label: "Ajuda e suporte", icon: CircleHelp, Component: HelpSection },
 ] as const;
 
@@ -86,6 +96,7 @@ function AccountSection() {
   const [mode, setMode] = useState<"none" | "upgrade" | "email" | "password">("none");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState("");
@@ -124,6 +135,10 @@ function AccountSection() {
   };
 
   const submitPassword = async () => {
+    if (password.length < 8 || password !== passwordConfirmation) {
+      setError("Use pelo menos 8 caracteres e confirme a mesma senha.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -131,6 +146,7 @@ function AccountSection() {
       setSuccess("Senha atualizada.");
       setMode("none");
       setPassword("");
+      setPasswordConfirmation("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível concluir.");
     } finally {
@@ -244,15 +260,25 @@ function AccountSection() {
                 <input
                   type="password"
                   placeholder="Nova senha"
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
+                />
+                <input
+                  type="password"
+                  placeholder="Confirmar nova senha"
+                  aria-label="Confirmar nova senha"
+                  autoComplete="new-password"
+                  value={passwordConfirmation}
+                  onChange={(e) => setPasswordConfirmation(e.target.value)}
                   className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
                 />
                 {error && <p className="text-xs text-danger">{error}</p>}
                 <div className="flex gap-2">
                   <button
                     onClick={submitPassword}
-                    disabled={busy || password.length < 8}
+                    disabled={busy || password.length < 8 || password !== passwordConfirmation}
                     className="rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-40"
                   >
                     Salvar
@@ -274,10 +300,12 @@ function DeleteAccountConfirm({
   confirmText,
   setConfirmText,
   onCancel,
+  userId,
 }: {
   confirmText: string;
   setConfirmText: (v: string) => void;
   onCancel: () => void;
+  userId: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -286,13 +314,8 @@ function DeleteAccountConfirm({
     setBusy(true);
     setError(null);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      const { error: fnError } = await supabase.functions.invoke("delete-account", {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-      if (fnError) throw new Error(fnError.message);
-      window.location.href = "/";
+      await deleteAccountPermanently(userId);
+      window.location.replace("/");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível excluir a conta.");
     } finally {
@@ -426,6 +449,7 @@ function PreferencesSection() {
           ))}
         </div>
       </div>
+      <TimeZonePicker />
     </section>
   );
 }
@@ -542,31 +566,115 @@ function NotificationsSection() {
 // Dados e privacidade
 // ---------------------------------------------------------------------------
 function DataPrivacySection() {
+  const user = useAuthUser();
   const [deleting, setDeleting] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [confirmText, setConfirmText] = useState("");
+  const [resetText, setResetText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   return (
     <section>
       <SectionHeader icon={Lock} title="Dados e privacidade" />
-      <div className="mt-2 card-surface p-3.5 text-xs text-muted-foreground">
-        <p>
-          Seus dados (planos, execuções, registros das sub-agendas, hidratação e perfil) ficam
-          vinculados só à sua conta, protegidos por autenticação e por políticas de acesso que
-          restringem o acesso conforme as permissões da sua conta.
+      <div className="mt-2 space-y-3 card-surface p-4 text-sm">
+        <p className="text-muted-foreground">
+          Controle seus registros. Sair da conta não apaga dados nem cancela sua assinatura.
         </p>
-        <p className="mt-2">
-          Excluir a conta é diferente de sair ou cancelar a renovação. Verifique sua assinatura
-          antes de excluir a conta.
-        </p>
-        {deleting ? (
-          <DeleteAccountConfirm
-            confirmText={confirmText}
-            setConfirmText={setConfirmText}
-            onCancel={() => setDeleting(false)}
-          />
-        ) : (
-          <button className="mt-4 text-danger" onClick={() => setDeleting(true)}>
-            Excluir minha conta
-          </button>
+        <div className="border-t border-border pt-3">
+          <h3 className="font-semibold">Recomeçar do zero</h3>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Apaga planos, finanças, treinos, alimentação, leituras, registros de fé, conversas
+            locais e arquivos. Mantém seu login, assinatura e histórico obrigatório de cobrança. Não
+            pode ser desfeito.
+          </p>
+          {!resetting ? (
+            <button
+              className="mt-3 text-sm text-foreground underline underline-offset-4"
+              onClick={() => {
+                setResetting(true);
+                setDeleting(false);
+                setError("");
+              }}
+            >
+              Resetar conta
+            </button>
+          ) : (
+            <div className="mt-3 space-y-2">
+              <label htmlFor="reset-confirm" className="block text-xs text-muted-foreground">
+                Digite <strong className="text-foreground">resetar</strong> para confirmar.
+              </label>
+              <input
+                id="reset-confirm"
+                value={resetText}
+                onChange={(event) => setResetText(event.target.value)}
+                className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
+              />
+              <div className="flex items-center gap-3">
+                <button
+                  disabled={busy || !user?.id || resetText.trim().toLowerCase() !== "resetar"}
+                  className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-40"
+                  onClick={async () => {
+                    if (!user?.id) return;
+                    setBusy(true);
+                    setError("");
+                    try {
+                      await resetAccountContent(user.id);
+                      window.location.replace("/");
+                    } catch (cause) {
+                      setError(
+                        cause instanceof Error
+                          ? cause.message
+                          : "Não foi possível resetar a conta.",
+                      );
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  {busy ? "Resetando…" : "Apagar meus dados"}
+                </button>
+                <button
+                  disabled={busy}
+                  className="text-xs text-muted-foreground"
+                  onClick={() => setResetting(false)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="border-t border-border pt-3">
+          <h3 className="font-semibold text-danger">Excluir conta definitivamente</h3>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Apaga sua identidade no Norte e os dados vinculados. A assinatura pode continuar sendo
+            cobrada pela loja ou pelo provedor de pagamento: cancele-a separadamente antes de
+            excluir.
+          </p>
+          {deleting && user?.id ? (
+            <DeleteAccountConfirm
+              confirmText={confirmText}
+              setConfirmText={setConfirmText}
+              onCancel={() => setDeleting(false)}
+              userId={user.id}
+            />
+          ) : (
+            <button
+              disabled={!user?.id}
+              className="mt-3 text-sm text-danger disabled:opacity-40"
+              onClick={() => {
+                setDeleting(true);
+                setResetting(false);
+                setError("");
+              }}
+            >
+              Excluir permanentemente
+            </button>
+          )}
+        </div>
+        {error && (
+          <p role="alert" className="text-xs text-danger">
+            {error}
+          </p>
         )}
       </div>
     </section>
