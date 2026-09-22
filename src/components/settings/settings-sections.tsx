@@ -4,6 +4,7 @@ import { ProfileEditor } from "@/components/settings/ProfileEditor";
 import { SubscriptionSection } from "@/components/settings/SubscriptionSection";
 import { TimeZonePicker } from "@/components/settings/TimeZonePicker";
 import { PrivacyPolicy, TermsOfUse } from "@/components/settings/LegalDocuments";
+import { IdeasSection } from "@/components/settings/IdeasSection";
 import { deleteAccountPermanently, resetAccountContent } from "@/lib/account-management";
 import {
   User,
@@ -14,6 +15,7 @@ import {
   CreditCard,
   CircleHelp,
   FileText,
+  Lightbulb,
 } from "lucide-react";
 import { useProfile, updateProfile, type TimeFormat, type WeekStart } from "@/lib/profile-store";
 import {
@@ -67,6 +69,7 @@ export const settingsSections = [
     Component: PrivacyPolicy,
   },
   { key: "termos-uso", label: "Termos de Uso", icon: FileText, Component: TermsOfUse },
+  { key: "ideias", label: "Ideias para o Norte", icon: Lightbulb, Component: IdeasSection },
   { key: "ajuda", label: "Ajuda e suporte", icon: CircleHelp, Component: HelpSection },
 ] as const;
 

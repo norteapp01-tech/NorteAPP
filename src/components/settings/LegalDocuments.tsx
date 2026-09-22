@@ -17,6 +17,7 @@ const privacy: LegalSection[] = [
       "Finanças: despesas, receitas, metas, categorias e outros lançamentos que você registrar. O Norte não acessa suas contas bancárias por meio dessa função.",
       "Corridas e fotos: percurso e coordenadas de localização quando você autoriza o registro de uma atividade, além de fotos que optar por enviar.",
       "Assistente: mensagens, comandos de voz transcritos, contexto necessário para responder e o histórico recente da conversa armazenado neste dispositivo.",
+      "Ideias para o Norte: sugestões de melhorias ou novidades que você decidir enviar, associadas à sua conta para organização do feedback.",
     ],
   },
   {
@@ -38,6 +39,7 @@ const privacy: LegalSection[] = [
     paragraphs: [
       "Usamos seus dados para autenticar sua conta, guardar os registros que criar, montar planos e análises, enviar lembretes solicitados, responder no assistente, proteger o serviço e administrar sua assinatura. Os tratamentos necessários para prestar essas funções se apoiam na execução da relação contratual; segurança e prevenção de abuso podem se apoiar em legítimo interesse; obrigações legais podem exigir conservação de alguns registros. Quando a LGPD exigir consentimento para determinada finalidade ou dado sensível, ele deverá ser obtido de forma específica.",
       "Você pode deixar de registrar dados opcionais e remover conteúdo que já inseriu. A ausência de certas informações reduz a precisão de análises e recomendações.",
+      "Quando você envia uma ideia, usamos o texto para avaliar possíveis melhorias do aplicativo. O envio não garante implementação nem resposta individual.",
     ],
   },
   {
