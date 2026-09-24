@@ -35,6 +35,22 @@ function domain(name: string, area?: unknown): [string, string] {
     category ? `/sub-agenda/${category}` : "/",
   ];
 }
+type CycleBlockArg = {
+  name: string;
+  plans?: { letter: string; name: string }[];
+};
+function cycleProposalCard(args: Record<string, unknown>): CardData {
+  const blocks = (args.blocks as CycleBlockArg[] | undefined) ?? [];
+  return {
+    card: "plan",
+    title: String(args.name ?? "Ciclo de treino"),
+    deadlineLabel: `${blocks.length} bloco${blocks.length === 1 ? "" : "s"} a partir de ${args.startDate ?? ""}`,
+    steps: blocks.map((b) => ({
+      title: b.name,
+      actions: (b.plans ?? []).map((p) => `${p.letter}: ${p.name}`),
+    })),
+  };
+}
 const fieldLabels: Record<string, string> = {
   title: "Título",
   why: "Objetivo",
@@ -358,6 +374,14 @@ export function NorteChat({
                 <AgentCard
                   key={i}
                   data={{ ...action.args, card: "plan" } as CardData}
+                  proposed
+                  onPrompt={setDraft}
+                  disabled={busy}
+                />
+              ) : action.name === "criar_ciclo_treino" ? (
+                <AgentCard
+                  key={i}
+                  data={cycleProposalCard(action.args)}
                   proposed
                   onPrompt={setDraft}
                   disabled={busy}
