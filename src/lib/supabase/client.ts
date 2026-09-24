@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 import { queryClient } from "../query-client";
+import { setAppTimeZone } from "../app-time-zone";
 
 // Norte é single-user, sem tela de login. A sessão é criada via Anonymous Auth do
 // Supabase — um auth.uid() real e estável, persistido pelo próprio supabase-js em
@@ -145,6 +146,7 @@ export async function signOutNorte() {
   bootstrapped = null;
   await queryClient.cancelQueries();
   queryClient.clear();
+  setAppTimeZone(null);
   for (const storage of [localStorage, sessionStorage]) {
     Object.keys(storage)
       .filter(
