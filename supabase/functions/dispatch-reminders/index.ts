@@ -72,10 +72,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    await admin.from("reminders").update({ notified_at: new Date().toISOString() }).eq(
-      "id",
-      reminder.id,
-    );
+    await admin
+      .from("reminders")
+      .update({ notified_at: new Date().toISOString() })
+      .eq("id", reminder.id);
     sent++;
   }
 

@@ -43,3 +43,18 @@ export function dateAndTimeInZone(date: Date, zone: string) {
     time: `${value("hour")}:${value("minute")}`,
   };
 }
+
+/** Inverso de dateAndTimeInZone: que instante UTC lê como "date time" quando
+ * visto em `zone`? Sem isso, montar um lembrete a partir de data+hora usaria
+ * o fuso do NAVEGADOR — errado sempre que a pessoa configurou um fuso do app
+ * diferente do dispositivo. "Chuta, mede o erro, corrige" (um passo, sem
+ * iterar) é suficiente aqui: nenhum fuso muda de offset dentro do minuto de
+ * correção que este cálculo faz. */
+export function zonedTimeToUtcISO(dateStr: string, timeStr: string, zone: string): string {
+  const guess = new Date(`${dateStr}T${timeStr}:00Z`);
+  const readAsZoned = dateAndTimeInZone(guess, zone);
+  const guessedAsUtc = new Date(`${readAsZoned.date}T${readAsZoned.time}:00Z`);
+  const wantedAsUtc = new Date(`${dateStr}T${timeStr}:00Z`);
+  const correction = wantedAsUtc.getTime() - guessedAsUtc.getTime();
+  return new Date(guess.getTime() + correction).toISOString();
+}

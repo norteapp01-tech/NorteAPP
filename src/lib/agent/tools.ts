@@ -81,6 +81,15 @@ import {
   blockOn,
   activeCycle,
 } from "../workout-cycle-store";
+import { dateAndTimeInZone, getAppTimeZone, zonedTimeToUtcISO } from "../app-time-zone";
+
+/** Mesmo fallback usado em run-agent.ts pro "hoje" do prompt: fuso escolhido
+ * no app, ou o do navegador quando a pessoa nunca configurou um. Sem isso,
+ * "às 14h" ficaria sujeito ao fuso do navegador mesmo quando o app já sabe
+ * que a pessoa configurou outro. */
+function effectiveTimeZone(): string {
+  return getAppTimeZone() ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
 
 const CATEGORY_IDS = FINANCE_CATEGORIES.map((c) => c.id).join(", ");
 
@@ -859,7 +868,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
               (r) =>
                 `[${r.id}] ${r.text} (${r.date}${
                   r.remindAt
-                    ? ` às ${new Date(r.remindAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+                    ? ` às ${dateAndTimeInZone(new Date(r.remindAt), effectiveTimeZone()).time}`
                     : ""
                 })`,
             )
@@ -877,6 +886,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
     case "criar_lembrete": {
       const relatedExecutionId = args.relatedExecutionId as string | undefined;
       const offsetMinutes = args.offsetMinutesBefore as number | undefined;
+      const zone = effectiveTimeZone();
       let remindAt: string | undefined;
       if (relatedExecutionId) {
         const state = await fetchGoalsState();
@@ -886,11 +896,11 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
             "Esse compromisso não tem hora marcada — consulte a agenda de novo antes de criar o lembrete.",
           );
         remindAt = new Date(
-          new Date(`${exec.agendaDate}T${exec.startTime}:00`).getTime() -
+          new Date(zonedTimeToUtcISO(exec.agendaDate, exec.startTime, zone)).getTime() -
             (offsetMinutes ?? 0) * 60_000,
         ).toISOString();
       } else if (args.time) {
-        remindAt = new Date(`${args.date}T${args.time}:00`).toISOString();
+        remindAt = zonedTimeToUtcISO(args.date as string, args.time as string, zone);
       }
       const id = await createReminder({
         text: args.text as string,
@@ -899,9 +909,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
         relatedExecutionId,
         offsetMinutes,
       });
-      const timeLabel = remindAt
-        ? ` às ${new Date(remindAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
-        : "";
+      const timeLabel = remindAt ? ` às ${dateAndTimeInZone(new Date(remindAt), zone).time}` : "";
       const summary = `Lembrete criado: "${args.text}" pra ${args.date}${timeLabel}.`;
       if (remindAt && !(await hasPushSubscription())) {
         return JSON.stringify({
@@ -933,7 +941,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
       await updateReminder(reminder.id, {
         text: args.text as string | undefined,
         date: args.date as string | undefined,
-        remindAt: nextTime ? new Date(`${nextDate}T${nextTime}:00`).toISOString() : undefined,
+        remindAt: nextTime ? zonedTimeToUtcISO(nextDate, nextTime, effectiveTimeZone()) : undefined,
       });
       return `Lembrete atualizado.`;
     }
