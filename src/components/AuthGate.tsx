@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { AlertTriangle, Compass, RefreshCcw, WifiOff } from "lucide-react";
+import { AlertTriangle, RefreshCcw, WifiOff } from "lucide-react";
 import { supabase, ensureSession, hasLinkedAccount, primeSession } from "@/lib/supabase/client";
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "./ui/drawer";
 import "./signup-sheet.css";
+import { DawnMark } from "./ui/app-design-system";
 
 type Status = "checking" | "ready" | "needs-login" | "connection-error";
 type Provider = "google" | "apple";
@@ -238,7 +239,9 @@ export function SignInScreen({
       >
         <DrawerContent className="signup-sheet">
           <div className="signup-sheet-body">
-            <Compass className="signup-sheet-mark text-primary" size={32} aria-hidden="true" />
+            <div className="signup-sheet-mark text-primary" aria-hidden="true">
+              <DawnMark compact />
+            </div>
             <DrawerTitle className="signup-sheet-title">{title}</DrawerTitle>
             <DrawerDescription className="signup-sheet-description">
               {description}

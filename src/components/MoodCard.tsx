@@ -23,12 +23,14 @@ export function MoodCard({
   value,
   saving,
   onPick,
+  inline = false,
 }: {
   options: readonly MoodOption[];
   /** Humor já registrado para hoje, ou null. */
   value: string | null;
   saving: boolean;
   onPick: (value: string) => Promise<void> | void;
+  inline?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -47,6 +49,51 @@ export function MoodCard({
       setJustSaved(false);
     }, COLLAPSE_DELAY_MS);
   };
+
+  if (inline) {
+    return (
+      <section className="today-mood-inline" data-open={open}>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="today-status-action interactive-press"
+        >
+          <SmilePlus className="h-[23px] w-[23px]" strokeWidth={1.65} />
+          <span>{registered ? registered.label : "Como você está?"}</span>
+          <ChevronDown
+            className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </button>
+        <div className="today-mood-drawer" aria-hidden={!open}>
+          <p className="mb-3 text-xs text-muted-foreground">Como está o seu ritmo agora?</p>
+          <div className="grid grid-cols-4 gap-2">
+            {options.map((option) => {
+              const selected = value === option.v;
+              return (
+                <button
+                  key={option.v}
+                  onClick={() => void choose(option)}
+                  disabled={saving}
+                  aria-pressed={selected}
+                  className={`mood-control interactive-press flex h-12 items-center justify-center rounded-xl border disabled:opacity-60 ${
+                    selected ? "border-primary bg-primary/10" : "border-border bg-surface-quiet"
+                  }`}
+                >
+                  <span className="text-xl">{option.emoji}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p
+            role="status"
+            className={`mt-2 flex items-center gap-1 text-[11px] text-success transition-opacity ${justSaved ? "opacity-100" : "opacity-0"}`}
+          >
+            <Check className="h-3.5 w-3.5" /> Registrado
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="card-surface-quiet mt-5 overflow-hidden">

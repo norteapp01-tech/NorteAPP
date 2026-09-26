@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Compass, Pause, Play, Utensils } from "lucide-react";
+import { Pause, Play, Utensils } from "lucide-react";
+import { DawnMark } from "./ui/app-design-system";
 import "./welcome.css";
 import "./welcome-live.css";
 
@@ -192,7 +193,7 @@ export function WelcomeScreen({ onEnter, onLogin }: { onEnter: () => void; onLog
     <main className="welcome-screen welcome-live" data-paused={paused || holding || hidden}>
       <header>
         <div className="welcome-brand">
-          <Compass aria-hidden="true" /> NORTE
+          <DawnMark />
         </div>
         <h1>
           Você vive. O Norte
@@ -262,7 +263,7 @@ export function WelcomeScreen({ onEnter, onLogin }: { onEnter: () => void; onLog
               }}
             >
               <div>
-                <Compass size={18} /> Norte
+                <DawnMark compact /> Norte
               </div>
               <p>{scene.reply}</p>
             </div>

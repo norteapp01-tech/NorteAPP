@@ -4,13 +4,30 @@ import { cn } from "@/lib/utils";
 import { nowDate } from "@/lib/test-clock";
 import { officialWeek } from "@/components/ui/app-design-system-data";
 
+export function DawnMark({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className="norte-dawn-brand" aria-label="Norte">
+      <svg
+        className={compact ? "h-4 w-10" : "h-6 w-[72px]"}
+        viewBox="0 0 72 24"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path d="M2 19.5C16 7.5 55 7.5 70 19.5" stroke="currentColor" strokeWidth="1.25" />
+        <circle cx="36" cy="8" r="3.75" fill="var(--primary)" />
+      </svg>
+      {!compact && <span>N O R T E</span>}
+    </div>
+  );
+}
+
 export function AppMenuButton({ className, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       type="button"
       aria-label="Mais opções"
       className={cn(
-        "interactive-press grid h-11 w-11 shrink-0 place-items-center text-muted-foreground hover:text-foreground",
+        "norte-menu-button interactive-press grid h-11 w-11 shrink-0 place-items-center text-muted-foreground hover:text-foreground",
         className,
       )}
       {...props}

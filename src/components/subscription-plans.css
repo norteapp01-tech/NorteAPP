@@ -23,12 +23,11 @@
   letter-spacing: 0.42em;
 }
 .subscription-logo {
-  display: grid;
-  width: 37px;
-  height: 37px;
-  place-items: center;
-  border: 1px solid var(--primary);
-  border-radius: 50%;
+  display: flex;
+  width: 40px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
   color: var(--primary);
 }
 .subscription-header h1 {

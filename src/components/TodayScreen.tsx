@@ -1,8 +1,20 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { nowDate } from "@/lib/test-clock";
-import { Check, X, Sparkles, CalendarClock, Compass, ChevronDown } from "lucide-react";
-import { AppMenuButton } from "@/components/ui/app-design-system";
+import {
+  Check,
+  X,
+  Sparkles,
+  CalendarClock,
+  ChevronDown,
+  MessageCircle,
+  CalendarDays,
+  ListTodo,
+  SlidersHorizontal,
+  Moon,
+  Plus,
+} from "lucide-react";
+import { AppMenuButton, DawnMark } from "@/components/ui/app-design-system";
 import { InlineError } from "@/components/ui/inline-error";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { useCompletedInSession } from "@/hooks/use-completed-in-session";
@@ -84,6 +96,10 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   const displayTasks = useMemo(() => orderedTodayTasks(tasks), [tasks]);
   const nextTaskId = displayTasks.find((t) => t.status !== "concluida")?.id;
+  const agendaPreview = displayTasks.slice(0, 3);
+  const hiddenAgendaItems = Math.max(0, displayTasks.length - agendaPreview.length);
+  const scheduledCount = tasks.filter((task) => task.rigid || task.startTime).length;
+  const flexibleCount = Math.max(0, total - scheduledCount);
 
   const pendingTasks = tasks.filter((t) => t.status === "planejada");
   const extraTasks = useMemo(() => {
@@ -136,48 +152,50 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
 
   return (
     <div className="norte-page today-page">
-      <header className="relative">
-        {onOpenChat && (
-          <button
-            aria-label="Conversar com o Norte"
-            onClick={onOpenChat}
-            className="absolute right-10 -top-2 flex h-10 w-10 items-center justify-center text-muted-foreground"
-          >
-            <Compass size={22} />
-          </button>
-        )}
-        <div>
-          <p className="pr-20 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-            {nowDate().toLocaleDateString("pt-BR", {
-              weekday: "long",
-              day: "2-digit",
-              month: "short",
-            })}
-          </p>
-          <h1 className="norte-page-title mt-2">
-            {greeting()}
-            {profile.displayName ? `, ${profile.displayName}` : ""}.
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground text-balance-tight">
-            {pendingTasks.some((t) => isMissed(t))
-              ? "Tem coisa atrasada aí embaixo. Encara."
-              : "Hoje é dia de seguir o plano."}
-          </p>
-        </div>
-        <AppMenuButton
-          onClick={() => setSettingsOpen(true)}
-          aria-label="Configurações"
-          className="absolute -right-2 -top-2"
-        />
-        <div className="mt-4 flex items-center gap-3">
-          <span className="text-xs font-medium text-muted-foreground">
-            {done} de {total} concluídas
-          </span>
-          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-2">
-            <div
-              className="progress-fill h-full rounded-full bg-primary"
-              style={{ width: `${pct}%` }}
+      <header className="today-hero relative">
+        <div className="flex items-center justify-between gap-4">
+          <DawnMark />
+          <div className="flex items-center gap-1">
+            {onOpenChat && (
+              <button
+                aria-label="Conversar com o Norte"
+                onClick={onOpenChat}
+                className="interactive-press grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-surface-quiet hover:text-foreground"
+              >
+                <MessageCircle className="h-5 w-5" strokeWidth={1.6} />
+              </button>
+            )}
+            <AppMenuButton
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Configurações"
+              className="rounded-full hover:bg-surface-quiet"
             />
+          </div>
+        </div>
+        <h1 className="today-greeting mt-9">
+          {greeting()}
+          {profile.displayName ? `, ${profile.displayName}` : ""}
+        </h1>
+        <p className="mt-1 text-[17px] capitalize text-muted-foreground">
+          {nowDate().toLocaleDateString("pt-BR", {
+            weekday: "long",
+            day: "2-digit",
+            month: "long",
+          })}
+        </p>
+        <div className="today-day-progress mt-6">
+          <div className="flex items-center justify-between gap-4 text-sm">
+            <span className="text-muted-foreground">
+              {pendingTasks.some((task) => isMissed(task))
+                ? "Seu dia pede um ajuste"
+                : "Seu dia está no rumo"}
+            </span>
+            <span className="whitespace-nowrap font-medium text-primary">
+              {done} de {total} concluída{done === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="mt-3 h-px overflow-hidden bg-border-quiet">
+            <div className="progress-fill h-full bg-primary" style={{ width: `${pct}%` }} />
           </div>
         </div>
         {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
@@ -218,17 +236,29 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
         </div>
       )}
 
-      <div className="mt-7 flex items-center justify-between">
-        <h2 className="norte-section-title">Tarefas de hoje</h2>
-        <span className="text-xs text-muted-foreground">
-          {done} de {total}
-        </span>
-      </div>
+      <section className="today-agenda mt-10">
+        <div className="flex items-end justify-between gap-4">
+          <h2 className="norte-view-title">Agenda de hoje</h2>
+          <Link to="/agenda" className="norte-secondary-action min-h-11 py-3 text-xs">
+            Ver dia completo →
+          </Link>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <Link to="/agenda" className="today-stat-card interactive-press">
+            <CalendarDays className="h-7 w-7" strokeWidth={1.5} />
+            <strong>{scheduledCount}</strong>
+            <span>compromisso{scheduledCount === 1 ? "" : "s"}</span>
+          </Link>
+          <Link to="/agenda" className="today-stat-card interactive-press">
+            <ListTodo className="h-7 w-7" strokeWidth={1.5} />
+            <strong>{flexibleCount}</strong>
+            <span>tarefa{flexibleCount === 1 ? "" : "s"}</span>
+          </Link>
+        </div>
+      </section>
 
-      <ul
-        className={`${tasks.length ? "card-surface-featured" : "card-surface"} mt-3 divide-y divide-border overflow-hidden`}
-      >
-        {displayTasks.map((t) => {
+      <ul className="today-agenda-list mt-5">
+        {agendaPreview.map((t) => {
           const cat = categoryMeta[t.category] ?? categoryMeta.generico;
           const missed = isMissed(t);
           const doneNow = t.status === "concluida";
@@ -236,29 +266,24 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
           return (
             <li
               key={`${t.id}-${t.agendaSessionId ?? t.agendaDate}`}
-              className={`group relative overflow-hidden px-4 py-4 transition-opacity ${doneNow ? "opacity-50" : ""} ${isNext ? "border-l-2 border-l-primary" : ""}`}
+              className={`today-agenda-row group relative transition-opacity ${doneNow ? "opacity-45" : ""}`}
             >
-              <div className="flex items-start gap-3">
+              {isNext && !doneNow && <span className="today-next-line" aria-hidden="true" />}
+              <div className="flex items-center gap-3">
                 <TaskCheckbox id={t.id} done={doneNow} />
-                <div className="min-w-0 flex-1">
+                <span className="w-[52px] shrink-0 font-mono text-sm text-muted-foreground">
+                  {formatTime(t.startTime, profile.timeFormat)}
+                </span>
+                <div className="min-w-0 flex-1 py-1">
                   <button
                     onClick={() => !doneNow && setFocus(t)}
-                    className={`block w-full text-left font-medium leading-snug ${doneNow ? "text-muted-foreground line-through" : ""}`}
+                    className={`block w-full truncate text-left text-[15px] font-medium leading-snug ${doneNow ? "text-muted-foreground line-through" : ""}`}
                   >
                     {t.title}
                   </button>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                    {isNext && !doneNow && (
-                      <span className="font-semibold uppercase tracking-wide text-primary">
-                        Próxima
-                      </span>
-                    )}
-                    <span className="font-mono">
-                      {formatTime(t.startTime, profile.timeFormat)}
-                      {t.endTime ? `–${formatTime(t.endTime, profile.timeFormat)}` : ""}
-                    </span>
-                    <span>·</span>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
                     <span>{cat.label}</span>
+                    {t.endTime && <span>· até {formatTime(t.endTime, profile.timeFormat)}</span>}
                     {missed && !doneNow && <span className="text-danger">· atrasada</span>}
                   </div>
                 </div>
@@ -272,7 +297,7 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
           );
         })}
         {tasks.length === 0 && (
-          <li className="flex flex-col items-center gap-2 p-6 text-center">
+          <li className="flex flex-col items-center gap-2 border-y border-border-quiet py-8 text-center">
             <p className="text-sm text-muted-foreground">Nada planejado para hoje.</p>
             <Link to="/agenda" className="text-xs font-semibold text-primary">
               Adicionar algo pro dia →
@@ -280,6 +305,24 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
           </li>
         )}
       </ul>
+
+      <div className="mt-1 flex min-h-12 items-center justify-between gap-3">
+        <Link
+          to="/criar"
+          search={{ modo: "agenda" }}
+          className="interactive-press inline-flex min-h-11 items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+        >
+          <Plus className="h-4 w-4" /> adicionar
+        </Link>
+        {(hiddenAgendaItems > 0 || extraTasks.length > 0) && (
+          <Link
+            to="/agenda"
+            className="rounded-full border border-border px-4 py-2 text-xs text-muted-foreground"
+          >
+            {hiddenAgendaItems + extraTasks.length} extras
+          </Link>
+        )}
+      </div>
 
       {extraTasks.length > 0 && (
         <details className="norte-disclosure card-surface-quiet mt-4 overflow-hidden">
@@ -301,25 +344,25 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
         </details>
       )}
 
-      <div className="mt-4 flex items-stretch gap-3">
-        <RemindersCard compact />
-        <HydrationCard className="flex-1" />
+      <div className="today-status-strip mt-6">
+        <RemindersCard inline />
+        <HydrationCard inline />
+        <MoodCard
+          inline
+          options={moodOptions}
+          value={todayMood}
+          saving={savingMood}
+          onPick={(v) => pickMood(v as EnergyMood)}
+        />
       </div>
 
-      {/* Minha rotina */}
-      <div className="mt-7">
-        <h2 className="norte-section-title">Minha rotina</h2>
+      <div className="mt-9 flex items-end justify-between gap-4">
+        <h2 className="norte-view-title">Minha rotina</h2>
+        <span className="pb-1 text-[11px] text-muted-foreground">deslize para acessar →</span>
       </div>
       <div className="mt-3">
         <SubagendasGrid />
       </div>
-
-      <MoodCard
-        options={moodOptions}
-        value={todayMood}
-        saving={savingMood}
-        onPick={(v) => pickMood(v as EnergyMood)}
-      />
 
       {moodPanelFor && (
         <MoodActionPanel
@@ -359,23 +402,19 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
         />
       )}
 
-      {/* "Reorganizar" e "Fechar o dia" viviam só dentro do antigo "Resumo do
-          dia". O resumo saiu (ele já existe no Espelho), mas estas duas AÇÕES
-          não existem em nenhum outro lugar do app — ficam aqui, discretas. */}
-      <div className="mt-3 flex items-center justify-center gap-4">
+      <div className="today-closing-actions mt-7 grid grid-cols-2 border-y border-border-quiet">
         <button
           onClick={() => setReorganizing(true)}
-          className="min-h-11 text-xs font-semibold text-muted-foreground hover:text-primary"
+          className="interactive-press flex min-h-16 items-center justify-center gap-2 border-r border-border-quiet text-sm text-foreground"
         >
+          <SlidersHorizontal className="h-4 w-4" strokeWidth={1.5} />
           Reorganizar meu dia
         </button>
-        <span aria-hidden className="text-muted-foreground/40">
-          ·
-        </span>
         <button
           onClick={() => setShowEod(true)}
-          className="min-h-11 text-xs font-semibold text-muted-foreground hover:text-primary"
+          className="interactive-press flex min-h-16 items-center justify-center gap-2 text-sm text-foreground"
         >
+          <Moon className="h-4 w-4" strokeWidth={1.5} />
           Fechar o dia
         </button>
       </div>

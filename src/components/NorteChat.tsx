@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, Compass, Mic, Paperclip, Square } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Mic, Paperclip, Square } from "lucide-react";
 import { runAgentTurn, type ChatTurn } from "@/lib/agent/run-agent";
 import { transcribeAudio } from "@/lib/agent/chat.functions";
 import { useSupabaseUserId, getAccessToken } from "@/lib/supabase/client";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
-import { AppMenuButton } from "@/components/ui/app-design-system";
+import { AppMenuButton, DawnMark } from "@/components/ui/app-design-system";
 import { AgentCard, parseCard, type CardData } from "./AgentCard";
 
 const labels: Record<string, [string, string]> = {
@@ -261,7 +261,7 @@ export function NorteChat({
           <ArrowLeft size={18} /> {demo ? "Voltar" : "Hoje"}
         </button>
         <div className="text-center">
-          <Compass className="mx-auto mb-1 text-primary" size={27} />
+          <DawnMark compact />
           <h1 className="font-semibold">Norte</h1>
           <p className="mt-1 text-xs text-muted-foreground">
             {demo ? "Experimente com uma conversa curta" : "Sua conversa, seu ritmo"}
@@ -278,7 +278,7 @@ export function NorteChat({
       <div className="flex-1 space-y-6 pb-6" role="log" aria-live="polite">
         {!turns.length && (
           <div className="pt-10">
-            <Compass className="mb-4 text-primary" />
+            <DawnMark compact />
             <p className="text-xl font-semibold">O que vamos organizar?</p>
             <p className="mt-2 text-sm text-muted-foreground">
               Conte o que aconteceu ou o que quer fazer.
@@ -314,7 +314,7 @@ export function NorteChat({
           >
             {turn.role === "assistant" && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Compass size={17} className="text-primary" /> Norte
+                <DawnMark compact /> Norte
               </div>
             )}
             <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{turn.text}</p>

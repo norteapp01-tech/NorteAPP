@@ -25,7 +25,13 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-export function RemindersCard({ compact = false }: { compact?: boolean }) {
+export function RemindersCard({
+  compact = false,
+  inline = false,
+}: {
+  compact?: boolean;
+  inline?: boolean;
+}) {
   const reminders = useRemindersStore((r) => r);
   const highlighted = highlightedReminders(reminders);
   const [index, setIndex] = useState(0);
@@ -75,6 +81,28 @@ export function RemindersCard({ compact = false }: { compact?: boolean }) {
 
   const current = highlighted[Math.min(index, highlighted.length - 1)];
   const isOverdue = current ? reminderStatus(current) === "atrasado" : false;
+
+  if (inline) {
+    return (
+      <>
+        <button
+          onClick={() => setShowModal(true)}
+          className="today-status-action interactive-press"
+        >
+          <span className="relative grid h-8 w-8 place-items-center">
+            <Bell className="h-[22px] w-[22px]" strokeWidth={1.65} />
+            {highlighted.length > 0 && (
+              <span className="absolute right-0 top-0 h-2 w-2 rounded-full bg-primary" />
+            )}
+          </span>
+          <span>
+            {highlighted.length} lembrete{highlighted.length === 1 ? "" : "s"}
+          </span>
+        </button>
+        {showModal && <RemindersModal onClose={() => setShowModal(false)} />}
+      </>
+    );
+  }
 
   if (compact) {
     return (

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Compass, Mail } from "lucide-react";
+import { Mail } from "lucide-react";
 import { NorteChat } from "./NorteChat";
 import { AuthGate } from "./AuthGate";
 import { SubscriptionPlans } from "./SubscriptionPlans";
 import { supabase } from "@/lib/supabase/client";
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from "./ui/drawer";
 import "./signup-sheet.css";
+import { DawnMark } from "./ui/app-design-system";
 
 const field = "w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm";
 const action =
@@ -195,7 +196,9 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
       >
         <DrawerContent className="signup-sheet" onEscapeKeyDown={(event) => event.preventDefault()}>
           <div className="signup-sheet-body">
-            <Compass className="signup-sheet-mark text-primary" size={32} />
+            <div className="signup-sheet-mark text-primary">
+              <DawnMark compact />
+            </div>
             <DrawerTitle className="signup-sheet-title">Crie sua conta para continuar.</DrawerTitle>
             <DrawerDescription className="signup-sheet-description">
               Crie sua conta para salvar o que você começou e continuar com o Norte.

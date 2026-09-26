@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Droplet } from "lucide-react";
 import { useTodayHydration, todayIntake } from "@/lib/hydration-store";
 import { useProfile } from "@/lib/profile-store";
 import { AddWaterSheet } from "./AddWaterSheet";
 import { ProgressBar } from "@/components/ui/progress-bar";
 
-export function HydrationCard({ className = "" }: { className?: string }) {
+export function HydrationCard({
+  className = "",
+  inline = false,
+}: {
+  className?: string;
+  inline?: boolean;
+}) {
   const logs = useTodayHydration();
   const profile = useProfile();
   const [open, setOpen] = useState(false);
@@ -15,6 +21,29 @@ export function HydrationCard({ className = "" }: { className?: string }) {
   const pct = goal > 0 ? Math.min(100, Math.round((current / goal) * 100)) : 0;
   const currentL = (current / 1000).toFixed(current % 1000 === 0 ? 0 : 1);
   const goalL = (goal / 1000).toFixed(goal % 1000 === 0 ? 0 : 1);
+
+  if (inline) {
+    return (
+      <>
+        <button
+          onClick={() => setOpen(true)}
+          aria-label={`Registrar água. ${currentL} de ${goalL} litros`}
+          className={`today-status-action interactive-press ${className}`}
+        >
+          <span
+            className="today-status-progress"
+            style={{ "--progress": `${pct * 3.6}deg` } as CSSProperties}
+          >
+            <Droplet className="h-[18px] w-[18px]" strokeWidth={1.7} />
+          </span>
+          <span>
+            {currentL}/{goalL} água
+          </span>
+        </button>
+        {open && <AddWaterSheet onClose={() => setOpen(false)} />}
+      </>
+    );
+  }
 
   return (
     <>

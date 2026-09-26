@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Check, ChevronRight, Compass, Minus } from "lucide-react";
+import { Check, ChevronRight, Minus } from "lucide-react";
+import { DawnMark } from "./ui/app-design-system";
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "./ui/drawer";
 import "./subscription-plans.css";
 
@@ -83,7 +84,7 @@ export function SubscriptionPlans() {
         <header className="subscription-header">
           <div className="subscription-brand" aria-label="Norte">
             <span className="subscription-logo">
-              <Compass size={21} />
+              <DawnMark compact />
             </span>
             <span>NORTE</span>
           </div>
