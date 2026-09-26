@@ -8,7 +8,7 @@ const rows = [
   { key: "fat", label: "Gorduras", unit: "g" },
 ] as const;
 export function MacroSummary({ totals, goals }: { totals: DailyGoals; goals: DailyGoals }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const configured = rows.filter(({ key }) => goals[key] > 0);
   const reached = configured.filter(
     ({ key }) => totals[key] >= goals[key] * 0.9 && totals[key] <= goals[key] * 1.1,

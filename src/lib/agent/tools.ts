@@ -38,6 +38,10 @@ import {
 import {
   fetchState as fetchRemindersState,
   createReminder,
+  updateReminder,
+  toggleReminder,
+  removeReminder,
+  hasPushSubscription,
   todayReminders,
   overdueReminders,
 } from "../reminders-store";
@@ -48,13 +52,44 @@ import {
   exercisesForPlan,
   startSession,
   logSet,
+  updateSet,
+  removeLastSet,
   finishSession,
   addBodyWeight,
+  bodyWeightsByDateDesc,
+  createPlan,
+  updatePlan,
+  removePlan,
+  addExercise,
+  removeExercise,
+  setWeeklyAssignment,
 } from "../workout-store";
 import { fetchState as fetchReadingState, addNote as addReadingNote } from "../reading-store";
 import { fetchState as fetchFeState, addNotebookEntry } from "../fe-store";
 import { captureToInbox } from "./inbox-store";
 import { fetchState as fetchNutritionState, confirmMealOption } from "../nutrition-store";
+import {
+  fetchCycleState,
+  createCycle,
+  createPlanInBlock,
+  setBlockDay,
+  activateCycle,
+  endCycle,
+  blocksForCycle,
+  plansOfBlock,
+  daysOfBlock,
+  blockOn,
+  activeCycle,
+} from "../workout-cycle-store";
+import { dateAndTimeInZone, getAppTimeZone, zonedTimeToUtcISO } from "../app-time-zone";
+
+/** Mesmo fallback usado em run-agent.ts pro "hoje" do prompt: fuso escolhido
+ * no app, ou o do navegador quando a pessoa nunca configurou um. Sem isso,
+ * "às 14h" ficaria sujeito ao fuso do navegador mesmo quando o app já sabe
+ * que a pessoa configurou outro. */
+function effectiveTimeZone(): string {
+  return getAppTimeZone() ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
 
 const CATEGORY_IDS = FINANCE_CATEGORIES.map((c) => c.id).join(", ");
 
@@ -74,10 +109,15 @@ export const AGENT_TOOLS = [
     function: {
       name: "consultar_rotina",
       description:
-        "Consulta dados reais de alimentação (momentos e opções com IDs), leitura, fé ou planos. Consulte antes de escolher IDs. Não retorne IDs internos na mensagem ao usuário.",
+        "Consulta dados reais de alimentação (momentos e opções com IDs), leitura, fé, planos ou academia (treinos/exercícios/dias da semana com IDs). Consulte antes de escolher IDs. Não retorne IDs internos na mensagem ao usuário.",
       parameters: {
         type: "object",
-        properties: { area: { type: "string", enum: ["alimentacao", "leitura", "fe", "planos"] } },
+        properties: {
+          area: {
+            type: "string",
+            enum: ["alimentacao", "leitura", "fe", "planos", "academia"],
+          },
+        },
         required: ["area"],
       },
     },
@@ -196,14 +236,47 @@ export const AGENT_TOOLS = [
     type: "function" as const,
     function: {
       name: "criar_lembrete",
-      description: "Cria um lembrete pontual pra uma data. Ação reversível, execute direto.",
+      description:
+        "Cria um lembrete pontual pra uma data, com hora opcional. Ação reversível, execute direto. Pra 'me lembra 1h antes do dentista', primeiro consulte a agenda pra achar o executionId do compromisso, então informe relatedExecutionId e offsetMinutesBefore (não invente time nesse caso — deixe o app calcular a partir do horário real do compromisso).",
       parameters: {
         type: "object",
         properties: {
           text: { type: "string" },
           date: { type: "string", description: "Data no formato YYYY-MM-DD" },
+          time: {
+            type: "string",
+            description: "HH:MM, só se a pessoa deu um horário explícito (sem ser 'antes de X')",
+          },
+          relatedExecutionId: {
+            type: "string",
+            description:
+              "id do compromisso, de consultar_agenda/consultar_dia, se o pedido for relativo a ele",
+          },
+          offsetMinutesBefore: {
+            type: "number",
+            description: "minutos antes do horário do compromisso referenciado; 0 = na hora exata",
+          },
         },
         required: ["text", "date"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "gerenciar_lembrete",
+      description:
+        "Conclui, remove ou edita um lembrete já existente, pelo id retornado por consultar_dia.",
+      parameters: {
+        type: "object",
+        properties: {
+          reminderId: { type: "string" },
+          action: { type: "string", enum: ["concluir", "remover", "editar"] },
+          text: { type: "string", description: "Só para action=editar" },
+          date: { type: "string", description: "YYYY-MM-DD, só para action=editar" },
+          time: { type: "string", description: "HH:MM, só para action=editar" },
+        },
+        required: ["reminderId", "action"],
       },
     },
   },
@@ -344,6 +417,235 @@ export const AGENT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "consultar_peso_corporal",
+      description: "Consulta o histórico recente de peso corporal e a variação.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "corrigir_serie",
+      description:
+        "Corrige peso e/ou repetições de uma série já registrada nesta sessão (não cria série nova). Consulte consultar_treino_hoje pra pegar sessionId/exerciseId.",
+      parameters: {
+        type: "object",
+        properties: {
+          sessionId: { type: "string" },
+          exerciseId: { type: "string" },
+          setIndex: { type: "number", description: "Posição da série, começando em 0" },
+          weight: { type: "number" },
+          reps: { type: "number" },
+        },
+        required: ["sessionId", "exerciseId", "setIndex"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "remover_ultima_serie",
+      description: "Remove a última série registrada de um exercício na sessão em andamento.",
+      parameters: {
+        type: "object",
+        properties: { sessionId: { type: "string" }, exerciseId: { type: "string" } },
+        required: ["sessionId", "exerciseId"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "gerenciar_plano_treino",
+      description:
+        "Cria, edita ou remove um treino da biblioteca (ex.: Treino A). Consulte consultar_rotina area=academia antes de editar/remover pra ter o planId. Ação reversível, execute direto.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: { type: "string", enum: ["criar", "editar", "remover"] },
+          planId: { type: "string", description: "Obrigatório para editar/remover" },
+          letter: { type: "string", description: "Ex.: 'A'. Obrigatório para criar" },
+          name: { type: "string", description: "Obrigatório para criar" },
+          muscleGroups: { type: "string", description: "Ex.: 'Peito e tríceps'" },
+          exercises: {
+            type: "array",
+            description:
+              "Obrigatório para criar (pelo menos 1); em editar, exercícios ADICIONADOS ao treino",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                setsTarget: { type: "number" },
+                repsTarget: { type: "number" },
+                loadTarget: { type: "number" },
+                restSeconds: { type: "number" },
+                muscleGroup: {
+                  type: "string",
+                  enum: [
+                    "peito",
+                    "costas",
+                    "ombros",
+                    "biceps",
+                    "triceps",
+                    "antebraco",
+                    "quadriceps",
+                    "posteriores",
+                    "gluteos",
+                    "panturrilhas",
+                    "abdomen",
+                    "corpo_inteiro",
+                    "cardio",
+                  ],
+                },
+                equipment: {
+                  type: "string",
+                  enum: [
+                    "barra",
+                    "halteres",
+                    "maquina",
+                    "cabo",
+                    "peso_corporal",
+                    "assistido",
+                    "kettlebell",
+                    "elastico",
+                    "outro",
+                  ],
+                },
+              },
+              required: ["name", "setsTarget", "repsTarget", "loadTarget"],
+            },
+          },
+          removeExerciseNames: {
+            type: "array",
+            items: { type: "string" },
+            description: "Em editar: nomes de exercícios a remover deste treino",
+          },
+        },
+        required: ["action"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "definir_dias_treino",
+      description:
+        "Define qual treino (da biblioteca) acontece em cada dia da semana. weekday: 0=domingo...6=sábado. planId nulo = descanso nesse dia.",
+      parameters: {
+        type: "object",
+        properties: {
+          assignments: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                weekday: { type: "number" },
+                planId: { type: ["string", "null"] },
+              },
+              required: ["weekday", "planId"],
+            },
+          },
+        },
+        required: ["assignments"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "criar_ciclo_treino",
+      description:
+        "Cria um ciclo de treino completo — um ou mais blocos (fases) com datas, cada um com seus próprios treinos (ex.: A/B/C) e exercícios, e a atribuição de dias da semana dentro de cada bloco. Use pra 'quero um ciclo de 3 meses de resistência, depois 2 meses ABC'. Ativa o ciclo por padrão (activate=false só se a pessoa pedir pra deixar como rascunho). Ação reversível, execute direto sem pedir confirmação por texto — o card mostra o resultado.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          startDate: { type: "string", description: "YYYY-MM-DD" },
+          why: { type: "string" },
+          activate: { type: "boolean" },
+          blocks: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                durationDays: { type: "number" },
+                focus: { type: "string" },
+                muscleGroups: { type: "string" },
+                plans: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      letter: { type: "string" },
+                      name: { type: "string" },
+                      muscleGroups: { type: "string" },
+                      exercises: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            name: { type: "string" },
+                            setsTarget: { type: "number" },
+                            repsTarget: { type: "number" },
+                            loadTarget: { type: "number" },
+                            restSeconds: { type: "number" },
+                          },
+                          required: ["name", "setsTarget", "repsTarget", "loadTarget"],
+                        },
+                      },
+                    },
+                    required: ["letter", "name", "exercises"],
+                  },
+                },
+                weekdayAssignment: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      weekday: { type: "number" },
+                      planLetter: { type: ["string", "null"] },
+                      startTime: { type: "string" },
+                    },
+                    required: ["weekday", "planLetter"],
+                  },
+                },
+              },
+              required: ["name", "durationDays", "plans"],
+            },
+          },
+        },
+        required: ["name", "startDate", "blocks"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "consultar_ciclo_treino",
+      description: "Consulta o ciclo de treino ativo — blocos, treinos de cada bloco e datas.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "encerrar_ciclo_treino",
+      description: "Encerra o ciclo de treino ativo.",
+      parameters: {
+        type: "object",
+        properties: {
+          restoreWeekly: {
+            type: "boolean",
+            description: "Volta o plano da semana de antes do ciclo. Padrão true.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "salvar_nota_leitura",
       description:
         "Salva uma citação, insight ou nota vinculada a um livro que a pessoa está lendo. Use o título do livro como a pessoa falou.",
@@ -419,7 +721,9 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
             ? await fetchReadingState()
             : args.area === "fe"
               ? await fetchFeState()
-              : await fetchGoalsState();
+              : args.area === "academia"
+                ? await fetchWorkoutState()
+                : await fetchGoalsState();
       return JSON.stringify(state);
     }
     case "registrar_refeicao": {
@@ -559,7 +863,16 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
         ...todayReminders(remindersState, today),
       ];
       const remText = rem.length
-        ? rem.map((r) => `${r.text} (${r.date})`).join("; ")
+        ? rem
+            .map(
+              (r) =>
+                `[${r.id}] ${r.text} (${r.date}${
+                  r.remindAt
+                    ? ` às ${dateAndTimeInZone(new Date(r.remindAt), effectiveTimeZone()).time}`
+                    : ""
+                })`,
+            )
+            .join("; ")
         : "nenhum lembrete pendente";
       return JSON.stringify({
         card: "agenda",
@@ -571,8 +884,66 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
     }
 
     case "criar_lembrete": {
-      await createReminder({ text: args.text as string, date: args.date as string });
-      return `Lembrete criado: "${args.text}" pra ${args.date}.`;
+      const relatedExecutionId = args.relatedExecutionId as string | undefined;
+      const offsetMinutes = args.offsetMinutesBefore as number | undefined;
+      const zone = effectiveTimeZone();
+      let remindAt: string | undefined;
+      if (relatedExecutionId) {
+        const state = await fetchGoalsState();
+        const exec = state.executions.find((e) => e.id === relatedExecutionId);
+        if (!exec?.agendaDate || !exec?.startTime)
+          throw new Error(
+            "Esse compromisso não tem hora marcada — consulte a agenda de novo antes de criar o lembrete.",
+          );
+        remindAt = new Date(
+          new Date(zonedTimeToUtcISO(exec.agendaDate, exec.startTime, zone)).getTime() -
+            (offsetMinutes ?? 0) * 60_000,
+        ).toISOString();
+      } else if (args.time) {
+        remindAt = zonedTimeToUtcISO(args.date as string, args.time as string, zone);
+      }
+      const id = await createReminder({
+        text: args.text as string,
+        date: args.date as string,
+        remindAt,
+        relatedExecutionId,
+        offsetMinutes,
+      });
+      const timeLabel = remindAt ? ` às ${dateAndTimeInZone(new Date(remindAt), zone).time}` : "";
+      const summary = `Lembrete criado: "${args.text}" pra ${args.date}${timeLabel}.`;
+      if (remindAt && !(await hasPushSubscription())) {
+        return JSON.stringify({
+          card: "notifications",
+          id,
+          description: `${summary} Ative notificações pra receber o aviso no horário certo.`,
+          summary,
+        });
+      }
+      return summary;
+    }
+
+    case "gerenciar_lembrete": {
+      const reminders = await fetchRemindersState();
+      const reminder = reminders.find((r) => r.id === args.reminderId);
+      if (!reminder)
+        throw new Error("Lembrete não encontrado. Consulte consultar_dia de novo pra pegar o id.");
+      const action = args.action as "concluir" | "remover" | "editar";
+      if (action === "concluir") {
+        await toggleReminder(reminder.id, reminder.done);
+        return `Lembrete concluído.`;
+      }
+      if (action === "remover") {
+        await removeReminder(reminder.id);
+        return `Lembrete removido.`;
+      }
+      const nextDate = (args.date as string | undefined) ?? reminder.date;
+      const nextTime = args.time as string | undefined;
+      await updateReminder(reminder.id, {
+        text: args.text as string | undefined,
+        date: args.date as string | undefined,
+        remindAt: nextTime ? zonedTimeToUtcISO(nextDate, nextTime, effectiveTimeZone()) : undefined,
+      });
+      return `Lembrete atualizado.`;
     }
 
     case "criar_execucao": {
@@ -680,6 +1051,219 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
     case "registrar_peso_corporal": {
       await addBodyWeight(args.weight as number);
       return `Peso registrado: ${args.weight}kg.`;
+    }
+
+    case "consultar_peso_corporal": {
+      const state = await fetchWorkoutState();
+      const sorted = bodyWeightsByDateDesc(state.bodyWeights);
+      if (sorted.length === 0) return "Nenhum peso registrado ainda.";
+      const latest = sorted[0];
+      const oldest = sorted[sorted.length - 1];
+      const delta = Math.round((latest.weight - oldest.weight) * 10) / 10;
+      const history = sorted
+        .slice(0, 5)
+        .map((b) => `${b.weight}kg (${b.date})`)
+        .join("; ");
+      return `Últimos registros: ${history}. Variação desde o mais antigo mostrado: ${delta > 0 ? "+" : ""}${delta}kg.`;
+    }
+
+    case "corrigir_serie": {
+      await updateSet(
+        args.sessionId as string,
+        args.exerciseId as string,
+        args.setIndex as number,
+        {
+          weight: args.weight as number | undefined,
+          reps: args.reps as number | undefined,
+        },
+      );
+      return `Série corrigida.`;
+    }
+
+    case "remover_ultima_serie": {
+      await removeLastSet(args.sessionId as string, args.exerciseId as string);
+      return `Última série removida.`;
+    }
+
+    case "gerenciar_plano_treino": {
+      const action = args.action as "criar" | "editar" | "remover";
+      type ExerciseInput = {
+        name: string;
+        setsTarget: number;
+        repsTarget: number;
+        loadTarget: number;
+        restSeconds?: number;
+        muscleGroup?: string;
+        equipment?: string;
+      };
+      if (action === "criar") {
+        const planId = await createPlan({
+          letter: args.letter as string,
+          name: args.name as string,
+          muscleGroups: (args.muscleGroups as string) ?? "",
+        });
+        for (const ex of (args.exercises as ExerciseInput[]) ?? []) {
+          await addExercise(planId, {
+            name: ex.name,
+            setsTarget: ex.setsTarget,
+            repsTarget: ex.repsTarget,
+            loadTarget: ex.loadTarget,
+            restSeconds: ex.restSeconds ?? 60,
+            muscleGroup: ex.muscleGroup as never,
+            equipment: ex.equipment as never,
+          });
+        }
+        return `Treino "${args.name}" criado com ${((args.exercises as ExerciseInput[]) ?? []).length} exercício(s).`;
+      }
+      if (action === "remover") {
+        await removePlan(args.planId as string);
+        return `Treino removido. Sessões já registradas continuam no seu histórico.`;
+      }
+      // editar
+      const patch: { name?: string; muscleGroups?: string } = {};
+      if (args.name !== undefined) patch.name = args.name as string;
+      if (args.muscleGroups !== undefined) patch.muscleGroups = args.muscleGroups as string;
+      if (Object.keys(patch).length > 0) await updatePlan(args.planId as string, patch);
+      let added = 0;
+      for (const ex of (args.exercises as ExerciseInput[]) ?? []) {
+        await addExercise(args.planId as string, {
+          name: ex.name,
+          setsTarget: ex.setsTarget,
+          repsTarget: ex.repsTarget,
+          loadTarget: ex.loadTarget,
+          restSeconds: ex.restSeconds ?? 60,
+          muscleGroup: ex.muscleGroup as never,
+          equipment: ex.equipment as never,
+        });
+        added++;
+      }
+      let removed = 0;
+      if ((args.removeExerciseNames as string[] | undefined)?.length) {
+        const state = await fetchWorkoutState();
+        const planExercises = state.exercises.filter((e) => e.planId === args.planId);
+        for (const name of args.removeExerciseNames as string[]) {
+          const match = planExercises.find((e) =>
+            e.name.toLowerCase().includes(name.toLowerCase()),
+          );
+          if (match) {
+            await removeExercise(match.id);
+            removed++;
+          }
+        }
+      }
+      return `Treino atualizado${added ? `, ${added} exercício(s) adicionado(s)` : ""}${removed ? `, ${removed} removido(s)` : ""}.`;
+    }
+
+    case "definir_dias_treino": {
+      const assignments = args.assignments as { weekday: number; planId: string | null }[];
+      for (const a of assignments) await setWeeklyAssignment(a.weekday, a.planId);
+      return `Dias da semana atualizados: ${assignments.length} dia(s).`;
+    }
+
+    case "criar_ciclo_treino": {
+      type PlanSpec = {
+        letter: string;
+        name: string;
+        muscleGroups?: string;
+        exercises: {
+          name: string;
+          setsTarget: number;
+          repsTarget: number;
+          loadTarget: number;
+          restSeconds?: number;
+        }[];
+      };
+      type BlockSpec = {
+        name: string;
+        durationDays: number;
+        focus?: string;
+        muscleGroups?: string;
+        plans: PlanSpec[];
+        weekdayAssignment?: { weekday: number; planLetter: string | null; startTime?: string }[];
+      };
+      const blocks = args.blocks as BlockSpec[];
+      const cycleId = await createCycle({
+        name: args.name as string,
+        startDate: args.startDate as string,
+        why: args.why as string | undefined,
+        blocks: blocks.map((b) => ({
+          name: b.name,
+          durationDays: b.durationDays,
+          focus: b.focus,
+          muscleGroups: b.muscleGroups,
+        })),
+      });
+
+      const cycleState = await fetchCycleState();
+      const createdBlocks = blocksForCycle(cycleState.blocks, cycleId).sort(
+        (a, b) => a.order - b.order,
+      );
+
+      for (let i = 0; i < blocks.length; i++) {
+        const blockSpec = blocks[i];
+        const blockId = createdBlocks[i]?.id;
+        if (!blockId) continue;
+        const letterToPlanId: Record<string, string> = {};
+        for (const planSpec of blockSpec.plans) {
+          const planId = await createPlanInBlock(blockId, {
+            letter: planSpec.letter,
+            name: planSpec.name,
+            muscleGroups: planSpec.muscleGroups,
+          });
+          letterToPlanId[planSpec.letter] = planId;
+          for (const ex of planSpec.exercises) {
+            await addExercise(planId, {
+              name: ex.name,
+              setsTarget: ex.setsTarget,
+              repsTarget: ex.repsTarget,
+              loadTarget: ex.loadTarget,
+              restSeconds: ex.restSeconds ?? 60,
+            });
+          }
+        }
+        for (const day of blockSpec.weekdayAssignment ?? []) {
+          const planId = day.planLetter ? (letterToPlanId[day.planLetter] ?? null) : null;
+          await setBlockDay(blockId, day.weekday, planId, day.startTime);
+        }
+      }
+
+      if (args.activate !== false) await activateCycle(cycleId);
+      return JSON.stringify({
+        card: "plan",
+        id: cycleId,
+        title: args.name,
+        deadlineLabel: `${blocks.length} bloco(s)`,
+        steps: blocks.map((b) => ({
+          title: b.name,
+          actions: b.plans.map((p) => `${p.letter}: ${p.name}`),
+        })),
+        summary: `Ciclo "${args.name}" criado com ${blocks.length} bloco(s)${args.activate !== false ? " e ativado" : ""}.`,
+      });
+    }
+
+    case "consultar_ciclo_treino": {
+      const cycleState = await fetchCycleState();
+      const cycle = activeCycle(cycleState.cycles);
+      if (!cycle) return "Nenhum ciclo de treino ativo no momento.";
+      const blocks = blocksForCycle(cycleState.blocks, cycle.id).sort((a, b) => a.order - b.order);
+      const current = blockOn(blocks, todayISO());
+      const workoutState = await fetchWorkoutState();
+      const blocksText = blocks
+        .map((b) => {
+          const plans = plansOfBlock(cycleState.blockPlans, workoutState.plans, b.id);
+          const days = daysOfBlock(cycleState.blockDays, b.id);
+          return `${b.name} (${b.startDate} a ${b.endDate})${b.id === current?.id ? " [ATUAL]" : ""}: treinos ${plans.map((p) => `${p.letter} ${p.name}`).join(", ") || "nenhum"}; ${days.length} dia(s) programado(s)`;
+        })
+        .join(" | ");
+      return `Ciclo "${cycle.name}" (${cycle.startDate} a ${cycle.endDate}). Blocos: ${blocksText}.`;
+    }
+
+    case "encerrar_ciclo_treino": {
+      const cycleState = await fetchCycleState();
+      const cycle = activeCycle(cycleState.cycles);
+      if (!cycle) return "Nenhum ciclo de treino ativo pra encerrar.";
+      await endCycle(cycle, args.restoreWeekly !== false);
+      return `Ciclo "${cycle.name}" encerrado.`;
     }
 
     case "salvar_nota_leitura": {

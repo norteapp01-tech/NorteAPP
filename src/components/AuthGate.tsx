@@ -1,20 +1,14 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { RefreshCcw, WifiOff, AlertTriangle } from "lucide-react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { AlertTriangle, Compass, RefreshCcw, WifiOff } from "lucide-react";
 import { supabase, ensureSession, hasLinkedAccount, primeSession } from "@/lib/supabase/client";
+import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "./ui/drawer";
+import "./signup-sheet.css";
 
 type Status = "checking" | "ready" | "needs-login" | "connection-error";
+type Provider = "google" | "apple";
+type LoginView = "login" | "forgot" | "sent" | "new-password";
 
-/**
- * No boot padrão (nunca fez upgrade pra e-mail/senha), continua 100% silencioso —
- * sessão anônima automática, sem tela nenhuma. Só se ESTE navegador já teve uma
- * conta real vinculada e a sessão sumiu (ex.: logout) é que mostramos um login
- * mínimo, pra não criar uma conta anônima nova e "perder" os dados de verdade.
- *
- * Se a criação/verificação de sessão falhar (rede indisponível, Supabase fora do
- * ar), nunca deixamos a tela em branco pra sempre — mostramos um estado de erro
- * explícito com "Tentar novamente" (que reexecuta o boot de verdade, já que
- * `ensureSession()` agora reseta seu cache interno quando falha).
- */
+/** Keep returning accounts out of a fresh anonymous session when their session expires. */
 export function AuthGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("checking");
   const [errorMessage, setErrorMessage] = useState("");
@@ -59,8 +53,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** Sutil, sem "pulo" de layout — evita tela branca perceptível em conexões lentas
- * sem competir visualmente com o app real quando a checagem é instantânea. */
 function BootScreen() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
@@ -105,113 +97,346 @@ function ConnectionErrorScreen({ message, onRetry }: { message: string; onRetry:
   );
 }
 
+const field =
+  "mt-1 w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-primary";
+const action =
+  "w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50";
+
+function rememberAccount() {
+  try {
+    localStorage.setItem("norte_has_account", "1");
+  } catch {
+    /* Storage may be unavailable. */
+  }
+}
+
 export function SignInScreen({
   onSuccess,
-  subtitle = "Este dispositivo já teve uma conta vinculada. Entre pra recuperar seus dados.",
+  subtitle = "Entre para continuar de onde parou.",
   onBack,
+  recovery = false,
+  showBackdrop = true,
 }: {
   onSuccess: () => void;
   subtitle?: string;
   onBack?: () => void;
+  recovery?: boolean;
+  showBackdrop?: boolean;
 }) {
+  const [view, setView] = useState<LoginView>(recovery ? "new-password" : "login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const submit = async () => {
+  async function submitLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setLoading(true);
     setError(null);
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (signInError) {
-      setError("E-mail ou senha incorretos.");
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (signInError) throw signInError;
+      rememberAccount();
+      onSuccess();
+    } catch {
+      setError("Não foi possível entrar. Confira seu e-mail e sua senha.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function sendRecovery(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/?auth=recovery`,
+      });
+      if (resetError) throw resetError;
+      setView("sent");
+    } catch {
+      setError("Não foi possível enviar o link agora. Tente novamente em instantes.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveNewPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (password.length < 8 || password !== confirmPassword) {
+      setError("Use pelo menos 8 caracteres e repita a mesma senha.");
       return;
     }
+    setLoading(true);
+    setError(null);
     try {
-      localStorage.setItem("norte_has_account", "1");
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !data.session || data.session.user.is_anonymous) {
+        setError("Este link expirou ou já foi usado. Solicite outro em 'Esqueci minha senha'.");
+        return;
+      }
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) throw updateError;
+      rememberAccount();
+      onSuccess();
     } catch {
-      // localStorage indisponível — segue sem persistir a flag.
+      setError("Não foi possível trocar a senha. Solicite um novo link e tente novamente.");
+    } finally {
+      setLoading(false);
     }
-    onSuccess();
-  };
+  }
+
+  async function signInWithProvider(provider: Provider) {
+    setLoading(true);
+    setError(null);
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: `${window.location.origin}/?auth=login` },
+      });
+      if (oauthError) throw oauthError;
+    } catch {
+      setError(
+        `Não foi possível abrir o login ${provider === "apple" ? "da Apple" : "do Google"}. Tente novamente.`,
+      );
+      setLoading(false);
+    }
+  }
+
+  const title =
+    view === "login"
+      ? "Entre na sua conta."
+      : view === "forgot"
+        ? "Recupere sua senha."
+        : view === "sent"
+          ? "Confira seu e-mail."
+          : "Escolha uma nova senha.";
+  const description =
+    view === "login"
+      ? subtitle
+      : view === "forgot"
+        ? "Enviaremos um link para você voltar à sua conta."
+        : view === "sent"
+          ? "Se houver uma conta com este e-mail, você receberá um link para criar uma nova senha."
+          : "Use pelo menos 8 caracteres para proteger sua conta.";
 
   return (
-    <div className="flex min-h-screen flex-col justify-center px-6">
-      {onBack && (
-        <button
-          onClick={onBack}
-          className="-ml-2 mb-6 flex h-9 w-9 items-center justify-center self-start rounded-full hover:bg-surface"
-          aria-label="Voltar"
-        >
-          ←
-        </button>
-      )}
-      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Norte</p>
-      <h1 className="mt-1 text-2xl font-bold">Entrar na sua conta</h1>
-      <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+    <>
+      {showBackdrop && <div className="min-h-svh bg-background" aria-hidden="true" />}
+      <Drawer
+        open
+        onOpenChange={(open) => {
+          if (!open) onBack?.();
+        }}
+        shouldScaleBackground={false}
+        dismissible={Boolean(onBack) && !recovery}
+      >
+        <DrawerContent className="signup-sheet">
+          <div className="signup-sheet-body">
+            <Compass className="signup-sheet-mark text-primary" size={32} aria-hidden="true" />
+            <DrawerTitle className="signup-sheet-title">{title}</DrawerTitle>
+            <DrawerDescription className="signup-sheet-description">
+              {description}
+            </DrawerDescription>
 
-      <div className="mt-6 space-y-3">
-        <label className="block">
-          <span className="mb-0.5 block text-[10px] uppercase text-muted-foreground">E-mail</span>
-          <input
-            type="email"
-            autoFocus
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
-          />
-        </label>
-        <label className="block">
-          <span className="mb-0.5 block text-[10px] uppercase text-muted-foreground">Senha</span>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
-          />
-        </label>
-        {error && <p className="text-xs text-danger">{error}</p>}
-        <button
-          onClick={submit}
-          disabled={loading || !email || !password}
-          className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
-        >
-          Entrar
-        </button>
+            {view === "login" && (
+              <>
+                <form onSubmit={submitLogin} className="space-y-3">
+                  <label className="block text-sm">
+                    E-mail
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      className={field}
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    Senha
+                    <input
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      className={field}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="signup-forgot-link"
+                    onClick={() => {
+                      setError(null);
+                      setView("forgot");
+                    }}
+                  >
+                    Esqueci minha senha
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading || !email.trim() || !password}
+                    className={action}
+                  >
+                    {loading ? "Entrando…" : "Entrar"}
+                  </button>
+                </form>
+                <div className="signup-sheet-divider">
+                  <span />
+                  ou
+                  <span />
+                </div>
+                <div className="signup-sheet-options">
+                  <button
+                    type="button"
+                    disabled={loading}
+                    className="signup-provider signup-google"
+                    onClick={() => void signInWithProvider("google")}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.25c1.9-1.75 2.97-4.33 2.97-7.36Z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 22c2.7 0 4.96-.9 6.61-2.41l-3.25-2.51c-.9.6-2.05.96-3.36.96-2.6 0-4.81-1.76-5.6-4.12H3.04v2.59A10 10 0 0 0 12 22Z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M6.4 13.92a6 6 0 0 1 0-3.84V7.49H3.04a10 10 0 0 0 0 9.02l3.36-2.59Z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.96c1.47 0 2.79.5 3.82 1.49l2.87-2.87A9.6 9.6 0 0 0 12 2a10 10 0 0 0-8.96 5.49l3.36 2.59C7.19 7.72 9.4 5.96 12 5.96Z"
+                      />
+                    </svg>
+                    <span>Entrar com Google</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    className="signup-provider signup-apple"
+                    onClick={() => void signInWithProvider("apple")}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M17.05 12.54c.03 3.14 2.75 4.18 2.78 4.2-.02.07-.43 1.49-1.43 2.96-.87 1.27-1.78 2.54-3.2 2.57-1.4.04-1.85-.83-3.45-.83-1.6 0-2.1.8-3.43.86-1.38.05-2.43-1.38-3.31-2.65-1.8-2.6-3.17-7.35-1.32-10.56a5.13 5.13 0 0 1 4.33-2.63c1.35-.03 2.63.92 3.45.92.83 0 2.37-1.14 3.99-.97.67.03 2.57.27 3.78 2.04-.1.06-2.25 1.31-2.23 4.09ZM14.43 4.7c.73-.89 1.22-2.13 1.08-3.36-1.05.04-2.33.7-3.08 1.59-.67.77-1.26 2.02-1.1 3.22 1.17.09 2.37-.6 3.1-1.45Z" />
+                    </svg>
+                    <span>Entrar com Apple</span>
+                  </button>
+                </div>
+              </>
+            )}
 
-        {/* Quem criou a conta com Google NÃO tem identidade de e-mail: para
-            essas contas o formulário acima nunca vai funcionar, por mais
-            correta que seja a senha. Sem este botão elas ficavam sem nenhuma
-            porta de entrada. */}
-        <div className="flex items-center gap-3 pt-1">
-          <span className="h-px flex-1 bg-border" />
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">ou</span>
-          <span className="h-px flex-1 bg-border" />
-        </div>
-        <button
-          onClick={() => void signInWithGoogle(setError)}
-          className="w-full rounded-xl border border-border py-3 text-sm font-semibold"
-        >
-          Continuar com Google
-        </button>
-      </div>
-    </div>
+            {view === "forgot" && (
+              <form onSubmit={sendRecovery} className="space-y-4">
+                <label className="block text-sm">
+                  E-mail
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    className={field}
+                  />
+                </label>
+                <button type="submit" disabled={loading || !email.trim()} className={action}>
+                  {loading ? "Enviando…" : "Enviar link de recuperação"}
+                </button>
+              </form>
+            )}
+
+            {view === "sent" && (
+              <button
+                type="button"
+                className={action}
+                onClick={() => {
+                  setView("login");
+                  setError(null);
+                }}
+              >
+                Voltar para o login
+              </button>
+            )}
+
+            {view === "new-password" && (
+              <form onSubmit={saveNewPassword} className="space-y-3">
+                <label className="block text-sm">
+                  Nova senha
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    className={field}
+                  />
+                </label>
+                <label className="block text-sm">
+                  Confirmar nova senha
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    className={field}
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={loading || !password || !confirmPassword}
+                  className={action}
+                >
+                  {loading ? "Salvando…" : "Salvar nova senha"}
+                </button>
+                <button
+                  type="button"
+                  className="signup-forgot-link"
+                  onClick={() => {
+                    setView("forgot");
+                    setError(null);
+                  }}
+                >
+                  Pedir outro link
+                </button>
+              </form>
+            )}
+
+            {error && (
+              <p role="alert" className="mt-4 text-sm text-destructive">
+                {error}
+              </p>
+            )}
+            {onBack && view !== "login" && view !== "new-password" && (
+              <button
+                type="button"
+                className="signup-sheet-return"
+                onClick={() => {
+                  setView("login");
+                  setError(null);
+                }}
+              >
+                Voltar
+              </button>
+            )}
+            {onBack && view === "login" && (
+              <button type="button" className="signup-sheet-return" onClick={onBack}>
+                Voltar
+              </button>
+            )}
+          </div>
+        </DrawerContent>
+      </Drawer>
+    </>
   );
-}
-
-/**
- * Entra numa conta que já existe.
- *
- * Diferente de `linkIdentity` (usado no cadastro, que PRENDE o provedor à
- * sessão anônima atual), aqui a intenção é a oposta: assumir a conta que já
- * tem aquele provedor. Chamar `linkIdentity` para quem já tem conta devolve
- * `identity_already_exists` e não há como avançar dali.
- */
-export async function signInWithGoogle(onError: (message: string) => void) {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo: `${window.location.origin}/` },
-  });
-  if (error) onError("Não foi possível abrir o login do Google. Tente novamente.");
 }

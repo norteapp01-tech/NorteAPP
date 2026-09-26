@@ -175,6 +175,108 @@ describe("Agente Norte — três personas e cenários adversariais", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it("cria lembrete relativo a um compromisso com offset, sem exigir horário calculado pelo modelo", async () => {
+    const execute = vi.fn(async () => 'Lembrete criado: "Dentista" pra 2026-09-11 às 18:00.');
+    const reply = await runAgentTurnWith([], "me lembra 1h antes do dentista", {
+      step: stepReturning([
+        {
+          name: "criar_lembrete",
+          args: {
+            text: "Dentista",
+            date: "2026-09-11",
+            relatedExecutionId: "11111111-1111-1111-1111-111111111111",
+            offsetMinutesBefore: 60,
+          },
+        },
+      ]) as never,
+      execute: execute as never,
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(reply.toolTrace?.[0].result).not.toContain("Não executei");
+  });
+
+  it("rejeita gerenciar_lembrete com action fora do enum permitido", async () => {
+    const execute = vi.fn();
+    const reply = await runAgentTurnWith([], "cancela aquele lembrete", {
+      step: stepReturning([
+        {
+          name: "gerenciar_lembrete",
+          args: { reminderId: "11111111-1111-1111-1111-111111111111", action: "cancelar" },
+        },
+      ]) as never,
+      execute: execute as never,
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(reply.toolTrace?.[0].result).toContain("Não executei");
+  });
+
+  it("exige confirmação antes de salvar um ciclo de treino proposto", async () => {
+    const execute = vi.fn(async () => 'Ciclo "Resistência" criado com 1 bloco(s) e ativado.');
+    const cycleCall = {
+      name: "criar_ciclo_treino",
+      args: {
+        name: "Resistência",
+        startDate: "2026-10-01",
+        blocks: [
+          {
+            name: "Base",
+            durationDays: 30,
+            plans: [
+              {
+                letter: "A",
+                name: "Treino A",
+                exercises: [{ name: "Supino", setsTarget: 3, repsTarget: 10, loadTarget: 40 }],
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const proposed = await runAgentTurnWith(
+      [],
+      "cria um ciclo de resistência de 30 dias com treino A de supino",
+      { step: stepReturning([cycleCall]) as never, execute: execute as never },
+    );
+    expect(execute).not.toHaveBeenCalled();
+    expect(proposed.pendingActions).toHaveLength(1);
+    const confirmed = await runAgentTurnWith([proposed], "confirmo", {
+      step: vi.fn() as never,
+      execute: execute as never,
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(confirmed.text).toContain("Ciclo");
+  });
+
+  it("rejeita gerenciar_plano_treino criar sem nenhum exercício", async () => {
+    const execute = vi.fn();
+    const reply = await runAgentTurnWith([], "cria um treino B vazio", {
+      step: stepReturning([
+        {
+          name: "gerenciar_plano_treino",
+          args: { action: "criar", letter: "B", name: "Treino B", exercises: [] },
+        },
+      ]) as never,
+      execute: execute as never,
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(reply.toolTrace?.[0].result).toContain("Não executei");
+  });
+
+  it("rejeita definir_dias_treino com weekday fora do intervalo 0-6", async () => {
+    const execute = vi.fn();
+    const reply = await runAgentTurnWith([], "treino A toda semana", {
+      step: stepReturning([
+        {
+          name: "definir_dias_treino",
+          args: { assignments: [{ weekday: 7, planId: "11111111-1111-1111-1111-111111111111" }] },
+        },
+      ]) as never,
+      execute: execute as never,
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(reply.toolTrace?.[0].result).toContain("Não executei");
+  });
+
   it("relata falha após confirmação sem afirmar que a alteração foi concluída", async () => {
     const proposal: ChatTurn = {
       role: "assistant",

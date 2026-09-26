@@ -362,6 +362,27 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
                 {error}
               </p>
             )}
+            <p className="mt-5 text-xs leading-relaxed text-muted-foreground">
+              Antes de criar sua conta, leia os{" "}
+              <a
+                href="/termos"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-foreground underline underline-offset-2"
+              >
+                Termos de Uso
+              </a>{" "}
+              e a{" "}
+              <a
+                href="/privacidade"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-foreground underline underline-offset-2"
+              >
+                Política de Privacidade
+              </a>
+              .
+            </p>
             {manual && (
               <button
                 disabled={busy}

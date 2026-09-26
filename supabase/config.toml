@@ -384,6 +384,13 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# dispatch-reminders roda a partir de um agendamento da plataforma (ver
+# supabase/functions/dispatch-reminders/README.md), nunca a pedido do
+# navegador — sem isso a verificação padrão de JWT de usuário rejeitaria
+# toda chamada do cron.
+[functions.dispatch-reminders]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

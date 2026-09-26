@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, ListFilter, X, UserRound, ChartNoAxesColumnIncreasing } from "lucide-react";
-import { formatDateShortBR, todayISO } from "@/lib/goals-store";
+import { useEffect, useMemo, useState } from "react";
+import { CalendarDays, ListFilter, X } from "lucide-react";
+import { formatDateShortBR } from "@/lib/goals-store";
 import { useWorkoutLoading, useWorkoutStore, type MuscleGroup } from "@/lib/workout-store";
 import {
   blocksForCycle,
@@ -10,15 +10,11 @@ import {
 } from "@/lib/workout-cycle-store";
 import {
   applyFilters,
-  attentionPoints,
   frequency,
-  exerciseTrends,
-  loadProgressions,
   muscleGroupLabel,
   muscleStimulus,
   rangeOfLastDays,
   resolveSets,
-  type AttentionPoint,
   type DateRange,
   type EvolutionFilters,
 } from "@/lib/workout-evolution";
@@ -27,8 +23,6 @@ import { muscleProgress, progressLabel } from "@/lib/workout-map";
 import { RepetitionProfile } from "./RepetitionProfile";
 import { RadarDistribution } from "./RadarDistribution";
 import { OverloadList } from "./OverloadList";
-import { AttentionCard } from "./AttentionCard";
-import { DashboardIndicators, PerformanceChart } from "./PerformanceDashboard";
 import "./evolution.css";
 import { ExerciseDetailSheet } from "./ExerciseDetailSheet";
 import { MeasurementsCard } from "./MeasurementsCard";
@@ -59,14 +53,7 @@ const PRESETS: { key: Preset; label: string; days: number }[] = [
   { key: "365", label: "1 ano", days: 365 },
 ];
 
-export function EvolutionTab({
-  initialStageId,
-  onReviewNext,
-}: {
-  initialStageId?: string;
-  onReviewNext?: () => void;
-}) {
-  const [view, setView] = useState<"corpo" | "desempenho">("corpo");
+export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
   const sessions = useWorkoutStore((s) => s.sessions);
   const exercises = useWorkoutStore((s) => s.exercises);
   const plans = useWorkoutStore((s) => s.plans);
@@ -88,7 +75,6 @@ export function EvolutionTab({
   const [muscle, setMuscle] = useState<MuscleGroup | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [openExercise, setOpenExercise] = useState<string | null>(null);
-  const overloadRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (initialStageId) setStageId(initialStageId);
@@ -132,7 +118,6 @@ export function EvolutionTab({
     () => resolveSets(sessions, exercises, plans),
     [sessions, exercises, plans],
   );
-  const progressions = useMemo(() => loadProgressions(data.sets, 5), [data.sets]);
 
   // Programação histórica: só as etapas do ciclo têm datas fixas. A atribuição
   // semanal solta é estado ATUAL e não pode dizer o que estava previsto no
@@ -153,18 +138,6 @@ export function EvolutionTab({
   }, [cycle, stage, blocks, blockDays, cycles, data.effectiveRange]);
 
   const freq = frequency(data, plannedCount);
-  const stablePoints: AttentionPoint[] = exerciseTrends(data.sets)
-    .filter((t) => t.kind === "estavel" && t.spark.length >= 4)
-    .map((t) => ({
-      id: `stable-${t.lineageId}`,
-      tone: "alerta",
-      text: `${t.name} manteve a mesma referência em ${t.spark.length} sessões.`,
-      target: { kind: "exercicio", lineageId: t.lineageId },
-    }));
-  const points = [
-    ...stablePoints,
-    ...attentionPoints(data, progressions, stimulus, freq, todayISO()),
-  ].slice(0, 3);
 
   const chips: { label: string; onRemove: () => void }[] = [];
   if (cycle)
@@ -176,31 +149,6 @@ export function EvolutionTab({
       },
     });
   if (stage) chips.push({ label: `Etapa: ${stage.name}`, onRemove: () => setStageId("") });
-
-  const scrollToExercises = () => {
-    setView("desempenho");
-    window.setTimeout(
-      () =>
-        overloadRef.current?.scrollIntoView({
-          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-            ? "instant"
-            : "smooth",
-          block: "start",
-        }),
-      50,
-    );
-  };
-
-  const openAttention = (point: AttentionPoint) => {
-    if (point.target.kind === "exercicio") {
-      setOpenExercise(point.target.lineageId);
-      return;
-    }
-    if (point.target.kind === "musculo" && point.target.group !== "nao_classificado") {
-      setMuscle(point.target.group as MuscleGroup);
-    }
-    scrollToExercises();
-  };
 
   if (loading) {
     return (
@@ -217,14 +165,6 @@ export function EvolutionTab({
 
   return (
     <div className="evolution-dashboard space-y-3 pb-4">
-      <div className="evo-tabs" role="group" aria-label="Visualização da evolução">
-        <button aria-pressed={view === "corpo"} onClick={() => setView("corpo")}>
-          <UserRound size={18} /> Corpo
-        </button>
-        <button aria-pressed={view === "desempenho"} onClick={() => setView("desempenho")}>
-          <ChartNoAxesColumnIncreasing size={18} /> Desempenho
-        </button>
-      </div>
       {/* 1. filtros globais ---------------------------------------------- */}
       <section>
         <div className="flex items-start justify-between gap-2">
@@ -312,34 +252,20 @@ export function EvolutionTab({
 
       <div>
         <h2 className="norte-view-title">
-          {view === "corpo"
-            ? `Seu corpo ${preset === "custom" ? "no período" : `em ${PRESETS.find((p) => p.key === preset)?.label}`}`
-            : "Seu desempenho"}
+          Seu corpo{" "}
+          {preset === "custom"
+            ? "no período"
+            : `em ${PRESETS.find((p) => p.key === preset)?.label}`}
         </h2>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          {view === "corpo"
-            ? "Entenda onde você avançou e o que precisa de atenção."
-            : "Veja onde sua força avançou e onde parou."}
+          Entenda onde você avançou e o que precisa de atenção.
         </p>
       </div>
-      {view === "desempenho" && (
-        <DashboardIndicators
-          view={view}
-          data={data}
-          frequency={freq}
-          sessions={sessions}
-          exercises={exercises}
-          plans={plans}
-          onOpen={setOpenExercise}
-        />
-      )}
-      {view === "corpo" && (
-        <div className="evo-frequency">
-          <span>Constância no período</span>
-          <strong>{freq.done} treinos registrados</strong>
-          {freq.planned !== undefined && <span>{freq.planned} programados</span>}
-        </div>
-      )}
+      <div className="evo-frequency">
+        <span>Constância no período</span>
+        <strong>{freq.done} treinos registrados</strong>
+        {freq.planned !== undefined && <span>{freq.planned} programados</span>}
+      </div>
       {empty && (
         <ModuleCard title="Sem registros neste período">
           <p className="text-sm leading-relaxed text-muted-foreground">
@@ -349,62 +275,38 @@ export function EvolutionTab({
           </p>
         </ModuleCard>
       )}
-      {view === "corpo" ? (
-        <>
-          <section className="evo-map-section">
-            <h2 className="evo-title mb-4">Seu mapa de treino</h2>
-            <BodyMap
-              stimulus={stimulus}
-              selected={muscle}
-              onSelect={setMuscle}
-              progress={progress}
-            />
-            {muscle && (
-              <MuscleDetail stimulus={stimulus} muscle={muscle} progress={progress.get(muscle)} />
-            )}
-          </section>
-          <OverloadList
-            key={`exercises-${muscle ?? "all"}`}
-            data={data}
-            selectedMuscle={muscle}
-            onOpen={setOpenExercise}
-          />
+      <section className="evo-map-section">
+        <h2 className="evo-title mb-4">Seu mapa de treino</h2>
+        <BodyMap stimulus={stimulus} selected={muscle} onSelect={setMuscle} progress={progress} />
+        {muscle && (
+          <MuscleDetail stimulus={stimulus} muscle={muscle} progress={progress.get(muscle)} />
+        )}
+      </section>
+      <OverloadList
+        key={`exercises-${muscle ?? "all"}`}
+        data={data}
+        selectedMuscle={muscle}
+        onOpen={setOpenExercise}
+      />
 
-          <details className="evo-open-section">
-            <summary className="cursor-pointer text-sm font-semibold">
-              Distribuição de séries
-            </summary>
-            <div className="mt-3">
-              <RadarDistribution stimulus={stimulus} selected={muscle} onSelect={setMuscle} />
-            </div>
-          </details>
-          <RepetitionProfile
-            key={`profile-${muscle ?? "all"}`}
-            sets={data.sets}
-            muscle={muscle}
-            onOpen={setOpenExercise}
-          />
+      <details className="evo-open-section">
+        <summary className="cursor-pointer text-sm font-semibold">Distribuição de séries</summary>
+        <div className="mt-3">
+          <RadarDistribution stimulus={stimulus} selected={muscle} onSelect={setMuscle} />
+        </div>
+      </details>
+      <RepetitionProfile
+        key={`profile-${muscle ?? "all"}`}
+        sets={data.sets}
+        muscle={muscle}
+        onOpen={setOpenExercise}
+      />
 
-          <MeasurementsCard
-            bodyWeights={bodyWeights}
-            measurements={measurements}
-            range={data.effectiveRange}
-          />
-        </>
-      ) : (
-        <>
-          <PerformanceChart data={data} selectedMuscle={muscle} onOpen={setOpenExercise} />
-          <div ref={overloadRef} className="scroll-mt-4">
-            {muscle && (
-              <button className="mb-2 text-xs text-primary" onClick={() => setMuscle(null)}>
-                Limpar filtro: {muscleGroupLabel[muscle]} ×
-              </button>
-            )}
-            <OverloadList data={data} selectedMuscle={muscle} onOpen={setOpenExercise} />
-          </div>
-          <AttentionCard points={points} onOpen={openAttention} onReviewNext={onReviewNext} />
-        </>
-      )}
+      <MeasurementsCard
+        bodyWeights={bodyWeights}
+        measurements={measurements}
+        range={data.effectiveRange}
+      />
       <p className="text-center text-[10px] text-muted-foreground">
         Dados baseados nos treinos registrados.
       </p>

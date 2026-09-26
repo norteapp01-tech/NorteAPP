@@ -880,6 +880,19 @@ export async function removePlan(planId: string) {
   await invalidate();
 }
 
+export async function updatePlan(
+  planId: string,
+  patch: Partial<Pick<WorkoutPlan, "letter" | "name" | "muscleGroups">>,
+) {
+  const dbPatch: Row = {};
+  if (patch.letter !== undefined) dbPatch.letter = patch.letter;
+  if (patch.name !== undefined) dbPatch.name = patch.name;
+  if (patch.muscleGroups !== undefined) dbPatch.muscle_groups = patch.muscleGroups;
+  if (Object.keys(dbPatch).length === 0) return;
+  unwrap(await supabase.from("workout_plans").update(dbPatch).eq("id", planId).select().single());
+  await invalidate();
+}
+
 export async function addExercise(
   planId: string,
   input: {

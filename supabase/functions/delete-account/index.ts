@@ -4,12 +4,14 @@
 // client) pra deletar a conta. Como toda tabela tem `user_id references
 // auth.users(id) on delete cascade`, apagar o auth.users já apaga tudo em cascata.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { removeUserFiles } from "../_shared/account-storage.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 Deno.serve(async (req) => {
+  if (req.method !== "POST") return new Response(null, { status: 405 });
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
     return new Response(JSON.stringify({ error: "Sem autenticação." }), { status: 401 });
@@ -26,9 +28,20 @@ Deno.serve(async (req) => {
 
   // Só aqui, no servidor, a service_role é usada — nunca chega no client.
   const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  try {
+    await removeUserFiles(adminClient, userData.user.id);
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "Não foi possível remover todos os arquivos. Tente novamente." }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
   const { error: deleteError } = await adminClient.auth.admin.deleteUser(userData.user.id);
   if (deleteError) {
-    return new Response(JSON.stringify({ error: deleteError.message }), { status: 500 });
+    return new Response(JSON.stringify({ error: deleteError.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   return new Response(JSON.stringify({ ok: true }), {
