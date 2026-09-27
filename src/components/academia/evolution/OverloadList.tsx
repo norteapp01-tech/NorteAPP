@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Search, Dumbbell } from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
 import type { MuscleGroup } from "@/lib/workout-store";
 import {
   exerciseTrends,
@@ -17,7 +17,7 @@ import { EmptyNote } from "./shared";
 // "o melhor": cargas de aparelhos distintos não se comparam.
 // ---------------------------------------------------------------------------
 
-const INITIAL = 3;
+const INITIAL = 4;
 
 export function OverloadList({
   data,
@@ -47,12 +47,9 @@ export function OverloadList({
   const visible = showAll ? ordered : ordered.slice(0, INITIAL);
 
   return (
-    <details className="evo-card card-surface-quiet group p-4">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2">
-        <h2 className="evo-title text-[13px] font-bold">Por exercício</h2>
-        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-      </summary>
-      <div className="mt-3">
+    <section className="evo-exercise-trends">
+      {!selectedMuscle && <h2>Por exercício</h2>}
+      <div>
         {selectedMuscle && (
           <p className="mb-2 rounded-lg bg-primary/10 px-2.5 py-1.5 text-[11px] font-semibold text-primary">
             Filtrado por {muscleGroupLabel[selectedMuscle]}
@@ -79,32 +76,18 @@ export function OverloadList({
               : "Nenhum exercício com séries registradas neste período."}
           </EmptyNote>
         ) : (
-          <ul className="space-y-1.5">
+          <ul>
             {visible.map((t) => (
               <li key={`${t.lineageId}-${t.equipment ?? "x"}`}>
                 <button onClick={() => onOpen(t.lineageId)} className="evo-row interactive-press">
-                  <span className="rounded-lg border border-primary/30 bg-primary/5 p-2 text-primary">
-                    <Dumbbell size={18} />
-                  </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{t.name}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      {t.muscleGroup ? muscleGroupLabel[t.muscleGroup] : "Não classificado"} ·{" "}
                       {t.sessions} {t.sessions === 1 ? "sessão" : "sessões"}
-                    </p>
-                    <p
-                      className={`mt-0.5 text-[12px] font-semibold ${
-                        t.kind === "melhora"
-                          ? "text-success"
-                          : t.kind === "queda"
-                            ? "text-destructive"
-                            : "text-muted-foreground"
-                      }`}
-                    >
-                      {t.summary}
                     </p>
                   </div>
                   <Spark values={t.spark} kind={t.kind} />
+                  <span className={`evo-trend-label is-${t.kind}`}>{t.summary}</span>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>
               </li>
@@ -121,7 +104,7 @@ export function OverloadList({
           </button>
         )}
       </div>
-    </details>
+    </section>
   );
 }
 

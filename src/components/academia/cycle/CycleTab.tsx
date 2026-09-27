@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { CalendarRange, ChevronDown, ChevronRight, Plus, Route as RouteIcon } from "lucide-react";
+import {
+  CalendarRange,
+  ChevronDown,
+  ChevronRight,
+  CirclePlus,
+  FileText,
+  Layers3,
+  Plus,
+  Route as RouteIcon,
+} from "lucide-react";
 import { Card } from "@/components/sub-agenda-shared";
 import { formatDateShortBR, todayISO } from "@/lib/goals-store";
 import { useWorkoutStore } from "@/lib/workout-store";
@@ -88,100 +97,128 @@ export function CycleTab() {
   const progress = active
     ? cycleProgress(active, stages, blockDays, sessions, evaluations, today)
     : null;
+  const currentIndex = current ? stages.findIndex((item) => item.id === current.id) : -1;
 
   return (
-    <div className="space-y-5">
+    <div className="academy-program-page">
       {active && progress && (
-        <Card title="Programa ativo">
-          <Link
-            to="/ciclo/$id"
-            params={{ id: active.id }}
-            className="interactive-press block rounded-lg"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-base font-bold">{active.name}</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {formatDateShortBR(active.startDate)} — {formatDateShortBR(active.endDate)} ·{" "}
-                  {stages.length} etapas
-                </p>
+        <>
+          <section className="academy-program-hero">
+            <p className="academy-program-eyebrow">Programa ativo</p>
+            <h2>{active.name}</h2>
+            <p className="academy-program-dates">
+              {formatDateShortBR(active.startDate)} — {formatDateShortBR(active.endDate)} ·{" "}
+              {stages.length} etapas
+            </p>
+            <div className="academy-program-main">
+              <div>
+                <span>Dias corridos do programa</span>
+                <strong>
+                  {progress.elapsedDays} de {progress.totalDays} dias
+                </strong>
+                <b>
+                  <i
+                    style={{
+                      width: `${Math.min(100, (progress.elapsedDays / Math.max(1, progress.totalDays)) * 100)}%`,
+                    }}
+                  />
+                </b>
               </div>
-              <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div className="academy-stage-line" aria-label="Etapas do programa">
+                {stages.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className={
+                      index < currentIndex
+                        ? "is-complete"
+                        : index === currentIndex
+                          ? "is-current"
+                          : ""
+                    }
+                  >
+                    <span>{index < currentIndex ? "✓" : index + 1}</span>
+                    <small>{index + 1}</small>
+                    <em>{index <= currentIndex ? item.name : "—"}</em>
+                  </div>
+                ))}
+              </div>
             </div>
-          </Link>
+            <Link to="/ciclo/$id" params={{ id: active.id }} className="academy-program-open">
+              Abrir programa <span>→</span>
+            </Link>
+          </section>
 
-          <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
-            {current ? (
-              <>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-primary">
-                  Etapa vigente
+          <details className="academy-program-details">
+            <summary>
+              <Layers3 />
+              <span>
+                <strong>Mais detalhes</strong>
+                <small>Etapa atual, treinos e metas</small>
+              </span>
+              <ChevronDown />
+            </summary>
+            <div className="academy-program-details-content">
+              {current ? (
+                <div>
+                  <small>Etapa atual</small>
+                  <strong>{current.name}</strong>
+                  <p>
+                    {formatDateShortBR(current.startDate)} — {formatDateShortBR(current.endDate)}
+                    {current.focus ? ` · foco: ${current.focus}` : ""}
+                  </p>
+                </div>
+              ) : (
+                <p>Hoje está fora das etapas programadas deste ciclo.</p>
+              )}
+              {upcoming && (
+                <p>
+                  Próxima mudança: <strong>{upcoming.name}</strong> em{" "}
+                  {formatDateShortBR(upcoming.startDate)}
+                  {stageState(upcoming, blockPlans, today) === "rascunho" && " — ainda sem treinos"}
                 </p>
-                <p className="mt-0.5 text-sm font-semibold">{current.name}</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {formatDateShortBR(current.startDate)} — {formatDateShortBR(current.endDate)}
-                  {current.focus ? ` · foco: ${current.focus}` : ""}
-                </p>
-              </>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Hoje está fora das etapas deste ciclo — nenhuma programação do ciclo está valendo.
-              </p>
-            )}
-            {upcoming && (
-              <p className="mt-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
-                Próxima mudança: <span className="font-semibold">{upcoming.name}</span> em{" "}
-                {formatDateShortBR(upcoming.startDate)}
-                {stageState(upcoming, blockPlans, today) === "rascunho" && (
-                  <span className="text-warning"> — ainda sem treinos</span>
-                )}
-              </p>
-            )}
-          </div>
-
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <Indicator
-              label="Tempo"
-              value={`${progress.elapsedDays}/${progress.totalDays}`}
-              hint="dias corridos"
-            />
-            <Indicator
-              label="Treinos"
-              value={`${progress.doneSessions}/${progress.plannedSessions}`}
-              hint={
-                progress.plannedSessions > 0
-                  ? `${Math.round((progress.doneSessions / progress.plannedSessions) * 100)}% do programado`
-                  : "nada programado ainda"
-              }
-            />
-            <Indicator
-              label="Metas"
-              value={
-                progress.goalsTotal > 0 ? `${progress.goalsReached}/${progress.goalsTotal}` : "—"
-              }
-              hint={progress.goalsTotal > 0 ? "atingidas" : "sem metas"}
-            />
-          </div>
-
-          <Link
-            to="/ciclo/$id"
-            params={{ id: active.id }}
-            className="interactive-press mt-3 block w-full rounded-xl bg-primary py-2.5 text-center text-xs font-bold text-primary-foreground"
-          >
-            Abrir programa
-          </Link>
-        </Card>
+              )}
+              <div className="academy-program-indicators">
+                <Indicator
+                  label="Treinos feitos"
+                  value={`${progress.doneSessions}/${progress.plannedSessions}`}
+                  hint="previstos até hoje"
+                />
+                <Indicator
+                  label="Metas da etapa"
+                  value={
+                    progress.goalsTotal > 0
+                      ? `${progress.goalsReached}/${progress.goalsTotal}`
+                      : "—"
+                  }
+                  hint={progress.goalsTotal > 0 ? "atingidas" : "sem metas definidas"}
+                />
+              </div>
+            </div>
+          </details>
+        </>
       )}
 
       {drafts.length > 0 && (
-        <Card quiet title="Rascunhos">
-          <ul className="space-y-2">
+        <details className="academy-program-row">
+          <summary>
+            <FileText />
+            <span>
+              <strong>Rascunhos</strong>
+              <small>
+                {drafts.length}{" "}
+                {drafts.length === 1 ? "programa não iniciado" : "programas não iniciados"}
+              </small>
+            </span>
+            <ChevronDown />
+          </summary>
+          <ul className="academy-program-row-content">
             {drafts.map((cycle) => (
               <li key={cycle.id}>
                 <CycleRow cycle={cycle} stageCount={blocksForCycle(blocks, cycle.id).length} />
               </li>
             ))}
           </ul>
-        </Card>
+        </details>
       )}
 
       {!active && drafts.length === 0 && (
@@ -194,29 +231,36 @@ export function CycleTab() {
 
       <button
         onClick={() => setCreating(true)}
-        className="interactive-press flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-xs font-semibold text-muted-foreground hover:border-primary/40 hover:text-primary"
+        className="academy-program-row academy-program-create interactive-press"
       >
-        <Plus className="h-4 w-4" /> Montar programa
+        <CirclePlus />
+        <span>
+          <strong>Montar novo programa</strong>
+          <small>Crie outro ciclo de treino</small>
+        </span>
+        <ChevronRight />
       </button>
 
       {past.length > 0 && (
-        <div className="border-t border-border pt-3">
+        <div className="academy-program-row">
           <button
             onClick={() => setShowPast((v) => !v)}
             aria-expanded={showPast}
-            className="flex w-full items-center gap-3 text-left"
+            className="academy-program-row-trigger"
           >
-            <CalendarRange className="h-5 w-5 text-muted-foreground" />
-            <div className="flex-1">
-              <p className="text-sm font-semibold">Programas anteriores</p>
-              <p className="text-xs text-muted-foreground">{past.length} encerrados</p>
-            </div>
+            <CalendarRange />
+            <span>
+              <strong>Programas anteriores</strong>
+              <small>
+                {past.length} {past.length === 1 ? "programa encerrado" : "programas encerrados"}
+              </small>
+            </span>
             <ChevronDown
               className={`h-4 w-4 text-muted-foreground transition-transform ${showPast ? "rotate-180" : ""}`}
             />
           </button>
           {showPast && (
-            <ul className="mt-3 space-y-2">
+            <ul className="academy-program-row-content">
               {past.map((cycle) => (
                 <li key={cycle.id} className="flex items-center gap-2">
                   <CycleRow
@@ -280,10 +324,10 @@ function CycleRow({
 
 function Indicator({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="rounded-xl border border-border bg-surface-2 p-2.5 text-center">
-      <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="mt-0.5 font-mono text-base font-bold tabular-nums">{value}</p>
-      <p className="text-[9px] leading-tight text-muted-foreground">{hint}</p>
+    <div>
+      <p>{label}</p>
+      <strong>{value}</strong>
+      <small>{hint}</small>
     </div>
   );
 }

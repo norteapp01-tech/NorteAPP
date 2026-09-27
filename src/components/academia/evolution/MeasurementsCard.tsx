@@ -3,7 +3,7 @@ import { formatDateShortBR } from "@/lib/goals-store";
 import type { BodyWeightEntry } from "@/lib/workout-store";
 import type { BodyMeasurement } from "@/lib/workout-cycle-store";
 import type { DateRange } from "@/lib/workout-evolution";
-import { EmptyNote, ModuleCard } from "./shared";
+import { EmptyNote } from "./shared";
 
 // ---------------------------------------------------------------------------
 // Medidas corporais — só medições reais, com data. Nada é inferido das cargas
@@ -57,11 +57,15 @@ export function MeasurementsCard({
     current.points.length > 1 ? Math.round((last.value - first.value) * 10) / 10 : undefined;
 
   return (
-    <ModuleCard
-      quiet
-      title="Medidas corporais"
-      action={
-        series.length > 1 ? (
+    <details className="evo-open-section evo-measurements">
+      <summary>
+        Medidas corporais
+        <span className="text-xs font-normal text-muted-foreground">
+          Peso e medidas registradas
+        </span>
+      </summary>
+      <div className="evo-measurements-content">
+        {series.length > 1 && (
           <select
             value={current.key}
             onChange={(e) => setSelected(e.target.value)}
@@ -74,53 +78,54 @@ export function MeasurementsCard({
               </option>
             ))}
           </select>
-        ) : undefined
-      }
-    >
-      {current.points.length === 1 ? (
-        <EmptyNote>
-          Um registro no período: {first.value} {current.unit} em {formatDateShortBR(first.date)}.
-          Com duas medições dá para mostrar variação.
-        </EmptyNote>
-      ) : (
-        <>
-          <div className="flex items-baseline gap-4">
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Primeiro</p>
-              <p className="font-mono text-lg font-bold tabular-nums">
-                {first.value} {current.unit}
-              </p>
-              <p className="text-[10px] text-muted-foreground">{formatDateShortBR(first.date)}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Último</p>
-              <p className="font-mono text-lg font-bold tabular-nums">
-                {last.value} {current.unit}
-              </p>
-              <p className="text-[10px] text-muted-foreground">{formatDateShortBR(last.date)}</p>
-            </div>
-            {delta !== undefined && (
-              <div className="ml-auto text-right">
+        )}
+        {current.points.length === 1 ? (
+          <EmptyNote>
+            Um registro no período: {first.value} {current.unit} em {formatDateShortBR(first.date)}.
+            Com duas medições dá para mostrar variação.
+          </EmptyNote>
+        ) : (
+          <>
+            <div className="flex items-baseline gap-4">
+              <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  Variação
+                  Primeiro
                 </p>
-                {/* Sem cor de bom ou ruim: o app não sabe o objetivo. */}
                 <p className="font-mono text-lg font-bold tabular-nums">
-                  {delta > 0 ? "+" : ""}
-                  {delta} {current.unit}
+                  {first.value} {current.unit}
                 </p>
+                <p className="text-[10px] text-muted-foreground">{formatDateShortBR(first.date)}</p>
               </div>
-            )}
-          </div>
-          <Line points={current.points} unit={current.unit} />
-        </>
-      )}
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Último</p>
+                <p className="font-mono text-lg font-bold tabular-nums">
+                  {last.value} {current.unit}
+                </p>
+                <p className="text-[10px] text-muted-foreground">{formatDateShortBR(last.date)}</p>
+              </div>
+              {delta !== undefined && (
+                <div className="ml-auto text-right">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Variação
+                  </p>
+                  {/* Sem cor de bom ou ruim: o app não sabe o objetivo. */}
+                  <p className="font-mono text-lg font-bold tabular-nums">
+                    {delta > 0 ? "+" : ""}
+                    {delta} {current.unit}
+                  </p>
+                </div>
+              )}
+            </div>
+            <Line points={current.points} unit={current.unit} />
+          </>
+        )}
 
-      <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-        Só medições registradas por você, com data. Nada aqui é estimado a partir das cargas de
-        treino.
-      </p>
-    </ModuleCard>
+        <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+          Só medições registradas por você, com data. Nada aqui é estimado a partir das cargas de
+          treino.
+        </p>
+      </div>
+    </details>
   );
 }
 

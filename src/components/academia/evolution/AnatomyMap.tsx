@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { Modal } from "@/components/ui/modal";
 import type { MuscleGroup } from "@/lib/workout-store";
 import { muscleGroupLabel, type MuscleStimulus } from "@/lib/workout-evolution";
 import { progressLabel, type muscleProgress } from "@/lib/workout-map";
@@ -180,19 +181,21 @@ export function BodyMap({
 }) {
   const [view, setView] = useState<"frente" | "costas">("frente");
   const [mode, setMode] = useState<"volume" | "progressao">("volume");
+  const [expanded, setExpanded] = useState(false);
   const id = useId().replace(/:/g, "");
   const max = Math.max(1, ...stimulus.map((s) => s.directSets));
-  return (
-    <div>
-      <div className="evo-map-controls">
-        <div className="evo-tabs" role="group" aria-label="Análise do mapa">
-          <button aria-pressed={mode === "volume"} onClick={() => setMode("volume")}>
-            Volume
-          </button>
-          <button aria-pressed={mode === "progressao"} onClick={() => setMode("progressao")}>
-            Progressão
-          </button>
-        </div>
+
+  const controls = (full = false) => (
+    <div className={`evo-map-controls ${full ? "is-full" : ""}`}>
+      <div className="evo-tabs" role="group" aria-label="Análise do mapa">
+        <button aria-pressed={mode === "volume"} onClick={() => setMode("volume")}>
+          Volume
+        </button>
+        <button aria-pressed={mode === "progressao"} onClick={() => setMode("progressao")}>
+          Progressão
+        </button>
+      </div>
+      {full && (
         <div className="evo-tabs" role="group" aria-label="Vista do corpo">
           {(["frente", "costas"] as const).map((v) => (
             <button key={v} aria-pressed={view === v} onClick={() => setView(v)}>
@@ -200,93 +203,145 @@ export function BodyMap({
             </button>
           ))}
         </div>
-      </div>
-      <p className="mt-3 text-xs text-muted-foreground">
-        {mode === "volume"
-          ? "Onde você concentrou suas séries."
-          : "Desempenho dos exercícios, não crescimento muscular."}
-      </p>
-      <div className="evo-body-stage">
-        <svg viewBox="10 0 610 1220" role="group" aria-label={`Mapa muscular: ${view}`}>
-          <defs>
-            <clipPath id={id}>
-              <rect width="627" height="1254" />
-            </clipPath>
-          </defs>
-          <image
-            clipPath={`url(#${id})`}
-            href="/images/academia/anatomy-atlas.png"
-            x={view === "frente" ? 0 : -627}
-            width="1254"
-            height="1254"
-            pointerEvents="none"
-          />
-          {(view === "frente" ? FRONT : BACK).flatMap((r, i) =>
-            [false, true].map((mirror) => {
-              const count = stimulus.find((s) => s.group === r.group)?.directSets ?? 0;
-              const state = progress.get(r.group)?.state ?? "insuficiente";
-              const known = mode === "volume" ? count > 0 : state !== "insuficiente";
-              const color =
-                mode === "progressao"
-                  ? COLORS[state]
-                  : !count
-                    ? COLORS.insuficiente
-                    : count / max > 0.72
-                      ? "#efba5b"
-                      : count / max > 0.35
-                        ? "#80e780"
-                        : "#63b4dd";
-              const active = selected === r.group;
-              return (
-                <path
-                  key={`${i}-${mirror}`}
-                  d={r.d}
-                  transform={
-                    mirror ? `translate(${view === "frente" ? 660 : 590} 0) scale(-1 1)` : undefined
-                  }
-                  fill={color}
-                  fillOpacity={known ? 0.48 : 0.05}
-                  stroke={active ? "#fff" : color}
-                  strokeOpacity={active ? 1 : 0.65}
-                  strokeWidth={active ? 2.5 : 1.2}
-                  role="button"
-                  tabIndex={0}
-                  aria-pressed={active}
-                  aria-label={`${r.label}, ${mirror ? "direita" : "esquerda"}: ${mode === "volume" ? `${count} séries do grupo ${muscleGroupLabel[r.group]}` : progressLabel[state]}`}
-                  onClick={() => onSelect(active ? null : r.group)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onSelect(active ? null : r.group);
-                    }
-                  }}
-                  style={{ cursor: "pointer" }}
-                >
-                  <title>
-                    {r.label} · dados de {muscleGroupLabel[r.group]}
-                  </title>
-                </path>
-              );
-            }),
-          )}
-        </svg>
-      </div>
-      <div className="evo-map-legend" aria-label="Legenda do mapa">
-        {(mode === "volume"
-          ? [
-              ["#63b4dd", "Menos"],
-              ["#80e780", "Intermediário"],
-              ["#efba5b", "Mais"],
-              ["#63717d", "Sem registro"],
-            ]
-          : Object.entries(COLORS).map(([k, c]) => [c, progressLabel[k as keyof typeof COLORS]])
-        ).map(([c, l]) => (
-          <span key={l}>
-            <i style={{ background: c }} />
-            {l}
-          </span>
-        ))}
-      </div>
+      )}
+    </div>
+  );
+
+  const stage = (interactive: boolean, suffix: string) => (
+    <div className="evo-body-stage">
+      <svg
+        viewBox="10 0 610 1220"
+        role={interactive ? "group" : "img"}
+        aria-label={`Mapa muscular: ${view}`}
+      >
+        <defs>
+          <clipPath id={`${id}-${suffix}`}>
+            <rect width="627" height="1254" />
+          </clipPath>
+        </defs>
+        <image
+          clipPath={`url(#${id}-${suffix})`}
+          href="/images/academia/anatomy-atlas.png"
+          x={view === "frente" ? 0 : -627}
+          width="1254"
+          height="1254"
+          pointerEvents="none"
+        />
+        {(view === "frente" ? FRONT : BACK).flatMap((region, index) =>
+          [false, true].map((mirror) => {
+            const count = stimulus.find((item) => item.group === region.group)?.directSets ?? 0;
+            const state = progress.get(region.group)?.state ?? "insuficiente";
+            const known = mode === "volume" ? count > 0 : state !== "insuficiente";
+            const color =
+              mode === "progressao"
+                ? COLORS[state]
+                : !count
+                  ? COLORS.insuficiente
+                  : count / max > 0.72
+                    ? "#efba5b"
+                    : count / max > 0.35
+                      ? "#80e780"
+                      : "#63b4dd";
+            const active = selected === region.group;
+            return (
+              <path
+                key={`${index}-${mirror}`}
+                d={region.d}
+                transform={
+                  mirror ? `translate(${view === "frente" ? 660 : 590} 0) scale(-1 1)` : undefined
+                }
+                fill={color}
+                fillOpacity={known ? 0.48 : 0.05}
+                stroke={active ? "#fff" : color}
+                strokeOpacity={active ? 1 : 0.65}
+                strokeWidth={active ? 2.5 : 1.2}
+                role={interactive ? "button" : undefined}
+                tabIndex={interactive ? 0 : undefined}
+                aria-pressed={interactive ? active : undefined}
+                aria-label={
+                  interactive
+                    ? `${region.label}, ${mirror ? "direita" : "esquerda"}: ${mode === "volume" ? `${count} séries do grupo ${muscleGroupLabel[region.group]}` : progressLabel[state]}`
+                    : undefined
+                }
+                onClick={interactive ? () => onSelect(active ? null : region.group) : undefined}
+                onKeyDown={
+                  interactive
+                    ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onSelect(active ? null : region.group);
+                        }
+                      }
+                    : undefined
+                }
+                style={{ cursor: interactive ? "pointer" : "default" }}
+              >
+                <title>
+                  {region.label} · dados de {muscleGroupLabel[region.group]}
+                </title>
+              </path>
+            );
+          }),
+        )}
+      </svg>
+    </div>
+  );
+
+  const legend = (
+    <div className="evo-map-legend" aria-label="Legenda do mapa">
+      {(mode === "volume"
+        ? [
+            ["#63b4dd", "Menos"],
+            ["#80e780", "Intermediário"],
+            ["#efba5b", "Mais"],
+            ["#63717d", "Sem registro"],
+          ]
+        : Object.entries(COLORS).map(([key, color]) => [
+            color,
+            progressLabel[key as keyof typeof COLORS],
+          ])
+      ).map(([color, label]) => (
+        <span key={label}>
+          <i style={{ background: color }} />
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="evo-map-compact">
+      {controls()}
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        className="evo-map-preview interactive-press"
+        aria-label="Ampliar mapa corporal"
+      >
+        <span>Toque para ampliar ↗</span>
+        {stage(false, "preview")}
+      </button>
+      <button
+        className="evo-view-toggle"
+        onClick={() => setView(view === "frente" ? "costas" : "frente")}
+      >
+        Frente <span>⇄</span> Costas
+      </button>
+
+      {expanded && (
+        <Modal onClose={() => setExpanded(false)} title="Mapa corporal">
+          <div className="evo-map-expanded">
+            {controls(true)}
+            <p className="mt-3 text-xs text-muted-foreground">
+              {mode === "volume"
+                ? "Onde você concentrou suas séries."
+                : "Desempenho dos exercícios, não crescimento muscular."}
+            </p>
+            {stage(true, "expanded")}
+            {legend}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

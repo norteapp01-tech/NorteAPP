@@ -381,3 +381,320 @@
     display: none;
   }
 }
+
+/* Academy / Amanhecer identity ------------------------------------------------ */
+.evolution-dashboard {
+  display: grid;
+  gap: 18px;
+}
+.evolution-dashboard .evo-filter-bar {
+  margin-bottom: 0;
+}
+.evolution-dashboard .evo-period {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.015);
+}
+.evolution-dashboard .evo-period-group {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+.evolution-dashboard .evo-period-group button {
+  min-height: 44px;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.evolution-dashboard .evo-period-group button[aria-pressed="true"] {
+  border: 1px solid var(--primary);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--foreground);
+}
+.evolution-dashboard .evo-custom {
+  min-width: 54px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 0;
+}
+.evolution-dashboard .evo-date-scope {
+  display: none;
+}
+.evolution-dashboard .evo-hero-card {
+  position: relative;
+  min-height: 300px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 92% 24%, rgb(124 89 48 / 0.2), transparent 40%),
+    linear-gradient(110deg, rgb(17 19 18 / 0.98), rgb(8 10 9 / 0.98));
+}
+.evolution-dashboard .evo-hero-copy {
+  position: relative;
+  z-index: 2;
+  width: 55%;
+  padding: 24px;
+}
+.evolution-dashboard .evo-hero-eyebrow {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.evolution-dashboard .evo-hero-copy h2 {
+  margin-top: 12px;
+  font-size: clamp(24px, 7vw, 32px);
+  font-weight: 680;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+}
+.evolution-dashboard .evo-hero-count {
+  margin-top: 8px;
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+.evolution-dashboard .evo-constancy {
+  max-width: 230px;
+  margin-top: 38px;
+}
+.evolution-dashboard .evo-constancy span {
+  display: block;
+  margin-bottom: 9px;
+  font-size: 12px;
+}
+.evolution-dashboard .evo-constancy b {
+  display: block;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgb(255 255 255 / 0.12);
+}
+.evolution-dashboard .evo-constancy i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+}
+.evolution-dashboard .evo-map-compact {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.evolution-dashboard .evo-map-compact > .evo-map-controls {
+  position: absolute;
+  bottom: 18px;
+  left: 24px;
+  z-index: 3;
+}
+.evolution-dashboard .evo-map-controls > .evo-tabs {
+  gap: 8px;
+  border: 0;
+  overflow: visible;
+}
+.evolution-dashboard .evo-map-controls > .evo-tabs button {
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding-inline: 18px;
+  background: rgb(7 9 8 / 0.58);
+  backdrop-filter: blur(10px);
+}
+.evolution-dashboard .evo-map-controls > .evo-tabs button[aria-pressed="true"] {
+  border-color: var(--primary);
+  color: var(--foreground);
+}
+.evolution-dashboard .evo-map-preview {
+  position: absolute;
+  inset: 0 0 0 48%;
+  width: 52%;
+  overflow: hidden;
+}
+.evolution-dashboard .evo-map-preview > span {
+  position: absolute;
+  top: 24px;
+  right: 20px;
+  z-index: 2;
+  max-width: 82px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  text-align: right;
+}
+.evolution-dashboard .evo-map-preview .evo-body-stage {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  width: 93%;
+  height: 330px;
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.evolution-dashboard .evo-view-toggle {
+  position: absolute;
+  right: 16px;
+  bottom: 18px;
+  z-index: 4;
+  min-height: 40px;
+  border: 1px solid rgb(255 255 255 / 0.36);
+  border-radius: 999px;
+  background: rgb(7 9 8 / 0.62);
+  padding: 0 16px;
+  color: var(--foreground);
+  font-size: 12px;
+  backdrop-filter: blur(10px);
+}
+.evolution-dashboard .evo-view-toggle span {
+  color: var(--primary);
+}
+.evolution-dashboard .evo-map-expanded .evo-body-stage {
+  height: min(58vh, 560px);
+  background: #050706;
+}
+.evolution-dashboard .evo-map-expanded .evo-map-controls {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+.evolution-dashboard .evo-muscle-summary {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+.evolution-dashboard .evo-muscle-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.evolution-dashboard .evo-muscle-heading p {
+  font-size: 27px;
+  font-weight: 680;
+  letter-spacing: -0.035em;
+}
+.evolution-dashboard .evo-muscle-heading strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.evolution-dashboard .evo-exercise-trends > h2 {
+  margin-bottom: 8px;
+  font-size: 25px;
+  font-weight: 680;
+  letter-spacing: -0.035em;
+}
+.evolution-dashboard .evo-exercise-trends ul {
+  border-bottom: 1px solid var(--border);
+}
+.evolution-dashboard .evo-exercise-trends li {
+  border-top: 1px solid var(--border);
+}
+.evolution-dashboard .evo-exercise-trends li:first-child {
+  border-top: 0;
+}
+.evolution-dashboard .evo-exercise-trends .evo-row {
+  min-height: 66px;
+  border: 0;
+}
+.evolution-dashboard .evo-trend-label {
+  width: 74px;
+  flex: none;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.evolution-dashboard .evo-trend-label.is-melhora {
+  color: var(--foreground);
+}
+.evolution-dashboard .evo-distribution {
+  padding-top: 8px;
+}
+.evolution-dashboard .evo-distribution > summary {
+  display: flex;
+  cursor: pointer;
+  list-style: none;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.evolution-dashboard .evo-distribution > summary span {
+  font-size: 27px;
+  font-weight: 680;
+  letter-spacing: -0.035em;
+}
+.evolution-dashboard .evo-distribution > summary small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.evolution-dashboard .evo-radar-card {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.018);
+  padding: 12px;
+}
+.evolution-dashboard .evo-open-section,
+.evolution-dashboard .evo-bottom-row {
+  min-height: 68px;
+  border-top: 1px solid var(--border);
+  padding: 0;
+}
+.evolution-dashboard .evo-open-section > summary,
+.evolution-dashboard .evo-bottom-row {
+  display: flex;
+  width: 100%;
+  cursor: pointer;
+  list-style: none;
+  align-items: center;
+  gap: 14px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.evolution-dashboard .evo-open-section > summary::after {
+  margin-left: auto;
+  color: var(--muted-foreground);
+  content: "›";
+}
+.evolution-dashboard .evo-open-section[open] > summary::after {
+  transform: rotate(90deg);
+}
+.evolution-dashboard .evo-open-section > summary > span,
+.evolution-dashboard .evo-bottom-row small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 400;
+}
+.evolution-dashboard .evo-measurements-content,
+.evolution-dashboard .evo-open-section > :not(summary) {
+  margin-bottom: 14px;
+}
+.evolution-dashboard .evo-bottom-row > span:nth-child(2) {
+  flex: 1;
+  text-align: left;
+}
+.evolution-dashboard .evo-bottom-row > span:last-child {
+  color: var(--muted-foreground);
+  font-size: 24px;
+}
+
+@media (max-width: 440px) {
+  .evolution-dashboard .evo-hero-copy {
+    width: 58%;
+    padding: 19px;
+  }
+  .evolution-dashboard .evo-map-compact > .evo-map-controls {
+    bottom: 15px;
+    left: 18px;
+  }
+  .evolution-dashboard .evo-map-controls > .evo-tabs button {
+    padding-inline: 12px;
+  }
+  .evolution-dashboard .evo-view-toggle {
+    right: 10px;
+    padding-inline: 10px;
+  }
+}
