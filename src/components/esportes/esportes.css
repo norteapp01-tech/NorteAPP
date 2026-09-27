@@ -1,115 +1,320 @@
-/* ---------------------------------------------------------------------------
-   Esportes — Visão geral.
-
-   Fundo preto, cards em grafite NEUTRO (sem verde na base), borda cinza fina.
-   O verde é reservado para ação, progresso, estado ativo e a métrica em
-   destaque; nunca para preencher superfície.
---------------------------------------------------------------------------- */
-
-.esportes-overview {
-  --sp-card: var(--surface);
-  --sp-card-border: var(--border);
+/* Esportes — identidade Amanhecer. Superfícies neutras, luz quente discreta
+   e verde reservado para seleção, progresso e ações. */
+.esportes-page .esportes-module,
+.esportes-overview,
+.sports-planning {
+  --sp-card: #111513;
+  --sp-card-soft: #171b19;
+  --sp-border: rgb(224 232 227 / 0.24);
+  --sp-line: rgb(224 232 227 / 0.2);
   --sp-accent: var(--primary);
   --sp-title: var(--foreground);
   --sp-muted: var(--muted-foreground);
   --sp-grid: var(--chart-grid);
-  padding-bottom: 4px;
 }
 
 .esportes-page .esportes-module {
   margin-top: 18px;
 }
-
-.esportes-page .esportes-tabs [role="tab"] {
-  height: 50px;
-  font-size: 14px;
+.esportes-module .esportes-modalities {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  flex: 1;
+  min-width: 0;
 }
-
+.esportes-module .esportes-modalities button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  font-weight: 500;
+}
+.esportes-module .esportes-modalities button + button {
+  position: relative;
+}
+.esportes-module .esportes-modalities button + button::before {
+  position: absolute;
+  left: 0;
+  width: 1px;
+  height: 25px;
+  background: var(--border);
+  content: "";
+}
+.esportes-module .esportes-modalities button svg {
+  width: 21px;
+  height: 21px;
+  flex: none;
+}
+.esportes-module .esportes-modalities button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.esportes-module .esportes-modalities button[aria-checked="true"] {
+  border-color: var(--primary);
+  color: var(--foreground);
+  font-weight: 700;
+}
+.esportes-module .esportes-modalities button[aria-checked="true"]::before,
+.esportes-module .esportes-modalities button[aria-checked="true"] + button::before {
+  opacity: 0;
+}
+.esportes-module .esportes-modalities button[aria-checked="true"] svg {
+  color: var(--primary);
+}
+.esportes-module > .flex > button[aria-label="Configurações da modalidade"] {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  background: transparent;
+}
+.esportes-page .esportes-tabs [role="tab"] {
+  height: 58px;
+  font-size: 17px;
+  font-weight: 500;
+}
 .esportes-page .esportes-tabs > span {
   height: 2px;
 }
 
-.esportes-overview .sp-card {
-  background: var(--sp-card);
-  border: 1px solid var(--sp-card-border);
-  border-radius: var(--norte-card-radius);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025);
+.esportes-overview {
+  padding: 0 2px 4px;
 }
-/* Card de apoio ao lado de outro que já carrega o destaque da seção (ex.:
- * "Próxima corrida" ao lado de "Consistência") — mesmo formato, tom quase
- * imperceptível sobre o preto. */
-.esportes-overview .sp-card--featured {
-  background: var(--surface-featured);
-  border-color: var(--border-featured);
-}
-.esportes-overview .sp-card--quiet {
-  background: var(--color-surface-quiet);
-  border-color: var(--color-border-quiet);
-}
-
-.esportes-overview .sp-section-title {
-  font-size: var(--norte-section-size);
-  font-weight: var(--norte-title-weight);
-  letter-spacing: -0.01em;
+.esportes-overview .sp-section-title,
+.sports-planning h2,
+.sp-routes-heading h3 {
   color: var(--sp-title);
+  font-size: 24px;
+  font-weight: 720;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
 }
-
 .esportes-overview .sp-rule {
-  height: 1px;
-  background: var(--sp-card-border);
+  display: none;
 }
 
-.esportes-overview .sp-start {
-  min-height: 126px;
+/* Cartão de início */
+.esportes-overview .sp-start-card {
+  position: relative;
+  min-height: 250px;
+  overflow: hidden;
+  border: 1px solid var(--sp-border);
+  border-radius: 16px;
+  background:
+    linear-gradient(90deg, rgb(5 7 6 / 0.96) 0%, rgb(5 7 6 / 0.68) 45%, rgb(5 7 6 / 0.08) 100%),
+    linear-gradient(0deg, rgb(0 0 0 / 0.32), transparent 55%),
+    url("/images/esportes/running-sunrise.jpg") center / cover no-repeat;
+  clip-path: polygon(0 0, calc(100% - 23px) 0, 100% 23px, 100% 100%, 0 100%);
+  box-shadow: 0 18px 55px rgb(0 0 0 / 0.28);
 }
-
-.esportes-overview .sp-week-card {
-  min-height: 126px;
+.esportes-overview .sp-start-copy {
+  position: absolute;
+  inset: 34px auto 26px 22px;
+  display: flex;
+  width: min(62%, 270px);
+  flex-direction: column;
 }
-
-.esportes-overview .sp-recent-row {
-  min-height: 92px;
-  padding-block: 12px;
-  border-top: 1px solid var(--sp-card-border);
-  border-bottom: 1px solid var(--sp-card-border);
+.esportes-overview .sp-eyebrow {
+  color: rgb(237 241 239 / 0.8);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
 }
-
-/* --- bloco de início ---------------------------------------------------- */
-
 .esportes-overview .sp-start-title {
+  margin-top: 14px;
+  color: #f5f6f5;
   font-size: 34px;
-  font-weight: 750;
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-  color: var(--sp-title);
+  font-weight: 760;
+  line-height: 1.04;
+  letter-spacing: -0.045em;
 }
-.esportes-overview .sp-play {
-  width: 72px;
-  height: 72px;
-  border-radius: 999px;
-  background: var(--sp-accent);
+.esportes-overview .sp-start-subtitle {
+  margin-top: 6px;
+  color: rgb(240 243 241 / 0.78);
+  font-size: 18px;
+  line-height: 1.3;
+}
+.esportes-overview .sp-start-gps {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: #06220c;
+  gap: 9px;
+  margin-top: auto;
+  color: rgb(246 248 247 / 0.88);
+  font-size: 14px;
 }
-.esportes-overview .sp-play svg {
+.esportes-overview .sp-start-gps svg {
+  width: 20px;
+}
+.esportes-overview .sp-start-action {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  min-width: 116px;
+  height: 54px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 999px;
+  background: #f4f3ef;
+  color: #111311;
+  font-size: 18px;
+  font-weight: 600;
+  box-shadow: 0 10px 32px rgb(0 0 0 / 0.28);
+}
+.esportes-overview .sp-start-action svg {
+  width: 20px;
+}
+
+/* Resumo semanal */
+.esportes-overview .sp-week-summary {
+  display: grid;
+  grid-template-columns: minmax(112px, 0.9fr) minmax(0, 1.7fr);
+  min-height: 176px;
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid var(--sp-border);
+  border-radius: 14px;
+  background: linear-gradient(120deg, #111513, #0c100e);
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+}
+.esportes-overview .sp-week-ring {
+  display: grid;
+  place-items: center;
+  border-right: 1px solid var(--sp-line);
+}
+.esportes-overview .sp-week-ring .norte-progress-ring-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--sp-title);
+}
+.esportes-overview .sp-week-ring strong {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+.esportes-overview .sp-week-ring strong small {
+  font-size: 14px;
+  font-weight: 500;
+}
+.esportes-overview .sp-week-ring span {
+  margin-top: 5px;
+  color: var(--sp-muted);
+  font-size: 11px;
+}
+.esportes-overview .sp-week-next {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  min-width: 0;
+  padding: 23px 20px 0;
+}
+.esportes-overview .sp-week-next-copy p {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--sp-muted);
+  font-size: 13px;
+}
+.esportes-overview .sp-week-next-copy p svg {
+  width: 17px;
+}
+.esportes-overview .sp-week-next-copy strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--sp-title);
+  font-size: 22px;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+.esportes-overview .sp-week-next-copy > span {
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--sp-muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.esportes-overview .sp-week-chevron {
+  position: absolute;
+  top: 44px;
+  right: 12px;
+  width: 17px;
+  color: var(--sp-muted);
+}
+.esportes-overview .sp-week-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  border-top: 1px solid var(--sp-line);
+}
+.esportes-overview .sp-week-actions button {
+  display: flex;
+  min-width: 0;
+  height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--sp-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.esportes-overview .sp-week-actions button + button {
+  border-left: 1px solid var(--sp-line);
+}
+.esportes-overview .sp-week-actions svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Evolução */
+.esportes-overview .sp-chart-panel {
+  padding: 8px 4px 0;
+}
+.esportes-overview .sp-chart-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.esportes-overview .sp-chart-heading h3 {
+  color: var(--sp-title);
+  font-size: 24px;
+  font-weight: 720;
+  letter-spacing: -0.025em;
+}
+.esportes-overview .sp-flip-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--sp-muted);
+  touch-action: none;
+}
+.esportes-overview .sp-flip-controls span {
+  margin-right: 5px;
+  font-size: 10px;
+}
+.esportes-overview .sp-flip-controls button {
+  display: grid;
   width: 28px;
   height: 28px;
-  fill: currentColor;
+  place-items: center;
 }
-
-/* --- carrossel de análise ----------------------------------------------- */
-
 .esportes-overview .sp-prism {
   position: relative;
-  /* A perspectiva fica no contêiner: aplicá-la em cada face faria cada uma
-     ter seu próprio ponto de fuga e o prisma "quebraria" ao girar. */
-  perspective: 1000px;
-  perspective-origin: 50% 50%;
-  height: 170px;
-  flex: 1;
+  height: 154px;
   min-width: 0;
+  perspective: 1000px;
+  touch-action: none;
 }
 .esportes-overview .sp-prism-stage {
   position: absolute;
@@ -120,128 +325,487 @@
 .esportes-overview .sp-prism-face {
   position: absolute;
   inset: 0;
-  backface-visibility: hidden;
-  /* Fundo da página, não um card: é o que a Alimentação faz. Opaco de
-     propósito — transparente deixaria as faces vizinhas aparecerem por trás
-     no meio do giro. */
-  background: var(--background);
-  padding: 4px 0 0;
   overflow: hidden;
+  padding-top: 10px;
+  backface-visibility: hidden;
+  background: var(--background);
 }
-/* Faces que não estão de frente perdem nitidez, mas continuam legíveis como
-   rótulo do que vem antes e depois. */
 .esportes-overview .sp-prism-face[data-active="false"] {
-  opacity: 0.45;
+  opacity: 0.42;
 }
-
-/* Sem animação: troca simples de opacidade, sem rotação nenhuma. */
-@media (prefers-reduced-motion: reduce) {
-  .esportes-overview .sp-prism {
-    perspective: none;
-  }
-  .esportes-overview .sp-prism-stage {
-    transform: none !important;
-    transform-style: flat;
-    transition: none;
-  }
-  .esportes-overview .sp-prism-face {
-    transform: none !important;
-    transition: opacity 120ms linear;
-  }
-  .esportes-overview .sp-prism-face[data-active="false"] {
-    opacity: 0;
-    pointer-events: none;
-  }
-}
-
-/* O gesto vertical vive no próprio card e nos controles do topo. `touch-action:
-   none` só nessas duas áreas: fora delas a página rola normalmente. */
-.esportes-overview .sp-prism {
-  touch-action: none;
-  cursor: grab;
-}
-.esportes-overview .sp-prism:active {
-  cursor: grabbing;
-}
-
-/* Cabeçalho do gráfico — mesmo arranjo da Alimentação. */
-.esportes-overview .sp-chart-panel {
-  padding: 18px 0 4px;
-  border-top: 1px solid var(--sp-card-border);
-}
-.esportes-overview .sp-chart-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.esportes-overview .sp-metric-layout {
+  display: grid;
+  grid-template-columns: minmax(118px, 0.8fr) minmax(0, 1.5fr);
+  height: 100%;
+  align-items: start;
   gap: 12px;
 }
-.esportes-overview .sp-chart-heading h3 {
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+.esportes-overview .sp-metric-summary {
+  padding-top: 10px;
+}
+.esportes-overview .sp-metric-label {
   color: var(--sp-title);
+  font-size: 16px;
+  text-align: left;
 }
-.esportes-overview .sp-flip-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  touch-action: none;
-}
-.esportes-overview .sp-flip-controls > div {
-  display: flex;
-}
-.esportes-overview .sp-flip-controls button {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 28px;
-  color: var(--sp-muted);
-}
-.esportes-overview .sp-flip-controls span {
-  font-size: 9px;
-  line-height: 1.15;
-  color: var(--sp-muted);
-}
-
 .esportes-overview .sp-metric-value {
-  font-size: 21px;
-  font-weight: 700;
-  color: var(--sp-accent);
-  line-height: 1.1;
+  margin-top: 8px;
+  color: var(--sp-title);
+  font-size: 34px;
+  font-weight: 740;
+  line-height: 1;
+  letter-spacing: -0.035em;
   font-variant-numeric: tabular-nums;
 }
-
-/* --- gráfico ------------------------------------------------------------ */
-
-.esportes-overview .sp-chart text {
-  font-size: 9px;
-  fill: var(--sp-muted);
+.esportes-overview .sp-metric-sub {
+  margin-top: 7px;
+  color: var(--sp-accent);
+  font-size: 12px;
 }
-.esportes-overview .sp-chart .sp-grid-line {
+.esportes-overview .sp-metric-chart {
+  min-width: 0;
+}
+.esportes-overview .sp-metric-detail {
+  min-height: 18px;
+  margin-top: -2px;
+  color: var(--sp-muted);
+  font-size: 9px;
+  line-height: 1.25;
+}
+.esportes-overview .sp-chart text {
+  fill: var(--sp-muted);
+  font-size: 8px;
+}
+.esportes-overview .sp-chart .sp-grid-line,
+.esportes-overview .sp-chart .sp-guide {
   stroke: var(--sp-grid);
   stroke-width: 1;
 }
 .esportes-overview .sp-chart .sp-guide {
-  stroke: var(--sp-grid);
-  stroke-width: 1;
   stroke-dasharray: 2 3;
 }
-.esportes-overview .sp-chart .sp-dot:focus-visible {
-  outline: none;
-  stroke: #ffffff;
-  stroke-width: 2.5;
+
+/* Última atividade */
+.esportes-overview .sp-history-plus {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--sp-border);
+  border-radius: 999px;
+}
+.esportes-overview .sp-recent-row {
+  min-height: 116px;
+  overflow: hidden;
+  border: 1px solid var(--sp-border);
+  border-radius: 14px;
+  background: linear-gradient(110deg, #111513, #0d100f);
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+}
+.esportes-overview button.sp-recent-row {
+  padding: 0 15px 0 0;
+}
+.esportes-overview .sp-recent-map {
+  width: 47%;
+  height: 114px;
+  flex: none;
+  border-radius: 0;
+}
+.esportes-overview .sp-recent-map--manual {
+  display: grid;
+  place-items: center;
+  background: #151a17;
+}
+.esportes-overview .sp-recent-copy {
+  min-width: 0;
+  flex: 1;
+}
+.esportes-overview .sp-recent-copy p {
+  color: var(--sp-title);
+  font-size: 25px;
+  font-weight: 700;
+}
+.esportes-overview .sp-recent-copy span,
+.esportes-overview .sp-recent-copy strong {
+  display: block;
+  color: var(--sp-muted);
+  font-size: 13px;
+  font-weight: 450;
+}
+.esportes-overview .sp-recent-copy strong {
+  margin-top: 4px;
+  color: var(--sp-title);
+}
+.esportes-overview .sp-plan-next {
+  display: flex;
+  width: 100%;
+  height: 58px;
+  align-items: center;
+  gap: 15px;
+  border-top: 1px solid var(--sp-line);
+  border-bottom: 1px solid var(--sp-line);
+  padding: 0 12px;
+  font-size: 15px;
+}
+.esportes-overview .sp-plan-next svg:last-child {
+  margin-left: auto;
 }
 
-/* --- histórico em tela inteira ------------------------------------------ */
+/* Planejamento */
+.sports-planning {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 4px 2px 2px;
+}
+.sports-planning .sp-plan-heading,
+.sp-routes-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.sports-planning .sp-plan-heading button,
+.sp-routes-heading button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--sp-muted);
+  font-size: 14px;
+}
+.sports-planning .sp-plan-heading svg,
+.sp-routes-heading svg {
+  width: 17px;
+}
+.sports-planning .sp-plan-week {
+  overflow: hidden;
+  border: 1px solid var(--sp-border);
+  border-radius: 18px;
+  background: linear-gradient(145deg, #111513, #0b0e0d);
+}
+.sports-planning .sp-plan-week-nav {
+  display: flex;
+  height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 15px;
+  border-bottom: 1px solid var(--sp-line);
+}
+.sports-planning .sp-plan-week-nav button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: var(--sp-muted);
+}
+.sports-planning .sp-plan-week-nav svg {
+  width: 18px;
+}
+.sports-planning .sp-plan-week-nav p {
+  color: var(--sp-title);
+  font-size: 16px;
+  font-weight: 680;
+}
+.sports-planning .sp-plan-weekdays {
+  padding: 0 8px;
+}
+.sports-planning .norte-weekdays {
+  gap: 0;
+}
+.sports-planning .norte-weekdays button {
+  position: relative;
+  height: 84px;
+  border: 1px solid transparent !important;
+  border-radius: 0;
+  background: transparent !important;
+  padding: 14px 2px 8px;
+}
+.sports-planning .norte-weekdays button + button::before {
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 0;
+  width: 1px;
+  background: var(--sp-line);
+  content: "";
+}
+.sports-planning .norte-weekdays button[aria-pressed="true"] {
+  border-color: var(--sp-accent) !important;
+  border-radius: 12px;
+}
+.sports-planning .norte-weekdays button[aria-pressed="true"]::before,
+.sports-planning .norte-weekdays button[aria-pressed="true"] + button::before {
+  opacity: 0;
+}
+.sports-planning .norte-weekdays span:first-child {
+  color: var(--sp-muted) !important;
+  font-size: 10px;
+}
+.sports-planning .norte-weekdays strong {
+  margin-top: 5px;
+  color: var(--sp-title);
+  font-size: 18px;
+}
+.sports-planning .norte-weekdays span:last-child {
+  margin-top: 7px;
+  color: var(--sp-accent);
+  font-size: 10px;
+}
+.sports-planning .sp-plan-day h3 {
+  margin-bottom: 20px;
+  color: var(--sp-title);
+  font-size: 23px;
+  font-weight: 720;
+  letter-spacing: -0.025em;
+}
+.sports-planning .sp-plan-day-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.sports-planning .sp-plan-empty {
+  display: flex;
+  min-height: 196px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.sports-planning .sp-plan-empty > div {
+  display: grid;
+  width: 66px;
+  height: 66px;
+  margin-bottom: 14px;
+  place-items: center;
+  border: 1px solid var(--sp-border);
+  border-radius: 999px;
+  color: var(--sp-muted);
+}
+.sports-planning .sp-plan-empty svg {
+  width: 30px;
+}
+.sports-planning .sp-plan-empty strong {
+  color: var(--sp-title);
+  font-size: 16px;
+}
+.sports-planning .sp-plan-empty p {
+  margin-top: 3px;
+  color: var(--sp-muted);
+  font-size: 13px;
+}
+.sports-planning .sp-plan-add {
+  display: flex;
+  width: 100%;
+  height: 50px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px dashed var(--sp-border);
+  border-radius: 999px;
+  color: var(--sp-title);
+  font-size: 14px;
+}
+.sports-planning .sp-plan-add svg {
+  width: 18px;
+}
+.sports-planning .sp-plan-activity {
+  display: grid;
+  grid-template-columns: 34px 1fr 20px;
+  align-items: center;
+  gap: 10px;
+  min-height: 68px;
+  border-bottom: 1px solid var(--sp-line);
+  padding: 8px 7px;
+  text-align: left;
+}
+.sports-planning .sp-plan-activity > svg {
+  width: 20px;
+  color: var(--sp-muted);
+}
+.sports-planning .sp-plan-activity p {
+  color: var(--sp-title);
+  font-size: 15px;
+  font-weight: 650;
+}
+.sports-planning .sp-plan-activity span {
+  display: block;
+  margin-top: 2px;
+  color: var(--sp-muted);
+  font-size: 11px;
+}
+
+/* Rotas salvas */
+.sp-routes-heading {
+  margin-bottom: 12px;
+}
+.sp-routes-empty {
+  display: grid;
+  grid-template-columns: 45% 55%;
+  min-height: 132px;
+  overflow: hidden;
+  border: 1px solid var(--sp-border);
+  border-radius: 14px;
+  background: #101412;
+  clip-path: polygon(0 0, calc(100% - 17px) 0, 100% 17px, 100% 100%, 0 100%);
+}
+.sp-routes-map {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at 25% 20%,
+      transparent 0 14px,
+      rgb(105 154 132 / 0.13) 15px 16px,
+      transparent 17px 30px
+    ),
+    repeating-radial-gradient(
+      circle at 90% 100%,
+      transparent 0 15px,
+      rgb(105 154 132 / 0.1) 16px 17px
+    );
+}
+.sp-routes-map svg:first-child {
+  width: 100%;
+  height: 100%;
+}
+.sp-routes-map path {
+  fill: none;
+  stroke: var(--sp-accent);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.sp-routes-map circle {
+  fill: #111513;
+  stroke: var(--sp-accent);
+  stroke-width: 4;
+}
+.sp-routes-map .sp-map-pin {
+  position: absolute;
+  width: 17px;
+  color: var(--sp-accent);
+}
+.sp-map-pin--a {
+  left: 7%;
+  bottom: 17%;
+}
+.sp-map-pin--b {
+  right: 18%;
+  top: 25%;
+}
+.sp-routes-empty-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 14px 15px;
+}
+.sp-routes-empty-copy strong {
+  color: var(--sp-title);
+  font-size: 15px;
+}
+.sp-routes-empty-copy p {
+  margin-top: 4px;
+  color: var(--sp-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.sp-routes-empty-copy button {
+  width: fit-content;
+  margin-top: 10px;
+  border: 1px solid var(--sp-accent);
+  border-radius: 999px;
+  padding: 7px 15px;
+  color: var(--sp-title);
+  font-size: 12px;
+}
+.sp-routes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sp-route-card {
+  display: flex;
+  min-height: 92px;
+  overflow: hidden;
+  border: 1px solid var(--sp-border);
+  border-radius: 14px;
+  background: #101412;
+}
+.sp-route-open {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+.sp-route-preview {
+  width: 35%;
+  height: 90px;
+  flex: none;
+  border-radius: 0;
+}
+.sp-route-copy {
+  min-width: 0;
+  flex: 1;
+}
+.sp-route-copy p {
+  overflow: hidden;
+  color: var(--sp-title);
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-route-copy span {
+  display: block;
+  overflow: hidden;
+  color: var(--sp-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-route-open > svg {
+  width: 17px;
+  flex: none;
+  color: var(--sp-muted);
+}
+.sp-route-play {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  margin: auto 10px auto 4px;
+  flex: none;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--sp-accent);
+  color: #052019;
+}
+.sports-planning .sp-plan-recurring {
+  display: grid;
+  grid-template-columns: 32px 1fr 20px;
+  min-height: 62px;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--sp-line);
+  border-bottom: 1px solid var(--sp-line);
+  padding: 0 10px;
+  color: var(--sp-title);
+  text-align: left;
+}
+.sports-planning .sp-plan-recurring > svg {
+  width: 21px;
+}
+.sports-planning .sp-plan-recurring > svg:last-child {
+  color: var(--sp-muted);
+}
 
 .sp-history-screen {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: var(--color-background, #000);
   display: flex;
   flex-direction: column;
+  background: var(--background);
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -249,98 +813,78 @@
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
 }
 
-/* --- tema claro --------------------------------------------------------- */
-
-.light .esportes-overview,
-[data-theme="light"] .esportes-overview {
-  --sp-card: var(--surface);
-  --sp-card-border: var(--border);
-  --sp-accent: var(--primary);
-  --sp-title: var(--foreground);
-  --sp-muted: var(--muted-foreground);
-  --sp-grid: var(--chart-grid);
-}
-.light .esportes-overview .sp-play,
-[data-theme="light"] .esportes-overview .sp-play {
-  color: #ffffff;
-}
-
-@media (max-width: 360px) {
-  .esportes-overview .sp-start-title {
-    font-size: 28px;
+@media (prefers-reduced-motion: reduce) {
+  .esportes-overview .sp-prism {
+    perspective: none;
   }
-  .esportes-overview .sp-play {
-    width: 68px;
-    height: 68px;
+  .esportes-overview .sp-prism-stage {
+    transform: none !important;
+    transition: none;
   }
-  .esportes-overview .sp-play svg {
-    width: 26px;
-    height: 26px;
+  .esportes-overview .sp-prism-face {
+    transform: none !important;
+  }
+  .esportes-overview .sp-prism-face[data-active="false"] {
+    opacity: 0;
+    pointer-events: none;
   }
 }
-
-/* --- seletor de modalidade ----------------------------------------------
-   As três lado a lado. A selecionada é a única com fundo; as outras ficam
-   só com a borda sobre o preto, para o contraste fazer o trabalho de dizer
-   qual está valendo sem precisar de check nem de cor extra. */
-.esportes-module .esportes-modalities {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-}
-.esportes-module .esportes-modalities button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  min-width: 0;
-  height: 40px;
-  /* Medido: a 390px sobram 97px por chip e "Caminhada" precisa de 66px de
-     texto. Ícone 13 + gap 3 + padding 10 + borda 2 deixa 69px — cabe com
-     folga de 3px, e é o que impede a reticência. */
-  padding: 0 5px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--foreground);
-  /* 12px é o maior tamanho em que "Caminhada" cabe inteiro nos três chips a
-     390px sem reticências — o rótulo cortado era pior que o texto menor. */
-  font-size: 12px;
-  font-weight: 600;
-}
-.esportes-module .esportes-modalities button span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.esportes-module .esportes-modalities button svg {
-  width: 13px;
-  height: 13px;
-  flex-shrink: 0;
-  color: var(--muted-foreground);
-}
-.esportes-module .esportes-modalities button[aria-checked="true"] {
-  background: var(--surface-2);
-  border-color: var(--border);
-}
-.esportes-module .esportes-modalities button[aria-checked="true"] svg {
-  color: var(--primary);
-}
-
-/* Abaixo disso nem 12px cabe com o ícone: o nome da modalidade importa mais
-   que a figura, então o ícone é o que sai. */
-@media (max-width: 370px) {
+@media (max-width: 390px) {
   .esportes-module .esportes-modalities button {
-    gap: 0;
-    padding: 0 3px;
+    gap: 4px;
+    font-size: 12px;
   }
   .esportes-module .esportes-modalities button svg {
-    display: none;
+    width: 18px;
+    height: 18px;
   }
+  .esportes-overview .sp-start-card {
+    min-height: 226px;
+  }
+  .esportes-overview .sp-start-title {
+    font-size: 30px;
+  }
+  .esportes-overview .sp-start-subtitle {
+    font-size: 15px;
+  }
+  .esportes-overview .sp-start-copy {
+    left: 18px;
+  }
+  .esportes-overview .sp-week-summary {
+    grid-template-columns: 104px minmax(0, 1fr);
+  }
+  .esportes-overview .sp-week-next {
+    padding-inline: 13px 8px;
+  }
+  .esportes-overview .sp-week-next-copy strong {
+    font-size: 19px;
+  }
+  .esportes-overview .sp-week-actions button {
+    gap: 2px;
+    font-size: 9px;
+  }
+  .esportes-overview .sp-metric-layout {
+    grid-template-columns: 108px minmax(0, 1fr);
+    gap: 4px;
+  }
+  .esportes-overview .sp-metric-value {
+    font-size: 29px;
+  }
+  .sports-planning .norte-weekdays button {
+    padding-inline: 0;
+  }
+  .sp-routes-empty {
+    grid-template-columns: 42% 58%;
+  }
+}
+.light .esportes-overview,
+.light .sports-planning,
+[data-theme="light"] .esportes-overview,
+[data-theme="light"] .sports-planning {
+  --sp-card: #f7f7f4;
+  --sp-card-soft: #efefeb;
+  --sp-border: rgb(22 30 26 / 0.2);
+  --sp-line: rgb(22 30 26 / 0.16);
 }

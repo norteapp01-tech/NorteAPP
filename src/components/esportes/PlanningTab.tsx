@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Footprints,
+  Plus,
+  Repeat2,
+  Trash2,
+} from "lucide-react";
 import { WeekdaySelector } from "@/components/ui/app-design-system";
 import { SavedRoutesSection } from "./SavedRoutes";
 import { weekdayLabels } from "@/components/sub-agenda-shared";
@@ -37,6 +45,20 @@ const monthAbbrev = [
   "dez",
 ];
 const weekdaysLong = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const monthLong = [
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
+];
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -46,7 +68,7 @@ function toISODate(d: Date) {
 }
 function formatLongDate(iso: string) {
   const d = new Date(iso + "T00:00:00");
-  return `${weekdaysLong[d.getDay()]}, ${d.getDate()} de ${monthAbbrev[d.getMonth()].replace(/^./, (c) => c.toUpperCase())}`;
+  return `${weekdaysLong[d.getDay()]}, ${d.getDate()} de ${monthLong[d.getMonth()]}`;
 }
 function formatWeekRangeLabel(start: Date, end: Date) {
   if (start.getMonth() === end.getMonth()) {
@@ -84,6 +106,7 @@ export function PlanningTab({ modality }: { modality: SportModality }) {
   const { weekStart, weekEnd, datesByWeekday, shift } = useWeekCursor(today);
   const [selectedDate, setSelectedDate] = useState(today);
   const [addingOpen, setAddingOpen] = useState(false);
+  const [recurringOpen, setRecurringOpen] = useState(false);
   const [editing, setEditing] = useState<Execution | null>(null);
 
   const plannedFor = (date: string) =>
@@ -103,26 +126,33 @@ export function PlanningTab({ modality }: { modality: SportModality }) {
   const dayItems = plannedFor(selectedDate);
 
   return (
-    <div className="space-y-5">
-      <div className="card-surface p-4">
-        <div className="flex items-center justify-between">
+    <div className="sports-planning">
+      <div className="sp-plan-heading">
+        <h2>Plano da semana</h2>
+        <button onClick={() => setAddingOpen(true)} className="interactive-press">
+          Horários <ChevronRight aria-hidden />
+        </button>
+      </div>
+
+      <section className="sp-plan-week">
+        <div className="sp-plan-week-nav">
           <button
             onClick={() => shift(-1)}
             aria-label="Semana anterior"
-            className="interactive-press rounded-full p-1.5 text-muted-foreground hover:text-foreground"
+            className="interactive-press"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft />
           </button>
-          <p className="text-sm font-semibold">{formatWeekRangeLabel(weekStart, weekEnd)}</p>
+          <p>{formatWeekRangeLabel(weekStart, weekEnd)}</p>
           <button
             onClick={() => shift(1)}
             aria-label="Próxima semana"
-            className="interactive-press rounded-full p-1.5 text-muted-foreground hover:text-foreground"
+            className="interactive-press"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight />
           </button>
         </div>
-        <div className="mt-3">
+        <div className="sp-plan-weekdays">
           <WeekdaySelector
             selectedDay={
               selectedInThisWeek ? new Date(selectedDate + "T00:00:00").getDay() : undefined
@@ -133,24 +163,21 @@ export function PlanningTab({ modality }: { modality: SportModality }) {
             secondary={(day) => (plannedFor(toISODate(datesByWeekday[day])).length > 0 ? "●" : "—")}
           />
         </div>
-      </div>
+      </section>
 
-      <div>
-        <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-          {formatLongDate(selectedDate)}
-        </h3>
-        <div className="space-y-2">
+      <section className="sp-plan-day">
+        <h3>{formatLongDate(selectedDate)}</h3>
+        <div className="sp-plan-day-list">
           {dayItems.map((e) => (
             <button
               key={e.id}
               onClick={() => setEditing(e)}
-              className="flex w-full items-center gap-2 rounded-lg border border-border bg-surface-2 p-3 text-left hover:border-primary/40"
+              className="sp-plan-activity interactive-press"
             >
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">
-                  {modalityLabel[e.sportModality ?? modality]}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
+              <CalendarDays aria-hidden />
+              <div>
+                <p>{modalityLabel[e.sportModality ?? modality]}</p>
+                <span>
                   {e.startTime ? `${e.startTime} · ` : ""}
                   {e.sportTargetDistanceM
                     ? formatDistanceKm(e.sportTargetDistanceM)
@@ -158,23 +185,36 @@ export function PlanningTab({ modality }: { modality: SportModality }) {
                       ? formatDurationClock(e.sportTargetDurationS)
                       : "Sem objetivo"}
                   {e.how ? ` · ${e.how}` : ""}
-                </p>
+                </span>
               </div>
+              <ChevronRight aria-hidden />
             </button>
           ))}
           {dayItems.length === 0 && (
-            <p className="text-sm text-muted-foreground">Nada planejado neste dia.</p>
+            <div className="sp-plan-empty">
+              <div>
+                <Footprints aria-hidden />
+              </div>
+              <strong>Nada planejado neste dia.</strong>
+              <p>Escolha um horário ou deixe livre para decidir depois.</p>
+            </div>
           )}
-          <button
-            onClick={() => setAddingOpen(true)}
-            className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border py-2.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary"
-          >
-            <Plus className="h-3 w-3" /> Adicionar atividade
+          <button onClick={() => setAddingOpen(true)} className="sp-plan-add interactive-press">
+            <Plus /> Adicionar atividade
           </button>
         </div>
-      </div>
+      </section>
 
       <SavedRoutesSection modality={modality} />
+
+      <button
+        onClick={() => setRecurringOpen(true)}
+        className="sp-plan-recurring interactive-press"
+      >
+        <Repeat2 aria-hidden />
+        <span>Criar atividade recorrente</span>
+        <ChevronRight aria-hidden />
+      </button>
 
       {addingOpen && (
         <ActivityFormModal
@@ -193,6 +233,15 @@ export function PlanningTab({ modality }: { modality: SportModality }) {
           onClose={() => setEditing(null)}
         />
       )}
+      {recurringOpen && (
+        <ActivityFormModal
+          modality={modality}
+          initialDate={selectedDate}
+          datesByWeekday={datesByWeekday}
+          startRecurring
+          onClose={() => setRecurringOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -205,12 +254,14 @@ function ActivityFormModal({
   initialDate,
   datesByWeekday,
   existing,
+  startRecurring = false,
   onClose,
 }: {
   modality: SportModality;
   initialDate: string;
   datesByWeekday: Record<number, Date>;
   existing?: Execution;
+  startRecurring?: boolean;
   onClose: () => void;
 }) {
   const isEditing = !!existing;
@@ -233,8 +284,8 @@ function ActivityFormModal({
     existing?.sportTargetDurationS ? String(existing.sportTargetDurationS / 60) : "",
   );
   const [note, setNote] = useState(existing?.how ?? "");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [copyMode, setCopyMode] = useState<CopyMode>("copiar");
+  const [advancedOpen, setAdvancedOpen] = useState(startRecurring);
+  const [copyMode, setCopyMode] = useState<CopyMode>(startRecurring ? "repetir" : "copiar");
   const [selectedDays, setSelectedDays] = useState<Set<number>>(
     () => new Set([new Date(initialDate + "T00:00:00").getDay()]),
   );

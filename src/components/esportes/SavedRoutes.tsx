@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronRight, Play, Route as RouteIcon } from "lucide-react";
+import { ChevronRight, MapPin, Play, Route as RouteIcon } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { formatDateBR } from "@/lib/goals-store";
 import { useSportRouteAttempts, useSportRoutes, type SportRoute } from "@/lib/sport-routes-data";
@@ -25,23 +25,54 @@ import { RoutePreview } from "./RoutePreview";
 export function SavedRoutesSection({ modality }: { modality: SportModality }) {
   const routes = useSportRoutes(modality);
   const [open, setOpen] = useState<SportRoute | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   return (
-    <section>
-      <h3 className="norte-section-title mb-3">Rotas salvas</h3>
+    <section className="sp-saved-routes">
+      <div className="sp-routes-heading">
+        <h3>Rotas salvas</h3>
+        {routes.length > 2 && (
+          <button onClick={() => setShowAll((value) => !value)} className="interactive-press">
+            {showAll ? "Ver menos" : "Ver todas"} <ChevronRight aria-hidden />
+          </button>
+        )}
+      </div>
       {routes.length === 0 ? (
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Nenhuma rota salva ainda. Ao concluir uma atividade gravada você pode salvar o percurso
-          para repetir depois.
-        </p>
+        <div className="sp-routes-empty">
+          <div className="sp-routes-map" aria-hidden>
+            <svg viewBox="0 0 250 150">
+              <path d="M30 112C58 105 59 55 101 75s47-31 88-22" />
+              <circle cx="30" cy="112" r="7" />
+              <circle cx="189" cy="53" r="7" />
+            </svg>
+            <MapPin className="sp-map-pin sp-map-pin--a" />
+            <MapPin className="sp-map-pin sp-map-pin--b" />
+          </div>
+          <div className="sp-routes-empty-copy">
+            <strong>Salve seus percursos favoritos</strong>
+            <p>Ao concluir uma atividade, guarde a rota para repetir depois.</p>
+            <button onClick={() => setHelpOpen(true)} className="interactive-press">
+              Como funciona
+            </button>
+          </div>
+        </div>
       ) : (
-        <div className="space-y-2">
-          {routes.map((route) => (
+        <div className="sp-routes-list">
+          {routes.slice(0, showAll ? routes.length : 2).map((route) => (
             <SavedRouteCard key={route.id} route={route} onOpen={() => setOpen(route)} />
           ))}
         </div>
       )}
       {open && <RouteDetailSheet route={open} onClose={() => setOpen(null)} />}
+      {helpOpen && (
+        <Modal title="Como salvar uma rota" onClose={() => setHelpOpen(false)}>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Inicie uma atividade com o GPS. Ao concluir, escolha salvar o percurso. Ele aparecerá
+            aqui para você repetir e comparar seu desempenho nas próximas vezes.
+          </p>
+        </Modal>
+      )}
     </section>
   );
 }
@@ -68,30 +99,27 @@ function SavedRouteCard({ route, onOpen }: { route: SportRoute; onOpen: () => vo
   const runRoute = useRunRoute();
 
   return (
-    <div className="card-surface flex items-center gap-3 p-3">
-      <button
-        onClick={onOpen}
-        className="interactive-press flex min-w-0 flex-1 items-center gap-3 text-left"
-      >
-        <RoutePreview points={route.points} className="h-14 w-14 shrink-0" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold">{route.title}</p>
-          <p className="truncate text-[11px] text-muted-foreground">
+    <div className="sp-route-card">
+      <button onClick={onOpen} className="interactive-press sp-route-open">
+        <RoutePreview points={route.points} className="sp-route-preview" />
+        <div className="sp-route-copy">
+          <p>{route.title}</p>
+          <span>
             {formatDistanceKm(route.distanceM)} ·{" "}
             {stats.count === 0
               ? "nenhuma execução"
               : `${stats.count} ${stats.count === 1 ? "execução" : "execuções"}`}
-          </p>
-          <p className="truncate text-[11px] text-muted-foreground">
+          </span>
+          <span>
             {stats.last ? `Última: ${formatDateBR(stats.last.dateIso)}` : "Ainda não percorrida"}
-          </p>
+          </span>
         </div>
-        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <ChevronRight aria-hidden />
       </button>
       <button
         onClick={() => runRoute(route)}
         aria-label={`Correr a rota ${route.title}`}
-        className="interactive-press flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
+        className="interactive-press sp-route-play"
       >
         <Play className="h-4 w-4 fill-current" />
       </button>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatDateShortBR } from "@/lib/goals-store";
 import {
   METRIC_FACES,
@@ -99,7 +99,7 @@ export function MetricCarousel({
           faixa lateral, que ocupava largura do gráfico e não dizia o que
           fazia. */}
       <div className="sp-chart-heading">
-        <h3>Evolução</h3>
+        <h3>Sua evolução</h3>
         <div
           className="sp-flip-controls"
           onPointerDown={onPointerDown}
@@ -107,19 +107,13 @@ export function MetricCarousel({
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
         >
-          <div>
-            <button onClick={() => step(-1)} aria-label="Análise anterior">
-              <ChevronUp size={18} />
-            </button>
-            <button onClick={() => step(1)} aria-label="Próxima análise">
-              <ChevronDown size={18} />
-            </button>
-          </div>
-          <span>
-            Deslize
-            <br />
-            para trocar
-          </span>
+          <span>deslize para trocar</span>
+          <button onClick={() => step(-1)} aria-label="Análise anterior">
+            <ChevronLeft size={18} />
+          </button>
+          <button onClick={() => step(1)} aria-label="Próxima análise">
+            <ChevronRight size={18} />
+          </button>
         </div>
       </div>
 
@@ -217,37 +211,31 @@ function Face({
   const chosen = picked !== null ? series[picked] : null;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-start justify-between gap-2">
-        <button
-          onClick={onTitleClick}
-          className="interactive-press text-left text-[15px] font-semibold"
-          style={{ color: "var(--sp-title)" }}
-        >
+    <div className="sp-metric-layout">
+      <div className="sp-metric-summary">
+        <button onClick={onTitleClick} className="interactive-press sp-metric-label">
           {metricFaceLabel(face, modality)}
         </button>
-        <div className="text-right">
-          <p className="sp-metric-value">{headline}</p>
-          {sub && (
-            <p className="text-[11px]" style={{ color: "var(--sp-muted)" }}>
-              {sub}
-            </p>
-          )}
-        </div>
+        <p className="sp-metric-value">{headline}</p>
+        {sub && <p className="sp-metric-sub">{sub}</p>}
       </div>
 
       {state === "sem_atividades" ? (
-        <Note>
-          Nenhuma atividade registrada nas últimas {weeks} semanas. O gráfico aparece assim que
-          houver registro.
-        </Note>
+        <div className="sp-metric-chart">
+          <Note>
+            Nenhuma atividade registrada nas últimas {weeks} semanas. O gráfico aparece assim que
+            houver registro.
+          </Note>
+        </div>
       ) : state === "dados_insuficientes" ? (
-        <Note>
-          Uma semana com registro. Com duas dá para comparar — por enquanto o número acima é o que
-          existe.
-        </Note>
+        <div className="sp-metric-chart">
+          <Note>
+            Uma semana com registro. Com duas dá para comparar — por enquanto o número ao lado é o
+            que existe.
+          </Note>
+        </div>
       ) : (
-        <>
+        <div className="sp-metric-chart">
           <Chart
             series={series}
             valueOf={valueOf}
@@ -256,13 +244,10 @@ function Face({
             picked={picked}
             onPick={setPicked}
           />
-          <p
-            className="mt-1 min-h-[22px] text-[10px] leading-snug"
-            style={{ color: "var(--sp-muted)" }}
-          >
+          <p className="sp-metric-detail">
             {chosen ? describeWeek(chosen, face, modality) : "Toque num ponto para ver a semana."}
           </p>
-        </>
+        </div>
       )}
     </div>
   );
