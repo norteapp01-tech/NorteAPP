@@ -9,8 +9,6 @@ import {
   formatDuration,
   type Book,
 } from "@/lib/reading-store";
-import { Card } from "@/components/sub-agenda-shared";
-import { BookCover } from "./BookCover";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { Play, Pencil } from "lucide-react";
 
@@ -53,42 +51,38 @@ export function ContinueReadingCard({
   const next = getNextReadingSchedule(routine, executions);
 
   return (
-    <div className="reading-hero">
-      <Card title="Continuar lendo">
-        <div className="flex gap-4">
-          <BookCover book={book} className="h-24 w-16" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-bold">{book.title}</p>
-            <p className="truncate text-xs text-muted-foreground">{book.authors.join(", ")}</p>
-            <p className="mt-2 text-sm font-semibold">
-              {progress.label}
-              {book.totalChapters
-                ? ` · Capítulo ${book.currentChapter ?? 0} de ${book.totalChapters}`
-                : ""}
-            </p>
-            {progress.total !== undefined && (
-              <ProgressBar
-                value={progress.pct}
-                className="mt-1 h-2"
-                fillClassName="rounded-none"
-                label="Progresso da leitura"
-              />
-            )}
-          </div>
-        </div>
+    <section className="reading-hero-card">
+      <div className="reading-hero-copy">
+        <p className="reading-eyebrow">Continuar lendo</p>
+        <h2>{book.title}</h2>
+        <p className="reading-book-author">{book.authors.join(", ")}</p>
+        <p className="reading-book-progress">
+          {progress.label}
+          {book.totalChapters
+            ? ` · Capítulo ${book.currentChapter ?? 0} de ${book.totalChapters}`
+            : ""}
+        </p>
+        {progress.total !== undefined && (
+          <ProgressBar
+            value={progress.pct}
+            className="reading-progress-bar"
+            fillClassName="rounded-none"
+            label="Progresso da leitura"
+          />
+        )}
 
         {routine ? (
-          <div className="mt-3 space-y-0.5 text-[11px] text-muted-foreground">
+          <div className="reading-hero-schedule">
             {target && (
               <>
-                <p className="text-muted-foreground">{todayLine(book, target.plannedAmount)}</p>
+                <p>{todayLine(book, target.plannedAmount)}</p>
                 <p>{milestoneLine(book, progress.current, target.plannedAmount)}</p>
               </>
             )}
             {next && <p>Próxima leitura: {nextScheduleLabel(next.date, next.time)}</p>}
           </div>
         ) : (
-          <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <div className="reading-hero-schedule reading-hero-schedule--empty">
             <p>Configure sua rotina para distribuir sua leitura.</p>
             <button onClick={onOpenRoutineSetup} className="norte-secondary-action shrink-0">
               configurar rotina
@@ -97,18 +91,18 @@ export function ContinueReadingCard({
         )}
 
         <div className="reading-hero-actions">
-          <button
-            onClick={onOpenReadingMode}
-            className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground"
-          >
+          <button onClick={onOpenReadingMode} className="interactive-press reading-primary-action">
             <Play size={19} /> Continuar leitura
           </button>
-          <button onClick={onOpenProgressUpdater} className="text-xs text-muted-foreground">
+          <button
+            onClick={onOpenProgressUpdater}
+            className="interactive-press reading-progress-action"
+          >
             <Pencil size={16} />{" "}
             {book.progressMode === "pages" ? "Atualizar página" : "Atualizar progresso"}
           </button>
         </div>
-      </Card>
-    </div>
+      </div>
+    </section>
   );
 }

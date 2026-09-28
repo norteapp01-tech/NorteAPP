@@ -34,6 +34,7 @@ const todayLabel = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "lo
   nowDate(),
 );
 const week = officialWeek;
+const weekdayNames = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const commonMoments = [
   ["Café da manhã", "08:00"],
   ["Almoço", "12:30"],
@@ -54,7 +55,7 @@ export function AlimentacaoModule() {
   const totals = dailyTotals(state.logs, date);
 
   return (
-    <div className="nutrition-module mt-6 space-y-5">
+    <div className="nutrition-module">
       <UnderlineTabs
         items={
           [
@@ -94,10 +95,10 @@ function TodayTab({
   ).length;
   const next = meals.find((meal) => !logForMealOnDate(state.logs, meal.id, todayISO()));
   return (
-    <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">Hoje, {todayLabel}</p>
+    <div className="nutrition-today">
+      <p className="nutrition-date">Hoje, {todayLabel}</p>
       <MacroSummary totals={totals} goals={state.goals} />
-      <section>
+      <section className="nutrition-meals-section">
         <div className="nutrition-section-heading">
           <h3>Refeições de hoje</h3>
           <span>
@@ -153,22 +154,17 @@ function PlanTab({ state }: { state: NutritionState }) {
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
   const [goalsOpen, setGoalsOpen] = useState(false);
   const meals = mealsForWeekday(state.meals, selectedDay);
-  const dayName = week.find((item) => item.day === selectedDay)?.label ?? "Dia";
+  const dayName = weekdayNames[selectedDay] ?? "Dia";
   return (
-    <div className="space-y-5">
-      <section>
-        <div className="flex items-center justify-between">
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Plano da semana
-          </h3>
-          <button
-            onClick={() => setGoalsOpen(true)}
-            className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
-          >
-            <Settings2 className="h-3.5 w-3.5" /> Metas
+    <div className="nutrition-plan">
+      <section className="nutrition-plan-week">
+        <div className="nutrition-plan-heading">
+          <h3>Plano da semana</h3>
+          <button onClick={() => setGoalsOpen(true)} className="interactive-press">
+            <Settings2 /> Metas <ChevronRight />
           </button>
         </div>
-        <div className="mt-3">
+        <div className="nutrition-plan-weekdays">
           <WeekdaySelector
             selectedDay={selectedDay}
             onSelect={setSelectedDay}
@@ -176,27 +172,24 @@ function PlanTab({ state }: { state: NutritionState }) {
           />
         </div>
       </section>
-      <section>
-        <div className="flex items-center justify-between">
+      <section className="nutrition-plan-day">
+        <div className="nutrition-plan-day-heading">
           <div>
-            <h3 className="text-base font-semibold">{dayName}</h3>
-            <p className="text-xs text-muted-foreground">
+            <h3>{dayName}</h3>
+            <p>
               {meals.length} {meals.length === 1 ? "momento configurado" : "momentos configurados"}
             </p>
           </div>
           <button
             onClick={() => setMomentsOpen(true)}
-            className="text-xs font-semibold text-primary"
+            className="interactive-press nutrition-edit-moments"
           >
             {meals.length ? "Editar momentos" : "Selecionar momentos"}
           </button>
         </div>
-        <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-surface">
+        <div className="nutrition-plan-meals">
           {meals.length === 0 ? (
-            <button
-              onClick={() => setMomentsOpen(true)}
-              className="flex w-full flex-col items-center gap-2 p-8 text-sm text-muted-foreground"
-            >
+            <button onClick={() => setMomentsOpen(true)} className="nutrition-plan-empty">
               <Utensils className="h-6 w-6" />
               Como será sua alimentação neste dia?
               <span className="text-primary">+ Selecionar momentos</span>
@@ -209,25 +202,29 @@ function PlanTab({ state }: { state: NutritionState }) {
                 <button
                   key={meal.id}
                   onClick={() => setEditingMeal(meal)}
-                  className="flex w-full items-center gap-3 border-b border-border p-4 text-left last:border-b-0"
+                  className="nutrition-plan-meal interactive-press"
                 >
-                  <span className="w-11 font-mono text-xs text-muted-foreground">
-                    {assignment?.time ?? meal.time}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold">{meal.name}</span>
-                    <span
-                      className={`block truncate text-[11px] ${option ? "text-muted-foreground" : "text-primary"}`}
-                    >
+                  <span className="nutrition-plan-time">{assignment?.time ?? meal.time}</span>
+                  <span className="nutrition-plan-meal-copy">
+                    <span>{meal.name}</span>
+                    <span className={option ? "" : "is-missing"}>
                       {option?.description ?? "Escolher uma opção"}
                     </span>
                   </span>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  <ChevronRight />
                 </button>
               );
             })
           )}
         </div>
+        {meals.length > 0 && (
+          <button
+            onClick={() => setMomentsOpen(true)}
+            className="nutrition-add-meal interactive-press"
+          >
+            <Plus /> Adicionar refeição
+          </button>
+        )}
       </section>
       {momentsOpen && (
         <MomentPicker state={state} weekday={selectedDay} onClose={() => setMomentsOpen(false)} />

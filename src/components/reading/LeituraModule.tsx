@@ -115,7 +115,7 @@ export function LeituraModule() {
       <UnderlineTabs items={tabs} value={tab} onChange={setTab} />
 
       {tab === "leitura" && (
-        <div className="mt-6 space-y-5 pb-2">
+        <div className="reading-main-tab">
           {missedTarget && (
             <MissedTargetAdjustment
               target={missedTarget}
@@ -180,41 +180,41 @@ export function LeituraModule() {
 
           <ReadingWeek />
 
-          <div className="divide-y divide-border border-y border-border">
-            <div className="flex items-center gap-3 py-3">
-              <Library className="h-5 w-5 text-muted-foreground" />
+          <div className="reading-settings-list">
+            <div className="reading-settings-row">
+              <Library aria-hidden />
               <button
                 onClick={() => setModal({ type: "library" })}
-                className="min-w-0 flex-1 text-left"
+                className="reading-settings-copy"
               >
-                <p className="text-sm font-semibold">Biblioteca</p>
-                <p className="truncate text-xs text-muted-foreground">
+                <p>Biblioteca</p>
+                <span>
                   {readingBooks.length} lendo · {completedBooks.length} concluídos ·{" "}
                   {wantBooks.length} quero ler
                   {pausedBooks.length ? ` · ${pausedBooks.length} pausados` : ""}
-                </p>
+                </span>
               </button>
               <button
                 aria-label="Adicionar livro"
                 onClick={() => setModal({ type: "addBook" })}
-                className="grid h-9 w-9 place-items-center rounded-lg border border-border"
+                className="interactive-press reading-add-book"
               >
-                <Plus className="h-4 w-4 text-muted-foreground" />
+                <Plus />
               </button>
             </div>
-            <details className="group py-3">
-              <summary className="flex cursor-pointer list-none items-center gap-3">
-                <CalendarClock className="h-5 w-5 text-muted-foreground" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold">Rotina de leitura</p>
-                  <p className="text-xs text-muted-foreground">Dias, horário e meta diária</p>
+            <details className="reading-settings-row reading-routine-row">
+              <summary>
+                <CalendarClock aria-hidden />
+                <div className="reading-settings-copy">
+                  <p>Rotina de leitura</p>
+                  <span>Dias, horário e meta diária</span>
                 </div>
-                <ChevronDown className="h-4 w-4 text-muted-foreground group-open:rotate-180" />
+                <ChevronDown />
               </summary>
               {selectedBook && (
                 <button
                   onClick={() => setModal({ type: "routine", book: selectedBook })}
-                  className="norte-secondary-action mt-3 ml-8 text-xs"
+                  className="norte-secondary-action reading-routine-action"
                 >
                   Configurar rotina
                 </button>
@@ -236,7 +236,7 @@ export function LeituraModule() {
       )}
 
       {tab === "caderno" && (
-        <div className="mt-6 pb-2">
+        <div className="reading-notebook-shell">
           <ReadingNotebookTab
             initialBookId={notebookBookId}
             onAddNote={() => selectedBook && setModal({ type: "note", book: selectedBook })}

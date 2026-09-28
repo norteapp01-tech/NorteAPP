@@ -8,43 +8,46 @@ const rows = [
   { key: "fat", label: "Gorduras", unit: "g" },
 ] as const;
 export function MacroSummary({ totals, goals }: { totals: DailyGoals; goals: DailyGoals }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const configured = rows.filter(({ key }) => goals[key] > 0);
   const reached = configured.filter(
     ({ key }) => totals[key] >= goals[key] * 0.9 && totals[key] <= goals[key] * 1.1,
   ).length;
   return (
-    <section className="nutrition-panel nutrition-goals">
+    <section className="nutrition-goals-hero">
+      <div className="nutrition-goals-copy">
+        <p className="nutrition-eyebrow">Metas de hoje</p>
+        <h3>
+          {reached} de {configured.length} na faixa
+        </h3>
+        {open && (
+          <div id="nutrition-daily-goals">
+            {rows.map(({ key, label, unit }) => (
+              <div className="nutrition-macro-row" key={key}>
+                <span>{label}</span>
+                <progress
+                  aria-label={label}
+                  max={100}
+                  value={macroProgress(totals[key], goals[key]).pct}
+                />
+                <span>
+                  <strong>{Math.round(totals[key]).toLocaleString("pt-BR")}</strong> /{" "}
+                  {goals[key].toLocaleString("pt-BR")} <small>{unit}</small>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       <button
-        className="nutrition-drawer-heading"
+        className="nutrition-goals-toggle interactive-press"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-controls="nutrition-daily-goals"
       >
-        <h3>Metas de hoje</h3>
-        <span>
-          {reached} de {configured.length} na faixa
-        </span>
+        Ver metas do dia
         <ChevronDown size={18} style={{ transform: open ? "rotate(180deg)" : undefined }} />
       </button>
-      {open && (
-        <div id="nutrition-daily-goals">
-          {rows.map(({ key, label, unit }) => (
-            <div className="nutrition-macro-row" key={key}>
-              <span>{label}</span>
-              <progress
-                aria-label={label}
-                max={100}
-                value={macroProgress(totals[key], goals[key]).pct}
-              />
-              <span>
-                <strong>{Math.round(totals[key]).toLocaleString("pt-BR")}</strong> /{" "}
-                {goals[key].toLocaleString("pt-BR")} <small>{unit}</small>
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
     </section>
   );
 }

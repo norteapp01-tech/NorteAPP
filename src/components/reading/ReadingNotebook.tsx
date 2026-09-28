@@ -53,22 +53,22 @@ export function ReadingNotebookTab({
 
   return (
     <div className="reading-notebook-tab">
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2">
-        <Search className="h-4 w-4 text-muted-foreground" />
+      <div className="reading-notebook-search">
+        <Search aria-hidden />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Busque uma frase, ideia ou assunto..."
-          className="w-full bg-transparent text-sm outline-none"
+          className="reading-notebook-search-input"
         />
       </div>
 
-      <div className="mt-3 flex gap-1.5 overflow-x-auto">
+      <div className="reading-filter-row" aria-label="Filtrar por tipo">
         {(["all", "quote", "insight", "note"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTypeFilter(t)}
-            className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold ${typeFilter === t ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
+            className={typeFilter === t ? "is-active" : ""}
           >
             {t === "all"
               ? "Todos"
@@ -82,12 +82,12 @@ export function ReadingNotebookTab({
       </div>
 
       {booksWithNotes.length > 0 && (
-        <div className="mt-3">
-          <p className="mb-1.5 text-[10px] uppercase text-muted-foreground">Selecionar livro</p>
-          <div className="flex gap-1.5 overflow-x-auto pb-1">
+        <div className="reading-book-filter">
+          <p>Livro</p>
+          <div>
             <button
               onClick={() => setBookFilter("all")}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold ${bookFilter === "all" ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
+              className={bookFilter === "all" ? "is-active" : ""}
             >
               Todos os livros
             </button>
@@ -95,7 +95,7 @@ export function ReadingNotebookTab({
               <button
                 key={b.id}
                 onClick={() => setBookFilter(b.id)}
-                className={`shrink-0 max-w-[9rem] truncate rounded-full px-3 py-1.5 text-[11px] font-semibold ${bookFilter === b.id ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
+                className={bookFilter === b.id ? "is-active" : ""}
               >
                 {b.title}
               </button>
@@ -105,11 +105,11 @@ export function ReadingNotebookTab({
       )}
 
       {allTags.length > 0 && (
-        <div className="mt-2">
+        <div className="reading-tag-filter">
           <select
             value={tagFilter}
             onChange={(e) => setTagFilter(e.target.value)}
-            className="rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-xs"
+            aria-label="Filtrar por tag"
           >
             <option value="all">Todas as tags</option>
             {allTags.map((t) => (
@@ -121,18 +121,15 @@ export function ReadingNotebookTab({
         </div>
       )}
 
-      <div className="-mt-1 mb-1 mt-3 flex justify-end">
-        <button
-          onClick={onAddNote}
-          className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground hover:border-primary/50"
-        >
-          <Plus className="h-3.5 w-3.5 text-primary" /> Nova anotação
+      <div className="reading-add-note-row">
+        <button onClick={onAddNote} className="interactive-press reading-add-note">
+          <Plus /> Nova anotação
         </button>
       </div>
 
-      <div className="mt-2 space-y-2">
+      <div className="reading-note-list">
         {results.length === 0 && (
-          <p className="text-sm text-muted-foreground">
+          <p className="reading-empty-notes">
             {query.trim() || bookFilter !== "all" || typeFilter !== "all" || tagFilter !== "all"
               ? "Nada encontrado."
               : "Ainda não há nada registrado."}
@@ -142,23 +139,21 @@ export function ReadingNotebookTab({
           const book = state.books.find((b) => b.id === n.bookId);
           const Icon = typeMeta[n.type].icon;
           return (
-            <div key={n.id} className="rounded-lg bg-surface-2 p-3">
-              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Icon className="h-3 w-3" /> {typeMeta[n.type].label} · {n.bookTitle}
+            <article key={n.id} className="reading-note-card">
+              <div className="reading-note-meta">
+                <span>
+                  <Icon /> {typeMeta[n.type].label} · {n.bookTitle}
                 </span>
                 <span>{n.createdAt.slice(0, 10).split("-").reverse().join("/")}</span>
               </div>
-              <p className="mt-1 text-sm italic">"{n.content}"</p>
-              <div className="mt-1 flex items-center justify-between">
-                <span className="text-[10px] text-muted-foreground">
-                  {book && positionText(book.progressMode, n)}
-                </span>
+              <p className="reading-note-content">“{n.content}”</p>
+              <div className="reading-note-footer">
+                <span>{book && positionText(book.progressMode, n)}</span>
                 {n.tags.length > 0 && (
-                  <span className="text-[10px] text-primary">{n.tags.join(", ")}</span>
+                  <span className="reading-note-tags">{n.tags.join(", ")}</span>
                 )}
               </div>
-            </div>
+            </article>
           );
         })}
       </div>
