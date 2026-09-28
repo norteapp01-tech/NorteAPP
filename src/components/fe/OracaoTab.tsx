@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { Archive, CheckCircle2, ChevronDown, ChevronRight, FilePenLine, Plus } from "lucide-react";
 import { addPrayerSubject, useFeStore } from "@/lib/fe-store";
 import { Modal } from "@/components/ui/modal";
 import { PrayerSubjectDetail } from "./PrayerSubjectDetail";
@@ -15,52 +15,51 @@ export function OracaoTab() {
   const [showArchived, setShowArchived] = useState(false);
 
   return (
-    <div className="space-y-6">
-      <section>
-        <div className="flex items-end justify-between">
+    <div className="faith-prayers">
+      <section className="faith-prayer-intro">
+        <div className="faith-prayer-title-row">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Seus alvos
-            </p>
-            <h2 className="mt-1 text-xl font-bold">O que você tem colocado em oração?</h2>
+            <p className="faith-eyebrow">Seus alvos</p>
+            <h2>O que você tem colocado em oração?</h2>
           </div>
           <button
             onClick={() => setAdding(true)}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground"
+            className="faith-prayer-add"
+            aria-label="Adicionar alvo de oração"
           >
-            <Plus className="h-5 w-5" />
+            <Plus />
           </button>
         </div>
+        <p className="faith-prayer-caption">
+          Acompanhe cada situação com calma, um dia de cada vez.
+        </p>
       </section>
 
-      <section>
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="norte-section-title mb-3">Em oração</h3>
-          <span className="text-xs text-muted-foreground">{active.length}</span>
+      <section className="faith-prayer-active">
+        <div className="faith-prayer-section-heading">
+          <h3>Em oração</h3>
+          <span>{active.length}</span>
         </div>
         {active.length === 0 ? (
-          <button
-            onClick={() => setAdding(true)}
-            className="w-full rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground"
-          >
+          <button onClick={() => setAdding(true)} className="faith-prayer-empty">
             Adicione seu primeiro alvo de oração
           </button>
         ) : (
-          <div className="card-surface divide-y divide-border p-0">
+          <div className="faith-prayer-card">
             {active.map((subject) => (
               <button
                 key={subject.id}
                 onClick={() => setOpenId(subject.id)}
-                className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+                className="faith-prayer-row"
               >
-                <span className="h-5 w-5 shrink-0 rounded-full border border-primary" />
-                <span className="min-w-0 flex-1">
-                  <strong className="block truncate text-sm">{subject.title}</strong>
-                  <span className="text-[11px] text-muted-foreground">
+                <span className="faith-prayer-circle" />
+                <span className="faith-prayer-row-copy">
+                  <strong>{subject.title}</strong>
+                  <span>
                     {subject.category || "Pessoal"} · desde {formatDate(subject.createdAt)}
                   </span>
                 </span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                <ChevronRight />
               </button>
             ))}
           </div>
@@ -90,6 +89,7 @@ export function OracaoTab() {
         count={archived.length}
         open={showArchived}
         onToggle={() => setShowArchived(!showArchived)}
+        icon={<Archive className="h-4 w-4" />}
       >
         {archived.map((subject) => (
           <button
@@ -102,6 +102,10 @@ export function OracaoTab() {
           </button>
         ))}
       </Drawer>
+
+      <p className="faith-prayer-helper">
+        <FilePenLine /> Abra um alvo para registrar uma atualização.
+      </p>
 
       {adding && <NewPrayerTarget onClose={() => setAdding(false)} />}
       {openId && <PrayerSubjectDetail subjectId={openId} onClose={() => setOpenId(null)} />}
@@ -125,16 +129,14 @@ function Drawer({
   children: React.ReactNode;
 }) {
   return (
-    <section className="border-b border-border">
-      <button onClick={onToggle} className="flex w-full items-center gap-2 py-3 text-left">
+    <section className="faith-prayer-drawer">
+      <button onClick={onToggle}>
         {icon}
-        <strong className="flex-1 text-sm">{title}</strong>
-        <span className="text-xs text-muted-foreground">{count}</span>
-        <ChevronDown
-          className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
-        />
+        <strong>{title}</strong>
+        <span>{count}</span>
+        <ChevronDown className={`faith-drawer-chevron ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && <div>{children}</div>}
+      {open && <div className="faith-prayer-drawer-content">{children}</div>}
     </section>
   );
 }

@@ -79,11 +79,14 @@ export function FaithRecords({ onOpenPrayer }: { onOpenPrayer: () => void }) {
   return (
     <div className="faith-records">
       <section className="faith-capture">
-        <h2>O que você quer guardar?</h2>
-        <p>Registre algo que viveu, aprendeu ou quer lembrar.</p>
-        <button className="faith-new" onClick={() => setPicker(true)}>
-          <Plus size={23} /> Novo registro
-        </button>
+        <div className="faith-capture-copy">
+          <span className="faith-eyebrow">Guardar o que importa</span>
+          <h2>O que você quer guardar?</h2>
+          <p>Registre algo que viveu, aprendeu ou quer lembrar.</p>
+          <button className="faith-new" onClick={() => setPicker(true)}>
+            <Plus size={23} /> Novo registro
+          </button>
+        </div>
         <div className="faith-quick">
           {choices.map(({ type, label, icon: Icon }) => (
             <button key={type} onClick={() => setEditor(type)}>
@@ -106,7 +109,7 @@ export function FaithRecords({ onOpenPrayer }: { onOpenPrayer: () => void }) {
         )}
       </section>
       {memory && (
-        <section>
+        <section className="faith-reminder-section">
           <h2>Para lembrar</h2>
           <button className="faith-memory" onClick={() => setEntry(memory)}>
             <Sparkles size={24} />

@@ -1,171 +1,277 @@
-.faith-module,
-.faith-records {
-  --faith-panel: var(--surface);
-  --faith-border: var(--border);
+/* Fé — identidade Norte Amanhecer.
+   Luz quente discreta, superfícies editoriais e verde reservado a ações. */
+.faith-page,
+.faith-module {
+  --faith-panel: #101412;
+  --faith-panel-soft: rgb(17 22 19 / 0.78);
+  --faith-line: rgb(224 232 227 / 0.22);
   --faith-muted: var(--muted-foreground);
+  --faith-text: var(--foreground);
 }
-:root[data-theme="light"] .faith-module,
-:root[data-theme="light"] .faith-records {
-  --faith-panel: var(--surface);
-  --faith-border: var(--border);
-  --faith-muted: var(--muted-foreground);
+
+.faith-page {
+  position: relative;
+  overflow-x: clip;
 }
-.faith-records {
+.faith-page::before {
+  position: absolute;
+  z-index: -1;
+  top: -105px;
+  right: -90px;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(153 99 46 / 0.17), transparent 70%);
+  content: "";
+  pointer-events: none;
+}
+.faith-module {
+  margin-top: 22px;
+}
+.faith-module .norte-tabs [role="tab"] {
+  height: 58px;
+  font-size: 16px;
+  font-weight: 550;
+}
+.faith-module .norte-tabs > span {
+  height: 2px;
+}
+.faith-module > div:last-child {
+  margin-top: 0;
+  padding-top: 22px;
+}
+.faith-eyebrow {
+  display: block;
+  color: rgb(239 243 241 / 0.78);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+.faith-records,
+.faith-prayers,
+.faith-bible {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 28px;
 }
-.faith-records h2 {
-  font-size: var(--norte-section-size);
-  font-weight: var(--norte-title-weight);
-  letter-spacing: -0.02em;
-  line-height: 1.25;
+.faith-records h2,
+.faith-prayers h2,
+.faith-bible h2 {
+  color: var(--faith-text);
+  font-size: 24px;
+  font-weight: 720;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
 }
+
+/* Registros --------------------------------------------------------------- */
 .faith-capture {
-  background: var(--surface-featured);
-  border: 1px solid var(--border-featured);
-  border-radius: var(--norte-card-radius);
-  padding: 18px 14px;
+  position: relative;
+  min-height: 318px;
+  overflow: hidden;
+  border: 1px solid var(--faith-line);
+  border-radius: 16px;
+  background:
+    linear-gradient(90deg, rgb(5 7 6 / 0.99) 0%, rgb(5 7 6 / 0.89) 48%, rgb(5 7 6 / 0.2) 80%),
+    linear-gradient(0deg, rgb(0 0 0 / 0.52), transparent 62%),
+    url("/images/home/routine-leitura.jpg") 66% center / cover no-repeat;
+  clip-path: polygon(
+    0 0,
+    calc(100% - 22px) 0,
+    100% 22px,
+    100% 100%,
+    22px 100%,
+    0 calc(100% - 22px)
+  );
+  box-shadow: 0 18px 55px rgb(0 0 0 / 0.25);
+  padding: 26px 18px 0;
 }
-.faith-capture > p {
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--faith-muted);
-  margin-top: 8px;
+.faith-capture-copy {
+  position: relative;
+  z-index: 1;
+  width: 62%;
+}
+.faith-capture h2 {
+  margin-top: 14px;
+  color: #f6f7f6;
+  font-size: 28px;
+  line-height: 1.05;
+}
+.faith-capture-copy > p {
+  margin-top: 10px;
+  color: rgb(239 243 241 / 0.72);
+  font-size: 13px;
+  line-height: 1.5;
 }
 .faith-new {
   display: flex;
+  min-height: 50px;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 9px;
   width: 100%;
+  margin-top: 19px;
   border: 1px solid var(--primary);
-  border-radius: 12px;
+  border-radius: 999px;
+  background: rgb(5 7 6 / 0.34);
   color: var(--primary);
-  font-size: 16px;
-  font-weight: 600;
-  padding: 12px;
-  margin-top: 18px;
+  font-size: 15px;
+  font-weight: 650;
+  backdrop-filter: blur(10px);
 }
 .faith-quick {
+  position: absolute;
+  z-index: 2;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-  margin-top: 12px;
+  border-top: 1px solid rgb(230 236 232 / 0.18);
+  padding-top: 14px;
 }
 .faith-quick button {
+  position: relative;
   display: flex;
+  min-width: 0;
   align-items: center;
   flex-direction: column;
-  gap: 8px;
-  border: 1px solid var(--faith-border);
-  border-radius: 11px;
-  padding: 12px 2px;
-  color: var(--faith-muted);
+  gap: 7px;
+  color: rgb(239 243 241 / 0.72);
   font-size: 10px;
-  min-height: 70px;
+}
+.faith-quick button + button::before {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 1px;
+  background: rgb(230 236 232 / 0.18);
+  content: "";
+}
+.faith-quick svg {
+  width: 22px;
+  height: 22px;
 }
 .faith-heading {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
-.faith-heading > button {
-  font-size: 12px;
+.faith-heading > button,
+.faith-heading > span {
+  flex-shrink: 0;
   color: var(--faith-muted);
+  font-size: 13px;
   white-space: nowrap;
 }
 .faith-record {
+  position: relative;
   display: flex;
   width: 100%;
+  min-height: 78px;
   align-items: center;
   gap: 12px;
+  border-bottom: 1px solid var(--faith-line);
+  padding: 15px 12px;
   text-align: left;
-  padding: 14px;
-  border-bottom: 1px solid var(--faith-border);
 }
 .faith-record > span {
   flex: 1;
   min-width: 0;
 }
 .faith-record > svg {
+  width: 17px;
   flex-shrink: 0;
   color: var(--faith-muted);
 }
 .faith-record small {
-  font-size: 10px;
   color: var(--faith-muted);
+  font-size: 10px;
 }
 .faith-record small > span {
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 .faith-record strong {
   display: block;
-  font-size: 15px;
   margin-top: 4px;
+  font-size: 15px;
 }
 .faith-record p {
-  font-size: 13px;
-  line-height: 1.5;
+  display: -webkit-box;
+  overflow: hidden;
   margin-top: 4px;
   color: var(--faith-muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
+  font-size: 13px;
+  line-height: 1.45;
   -webkit-box-orient: vertical;
-  overflow: hidden;
+  -webkit-line-clamp: 2;
 }
 .faith-record.is-featured {
-  background: var(--faith-panel);
-  border-radius: var(--norte-card-radius);
-  border-bottom: 0;
+  overflow: hidden;
+  border: 1px solid var(--faith-line);
+  border-radius: 15px;
+  background: linear-gradient(115deg, var(--faith-panel), rgb(15 19 17 / 0.72));
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  padding-left: 20px;
 }
-.faith-record.is-featured small > span {
-  color: var(--faith-muted);
+.faith-record.is-featured::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: var(--primary);
+  content: "";
+}
+.faith-reminder-section {
+  padding-top: 2px;
 }
 .faith-memory {
   display: flex;
   gap: 14px;
-  text-align: left;
   width: 100%;
-  border-left: 1px solid var(--faith-muted);
-  padding: 4px 0 4px 12px;
   margin-top: 16px;
+  border-left: 2px solid var(--primary);
+  padding: 5px 0 5px 14px;
+  text-align: left;
 }
 .faith-memory > svg {
-  color: var(--faith-muted);
   flex-shrink: 0;
+  color: var(--faith-muted);
 }
 .faith-memory small {
-  font-size: 11px;
   color: var(--faith-muted);
+  font-size: 11px;
 }
 .faith-memory p {
-  margin: 6px 0;
-  font-size: 14px;
-  line-height: 1.5;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
   overflow: hidden;
+  margin: 7px 0;
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .faith-link {
-  color: var(--faith-muted);
+  color: var(--primary);
   font-size: 12px;
 }
 .faith-navigation {
-  border-top: 1px solid var(--faith-border);
+  border-top: 1px solid var(--faith-line);
 }
 .faith-navigation button {
   display: flex;
+  width: 100%;
   align-items: center;
   gap: 14px;
-  width: 100%;
+  border-bottom: 1px solid var(--faith-line);
   padding: 18px 6px;
   text-align: left;
-  border-bottom: 1px solid var(--faith-border);
 }
 .faith-navigation button > span {
   flex: 1;
@@ -173,30 +279,387 @@
 .faith-navigation strong {
   display: block;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 650;
 }
 .faith-navigation small {
   display: block;
-  font-size: 12px;
-  color: var(--faith-muted);
   margin-top: 3px;
+  color: var(--faith-muted);
+  font-size: 12px;
 }
 .faith-navigation svg {
   color: var(--faith-muted);
 }
-.faith-empty {
+
+/* Orações ----------------------------------------------------------------- */
+.faith-prayers {
+  min-height: 660px;
+  gap: 30px;
+}
+.faith-prayer-intro {
+  padding: 8px 2px 0;
+}
+.faith-prayer-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.faith-prayer-title-row h2 {
+  max-width: 440px;
+  margin-top: 13px;
+  font-size: 30px;
+  line-height: 1.08;
+}
+.faith-prayer-add {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+  place-items: center;
+  border: 1px solid var(--primary);
+  border-radius: 50%;
+  color: var(--primary);
+}
+.faith-prayer-add svg {
+  width: 27px;
+  height: 27px;
+}
+.faith-prayer-caption {
+  margin-top: 14px;
+  color: var(--faith-muted);
+  font-size: 14px;
+}
+.faith-prayer-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.faith-prayer-section-heading h3 {
+  font-size: 23px;
+  font-weight: 700;
+}
+.faith-prayer-section-heading span {
+  color: var(--faith-muted);
   font-size: 13px;
-  line-height: 1.6;
+}
+.faith-prayer-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--faith-line);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 100% 0%, rgb(152 98 46 / 0.16), transparent 38%),
+    linear-gradient(120deg, var(--faith-panel), #0b0e0c);
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+}
+.faith-prayer-row {
+  display: flex;
+  width: 100%;
+  min-height: 88px;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  text-align: left;
+}
+.faith-prayer-row + .faith-prayer-row {
+  border-top: 1px solid var(--faith-line);
+}
+.faith-prayer-circle {
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  border: 1px solid var(--primary);
+  border-radius: 50%;
+}
+.faith-prayer-row-copy {
+  min-width: 0;
+  flex: 1;
+}
+.faith-prayer-row-copy strong {
+  display: block;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.faith-prayer-row-copy > span {
+  display: block;
+  margin-top: 5px;
+  color: var(--faith-muted);
+  font-size: 12px;
+}
+.faith-prayer-row > svg {
+  width: 17px;
+  color: var(--faith-muted);
+}
+.faith-prayer-empty {
+  width: 100%;
+  border: 1px dashed var(--faith-line);
+  border-radius: 16px;
+  padding: 28px;
+  color: var(--faith-muted);
+  font-size: 13px;
+}
+.faith-prayer-drawer {
+  border-bottom: 1px solid var(--faith-line);
+}
+.faith-prayer-drawer > button {
+  display: flex;
+  width: 100%;
+  min-height: 58px;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 5px;
+  text-align: left;
+}
+.faith-prayer-drawer > button > svg:first-child {
+  width: 20px;
+  height: 20px;
+  color: var(--faith-muted);
+}
+.faith-prayer-drawer > button > strong {
+  flex: 1;
+  font-size: 15px;
+}
+.faith-prayer-drawer > button > span,
+.faith-drawer-chevron {
+  color: var(--faith-muted);
+  font-size: 12px;
+}
+.faith-drawer-chevron {
+  width: 17px;
+  transition: transform 0.2s ease;
+}
+.faith-prayer-drawer-content button {
+  border-color: var(--faith-line);
+}
+.faith-prayer-helper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--faith-muted);
+  font-size: 12px;
+}
+.faith-prayer-helper svg {
+  width: 19px;
+}
+
+/* Bíblia ------------------------------------------------------------------ */
+.faith-bible-hero {
+  position: relative;
+  min-height: 284px;
+  overflow: hidden;
+  border: 1px solid var(--faith-line);
+  border-radius: 16px;
+  background:
+    linear-gradient(90deg, rgb(5 7 6 / 0.99) 0%, rgb(5 7 6 / 0.86) 47%, rgb(5 7 6 / 0.15) 82%),
+    linear-gradient(0deg, rgb(0 0 0 / 0.43), transparent 60%),
+    url("/images/home/routine-leitura.jpg") 68% center / cover no-repeat;
+  clip-path: polygon(
+    0 0,
+    calc(100% - 22px) 0,
+    100% 22px,
+    100% 100%,
+    22px 100%,
+    0 calc(100% - 22px)
+  );
+  box-shadow: 0 18px 55px rgb(0 0 0 / 0.25);
+}
+.faith-bible-hero-copy {
+  display: flex;
+  min-height: 284px;
+  width: 58%;
+  flex-direction: column;
+  padding: 25px 0 23px 20px;
+}
+.faith-bible-hero h2 {
+  margin-top: 15px;
+  color: #f6f7f6;
+  font-size: 29px;
+}
+.faith-bible-current {
+  margin-top: 8px;
+  color: rgb(239 243 241 / 0.74);
+  font-size: 14px;
+}
+.faith-bible-count {
+  margin-top: 5px;
+  color: rgb(239 243 241 / 0.66);
+  font-size: 12px;
+}
+.faith-bible-progress {
+  overflow: hidden;
+  width: 100%;
+  height: 6px;
+  margin-top: 13px;
+  border-radius: 999px;
+  background: rgb(208 218 212 / 0.18);
+}
+.faith-bible-progress .progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+}
+.faith-bible-empty {
+  margin-top: 15px;
+  color: rgb(239 243 241 / 0.7);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.faith-bible-log {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: auto;
+  border: 1px solid var(--primary);
+  border-radius: 999px;
+  background: rgb(5 7 6 / 0.34);
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 650;
+  backdrop-filter: blur(10px);
+}
+.faith-bible-log svg {
+  width: 17px;
+}
+.faith-bible-rhythm > p {
+  margin-top: 7px;
+  color: var(--faith-muted);
+  font-size: 13px;
+}
+.faith-frequency-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 15px;
+}
+.faith-frequency-options button {
+  min-height: 36px;
+  border: 1px solid var(--faith-line);
+  border-radius: 999px;
+  padding: 7px 14px;
+  color: var(--faith-muted);
+  font-size: 12px;
+  font-weight: 550;
+}
+.faith-frequency-options button.is-active {
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 18px rgb(122 244 199 / 0.05);
+}
+.faith-bible-verses ul,
+.faith-bible-history ul {
+  list-style: none;
+}
+.faith-verse {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--faith-line);
+  border-radius: 15px;
+  background: linear-gradient(115deg, var(--faith-panel), rgb(15 19 17 / 0.72));
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  padding: 17px 16px 17px 20px;
+  text-align: left;
+}
+.faith-verse::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: var(--primary);
+  content: "";
+}
+.faith-bible-verses li + li {
+  margin-top: 9px;
+}
+.faith-verse-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.faith-verse-heading strong {
+  flex: 1;
+  font-size: 15px;
+}
+.faith-verse-heading span {
+  color: var(--faith-muted);
+  font-size: 11px;
+}
+.faith-verse-heading svg {
+  width: 16px;
+  color: var(--faith-muted);
+  transition: transform 0.2s ease;
+}
+.faith-verse.is-expanded .faith-verse-heading svg {
+  transform: rotate(90deg);
+}
+.faith-verse-text {
+  margin-top: 9px;
+  color: rgb(239 243 241 / 0.84);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.faith-verse-note,
+.faith-history-reflection {
+  margin-top: 7px;
+  color: var(--faith-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.faith-bible-history h2 {
+  margin-bottom: 11px;
+}
+.faith-bible-history li {
+  border-bottom: 1px solid var(--faith-line);
+}
+.faith-history-row {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  gap: 11px;
+  padding: 7px 4px;
+}
+.faith-history-row strong {
+  min-width: 0;
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+}
+.faith-history-row span {
+  color: var(--faith-muted);
+  font-size: 11px;
+}
+.faith-history-row svg {
+  width: 15px;
+  color: var(--faith-muted);
+}
+.faith-history-reflection {
+  margin: -4px 26px 10px 4px;
+  font-style: italic;
+}
+
+/* Estados compartilhados e modais ---------------------------------------- */
+.faith-empty {
   padding: 16px 0;
   color: var(--faith-muted);
+  font-size: 13px;
+  line-height: 1.6;
 }
 .faith-search {
   display: flex;
-  gap: 8px;
   align-items: center;
-  border: 1px solid var(--faith-border);
-  padding: 10px;
-  border-radius: 12px;
+  gap: 8px;
+  border: 1px solid var(--faith-line);
+  border-radius: 999px;
+  padding: 10px 14px;
 }
 .faith-search input {
   min-width: 0;
@@ -204,14 +667,58 @@
   background: transparent;
   font-size: 13px;
 }
-.faith-records button:focus-visible {
+.faith-module button:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 3px;
 }
-.faith-records button {
-  transition: background-color 0.15s;
+.faith-module button {
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease,
+    color 0.16s ease;
 }
-.faith-quick button:hover,
-.faith-record:hover {
-  background: var(--faith-panel);
+
+@media (max-width: 430px) {
+  .faith-records,
+  .faith-prayers,
+  .faith-bible {
+    gap: 24px;
+  }
+  .faith-capture {
+    min-height: 300px;
+    padding-inline: 15px;
+  }
+  .faith-capture-copy {
+    width: 68%;
+  }
+  .faith-capture h2,
+  .faith-prayer-title-row h2 {
+    font-size: 25px;
+  }
+  .faith-capture-copy > p {
+    font-size: 12px;
+  }
+  .faith-new {
+    min-height: 45px;
+    font-size: 14px;
+  }
+  .faith-prayer-add {
+    width: 50px;
+    height: 50px;
+    flex-basis: 50px;
+  }
+  .faith-bible-hero-copy {
+    width: 64%;
+    padding-left: 17px;
+  }
+  .faith-bible-hero h2 {
+    font-size: 26px;
+  }
+  .faith-heading h2 {
+    font-size: 21px;
+  }
+}
+
+:root[data-theme="light"] .faith-page::before {
+  opacity: 0.55;
 }

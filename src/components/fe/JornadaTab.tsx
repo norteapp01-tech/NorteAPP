@@ -7,7 +7,7 @@ import {
   setReadingFrequency,
   type ReadingFrequency,
 } from "@/lib/fe-store";
-import { Card } from "@/components/sub-agenda-shared";
+import { ArrowRight, ChevronRight } from "lucide-react";
 
 const frequencyOptions: { value: ReadingFrequency; label: string }[] = [
   { value: "2x", label: "2 vezes por semana" },
@@ -26,81 +26,78 @@ export function JornadaTab({ onOpenLogReading }: { onOpenLogReading: () => void 
   const [expandedVerse, setExpandedVerse] = useState<string | null>(null);
 
   return (
-    <div className="space-y-5">
-      <Card title="Minha leitura">
-        {book && progress ? (
-          <>
-            <p className="text-lg font-bold">{book}</p>
-            <p className="text-sm text-muted-foreground">
-              Capítulo atual: {book} {progress.chapter}
-            </p>
-            {progress.total && (
-              <>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {progress.chapter} de {progress.total} capítulos
-                </p>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
-                  <div
-                    className="progress-fill h-full bg-primary"
-                    style={{ width: `${progress.pct}%` }}
-                  />
-                </div>
-              </>
-            )}
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Registre onde sua leitura está acontecendo.
-          </p>
-        )}
-        <button
-          onClick={onOpenLogReading}
-          className="mt-3 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
-        >
-          Registrar leitura
-        </button>
-      </Card>
+    <div className="faith-bible">
+      <section className="faith-bible-hero">
+        <div className="faith-bible-hero-copy">
+          <span className="faith-eyebrow">Minha leitura</span>
+          {book && progress ? (
+            <>
+              <h2>{book}</h2>
+              <p className="faith-bible-current">
+                Capítulo atual: {book} {progress.chapter}
+              </p>
+              {progress.total && (
+                <>
+                  <p className="faith-bible-count">
+                    {progress.chapter} de {progress.total} capítulos
+                  </p>
+                  <div className="faith-bible-progress">
+                    <div className="progress-fill" style={{ width: `${progress.pct}%` }} />
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <p className="faith-bible-empty">Registre onde sua leitura está acontecendo.</p>
+          )}
+          <button onClick={onOpenLogReading} className="faith-bible-log">
+            Registrar leitura <ArrowRight />
+          </button>
+        </div>
+      </section>
 
-      <Card quiet title="Meu ritmo de leitura">
-        <p className="text-xs text-muted-foreground">Quero separar um momento para a Palavra</p>
-        <div className="mt-2 flex flex-wrap gap-1.5">
+      <section className="faith-bible-rhythm">
+        <h2>Meu ritmo de leitura</h2>
+        <p>Quero separar um momento para a Palavra</p>
+        <div className="faith-frequency-options">
           {frequencyOptions.map((o) => (
             <button
               key={o.value}
               onClick={() => setReadingFrequency(o.value)}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${state.readingFrequency === o.value ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
+              className={state.readingFrequency === o.value ? "is-active" : ""}
             >
               {o.label}
             </button>
           ))}
         </div>
-      </Card>
+      </section>
 
-      <Card quiet title="Versículos que quero carregar comigo">
+      <section className="faith-bible-verses">
+        <div className="faith-heading">
+          <h2>Versículos que quero carregar comigo</h2>
+          <span>Ver todos →</span>
+        </div>
         {verses.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhum versículo guardado ainda.</p>
+          <p className="faith-empty">Nenhum versículo guardado ainda.</p>
         ) : (
-          <ul className="space-y-2">
+          <ul>
             {verses.map((v) => {
               const expanded = expandedVerse === v.id;
               return (
                 <li key={v.id}>
                   <button
                     onClick={() => setExpandedVerse(expanded ? null : v.id)}
-                    className="w-full rounded-lg bg-surface-2 p-3 text-left"
+                    className={`faith-verse ${expanded ? "is-expanded" : ""}`}
                   >
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold">{v.verseReference}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {v.createdAt.slice(0, 10).split("-").reverse().join("/")}
-                      </p>
+                    <div className="faith-verse-heading">
+                      <strong>{v.verseReference}</strong>
+                      <span>{v.createdAt.slice(0, 10).split("-").reverse().join("/")}</span>
+                      <ChevronRight />
                     </div>
                     {expanded && (
                       <>
-                        {v.verseText && <p className="mt-1.5 text-sm italic">"{v.verseText}"</p>}
-                        {v.content && (
-                          <p className="mt-1.5 text-xs text-muted-foreground">{v.content}</p>
-                        )}
+                        {v.verseText && <p className="faith-verse-text">{v.verseText}</p>}
+                        {v.content && <p className="faith-verse-note">{v.content}</p>}
                       </>
                     )}
                   </button>
@@ -109,32 +106,30 @@ export function JornadaTab({ onOpenLogReading }: { onOpenLogReading: () => void 
             })}
           </ul>
         )}
-      </Card>
+      </section>
 
-      <Card quiet title="Histórico de leitura">
+      <section className="faith-bible-history">
+        <h2>Histórico de leitura</h2>
         {history.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nada registrado ainda.</p>
+          <p className="faith-empty">Nada registrado ainda.</p>
         ) : (
-          <ul className="space-y-2">
+          <ul>
             {history.slice(0, 12).map((h) => (
-              <li key={h.id} className="rounded-lg bg-surface-2 p-2.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold">
+              <li key={h.id}>
+                <div className="faith-history-row">
+                  <strong>
                     {h.book} {h.chapter}
                     {h.verseRange ? `:${h.verseRange}` : ""}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {h.date.split("-").reverse().join("/")}
-                  </span>
+                  </strong>
+                  <span>{h.date.split("-").reverse().join("/")}</span>
+                  <ChevronRight />
                 </div>
-                {h.reflection && (
-                  <p className="mt-1 text-xs italic text-muted-foreground">"{h.reflection}"</p>
-                )}
+                {h.reflection && <p className="faith-history-reflection">{h.reflection}</p>}
               </li>
             ))}
           </ul>
         )}
-      </Card>
+      </section>
     </div>
   );
 }
