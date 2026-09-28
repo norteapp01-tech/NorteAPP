@@ -60,34 +60,26 @@ export function ResumoTab({
     .slice(0, 4);
 
   return (
-    <div className="space-y-6">
-      <section aria-labelledby="month-reading">
-        <div className="flex items-end justify-between gap-4">
+    <div className="finance-overview">
+      <section className="finance-month-reading" aria-labelledby="month-reading">
+        <div className="finance-month-reading-head">
           <div>
-            <p
-              id="month-reading"
-              className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground"
-            >
+            <p id="month-reading" className="finance-eyebrow">
               Leitura de {monthLabel(month)}
             </p>
-            <p className="mt-1 text-3xl font-bold">{formatBRL(expenses)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">registrados em gastos</p>
+            <p className="finance-month-total">{formatBRL(expenses)}</p>
+            <p className="finance-muted">registrados em gastos</p>
           </div>
-          <button
-            onClick={() => onOpenMovements()}
-            className="norte-secondary-action flex min-h-11 items-center gap-1 text-xs"
-          >
+          <button onClick={() => onOpenMovements()} className="finance-text-link interactive-press">
             Lançamentos <ChevronRight className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="finance-facts mt-4 grid grid-cols-3 gap-2">
+        <div className="finance-facts">
           <Fact label="Entrou" value={income} icon={<ArrowUpRight />} />
           <Fact label="Objetivos" value={directed} icon={<Target />} />
           <Fact label="Sem destino" value={unallocated} icon={<ArrowDownRight />} />
         </div>
-        <p className="mt-2 text-[10px] text-muted-foreground">
-          Valores baseados apenas no que você registrou no Norte.
-        </p>
+        <p className="finance-data-note">Valores baseados apenas no que você registrou no Norte.</p>
       </section>
 
       <Card featured title="Para onde foi seu dinheiro">
@@ -100,15 +92,15 @@ export function ResumoTab({
           </div>
         ) : (
           <>
-            <div className="finance-distribution flex items-center gap-5">
+            <div className="finance-distribution">
               <Donut items={breakdown} selected={selected} onSelect={selectCategory} />
-              <div className="min-w-0 flex-1 space-y-1">
+              <div className="finance-category-list">
                 {breakdown.map((item, index) => (
                   <button
                     key={item.category}
                     onClick={() => selectCategory(item.category)}
                     aria-pressed={selected === item.category}
-                    className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left ${selected === item.category ? "bg-primary/10" : ""}`}
+                    className={`finance-category-row ${selected === item.category ? "is-selected" : ""}`}
                   >
                     <span className="flex min-w-0 items-center gap-2 text-xs font-medium">
                       <span
@@ -123,7 +115,7 @@ export function ResumoTab({
               </div>
             </div>
             <details
-              className="norte-disclosure mt-4 border-t border-border"
+              className="norte-disclosure finance-recent-disclosure"
               open={recentOpen}
               onToggle={(event) => setRecentOpen(event.currentTarget.open)}
             >
@@ -169,8 +161,8 @@ export function ResumoTab({
         )}
       </Card>
 
-      <section>
-        <div className="mb-2 flex items-center justify-between">
+      <section className="finance-goal-preview">
+        <div className="finance-section-heading">
           <h2 className="norte-section-title">Sonhos e objetivos</h2>
           <button onClick={onOpenObjetivos} className="text-xs text-muted-foreground">
             ver todos
@@ -196,12 +188,12 @@ export function ResumoTab({
 
 function Fact({ label, value, icon }: { label: string; value: number; icon: ReactElement }) {
   return (
-    <div className="rounded-xl border border-border bg-surface px-3 py-3">
-      <div className="flex items-center gap-1 text-muted-foreground [&_svg]:h-3 [&_svg]:w-3">
+    <div className="finance-fact">
+      <div className="finance-fact-label">
         {icon}
         <span className="text-[11px] font-medium">{label}</span>
       </div>
-      <p className="mt-1 text-sm font-semibold">{formatBRL(value)}</p>
+      <p>{formatBRL(value)}</p>
     </div>
   );
 }
@@ -282,7 +274,7 @@ function GoalRow({ goal, onClick }: { goal: FinancialGoal; onClick: () => void }
       ? Math.min(100, Math.round((goal.savedAmount / goal.targetAmount) * 100))
       : 0;
   return (
-    <button onClick={onClick} className="card-surface w-full p-4 text-left">
+    <button onClick={onClick} className="finance-goal-row interactive-press">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{goal.name}</p>

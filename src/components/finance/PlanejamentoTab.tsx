@@ -20,21 +20,16 @@ export function PlanejamentoTab() {
   const withoutPlan = objectives.filter((objective) => !objective.planId);
 
   return (
-    <div className="space-y-6">
-      <section>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          Planejamento financeiro
-        </p>
-        <h2 className="mt-1 text-xl font-bold">Transforme um objetivo em caminho</h2>
-        <p className="mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
-          Aqui você inicia e acompanha planos financeiros. Etapas, ações e cronograma continuam no
-          mesmo editor da aba Plano.
-        </p>
+    <div className="finance-planning">
+      <section className="finance-planning-intro">
+        <p className="finance-eyebrow">Planejamento financeiro</p>
+        <h2>Transforme um objetivo em caminho</h2>
+        <p>Etapas, ações e cronograma para tirar seus planos do papel.</p>
       </section>
 
       {rows.length > 0 && (
-        <section className="space-y-2">
-          <h3 className="norte-section-title mb-3">Seus planejamentos</h3>
+        <section className="finance-plans-section">
+          <h3>Seus planejamentos</h3>
           {rows.map(({ plan, objective }) => (
             <PlanRow
               key={plan.id}
@@ -47,11 +42,11 @@ export function PlanejamentoTab() {
         </section>
       )}
 
-      <section className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="norte-section-title mb-3">Começar um planejamento</h3>
+      <section className="finance-start-planning">
+        <div className="finance-section-heading">
+          <h3>Começar um planejamento</h3>
           {withoutPlan.length > 0 && (
-            <span className="text-[10px] text-muted-foreground">
+            <span className="finance-count">
               {withoutPlan.length} objetivo{withoutPlan.length === 1 ? "" : "s"}
             </span>
           )}
@@ -61,18 +56,18 @@ export function PlanejamentoTab() {
             key={objective.id}
             to="/criar"
             search={{ modo: "planejamento", financeGoalId: objective.id }}
-            className="card-surface flex items-center gap-3 p-4"
+            className="finance-objective-plan-row interactive-press"
           >
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-2">
+            <span className="finance-objective-icon">
               <Target className="h-5 w-5 text-muted-foreground" />
             </span>
-            <span className="min-w-0 flex-1">
+            <span className="finance-objective-copy">
               <strong className="block truncate text-sm">{objective.name}</strong>
               <span className="mt-0.5 block text-[11px] text-muted-foreground">
                 Meta de {formatBRL(objective.targetAmount)}
               </span>
             </span>
-            <span className="norte-secondary-action flex items-center gap-1 text-xs">
+            <span className="finance-plan-action">
               Planejar <ArrowRight className="h-3.5 w-3.5" />
             </span>
           </Link>
@@ -80,14 +75,14 @@ export function PlanejamentoTab() {
         <Link
           to="/criar"
           search={{ modo: "planejamento", financialPreset: true }}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-xs font-semibold text-muted-foreground hover:border-primary/50 hover:text-primary"
+          className="finance-create-plan interactive-press"
         >
           <Plus className="h-4 w-4" /> Criar plano financeiro sem objetivo
         </Link>
       </section>
 
       {rows.length === 0 && withoutPlan.length === 0 && (
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="finance-planning-empty">
           <CalendarRange className="h-5 w-5 text-muted-foreground" />
           <p className="mt-3 text-sm font-semibold">Você ainda não tem um objetivo financeiro</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
@@ -118,20 +113,22 @@ function PlanRow({
       ? Math.min(100, Math.round((objective.savedAmount / objective.targetAmount) * 100))
       : null;
   return (
-    <Link to="/objetivo/$id" params={{ id: plan.id }} className="card-surface block p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{plan.title}</p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
+    <Link to="/objetivo/$id" params={{ id: plan.id }} className="finance-plan-card">
+      <div className="finance-plan-card-copy">
+        <div>
+          <p className="finance-plan-title">{plan.title}</p>
+          <p className="finance-plan-meta">
             {planSteps.length} etapa{planSteps.length === 1 ? "" : "s"} · {plan.deadlineLabel}
           </p>
         </div>
-        <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
       </div>
-      <div className="mt-3 space-y-2">
+      <div className="finance-plan-progress">
         <ProgressLine label="Plano" value={progress} />
         {moneyProgress !== null && <ProgressLine label="Valor guardado" value={moneyProgress} />}
       </div>
+      <span className="finance-open-plan">
+        Abrir planejamento <ArrowRight />
+      </span>
     </Link>
   );
 }

@@ -33,8 +33,14 @@ export function MovimentacoesTab({
   }, [initialQuery]);
 
   const normalizedQuery = query.trim().toLowerCase();
-  const filtered = transactions
-    .filter((t) => monthOf(t.date) === month)
+  const monthTransactions = transactions.filter((t) => monthOf(t.date) === month);
+  const monthIncome = monthTransactions
+    .filter((t) => t.type === "income")
+    .reduce((sum, t) => sum + t.amount, 0);
+  const monthExpenses = monthTransactions
+    .filter((t) => t.type === "expense")
+    .reduce((sum, t) => sum + t.amount, 0);
+  const filtered = monthTransactions
     .filter((t) => filter === "all" || t.type === filter)
     .filter(
       (t) =>
@@ -52,18 +58,18 @@ export function MovimentacoesTab({
   const orderedDates = [...groups.keys()].sort((a, b) => b.localeCompare(a));
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2">
+    <div className="finance-records">
+      <div className="finance-search">
         <Search className="h-4 w-4 text-muted-foreground" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Buscar lançamento ou categoria..."
-          className="w-full bg-transparent text-sm outline-none"
+          className="finance-search-input"
         />
       </div>
 
-      <div className="norte-segmented">
+      <div className="norte-segmented finance-record-filters">
         {(
           [
             ["all", "Todos"],
@@ -77,36 +83,37 @@ export function MovimentacoesTab({
         ))}
       </div>
 
+      <div className="finance-record-summary">
+        <span>{monthTransactions.length} lançamentos neste mês</span>
+        <span>
+          Entrou <strong>{formatBRL(monthIncome)}</strong> · Saiu <b>{formatBRL(monthExpenses)}</b>
+        </span>
+      </div>
+
       {orderedDates.length === 0 && (
         <p className="py-8 text-center text-sm text-muted-foreground">Nada por aqui ainda.</p>
       )}
 
       {orderedDates.map((date) => (
-        <div key={date}>
-          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            {dayLabel(date)}
-          </p>
-          <div className="card-surface p-4">
-            <ul className="divide-y divide-border">
+        <section key={date} className="finance-record-group">
+          <p className="finance-record-date">{dayLabel(date)}</p>
+          <div className="finance-record-list">
+            <ul>
               {groups.get(date)!.map((t) => (
-                <li
-                  key={t.id}
-                  className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{t.description}</p>
-                    <p className="text-[11px] text-muted-foreground">{t.category}</p>
+                <li key={t.id} className="finance-record-row">
+                  <span className={`finance-record-icon finance-record-icon--${t.type}`} />
+                  <div className="finance-record-copy">
+                    <p>{t.description}</p>
+                    <span>{t.category}</span>
                   </div>
-                  <span
-                    className={`shrink-0 text-sm font-bold ${t.type === "income" ? "text-success" : "text-danger"}`}
-                  >
+                  <span className={`finance-record-value finance-record-value--${t.type}`}>
                     {t.type === "income" ? "+" : "−"} {formatBRL(t.amount)}
                   </span>
                 </li>
               ))}
             </ul>
           </div>
-        </div>
+        </section>
       ))}
     </div>
   );

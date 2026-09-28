@@ -7,6 +7,7 @@ import { ObjetivosTab } from "./ObjetivosTab";
 import { PlanejamentoTab } from "./PlanejamentoTab";
 import { QuickAddSheet } from "./QuickAddSheet";
 import { UnderlineTabs } from "@/components/ui/app-design-system";
+import "./finance.css";
 
 type Tab = "resumo" | "movimentacoes" | "planejamento" | "objetivos";
 const tabs: { key: Tab; label: string }[] = [
@@ -28,20 +29,17 @@ export function FinancasModule() {
   };
 
   return (
-    <div className="finance-module relative mt-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1">
+    <div className="finance-module">
+      <div className="finance-toolbar">
+        <div className="finance-month-picker">
           <button
             aria-label="Mês anterior"
             onClick={() => setMonth((m) => addMonths(m, -1))}
-            className="grid h-11 w-11 place-items-center text-muted-foreground"
+            className="interactive-press"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span
-            className="whitespace-nowrap text-center text-xs font-semibold"
-            title={monthLabel(month)}
-          >
+          <span className="finance-month-label" title={monthLabel(month)}>
             {new Intl.DateTimeFormat("pt-BR", { month: "short", year: "numeric" })
               .format(new Date(month + "-01T12:00:00"))
               .replace(" de ", " ")}
@@ -49,22 +47,22 @@ export function FinancasModule() {
           <button
             aria-label="Próximo mês"
             onClick={() => setMonth((m) => addMonths(m, 1))}
-            className="grid h-11 w-11 place-items-center text-muted-foreground"
+            className="interactive-press"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
         <button
           onClick={() => setQuickAddOpen(true)}
-          className="flex items-center gap-1 rounded-full border border-primary/50 px-3 py-1.5 text-xs font-semibold text-primary"
+          className="finance-register interactive-press"
         >
           <Plus className="h-3.5 w-3.5" /> Registrar
         </button>
       </div>
 
-      <UnderlineTabs items={tabs} value={tab} onChange={setTab} className="mt-3" />
+      <UnderlineTabs items={tabs} value={tab} onChange={setTab} className="finance-tabs" />
 
-      <div className="mt-5 pb-4">
+      <div className="finance-tab-content">
         {tab === "resumo" && (
           <ResumoTab
             month={month}

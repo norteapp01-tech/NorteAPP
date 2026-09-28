@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent } from "react";
-import { Plus, Trash2, Image as ImageIcon } from "lucide-react";
+import { Plus, Trash2, Image as ImageIcon, ArrowRightLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { Modal } from "@/components/ui/modal";
 import {
@@ -16,24 +16,50 @@ import {
 import { createGoal } from "@/lib/goals-store";
 
 export function ObjetivosTab() {
-  const goals = useFinanceStore((s) => s.goals);
+  const state = useFinanceStore((s) => s);
+  const goals = state.goals;
   const [openGoalId, setOpenGoalId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const savedTotal = goals.reduce((sum, goal) => sum + goal.savedAmount, 0);
+  const latestContribution = [...state.contributions].sort((a, b) =>
+    b.date.localeCompare(a.date),
+  )[0];
 
   return (
-    <div>
-      <div className="grid grid-cols-2 gap-3">
+    <div className="finance-goals">
+      <div className="finance-goals-heading">
+        <div>
+          <h2>Sonhos e objetivos</h2>
+          <p>Dê um destino ao que você guarda.</p>
+        </div>
+        <p>
+          <strong>{formatBRL(savedTotal)}</strong>
+          <span>guardados</span>
+        </p>
+      </div>
+      <div className="finance-goal-grid">
         {goals.map((g) => (
           <GoalCard key={g.id} goal={g} onClick={() => setOpenGoalId(g.id)} />
         ))}
-        <button
-          onClick={() => setCreating(true)}
-          className="flex min-h-32 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-xs text-muted-foreground hover:border-primary/40 hover:text-primary"
-        >
-          <Plus className="h-5 w-5" />
-          novo objetivo
-        </button>
       </div>
+
+      <button onClick={() => setCreating(true)} className="finance-new-goal interactive-press">
+        <Plus /> Novo objetivo
+      </button>
+
+      {latestContribution && (
+        <button
+          onClick={() => setOpenGoalId(latestContribution.goalId)}
+          className="finance-contributions-link interactive-press"
+        >
+          <ArrowRightLeft />
+          <span>
+            <strong>Aportes recentes</strong>
+            <small>Veja seus últimos aportes nos objetivos.</small>
+          </span>
+          <ChevronRight />
+        </button>
+      )}
 
       {goals.length === 0 && (
         <p className="mt-3 text-sm text-muted-foreground">
@@ -54,26 +80,29 @@ function GoalCard({ goal, onClick }: { goal: FinancialGoal; onClick: () => void 
       ? Math.min(100, Math.round((goal.savedAmount / goal.targetAmount) * 100))
       : 0;
   return (
-    <button
-      onClick={onClick}
-      className="card-surface flex flex-col overflow-hidden p-0 text-left hover:border-primary/40"
-    >
-      <div className="flex h-20 items-center justify-center bg-surface-2">
+    <button onClick={onClick} className="finance-goal-card interactive-press">
+      <div className="finance-goal-image">
         {goal.imageUrl ? (
           <img src={goal.imageUrl} alt={goal.name} className="h-full w-full object-cover" />
         ) : (
-          <ImageIcon className="h-6 w-6 text-muted-foreground/50" />
+          <ImageIcon />
         )}
       </div>
-      <div className="p-3">
-        <p className="truncate text-sm font-semibold">{goal.name}</p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">
+      <div className="finance-goal-card-copy">
+        <div className="finance-goal-card-title">
+          <p>{goal.name}</p>
+          <strong>{pct}%</strong>
+        </div>
+        <p className="finance-goal-amount">
           {formatBRL(goal.savedAmount)} / {formatBRL(goal.targetAmount)}
         </p>
-        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-2">
+        <div className="finance-goal-progress">
           <div className="progress-fill h-full bg-primary" style={{ width: `${pct}%` }} />
         </div>
-        <p className="mt-1 text-[10px] text-primary">{pct}%</p>
+        <p className="finance-goal-deadline">
+          {goal.deadline ? `até ${goal.deadline.split("-").reverse().join("/")}` : "sem prazo"}
+          <ChevronRight />
+        </p>
       </div>
     </button>
   );
