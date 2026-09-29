@@ -97,35 +97,6 @@
   content: "";
 }
 
-/* Animação de "entrega" ao tocar o microfone — o morph da referência 60fps,
- * adaptado: o botão cresce (o ponto de partida do que vira a conversa) e o
- * texto/ondinhas/teclado ao lado somem, com easing de mola (--ease-spring).
- * O dock some da árvore logo em seguida (o pai monta o sheet do chat), mas
- * o começo do movimento já é visível no primeiro frame. */
-.norte-voice-dock.is-activating .norte-voice-mic {
-  transform: scale(1.18);
-  transition: transform 220ms var(--ease-spring);
-}
-
-.norte-voice-dock.is-activating .norte-voice-copy,
-.norte-voice-dock.is-activating .norte-voice-wave,
-.norte-voice-dock.is-activating .norte-voice-keyboard {
-  opacity: 0;
-  transform: scale(0.85);
-  transition:
-    opacity 180ms var(--ease-spring),
-    transform 180ms var(--ease-spring);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .norte-voice-dock.is-activating .norte-voice-mic,
-  .norte-voice-dock.is-activating .norte-voice-copy,
-  .norte-voice-dock.is-activating .norte-voice-wave,
-  .norte-voice-dock.is-activating .norte-voice-keyboard {
-    transition-duration: 1ms;
-  }
-}
-
 .norte-voice-wave {
   display: flex;
   height: 42px;
@@ -171,6 +142,21 @@
     transform: scaleY(1);
     opacity: 1;
   }
+}
+
+.norte-global-chat {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  overflow-y: auto;
+  background: var(--background);
+}
+
+.norte-global-chat > section {
+  width: min(100%, 448px);
+  min-height: 100dvh;
+  margin-inline: auto;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .norte-functions-layer {

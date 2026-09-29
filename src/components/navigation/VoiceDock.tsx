@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Keyboard, Mic } from "lucide-react";
 
 function Waveform({ reverse = false }: { reverse?: boolean }) {
@@ -19,20 +18,8 @@ export function VoiceDock({
   onVoice: () => void;
   onKeyboard: () => void;
 }) {
-  // Animação de "entrega" ao tocar o microfone: o botão cresce e os
-  // elementos ao lado somem — o morph da referência, adaptado (aqui não há
-  // um passo de pill-de-status pra virar botão; o próprio botão já É o
-  // ponto de partida). Dispara junto com onVoice, sem atraso artificial —
-  // o dock some da árvore quase junto (voiceChatOpen vira true no pai), mas
-  // o começo do movimento já fica visível no primeiro frame.
-  const [activating, setActivating] = useState(false);
-
   return (
-    <div
-      className={`norte-voice-dock ${activating ? "is-activating" : ""}`}
-      role="group"
-      aria-label="Conversa com o Norte"
-    >
+    <div className="norte-voice-dock" role="group" aria-label="Conversa com o Norte">
       <button
         type="button"
         onClick={onKeyboard}
@@ -46,10 +33,7 @@ export function VoiceDock({
 
       <button
         type="button"
-        onClick={() => {
-          setActivating(true);
-          onVoice();
-        }}
+        onClick={onVoice}
         className="norte-voice-mic interactive-press"
         aria-label="Conversar por voz com o Norte"
       >

@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
  * acontecendo. */
 const EXIT_FALLBACK_MS = 400;
 
-export function useExitBeforeUnmount(onClose: () => void) {
+function useExitBeforeUnmount(onClose: () => void) {
   const [open, setOpen] = useState(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -194,54 +194,6 @@ export function FullScreenSheet({
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-8">
             {children}
-          </div>
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
-  );
-}
-
-/**
- * Reveal do chat do Norte — deliberadamente NÃO é tela cheia. Diferente do
- * `FullScreenSheet` (que cobre `inset-0`, sem deixar nada visível atrás), o
- * painel aqui fica ancorado embaixo com um respiro no topo: é esse respiro
- * que deixa a tela anterior visível, escurecida e borrada, por trás — a
- * sensação de "ativei uma função por cima", não "naveguei pra outra
- * página". Conteúdo já traz o próprio cabeçalho (o `NorteChat`), por isso
- * não há chevron/título visível aqui — só um título para leitor de tela,
- * como o Radix exige.
- */
-export function VoiceRevealSheet({
-  onClose,
-  title,
-  children,
-}: {
-  onClose: () => void;
-  title: string;
-  children: (requestClose: () => void) => ReactNode;
-}) {
-  const { open, requestClose, onAnimationEnd } = useExitBeforeUnmount(onClose);
-
-  return (
-    <DialogPrimitive.Root
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) requestClose();
-      }}
-    >
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/72 backdrop-blur-[8px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
-        <DialogPrimitive.Content
-          onAnimationEnd={onAnimationEnd}
-          className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-w-md flex-col rounded-t-[28px] border-t border-border bg-surface shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom data-[state=open]:duration-[380ms] data-[state=open]:ease-(--ease-spring) data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=closed]:duration-(--dur-state)"
-          style={{
-            top: "max(64px, calc(env(safe-area-inset-top) + 40px))",
-            paddingBottom: "env(safe-area-inset-bottom)",
-          }}
-        >
-          <DialogPrimitive.Title className="sr-only">{title}</DialogPrimitive.Title>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-            {children(requestClose)}
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

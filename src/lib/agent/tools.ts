@@ -17,16 +17,12 @@ import {
 import {
   addTransaction,
   correctTransaction,
-  removeTransaction,
   fetchState as fetchFinanceState,
   totalsForMonth,
   categoryBreakdown,
   currentMonth,
   formatBRL,
   FINANCE_CATEGORIES,
-  addFinancialGoal,
-  updateFinancialGoal,
-  contributeToGoal,
 } from "../finance-store";
 import {
   fetchState as fetchGoalsState,
@@ -37,9 +33,6 @@ import {
   updateAgendaSession,
   createGoal,
   addSubtask,
-  addStep,
-  toggleStep,
-  updateGoalDeadline,
   todayISO,
 } from "../goals-store";
 import {
@@ -71,30 +64,10 @@ import {
   removeExercise,
   setWeeklyAssignment,
 } from "../workout-store";
-import {
-  fetchState as fetchReadingState,
-  addNote as addReadingNote,
-  addBookManual,
-  quickAddWantToRead,
-  updateProgress,
-  startReading,
-  pauseBook,
-  resumeBook,
-  completeBook,
-} from "../reading-store";
+import { fetchState as fetchReadingState, addNote as addReadingNote } from "../reading-store";
 import { fetchState as fetchFeState, addNotebookEntry } from "../fe-store";
 import { captureToInbox } from "./inbox-store";
-import {
-  fetchState as fetchNutritionState,
-  confirmMealOption,
-  confirmMealCustom,
-  addMeal,
-  updateMeal,
-  removeMeal,
-  addMealOption,
-  setDailyGoals,
-} from "../nutrition-store";
-import { createManualActivity, fetchActivities } from "../sport-store";
+import { fetchState as fetchNutritionState, confirmMealOption } from "../nutrition-store";
 import {
   fetchCycleState,
   createCycle,
@@ -136,13 +109,13 @@ export const AGENT_TOOLS = [
     function: {
       name: "consultar_rotina",
       description:
-        "Consulta dados reais de alimentação (momentos e opções com IDs), leitura, fé, planos, academia (treinos/exercícios/dias da semana com IDs) ou esportes (atividades registradas). Consulte antes de escolher IDs. Não retorne IDs internos na mensagem ao usuário.",
+        "Consulta dados reais de alimentação (momentos e opções com IDs), leitura, fé, planos ou academia (treinos/exercícios/dias da semana com IDs). Consulte antes de escolher IDs. Não retorne IDs internos na mensagem ao usuário.",
       parameters: {
         type: "object",
         properties: {
           area: {
             type: "string",
-            enum: ["alimentacao", "leitura", "fe", "planos", "academia", "esportes"],
+            enum: ["alimentacao", "leitura", "fe", "planos", "academia"],
           },
         },
         required: ["area"],
@@ -246,7 +219,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "consultar_financas",
       description:
-        "Consulta o relatório financeiro do mês atual (total gasto, por categoria, saldo), as metas financeiras (com id) e as transações de hoje (com id, pra corrigir/remover).",
+        "Consulta o relatório financeiro do mês atual — total gasto, por categoria, e saldo.",
       parameters: { type: "object", properties: {} },
     },
   },
@@ -673,223 +646,6 @@ export const AGENT_TOOLS = [
   {
     type: "function" as const,
     function: {
-      name: "gerenciar_refeicao",
-      description:
-        "Cria, edita ou remove uma refeição do plano alimentar (ex.: 'Café da manhã'), com opções (ex.: 'Ovos mexidos com pão'). Consulte consultar_rotina area=alimentacao antes de editar/remover pra ter o mealId. Ação reversível.",
-      parameters: {
-        type: "object",
-        properties: {
-          action: { type: "string", enum: ["criar", "editar", "remover"] },
-          mealId: { type: "string", description: "Obrigatório para editar/remover" },
-          time: { type: "string", description: "HH:MM. Obrigatório para criar" },
-          name: { type: "string", description: "Ex.: 'Café da manhã'. Obrigatório para criar" },
-          weekdays: {
-            type: "array",
-            items: { type: "number" },
-            description: "0=domingo...6=sábado. Vazio/omitido = todo dia",
-          },
-          options: {
-            type: "array",
-            description:
-              "Opções da refeição — em criar, pelo menos 1; em editar, opções ADICIONADAS",
-            items: {
-              type: "object",
-              properties: {
-                description: { type: "string" },
-                protein: { type: "number" },
-                carbs: { type: "number" },
-                fat: { type: "number" },
-                calories: { type: "number" },
-              },
-              required: ["description"],
-            },
-          },
-        },
-        required: ["action"],
-      },
-    },
-  },
-  {
-    type: "function" as const,
-    function: {
-      name: "atualizar_meta_diaria",
-      description:
-        "Atualiza a meta diária de calorias/macros. Só muda os campos informados, mantém o resto como está.",
-      parameters: {
-        type: "object",
-        properties: {
-          calories: { type: "number" },
-          protein: { type: "number" },
-          carbs: { type: "number" },
-          fat: { type: "number" },
-        },
-      },
-    },
-  },
-  {
-    type: "function" as const,
-    function: {
-      name: "registrar_refeicao_livre",
-      description:
-        "Registra o consumo de algo que NÃO estava pré-cadastrado no plano (ex.: 'comi uma pizza no jantar'). Consulte consultar_rotina area=alimentacao pro mealId do momento certo (café da manhã, almoço...). Macros só se a pessoa informar — nunca invente.",
-      parameters: {
-        type: "object",
-        properties: {
-          mealId: { type: "string" },
-          description: { type: "string" },
-          protein: { type: "number" },
-          carbs: { type: "number" },
-          fat: { type: "number" },
-          calories: { type: "number" },
-        },
-        required: ["mealId", "description"],
-      },
-    },
-  },
-  {
-    type: "function" as const,
-    function: {
-      name: "adicionar_livro",
-      description:
-        "Adiciona um livro à biblioteca — pra já começar a ler agora, ou só pra lista de 'quero ler'. Sem muitos detalhes: infira o resto (formato físico, progresso por página) e não pergunte o que não for essencial.",
-      parameters: {
-        type: "object",
-        properties: {
-          title: { type: "string" },
-          authors: { type: "array", items: { type: "string" } },
-          status: { type: "string", enum: ["reading", "want_to_read"] },
-          format: { type: "string", enum: ["physical", "ebook", "audiobook"] },
-          progressMode: { type: "string", enum: ["pages", "percentage", "time"] },
-          totalPages: { type: "number" },
-        },
-        required: ["title", "status"],
-      },
-    },
-  },
-  {
-    type: "function" as const,
-    function: {
-      name: "atualizar_progresso_leitura",
-      description:
-        "Atualiza o progresso de leitura pro valor absoluto informado (não é soma). A unidade depende do progressMode do livro (página, %, minutos) — consulte consultar_rotina area=leitura antes.",
-      parameters: {
-        type: "object",
-        properties: {
-          bookId: { type: "string" },
-          newValue: { type: "number" },
-        },
-        required: ["bookId", "newValue"],
-      },
-    },
-  },
-  {
-    type: "function" as const,
-    function: {
-      name: "mudar_status_livro",
-      description:
-        "Muda o status de um livro: começar a ler, pausar, retomar, ou marcar como concluído.",
-      parameters: {
-        type: "object",
-        properties: {
-          bookId: { type: "string" },
-          status: { type: "string", enum: ["reading", "paused", "completed"] },
-          rating: { type: "number", description: "1 a 5, só se status=completed" },
-        },
-        required: ["bookId", "status"],
-      },
-    },
-  },
-  {
-    type: "function" as const,
-    function: {
-      name: "registrar_atividade_esportiva",
-      description:
-        "Registra uma atividade esportiva já feita (corrida, caminhada ou ciclismo) lançada manualmente — não é uma gravação por GPS.",
-      parameters: {
-        type: "object",
-        properties: {
-          modality: { type: "string", enum: ["corrida", "caminhada", "ciclismo"] },
-          title: { type: "string" },
-          distanceKm: { type: "number" },
-          durationMinutes: { type: "number" },
-          date: { type: "string", description: "YYYY-MM-DD, padrão hoje" },
-          time: { type: "string", description: "HH:MM, padrão agora" },
-        },
-        required: ["modality", "title", "distanceKm", "durationMinutes"],
-      },
-    },
-  },
-  {
-    type: "function" as const,
-    function: {
-      name: "gerenciar_meta_financeira",
-      description:
-        "Cria ou edita uma meta financeira (ex.: 'Viagem', 'Reserva de emergência'). Consulte consultar_financas pro goalId antes de editar.",
-      parameters: {
-        type: "object",
-        properties: {
-          action: { type: "string", enum: ["criar", "editar"] },
-          goalId: { type: "string", description: "Obrigatório para editar" },
-          name: { type: "string" },
-          targetAmount: { type: "number" },
-          deadline: { type: "string", description: "YYYY-MM-DD" },
-        },
-        required: ["action"],
-      },
-    },
-  },
-  {
-    type: "function" as const,
-    function: {
-      name: "contribuir_meta_financeira",
-      description: "Adiciona um valor ao quanto já foi guardado numa meta financeira.",
-      parameters: {
-        type: "object",
-        properties: {
-          goalId: { type: "string" },
-          amount: { type: "number" },
-          note: { type: "string" },
-        },
-        required: ["goalId", "amount"],
-      },
-    },
-  },
-  {
-    type: "function" as const,
-    function: {
-      name: "remover_transacao",
-      description:
-        "Remove uma transação financeira — só permite remover lançamentos de HOJE, por segurança (histórico antigo não pode ser apagado por chat).",
-      parameters: {
-        type: "object",
-        properties: { transactionId: { type: "string" } },
-        required: ["transactionId"],
-      },
-    },
-  },
-  {
-    type: "function" as const,
-    function: {
-      name: "atualizar_plano",
-      description:
-        "Adiciona uma etapa, conclui/reabre uma etapa, ou muda o prazo final de um plano/objetivo já existente. Consulte consultar_rotina area=planos pro goalId/stepId.",
-      parameters: {
-        type: "object",
-        properties: {
-          action: { type: "string", enum: ["adicionar_etapa", "concluir_etapa", "mudar_prazo"] },
-          goalId: { type: "string" },
-          stepId: { type: "string", description: "Obrigatório para concluir_etapa" },
-          title: { type: "string", description: "Obrigatório para adicionar_etapa" },
-          targetDate: { type: "string", description: "YYYY-MM-DD, opcional em adicionar_etapa" },
-          deadlineISO: { type: "string", description: "YYYY-MM-DD, obrigatório para mudar_prazo" },
-        },
-        required: ["action", "goalId"],
-      },
-    },
-  },
-  {
-    type: "function" as const,
-    function: {
       name: "salvar_nota_leitura",
       description:
         "Salva uma citação, insight ou nota vinculada a um livro que a pessoa está lendo. Use o título do livro como a pessoa falou.",
@@ -967,9 +723,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
               ? await fetchFeState()
               : args.area === "academia"
                 ? await fetchWorkoutState()
-                : args.area === "esportes"
-                  ? await fetchActivities()
-                  : await fetchGoalsState();
+                : await fetchGoalsState();
       return JSON.stringify(state);
     }
     case "registrar_refeicao": {
@@ -1089,20 +843,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
         .slice(0, 5)
         .map((c) => `${c.category}: ${formatBRL(c.amount)}`)
         .join(", ");
-      const today = todayISO();
-      return JSON.stringify({
-        summary: `Este mês: receitas ${formatBRL(totals.income)}, gastos ${formatBRL(totals.expenses)}. Por categoria: ${breakdown || "nada ainda"}.`,
-        metasFinanceiras: state.goals.map((g) => ({
-          id: g.id,
-          name: g.name,
-          targetAmount: g.targetAmount,
-          savedAmount: g.savedAmount,
-        })),
-        // Só as de hoje — remover_transacao só permite apagar lançamentos do dia.
-        transacoesDeHoje: state.transactions
-          .filter((t) => t.date === today)
-          .map((t) => ({ id: t.id, description: t.description, amount: t.amount, type: t.type })),
-      });
+      return `Este mês: receitas ${formatBRL(totals.income)}, gastos ${formatBRL(totals.expenses)}. Por categoria: ${breakdown || "nada ainda"}.`;
     }
 
     case "consultar_dia": {
@@ -1523,182 +1264,6 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
       if (!cycle) return "Nenhum ciclo de treino ativo pra encerrar.";
       await endCycle(cycle, args.restoreWeekly !== false);
       return `Ciclo "${cycle.name}" encerrado.`;
-    }
-
-    case "gerenciar_refeicao": {
-      const action = args.action as "criar" | "editar" | "remover";
-      type OptionInput = {
-        description: string;
-        protein?: number;
-        carbs?: number;
-        fat?: number;
-        calories?: number;
-      };
-      if (action === "remover") {
-        await removeMeal(args.mealId as string);
-        return `Refeição removida (junto com suas opções e registros).`;
-      }
-      if (action === "criar") {
-        const mealId = await addMeal({
-          time: args.time as string,
-          name: args.name as string,
-          weekdays: args.weekdays as number[] | undefined,
-        });
-        for (const opt of (args.options as OptionInput[]) ?? []) await addMealOption(mealId, opt);
-        return `Refeição "${args.name}" criada com ${((args.options as OptionInput[]) ?? []).length} opção(ões).`;
-      }
-      // editar
-      const patch: { time?: string; name?: string; weekdays?: number[] } = {};
-      if (args.time !== undefined) patch.time = args.time as string;
-      if (args.name !== undefined) patch.name = args.name as string;
-      if (args.weekdays !== undefined) patch.weekdays = args.weekdays as number[];
-      if (Object.keys(patch).length > 0) await updateMeal(args.mealId as string, patch);
-      let added = 0;
-      for (const opt of (args.options as OptionInput[]) ?? []) {
-        await addMealOption(args.mealId as string, opt);
-        added++;
-      }
-      return `Refeição atualizada${added ? `, ${added} opção(ões) adicionada(s)` : ""}.`;
-    }
-
-    case "atualizar_meta_diaria": {
-      const state = await fetchNutritionState();
-      await setDailyGoals({
-        calories: (args.calories as number | undefined) ?? state.goals.calories,
-        protein: (args.protein as number | undefined) ?? state.goals.protein,
-        carbs: (args.carbs as number | undefined) ?? state.goals.carbs,
-        fat: (args.fat as number | undefined) ?? state.goals.fat,
-      });
-      return `Meta diária atualizada.`;
-    }
-
-    case "registrar_refeicao_livre": {
-      await confirmMealCustom(args.mealId as string, args.description as string, {
-        protein: args.protein as number | undefined,
-        carbs: args.carbs as number | undefined,
-        fat: args.fat as number | undefined,
-        calories: args.calories as number | undefined,
-      });
-      return `Registrado: "${args.description}".`;
-    }
-
-    case "adicionar_livro": {
-      const status = args.status as "reading" | "want_to_read";
-      if (status === "want_to_read" && !args.format && !args.progressMode && !args.totalPages) {
-        await quickAddWantToRead(args.title as string);
-        return `"${args.title}" adicionado à lista de quero ler.`;
-      }
-      await addBookManual({
-        title: args.title as string,
-        authors: args.authors as string[] | undefined,
-        status,
-        format: (args.format as "physical" | "ebook" | "audiobook" | undefined) ?? "physical",
-        progressMode: args.progressMode as "pages" | "percentage" | "time" | undefined,
-        totalPages: args.totalPages as number | undefined,
-      });
-      return `"${args.title}" adicionado à biblioteca${status === "reading" ? ", já como leitura atual" : ""}.`;
-    }
-
-    case "atualizar_progresso_leitura": {
-      const result = await updateProgress(args.bookId as string, args.newValue as number);
-      if (!result.ok)
-        throw new Error(
-          result.needsConfirmation
-            ? "Isso diminuiria o progresso já registrado — confirme com a pessoa antes de tentar de novo."
-            : (result.error ?? "Não foi possível atualizar o progresso."),
-        );
-      return result.completed ? `Progresso atualizado — livro concluído!` : `Progresso atualizado.`;
-    }
-
-    case "mudar_status_livro": {
-      const state = await fetchReadingState();
-      const book = state.books.find((b) => b.id === args.bookId);
-      if (!book) throw new Error("Livro não encontrado. Consulte consultar_rotina de novo.");
-      const status = args.status as "reading" | "paused" | "completed";
-      if (status === "paused") await pauseBook(book.id);
-      else if (status === "completed")
-        await completeBook(book.id, { rating: args.rating as number | undefined });
-      else if (book.status === "paused") await resumeBook(book.id, { recalcPlan: false });
-      else await startReading(book.id);
-      return `"${book.title}" agora está ${status === "reading" ? "em leitura" : status === "paused" ? "pausado" : "concluído"}.`;
-    }
-
-    case "registrar_atividade_esportiva": {
-      const zone = effectiveTimeZone();
-      const date = (args.date as string | undefined) ?? todayISO();
-      const time = (args.time as string | undefined) ?? dateAndTimeInZone(new Date(), zone).time;
-      const startedAt = zonedTimeToUtcISO(date, time, zone);
-      await createManualActivity({
-        modality: args.modality as "corrida" | "caminhada" | "ciclismo",
-        title: args.title as string,
-        startedAt,
-        distanceM: (args.distanceKm as number) * 1000,
-        totalDurationS: Math.round((args.durationMinutes as number) * 60),
-      });
-      return `Atividade "${args.title}" registrada: ${args.distanceKm}km em ${args.durationMinutes}min.`;
-    }
-
-    case "gerenciar_meta_financeira": {
-      const action = args.action as "criar" | "editar";
-      if (action === "criar") {
-        await addFinancialGoal({
-          name: args.name as string,
-          targetAmount: args.targetAmount as number,
-          deadline: args.deadline as string | undefined,
-        });
-        return `Meta "${args.name}" criada.`;
-      }
-      await updateFinancialGoal(args.goalId as string, {
-        name: args.name as string | undefined,
-        targetAmount: args.targetAmount as number | undefined,
-        deadline: args.deadline as string | undefined,
-      });
-      return `Meta atualizada.`;
-    }
-
-    case "contribuir_meta_financeira": {
-      await contributeToGoal(
-        args.goalId as string,
-        args.amount as number,
-        args.note as string | undefined,
-      );
-      return `Adicionado à meta.`;
-    }
-
-    case "remover_transacao": {
-      const state = await fetchFinanceState();
-      const txn = state.transactions.find((t) => t.id === args.transactionId);
-      if (!txn) throw new Error("Transação não encontrada. Consulte consultar_financas de novo.");
-      if (txn.date !== todayISO())
-        throw new Error(
-          "Só posso remover uma transação lançada hoje. Peça pra pessoa remover manualmente uma mais antiga.",
-        );
-      await removeTransaction(txn.id);
-      return `Transação removida.`;
-    }
-
-    case "atualizar_plano": {
-      const action = args.action as "adicionar_etapa" | "concluir_etapa" | "mudar_prazo";
-      if (action === "adicionar_etapa") {
-        await addStep(
-          args.goalId as string,
-          args.title as string,
-          args.targetDate as string | undefined,
-        );
-        return `Etapa "${args.title}" adicionada.`;
-      }
-      if (action === "mudar_prazo") {
-        await updateGoalDeadline(args.goalId as string, args.deadlineISO as string);
-        return `Prazo atualizado.`;
-      }
-      // concluir_etapa — lê o estado real do passo em vez de confiar no que o
-      // modelo supõe, porque toggleStep inverte o valor recebido: um done
-      // errado marcaria concluído o que já estava, ou reabriria por engano.
-      const state = await fetchGoalsState();
-      const step = state.steps.find((s) => s.id === args.stepId);
-      if (!step) throw new Error("Etapa não encontrada. Consulte consultar_rotina area=planos.");
-      await toggleStep(step.id, step.done);
-      return step.done ? `Etapa reaberta.` : `Etapa concluída.`;
     }
 
     case "salvar_nota_leitura": {

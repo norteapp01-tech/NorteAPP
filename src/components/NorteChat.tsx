@@ -6,27 +6,6 @@ import { useSupabaseUserId, getAccessToken } from "@/lib/supabase/client";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { AppMenuButton, DawnMark } from "@/components/ui/app-design-system";
 import { AgentCard, parseCard, type CardData } from "./AgentCard";
-import { useMicWaveform } from "@/lib/use-mic-waveform";
-
-/** Barras com a amplitude REAL do microfone (useMicWaveform) — nada de CSS
- * em loop fingindo reagir à voz. */
-function LiveWaveform({ levels }: { levels: number[] }) {
-  return (
-    <div
-      className="flex h-12 items-center justify-center gap-[3px]"
-      role="img"
-      aria-label="Gravando"
-    >
-      {levels.map((level, i) => (
-        <span
-          key={i}
-          className="w-1 rounded-full bg-primary"
-          style={{ height: `${8 + level * 40}px`, transition: "height 80ms linear" }}
-        />
-      ))}
-    </div>
-  );
-}
 
 const labels: Record<string, [string, string]> = {
   criar_plano: ["Planejamento", "/planejamento"],
@@ -38,17 +17,6 @@ const labels: Record<string, [string, string]> = {
   registrar_refeicao: ["Confirmar refeição", "/sub-agenda/alimentacao"],
   criar_lembrete: ["Lembrete", "/agenda"],
   gerenciar_lembrete: ["Lembrete", "/agenda"],
-  gerenciar_refeicao: ["Plano alimentar", "/sub-agenda/alimentacao"],
-  atualizar_meta_diaria: ["Metas diárias", "/sub-agenda/alimentacao"],
-  registrar_refeicao_livre: ["Refeição registrada", "/sub-agenda/alimentacao"],
-  adicionar_livro: ["Biblioteca", "/sub-agenda/leitura"],
-  atualizar_progresso_leitura: ["Progresso de leitura", "/sub-agenda/leitura"],
-  mudar_status_livro: ["Biblioteca", "/sub-agenda/leitura"],
-  registrar_atividade_esportiva: ["Atividade registrada", "/sub-agenda/esportes"],
-  gerenciar_meta_financeira: ["Meta financeira", "/sub-agenda/financas"],
-  contribuir_meta_financeira: ["Meta financeira", "/sub-agenda/financas"],
-  remover_transacao: ["Movimentação", "/sub-agenda/financas"],
-  atualizar_plano: ["Planejamento", "/planejamento"],
 };
 function domain(name: string, area?: unknown): [string, string] {
   if (labels[name]) return labels[name];
@@ -81,16 +49,6 @@ function cycleProposalCard(args: Record<string, unknown>): CardData {
       title: b.name,
       actions: (b.plans ?? []).map((p) => `${p.letter}: ${p.name}`),
     })),
-  };
-}
-type MealOptionArg = { description: string };
-function mealProposalCard(args: Record<string, unknown>): CardData {
-  const options = (args.options as MealOptionArg[] | undefined) ?? [];
-  return {
-    card: "plan",
-    title: String(args.name ?? "Refeição"),
-    deadlineLabel: args.time ? String(args.time) : "Sem horário",
-    steps: [{ title: "Opções", actions: options.map((o) => o.description) }],
   };
 }
 const fieldLabels: Record<string, string> = {
@@ -151,10 +109,6 @@ export function NorteChat({
   const successfulReplies = useRef(0);
   const nearBottom = useRef(true);
   const [unreadBelow, setUnreadBelow] = useState(false);
-  // streamRef já existe no momento em que `recording` vira true (é setado
-  // antes de setRecording na mesma função) — ler .current aqui no render
-  // pega o stream certo, sem precisar duplicar em estado React.
-  const waveformLevels = useMicWaveform(recording, recording ? streamRef.current : null);
 
   const scrollToBottom = () => {
     bottom.current?.scrollIntoView({
@@ -310,7 +264,7 @@ export function NorteChat({
 
   return (
     <section
-      className={`mx-auto flex max-w-md flex-col px-5 pt-5 ${fullscreen ? "min-h-dvh" : "min-h-[calc(100dvh-112px)]"}`}
+      className={`flex flex-col px-5 pt-5 ${fullscreen ? "min-h-dvh" : "min-h-[calc(100dvh-112px)]"}`}
       aria-label="Conversa com Norte"
     >
       <header className="flex items-start justify-between pb-8">
@@ -446,14 +400,6 @@ export function NorteChat({
                   onPrompt={setDraft}
                   disabled={busy}
                 />
-              ) : action.name === "gerenciar_refeicao" ? (
-                <AgentCard
-                  key={i}
-                  data={mealProposalCard(action.args)}
-                  proposed
-                  onPrompt={setDraft}
-                  disabled={busy}
-                />
               ) : (
                 <div key={i} className="rounded-2xl border border-border p-4">
                   <p className="mb-3 font-medium">{domain(action.name, action.args.area)[0]}</p>
@@ -536,16 +482,11 @@ export function NorteChat({
           Novas mensagens
         </button>
       )}
-      <div
-        className={`sticky ${demo || fullscreen ? "bottom-0" : "bottom-24"} ${fullscreen ? "bg-surface" : "bg-background"} py-3`}
-      >
+      <div className={`sticky ${demo || fullscreen ? "bottom-0" : "bottom-24"} bg-background py-3`}>
         {recording && (
-          <div className="mb-2">
-            <LiveWaveform levels={waveformLevels} />
-            <p className="text-center text-xs text-muted-foreground">
-              Gravando… Toque em parar para revisar o texto.
-            </p>
-          </div>
+          <p className="mb-2 text-sm text-primary">
+            Gravando… Toque em parar para revisar o texto.
+          </p>
         )}
         <form
           onSubmit={(e) => {

@@ -74,17 +74,9 @@ const blockInput = z.object({
     .optional(),
 });
 
-const mealOptionInput = z.object({
-  description: z.string().trim().min(1).max(240),
-  protein: z.number().min(0).max(1_000).optional(),
-  carbs: z.number().min(0).max(1_000).optional(),
-  fat: z.number().min(0).max(1_000).optional(),
-  calories: z.number().min(0).max(10_000).optional(),
-});
-
 const schemas: Record<string, z.ZodType<Record<string, unknown>>> = {
   consultar_rotina: z.object({
-    area: z.enum(["alimentacao", "leitura", "fe", "planos", "academia", "esportes"]),
+    area: z.enum(["alimentacao", "leitura", "fe", "planos", "academia"]),
   }),
   reagendar_execucao: z.object({
     executionId: z.string().uuid(),
@@ -229,102 +221,6 @@ const schemas: Record<string, z.ZodType<Record<string, unknown>>> = {
   }),
   consultar_ciclo_treino: z.object({}),
   encerrar_ciclo_treino: z.object({ restoreWeekly: z.boolean().optional() }),
-  gerenciar_refeicao: z
-    .object({
-      action: z.enum(["criar", "editar", "remover"]),
-      mealId: z.string().uuid().optional(),
-      time: hhmm.optional(),
-      name: z.string().trim().min(1).max(120).optional(),
-      weekdays: z.array(weekday).max(7).optional(),
-      options: z.array(mealOptionInput).max(20).optional(),
-    })
-    .refine((v) => v.action !== "criar" || (!!v.time && !!v.name && (v.options?.length ?? 0) > 0), {
-      message: "criar exige time, name e ao menos 1 opção",
-    })
-    .refine((v) => v.action === "criar" || !!v.mealId, {
-      message: "editar/remover exigem mealId",
-    }),
-  atualizar_meta_diaria: z
-    .object({
-      calories: z.number().min(0).max(10_000).optional(),
-      protein: z.number().min(0).max(1_000).optional(),
-      carbs: z.number().min(0).max(1_000).optional(),
-      fat: z.number().min(0).max(1_000).optional(),
-    })
-    .refine((v) => Object.values(v).some((item) => item !== undefined), {
-      message: "informe ao menos um campo",
-    }),
-  registrar_refeicao_livre: z.object({
-    mealId: z.string().uuid(),
-    description: z.string().trim().min(1).max(240),
-    protein: z.number().min(0).max(1_000).optional(),
-    carbs: z.number().min(0).max(1_000).optional(),
-    fat: z.number().min(0).max(1_000).optional(),
-    calories: z.number().min(0).max(10_000).optional(),
-  }),
-  adicionar_livro: z.object({
-    title: z.string().trim().min(1).max(240),
-    authors: z.array(z.string().trim().min(1).max(120)).max(10).optional(),
-    status: z.enum(["reading", "want_to_read"]),
-    format: z.enum(["physical", "ebook", "audiobook"]).optional(),
-    progressMode: z.enum(["pages", "percentage", "time"]).optional(),
-    totalPages: z.number().int().min(1).max(20_000).optional(),
-  }),
-  atualizar_progresso_leitura: z.object({
-    bookId: z.string().uuid(),
-    newValue: z.number().min(0).max(1_000_000),
-  }),
-  mudar_status_livro: z.object({
-    bookId: z.string().uuid(),
-    status: z.enum(["reading", "paused", "completed"]),
-    rating: z.number().min(1).max(5).optional(),
-  }),
-  registrar_atividade_esportiva: z.object({
-    modality: z.enum(["corrida", "caminhada", "ciclismo"]),
-    title: z.string().trim().min(1).max(120),
-    distanceKm: z.number().min(0).max(1_000),
-    durationMinutes: z.number().min(1).max(1_440),
-    date: isoDate.optional(),
-    time: hhmm.optional(),
-  }),
-  gerenciar_meta_financeira: z
-    .object({
-      action: z.enum(["criar", "editar"]),
-      goalId: z.string().uuid().optional(),
-      name: z.string().trim().min(1).max(120).optional(),
-      targetAmount: positive.max(100_000_000).optional(),
-      deadline: isoDate.optional(),
-    })
-    .refine((v) => v.action !== "criar" || (!!v.name && v.targetAmount !== undefined), {
-      message: "criar exige name e targetAmount",
-    })
-    .refine((v) => (v.action === "editar" ? !!v.goalId : true), {
-      message: "editar exige goalId",
-    }),
-  contribuir_meta_financeira: z.object({
-    goalId: z.string().uuid(),
-    amount: positive.max(100_000_000),
-    note: z.string().trim().max(240).optional(),
-  }),
-  remover_transacao: z.object({ transactionId: z.string().uuid() }),
-  atualizar_plano: z
-    .object({
-      action: z.enum(["adicionar_etapa", "concluir_etapa", "mudar_prazo"]),
-      goalId: z.string().uuid(),
-      stepId: z.string().uuid().optional(),
-      title: z.string().trim().min(1).max(240).optional(),
-      targetDate: isoDate.optional(),
-      deadlineISO: isoDate.optional(),
-    })
-    .refine((v) => v.action !== "adicionar_etapa" || !!v.title, {
-      message: "adicionar_etapa exige title",
-    })
-    .refine((v) => v.action !== "concluir_etapa" || !!v.stepId, {
-      message: "concluir_etapa exige stepId",
-    })
-    .refine((v) => v.action !== "mudar_prazo" || !!v.deadlineISO, {
-      message: "mudar_prazo exige deadlineISO",
-    }),
   salvar_nota_leitura: z.object({
     bookTitle: z.string().trim().min(1).max(240),
     content: z.string().trim().min(1).max(10_000),
@@ -347,12 +243,7 @@ const schemas: Record<string, z.ZodType<Record<string, unknown>>> = {
 
 // Estas ações mudam agenda ou planejamento. Mesmo que o modelo tente executá-las,
 // o orquestrador interrompe e exige confirmação explícita da pessoa.
-const confirmationRequired = new Set([
-  "criar_plano",
-  "registrar_refeicao",
-  "criar_ciclo_treino",
-  "gerenciar_refeicao",
-]);
+const confirmationRequired = new Set(["criar_plano", "registrar_refeicao", "criar_ciclo_treino"]);
 
 export function parseAndValidateToolCall(call: AgentToolCall): PendingAgentAction {
   const schema = schemas[call.function.name];
