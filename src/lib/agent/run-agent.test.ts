@@ -277,6 +277,94 @@ describe("Agente Norte — três personas e cenários adversariais", () => {
     expect(reply.toolTrace?.[0].result).toContain("Não executei");
   });
 
+  it("exige confirmação antes de salvar uma refeição proposta", async () => {
+    const execute = vi.fn(async () => 'Refeição "Café da manhã" criada com 1 opção(ões).');
+    const mealCall = {
+      name: "gerenciar_refeicao",
+      args: {
+        action: "criar",
+        time: "07:30",
+        name: "Café da manhã",
+        options: [{ description: "Ovos com pão integral" }],
+      },
+    };
+    const proposed = await runAgentTurnWith(
+      [],
+      "cria café da manhã com ovos e pão integral às 7:30",
+      { step: stepReturning([mealCall]) as never, execute: execute as never },
+    );
+    expect(execute).not.toHaveBeenCalled();
+    expect(proposed.pendingActions).toHaveLength(1);
+    const confirmed = await runAgentTurnWith([proposed], "confirmo", {
+      step: vi.fn() as never,
+      execute: execute as never,
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(confirmed.text).toContain("criada");
+  });
+
+  it("rejeita gerenciar_refeicao criar sem nenhuma opção", async () => {
+    const execute = vi.fn();
+    const reply = await runAgentTurnWith([], "cria uma refeição vazia", {
+      step: stepReturning([
+        {
+          name: "gerenciar_refeicao",
+          args: { action: "criar", time: "12:00", name: "Almoço", options: [] },
+        },
+      ]) as never,
+      execute: execute as never,
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(reply.toolTrace?.[0].result).toContain("Não executei");
+  });
+
+  it("registra atividade esportiva manual sem confirmação (não é estrutural)", async () => {
+    const execute = vi.fn(async () => 'Atividade "Corrida no parque" registrada: 5km em 30min.');
+    const reply = await runAgentTurnWith([], "corri 5km em 30 minutos no parque", {
+      step: stepReturning([
+        {
+          name: "registrar_atividade_esportiva",
+          args: {
+            modality: "corrida",
+            title: "Corrida no parque",
+            distanceKm: 5,
+            durationMinutes: 30,
+          },
+        },
+      ]) as never,
+      execute: execute as never,
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(reply.pendingActions).toBeUndefined();
+  });
+
+  it("rejeita remover_transacao com id que não é um uuid válido", async () => {
+    const execute = vi.fn();
+    const reply = await runAgentTurnWith([], "apaga aquele gasto", {
+      step: stepReturning([
+        { name: "remover_transacao", args: { transactionId: "não-é-um-uuid" } },
+      ]) as never,
+      execute: execute as never,
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(reply.toolTrace?.[0].result).toContain("Não executei");
+  });
+
+  it("rejeita atualizar_plano mudar_prazo sem deadlineISO", async () => {
+    const execute = vi.fn();
+    const reply = await runAgentTurnWith([], "muda o prazo do meu objetivo", {
+      step: stepReturning([
+        {
+          name: "atualizar_plano",
+          args: { action: "mudar_prazo", goalId: "11111111-1111-1111-1111-111111111111" },
+        },
+      ]) as never,
+      execute: execute as never,
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(reply.toolTrace?.[0].result).toContain("Não executei");
+  });
+
   it("relata falha após confirmação sem afirmar que a alteração foi concluída", async () => {
     const proposal: ChatTurn = {
       role: "assistant",
