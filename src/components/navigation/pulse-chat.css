@@ -69,16 +69,24 @@
   overflow: hidden;
   transition: backdrop-filter 650ms ease;
 }
-.norte-app .norte-global-chat:has(.is-listening) {
-  backdrop-filter: blur(12px) saturate(1.3);
-  -webkit-backdrop-filter: blur(12px) saturate(1.3);
+/* Explicit blur also works when a browser isolates backdrop sampling. */
+.norte-app > :where(.page-enter),
+.norte-app .page-enter {
+  transition: filter 680ms cubic-bezier(0.22, 0.8, 0.2, 1);
 }
-/* Explicit page blur also covers browsers that isolate backdrop sampling. */
+.norte-app:has(.pulse-chat) .page-enter {
+  filter: blur(7px) saturate(0.65);
+}
 .norte-app:has(.pulse-chat.is-listening) .page-enter {
-  filter: blur(5px) saturate(0.85);
+  filter: blur(11px) saturate(0.7);
 }
 .norte-global-chat > .pulse-chat,
 .pulse-chat {
+  --foreground: #f4f6f5;
+  --muted-foreground: #a8b0ad;
+  --primary: #91f5da;
+  --primary-foreground: #08120f;
+  color: var(--foreground);
   position: relative;
   isolation: isolate;
   width: 100%;
@@ -88,7 +96,7 @@
   min-height: 0;
   padding-top: max(18px, env(safe-area-inset-top));
   padding-bottom: max(18px, env(safe-area-inset-bottom));
-  background: var(--background);
+  background: transparent;
   transition: background 450ms ease;
 }
 .pulse-chat.is-listening {
@@ -101,19 +109,14 @@
   padding-bottom: 20px;
 }
 .pulse-chat > header .norte-dawn-mark {
-  display: none;
+  display: block;
+  margin: 0 auto 7px;
 }
 .pulse-chat-log {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-}
-.pulse-chat.is-listening .pulse-chat-log {
-  visibility: hidden;
-}
-.pulse-chat.is-listening > header > :not(:first-child) {
-  visibility: hidden;
 }
 .pulse-chat.is-listening > header > button:first-child {
   color: var(--foreground);
@@ -171,21 +174,22 @@
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  opacity: 0;
-  backdrop-filter: blur(0px);
-  -webkit-backdrop-filter: blur(0px);
+  opacity: 1;
+  backdrop-filter: blur(12px) saturate(0.65);
+  -webkit-backdrop-filter: blur(12px) saturate(0.65);
   transition:
     opacity 450ms ease,
     backdrop-filter 650ms ease;
-  background: linear-gradient(145deg, #faf2e31c, #bcc4ff25 55%, #a7ffdc13);
+  background: linear-gradient(145deg, #101718b8, #182022a6 55%, #0c1416b8);
   box-shadow:
-    inset 0 0 0 1px #fff3,
-    inset 0 0 60px #fff1;
+    inset 0 0 0 1px #ffffff12,
+    inset 0 0 60px #ffffff08;
+  animation: norte-glass-reveal 680ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
 }
 .is-listening .pulse-glass {
   opacity: 1;
-  backdrop-filter: blur(15px) saturate(1.35);
-  -webkit-backdrop-filter: blur(15px) saturate(1.35);
+  backdrop-filter: blur(19px) saturate(0.8);
+  -webkit-backdrop-filter: blur(19px) saturate(0.8);
 }
 .pulse-glass i {
   position: absolute;
@@ -194,11 +198,11 @@
   left: -15%;
   bottom: -20%;
   border-radius: 45%;
-  border: 1px solid #ffffff30;
-  background: radial-gradient(ellipse, #c4baff30, transparent 65%);
+  border: 1px solid #ffffff12;
+  background: radial-gradient(ellipse, #bec9cc0d, transparent 65%);
   box-shadow:
-    inset 0 10px 40px #fff2,
-    0 -12px 70px #c4d9ff20;
+    inset 0 10px 40px #ffffff08,
+    0 -12px 70px #c4d9ff08;
   animation: pulse-liquid 7s ease-in-out infinite alternate;
 }
 .pulse-glass i + i {
@@ -232,7 +236,183 @@
     transform: rotate(360deg);
   }
 }
+/* The glass and dock share the microphone's origin at the bottom centre. */
+@keyframes norte-glass-reveal {
+  from {
+    clip-path: circle(29px at 50% calc(100% - max(10px, env(safe-area-inset-bottom)) - 39px));
+  }
+  to {
+    clip-path: circle(110vmax at 50% calc(100% - max(10px, env(safe-area-inset-bottom)) - 39px));
+  }
+}
+@keyframes norte-dock-morph {
+  from {
+    border-radius: 25px 3px 25px 25px;
+    clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  }
+  to {
+    border-radius: 40px;
+    clip-path: polygon(0 0, 100% 0, 100% 0, 100% 100%, 0 100%);
+  }
+}
+@keyframes norte-message-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.norte-global-chat > .pulse-chat {
+  min-height: 0;
+  padding: max(18px, env(safe-area-inset-top)) 18px max(10px, env(safe-area-inset-bottom));
+}
+.pulse-chat > header {
+  align-items: center;
+}
+.pulse-chat > header > button:first-child {
+  border: 1px solid #ffffff14;
+  border-radius: 40px;
+  padding: 0 12px;
+  color: var(--foreground);
+  background: #080d0cc2;
+}
+.pulse-chat-log {
+  position: relative;
+  z-index: 1;
+  padding-top: 32px;
+  animation: norte-message-reveal 420ms 180ms both;
+}
+.pulse-user-message,
+.pulse-assistant-message > p {
+  background: linear-gradient(130deg, #090d0eeb, #111615e6);
+  border: 1px solid #ffffff29;
+  border-radius: 22px;
+  box-shadow: inset 0 1px 0 #ffffff05;
+}
+.pulse-assistant-message > p {
+  padding: 13px 16px;
+}
+.pulse-assistant-message [data-testid^="agent-card-"] {
+  position: relative;
+  border-radius: 22px 4px 22px 22px;
+  clip-path: polygon(0 0, calc(100% - 19px) 0, 100% 19px, 100% 100%, 0 100%);
+  background:
+    radial-gradient(ellipse at 100% 0, #a67d4033, transparent 43%),
+    linear-gradient(145deg, #0a100feb, #121817ed);
+  border-color: #ffffff30;
+  padding: 20px;
+}
+.pulse-assistant-message [data-testid^="agent-card-"]::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: -4px;
+  width: 29px;
+  height: 1px;
+  transform: rotate(45deg);
+  background: #c99b566b;
+}
+.pulse-chat .text-primary {
+  color: var(--primary);
+}
+.pulse-chat-composer {
+  width: calc(100% + 8px);
+  margin-left: -4px;
+  padding: 8px 12px;
+  border: 1px solid #ffffff29;
+  border-radius: 40px;
+  background: linear-gradient(135deg, #111817ef, #1a2222db);
+  box-shadow:
+    0 16px 48px #0005,
+    inset 0 1px 0 #ffffff08;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  animation: norte-dock-morph 580ms cubic-bezier(0.22, 0.8, 0.2, 1) backwards;
+  transition:
+    border-radius 420ms,
+    padding 420ms,
+    width 420ms cubic-bezier(0.22, 0.8, 0.2, 1),
+    margin-left 420ms cubic-bezier(0.22, 0.8, 0.2, 1);
+}
+.pulse-composer-controls {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  min-height: 58px;
+}
+.pulse-composer-controls .pulse-side {
+  border: 0;
+}
+.pulse-composer-controls .pulse-microphone {
+  color: var(--primary);
+}
+.pulse-composer-controls .pulse-microphone::after {
+  top: auto;
+  bottom: -4px;
+  right: 25px;
+}
+.pulse-composer-controls .pulse-active-pill {
+  width: min(184px, 100%);
+  margin: 0;
+  justify-self: center;
+  font-size: 12px;
+  gap: 8px;
+  animation: none;
+}
+.pulse-message-form {
+  max-height: 0;
+  opacity: 0;
+  visibility: hidden;
+  overflow: hidden;
+  transition:
+    max-height 450ms cubic-bezier(0.22, 0.8, 0.2, 1),
+    opacity 250ms,
+    visibility 250ms;
+}
+.pulse-chat-composer.is-keyboard {
+  border-radius: 26px;
+  width: calc(100% + 20px);
+  margin-left: -10px;
+}
+@starting-style {
+  .pulse-chat-composer.is-keyboard .pulse-message-form {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+  }
+}
+.is-keyboard .pulse-message-form {
+  max-height: 160px;
+  opacity: 1;
+  visibility: visible;
+  border-top: 1px solid #ffffff16;
+  padding-top: 8px;
+}
+.pulse-composer-controls button:disabled {
+  opacity: 0.45;
+}
+.is-listening .pulse-active-pill {
+  border-color: #d4e0dc70;
+  background: linear-gradient(145deg, #263431ed, #111a19e8);
+  box-shadow:
+    0 0 22px #dcece413,
+    inset 0 1px 0 #ffffff1c;
+}
+.pulse-chat button:focus-visible,
+.pulse-chat textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+.pulse-chat textarea {
+  border-radius: 10px;
+}
 @media (prefers-reduced-motion: reduce) {
+  .norte-app .page-enter {
+    transition: none;
+  }
   .norte-app .norte-global-chat,
   .pulse-glass,
   .pulse-chat {
@@ -242,5 +422,11 @@
   .pulse-active-pill,
   .pulse-working {
     animation: none;
+  }
+  .pulse-chat *,
+  .pulse-chat *::before,
+  .pulse-chat *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }

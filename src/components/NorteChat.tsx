@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, Mic, Paperclip, Square } from "lucide-react";
+import { flushSync } from "react-dom";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  Keyboard,
+  Menu,
+  Mic,
+  Paperclip,
+  Square,
+  ChevronDown,
+} from "lucide-react";
 import { runAgentTurn, type ChatTurn } from "@/lib/agent/run-agent";
 import { transcribeAudio } from "@/lib/agent/chat.functions";
 import { useSupabaseUserId, getAccessToken } from "@/lib/supabase/client";
@@ -7,6 +18,7 @@ import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { AppMenuButton, DawnMark } from "@/components/ui/app-design-system";
 import { AgentCard, parseCard, type CardData } from "./AgentCard";
 import "./navigation/pulse-chat.css";
+import { MoreFunctionsSheet } from "./navigation/MoreFunctionsSheet";
 
 const labels: Record<string, [string, string]> = {
   criar_plano: ["Planejamento", "/planejamento"],
@@ -78,17 +90,31 @@ export function NorteChat({
   onDemoComplete,
   autoStartAudio = false,
   fullscreen = false,
+  onMenu,
 }: {
   onBack: () => void;
   demo?: boolean;
   onDemoComplete?: () => void;
   autoStartAudio?: boolean;
   fullscreen?: boolean;
+  onMenu?: () => void;
 }) {
   const userId = useSupabaseUserId();
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [ready, setReady] = useState(false);
   const [draft, setDraft] = useState("");
+  const [keyboardOpen, setKeyboardOpen] = useState(!autoStartAudio);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const openKeyboard = () => {
+    // Focus stays inside the tap event so Safari can open the native keyboard.
+    flushSync(() => setKeyboardOpen(true));
+    inputRef.current?.focus();
+  };
+  const prompt = (text: string) => {
+    setDraft(text);
+    openKeyboard();
+  };
   const [busy, setBusy] = useState(false);
   const [requestingAudio, setRequestingAudio] = useState(autoStartAudio);
   const [transcribing, setTranscribing] = useState(false);
@@ -108,6 +134,7 @@ export function NorteChat({
   const startAudioRef = useRef<() => void>(() => undefined);
   const lock = useRef(false);
   const recorder = useRef<MediaRecorder | null>(null);
+  const audioStarting = useRef(false);
   const streamRef = useRef<MediaStream | null>(null);
   const mounted = useRef(true);
   const bottom = useRef<HTMLDivElement>(null);
@@ -137,19 +164,24 @@ export function NorteChat({
     const previous = document.activeElement as HTMLElement | null;
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    chatShell.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    if (autoStartAudio) chatShell.current?.querySelector<HTMLButtonElement>("button")?.focus();
     const viewport = window.visualViewport;
     const resize = () => {
-      if (chatShell.current && viewport) chatShell.current.style.height = `${viewport.height}px`;
+      if (chatShell.current && viewport) {
+        chatShell.current.style.height = `${viewport.height}px`;
+        chatShell.current.style.top = `${viewport.offsetTop}px`;
+      }
     };
     resize();
     viewport?.addEventListener("resize", resize);
+    viewport?.addEventListener("scroll", resize);
     return () => {
       viewport?.removeEventListener("resize", resize);
+      viewport?.removeEventListener("scroll", resize);
       document.body.style.overflow = overflow;
       previous?.focus();
     };
-  }, [fullscreen]);
+  }, [fullscreen, autoStartAudio]);
   useEffect(() => {
     if (!userId) return;
     try {
@@ -235,7 +267,11 @@ export function NorteChat({
     }
   }
   async function startAudio() {
-    if (recording || busy || lock.current || transcribing) return;
+    if (recording || audioStarting.current || busy || lock.current || transcribing || !ready)
+      return;
+    audioStarting.current = true;
+    inputRef.current?.blur();
+    setKeyboardOpen(false);
     setRequestingAudio(true);
     setError("");
     try {
@@ -325,9 +361,12 @@ export function NorteChat({
         /* Manual stop remains available without audio analysis. */
       }
     } catch {
+      if (!mounted.current) return;
       setRequestingAudio(false);
       setError("Permita o microfone para gravar uma mensagem.");
       streamRef.current?.getTracks().forEach((t) => t.stop());
+    } finally {
+      audioStarting.current = false;
     }
   }
   startAudioRef.current = () => void startAudio();
@@ -347,7 +386,12 @@ export function NorteChat({
       aria-label="Conversa com Norte"
       onKeyDown={(event) => {
         if (!fullscreen) return;
-        if (event.key === "Escape") onBack();
+        if (event.key === "Escape") {
+          if (keyboardOpen) {
+            setKeyboardOpen(false);
+            inputRef.current?.blur();
+          } else onBack();
+        }
         if (event.key === "Tab") {
           const controls = Array.from(
             chatShell.current?.querySelectorAll<HTMLElement>(
@@ -380,9 +424,9 @@ export function NorteChat({
         <div className="text-center">
           <DawnMark compact />
           <h1 className="font-semibold">Norte</h1>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {demo ? "Experimente com uma conversa curta" : "Sua conversa, seu ritmo"}
-          </p>
+          {demo && (
+            <p className="mt-1 text-xs text-muted-foreground">Experimente com uma conversa curta</p>
+          )}
         </div>
         {demo ? (
           <button className="min-h-11 text-xs text-primary" onClick={onDemoComplete}>
@@ -394,7 +438,6 @@ export function NorteChat({
       </header>
       <div
         ref={chatLog}
-        inert={transcribing || requestingAudio || recording}
         className="pulse-chat-log flex-1 space-y-6 pb-6"
         role="log"
         aria-live="polite"
@@ -432,7 +475,9 @@ export function NorteChat({
           <div
             key={index}
             className={
-              turn.role === "user" ? "ml-10 rounded-2xl bg-surface-2 px-4 py-3" : "space-y-3"
+              turn.role === "user"
+                ? "pulse-user-message ml-10 px-4 py-3"
+                : "pulse-assistant-message space-y-3"
             }
           >
             {turn.role === "assistant" && (
@@ -480,7 +525,7 @@ export function NorteChat({
                         ),
                       )
                     }
-                    onPrompt={setDraft}
+                    onPrompt={prompt}
                     disabled={busy}
                   />
                 ) : (
@@ -498,7 +543,7 @@ export function NorteChat({
                   key={i}
                   data={{ ...action.args, card: "plan" } as CardData}
                   proposed
-                  onPrompt={setDraft}
+                  onPrompt={prompt}
                   disabled={busy}
                 />
               ) : action.name === "criar_ciclo_treino" ? (
@@ -506,7 +551,7 @@ export function NorteChat({
                   key={i}
                   data={cycleProposalCard(action.args)}
                   proposed
-                  onPrompt={setDraft}
+                  onPrompt={prompt}
                   disabled={busy}
                 />
               ) : (
@@ -591,37 +636,80 @@ export function NorteChat({
           Novas mensagens
         </button>
       )}
-      <div className="pulse-chat-composer">
-        {(recording || requestingAudio || transcribing || busy) && (
+      <div className={`pulse-chat-composer ${keyboardOpen ? "is-keyboard" : ""}`}>
+        <div className="pulse-composer-controls">
           <button
             type="button"
-            className="pulse-active-pill"
-            disabled={!recording}
-            aria-label={recording ? "Parar gravação e enviar" : undefined}
-            onClick={() => recorder.current?.stop()}
+            className="pulse-side"
+            aria-label="Abrir mais funções"
+            disabled={recording || requestingAudio || transcribing}
+            onClick={() => {
+              inputRef.current?.blur();
+              setKeyboardOpen(false);
+              if (onMenu) onMenu();
+              else setMenuOpen(true);
+            }}
           >
-            {recording ? (
-              <Square size={17} fill="currentColor" />
-            ) : (
-              <span className="pulse-working" />
-            )}
-            <span role="status">
-              {requestingAudio
-                ? "Abrindo microfone…"
-                : recording
-                  ? "Ouvindo…"
-                  : transcribing
-                    ? "Transcrevendo…"
-                    : "Pensando…"}
-            </span>
+            <Menu size={23} />
           </button>
-        )}
+          {!(recording || requestingAudio || transcribing || busy) && (
+            <button
+              type="button"
+              className="pulse-microphone"
+              aria-label="Gravar áudio"
+              disabled={!ready}
+              onClick={() => void startAudio()}
+            >
+              <Mic size={25} />
+            </button>
+          )}
+          {(recording || requestingAudio || transcribing || busy) && (
+            <button
+              type="button"
+              className="pulse-active-pill"
+              disabled={!recording}
+              aria-label={recording ? "Parar gravação e enviar" : undefined}
+              onClick={() => recorder.current?.stop()}
+            >
+              {recording ? (
+                <Square size={17} fill="currentColor" />
+              ) : (
+                <span className="pulse-working" />
+              )}
+              <span role="status">
+                {requestingAudio
+                  ? "Abrindo microfone…"
+                  : recording
+                    ? "Ouvindo…"
+                    : transcribing
+                      ? "Transcrevendo…"
+                      : "Pensando…"}
+              </span>
+            </button>
+          )}
+          <button
+            type="button"
+            className="pulse-side"
+            aria-label={keyboardOpen ? "Recolher teclado" : "Abrir teclado da conversa"}
+            disabled={recording || requestingAudio || transcribing || busy}
+            onClick={() => {
+              if (keyboardOpen) {
+                setKeyboardOpen(false);
+                inputRef.current?.blur();
+              } else openKeyboard();
+            }}
+          >
+            {keyboardOpen ? <ChevronDown size={23} /> : <Keyboard size={23} />}
+          </button>
+        </div>
         <form
           onSubmit={(e) => {
             e.preventDefault();
             void send(draft);
           }}
-          className={`pulse-message-form flex items-end gap-1 rounded-3xl border border-border bg-surface p-2 ${recording || requestingAudio ? "is-hidden" : ""}`}
+          className="pulse-message-form flex items-end gap-1"
+          inert={!keyboardOpen}
+          aria-hidden={!keyboardOpen}
         >
           <input
             ref={file}
@@ -649,6 +737,8 @@ export function NorteChat({
             <Paperclip size={19} />
           </button>
           <textarea
+            ref={inputRef}
+            autoFocus={!autoStartAudio}
             aria-label="Mensagem para o Norte"
             rows={1}
             value={draft}
@@ -657,15 +747,6 @@ export function NorteChat({
             placeholder="Fale com o Norte…"
             className="max-h-32 min-h-11 flex-1 resize-none bg-transparent py-3 text-sm outline-none"
           />
-          <button
-            type="button"
-            aria-label={recording ? "Parar gravação" : "Gravar áudio"}
-            disabled={busy || transcribing}
-            onClick={() => (recording ? recorder.current?.stop() : void startAudio())}
-            className="p-2.5"
-          >
-            {recording ? <Square size={19} /> : <Mic size={19} />}
-          </button>
           <button
             type="submit"
             aria-label="Enviar mensagem"
@@ -677,6 +758,19 @@ export function NorteChat({
         </form>
       </div>
       {settings && <SettingsPanel onClose={() => setSettings(false)} />}
+      {menuOpen && (
+        <MoreFunctionsSheet
+          onClose={() => setMenuOpen(false)}
+          onOpenChat={() => {
+            setMenuOpen(false);
+            openKeyboard();
+          }}
+          onOpenSettings={() => {
+            setMenuOpen(false);
+            setSettings(true);
+          }}
+        />
+      )}
     </section>
   );
 }

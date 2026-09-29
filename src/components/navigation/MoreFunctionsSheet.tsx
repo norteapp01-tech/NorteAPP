@@ -113,10 +113,12 @@ export function MoreFunctionsSheet({
   onClose,
   onOpenChat,
   onOpenSettings,
+  onNavigate = onClose,
 }: {
   onClose: () => void;
   onOpenChat: () => void;
   onOpenSettings: () => void;
+  onNavigate?: () => void;
 }) {
   return (
     <div
@@ -143,7 +145,7 @@ export function MoreFunctionsSheet({
             <h3>Principal</h3>
             <div className="norte-functions-group">
               {mainItems.map((item) => (
-                <FunctionRow key={item.label} item={item} onClose={onClose} />
+                <FunctionRow key={item.label} item={item} onClose={onNavigate} />
               ))}
             </div>
           </section>
@@ -152,7 +154,7 @@ export function MoreFunctionsSheet({
             <h3>Rotina</h3>
             <div className="norte-functions-group">
               {routineItems.map((item) => (
-                <FunctionRow key={item.label} item={item} onClose={onClose} />
+                <FunctionRow key={item.label} item={item} onClose={onNavigate} />
               ))}
             </div>
           </section>
@@ -160,7 +162,11 @@ export function MoreFunctionsSheet({
           <section>
             <h3>Ações rápidas</h3>
             <div className="norte-functions-group">
-              <Link to="/criar" onClick={onClose} className="norte-function-row interactive-press">
+              <Link
+                to="/criar"
+                onClick={onNavigate}
+                className="norte-function-row interactive-press"
+              >
                 <span className="norte-function-icon">
                   <Plus className="h-5 w-5" />
                 </span>

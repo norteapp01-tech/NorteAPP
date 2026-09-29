@@ -9,6 +9,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { WelcomeScreen } from "../components/WelcomeScreen";
 import { OnboardingFlow } from "../components/OnboardingFlow";
 import { MoreVertical } from "lucide-react";
@@ -336,16 +337,22 @@ function RootComponent() {
                       setVoiceChatOpen(true);
                     }}
                     onKeyboard={() => {
-                      setStartChatWithVoice(false);
-                      setVoiceChatOpen(true);
+                      flushSync(() => {
+                        setStartChatWithVoice(false);
+                        setVoiceChatOpen(true);
+                      });
+                      document
+                        .querySelector<HTMLTextAreaElement>(".pulse-message-form textarea")
+                        ?.focus();
                     }}
                   />
                 </>
               )}
               {voiceChatOpen && (
-                <div className="norte-global-chat">
+                <div className="norte-global-chat" inert={functionsOpen || globalSettingsOpen}>
                   <NorteChat
                     fullscreen
+                    onMenu={() => setFunctionsOpen(true)}
                     autoStartAudio={startChatWithVoice}
                     onBack={() => {
                       setVoiceChatOpen(false);
@@ -357,6 +364,10 @@ function RootComponent() {
               {functionsOpen && (
                 <MoreFunctionsSheet
                   onClose={() => setFunctionsOpen(false)}
+                  onNavigate={() => {
+                    setFunctionsOpen(false);
+                    setVoiceChatOpen(false);
+                  }}
                   onOpenChat={() => {
                     setStartChatWithVoice(false);
                     setVoiceChatOpen(true);
