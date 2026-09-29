@@ -52,6 +52,9 @@
   --dur-progress: 300ms;
   --dur-flip: 220ms;
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  /* Só para a entrada com "morph" do chat do Norte (VoiceDock) — leve
+   * overshoot pra ler como física de mola, sem trazer uma lib de animação. */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   --radius: 1.125rem;
   --background: #090b0a;

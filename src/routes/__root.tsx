@@ -26,6 +26,7 @@ import { VoiceDock } from "../components/navigation/VoiceDock";
 import { MoreFunctionsSheet } from "../components/navigation/MoreFunctionsSheet";
 import { NorteChat } from "../components/NorteChat";
 import { SettingsPanel } from "../components/settings/SettingsPanel";
+import { FullScreenSheet } from "../components/ui/modal";
 import "../components/navigation/navigation.css";
 
 function NotFoundComponent() {
@@ -350,16 +351,23 @@ function RootComponent() {
                 </>
               )}
               {voiceChatOpen && (
-                <div className="norte-global-chat">
-                  <NorteChat
-                    fullscreen
-                    autoStartAudio={startChatWithVoice}
-                    onBack={() => {
-                      setVoiceChatOpen(false);
-                      setStartChatWithVoice(false);
-                    }}
-                  />
-                </div>
+                <FullScreenSheet
+                  hideHeader
+                  overlayVariant="dim"
+                  title="Conversa com Norte"
+                  onClose={() => {
+                    setVoiceChatOpen(false);
+                    setStartChatWithVoice(false);
+                  }}
+                >
+                  {(requestClose) => (
+                    <NorteChat
+                      fullscreen
+                      autoStartAudio={startChatWithVoice}
+                      onBack={requestClose}
+                    />
+                  )}
+                </FullScreenSheet>
               )}
               {functionsOpen && (
                 <MoreFunctionsSheet

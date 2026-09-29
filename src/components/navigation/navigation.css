@@ -97,6 +97,48 @@
   content: "";
 }
 
+/* Pulso de disparo único ao tocar o microfone — o "morph" da referência 60fps,
+ * adaptado: o botão ganha um pequeno bounce e o anel expande/some com um
+ * easing de mola (--ease-spring). Some sozinho ao acabar (o React limpa a
+ * classe no onAnimationEnd do botão). */
+.norte-voice-mic.is-pulsing {
+  animation: norte-mic-press 380ms var(--ease-spring);
+}
+
+.norte-voice-mic.is-pulsing::after {
+  animation: norte-mic-ring-burst 420ms var(--ease-spring);
+}
+
+@keyframes norte-mic-press {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(0.88);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes norte-mic-ring-burst {
+  0% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.55);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .norte-voice-mic.is-pulsing,
+  .norte-voice-mic.is-pulsing::after {
+    animation-duration: 1ms;
+  }
+}
+
 .norte-voice-wave {
   display: flex;
   height: 42px;
@@ -142,21 +184,6 @@
     transform: scaleY(1);
     opacity: 1;
   }
-}
-
-.norte-global-chat {
-  position: fixed;
-  z-index: 80;
-  inset: 0;
-  overflow-y: auto;
-  background: var(--background);
-}
-
-.norte-global-chat > section {
-  width: min(100%, 448px);
-  min-height: 100dvh;
-  margin-inline: auto;
-  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .norte-functions-layer {

@@ -154,12 +154,25 @@ export function FullScreenSheet({
   title,
   action,
   children,
+  /** "dim" mostra a tela de trás fosca e borrada (mesmo tratamento do
+   * `Modal`) em vez da troca opaca padrão — para sobreposições que devem
+   * parecer um modal sobre a tela atual, não uma navegação de página. */
+  overlayVariant = "solid",
+  /** Pula o cabeçalho embutido (chevron + título) para conteúdo que já traz
+   * o próprio cabeçalho. Nesse caso `children` pode ser uma função que
+   * recebe `requestClose`, para o cabeçalho do próprio conteúdo disparar o
+   * fechamento animado em vez de desmontar na hora. O título continua
+   * renderizado (visualmente oculto) — o Radix Dialog exige um pra leitor
+   * de tela. */
+  hideHeader = false,
 }: {
   onClose: () => void;
   title: ReactNode;
   /** Ação à direita do cabeçalho (ex.: registrar manualmente). */
   action?: ReactNode;
-  children: ReactNode;
+  children: ReactNode | ((requestClose: () => void) => ReactNode);
+  overlayVariant?: "solid" | "dim";
+  hideHeader?: boolean;
 }) {
   const { open, requestClose, onAnimationEnd } = useExitBeforeUnmount(onClose);
 
@@ -171,7 +184,12 @@ export function FullScreenSheet({
       }}
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-background data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+        <DialogPrimitive.Overlay
+          className={cn(
+            "fixed inset-0 z-50 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
+            overlayVariant === "dim" ? "bg-background/85 backdrop-blur-sm" : "bg-background",
+          )}
+        />
         <DialogPrimitive.Content
           onAnimationEnd={onAnimationEnd}
           className="fixed inset-0 z-50 flex flex-col bg-background outline-none duration-(--dur-state) data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom"
@@ -180,20 +198,30 @@ export function FullScreenSheet({
             paddingBottom: "env(safe-area-inset-bottom)",
           }}
         >
-          <div className="flex shrink-0 items-center gap-2 px-4 py-3">
-            <DialogPrimitive.Close
-              aria-label="Voltar"
-              className="-m-2 shrink-0 rounded-full p-2 text-foreground transition-colors hover:bg-surface-2"
-            >
-              <ChevronLeft className="h-6 w-6" />
-            </DialogPrimitive.Close>
-            <DialogPrimitive.Title className="min-w-0 flex-1 truncate text-lg font-bold">
-              {title}
-            </DialogPrimitive.Title>
-            {action}
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-8">
-            {children}
+          {hideHeader ? (
+            <DialogPrimitive.Title className="sr-only">{title}</DialogPrimitive.Title>
+          ) : (
+            <div className="flex shrink-0 items-center gap-2 px-4 py-3">
+              <DialogPrimitive.Close
+                aria-label="Voltar"
+                className="-m-2 shrink-0 rounded-full p-2 text-foreground transition-colors hover:bg-surface-2"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </DialogPrimitive.Close>
+              <DialogPrimitive.Title className="min-w-0 flex-1 truncate text-lg font-bold">
+                {title}
+              </DialogPrimitive.Title>
+              {action}
+            </div>
+          )}
+          <div
+            className={
+              hideHeader
+                ? "min-h-0 flex-1 overflow-y-auto overscroll-contain"
+                : "min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-8"
+            }
+          >
+            {typeof children === "function" ? children(requestClose) : children}
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

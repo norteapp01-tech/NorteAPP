@@ -264,7 +264,7 @@ export function NorteChat({
 
   return (
     <section
-      className={`flex flex-col px-5 pt-5 ${fullscreen ? "min-h-dvh" : "min-h-[calc(100dvh-112px)]"}`}
+      className={`mx-auto flex max-w-md flex-col px-5 pt-5 ${fullscreen ? "min-h-dvh" : "min-h-[calc(100dvh-112px)]"}`}
       aria-label="Conversa com Norte"
     >
       <header className="flex items-start justify-between pb-8">

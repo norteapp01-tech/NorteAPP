@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Keyboard, Mic } from "lucide-react";
 
 function Waveform({ reverse = false }: { reverse?: boolean }) {
@@ -18,6 +19,12 @@ export function VoiceDock({
   onVoice: () => void;
   onKeyboard: () => void;
 }) {
+  // Pulso de disparo único no toque do microfone — o "morph" da referência,
+  // sem um passo de pill-de-status que não existe aqui. Limpo pelo próprio
+  // fim da animação (mesmo padrão de check-enter/page-enter em styles.css),
+  // nunca preso em "true" se o clique disparar mais rápido que o CSS carrega.
+  const [pulsing, setPulsing] = useState(false);
+
   return (
     <div className="norte-voice-dock" role="group" aria-label="Conversa com o Norte">
       <button
@@ -33,8 +40,12 @@ export function VoiceDock({
 
       <button
         type="button"
-        onClick={onVoice}
-        className="norte-voice-mic interactive-press"
+        onClick={() => {
+          setPulsing(true);
+          onVoice();
+        }}
+        onAnimationEnd={() => setPulsing(false)}
+        className={`norte-voice-mic interactive-press ${pulsing ? "is-pulsing" : ""}`}
         aria-label="Conversar por voz com o Norte"
       >
         <Mic className="h-7 w-7" strokeWidth={2} />
