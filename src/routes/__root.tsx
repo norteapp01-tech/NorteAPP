@@ -128,6 +128,7 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function RootComponent() {
+  const router = useRouter();
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [entered, setEntered] = useState(false);
@@ -313,7 +314,7 @@ function RootComponent() {
                 é isso que os mantém montados ao trocar de tela, em vez de
                 remontar (e perder o painel aberto) a cada navegação. */}
             <GymSessionProvider>
-              <div key={pathname} className="page-enter">
+              <div key={pathname} className="page-enter" inert={voiceChatOpen}>
                 <Outlet />
               </div>
               <ActiveRecordingBar />
@@ -338,6 +339,9 @@ function RootComponent() {
                     </button>
                   </div>
                   <VoiceDock
+                    onCreate={() => {
+                      void router.navigate({ to: "/criar" });
+                    }}
                     onVoice={() => {
                       setStartChatWithVoice(true);
                       setVoiceChatOpen(true);

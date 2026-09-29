@@ -377,6 +377,64 @@ try {
       console.log(`PASS ${theme} ${name}`);
     }
   }
+  if (process.env.AUDIT_PULSE) {
+    await page.goto("http://127.0.0.1:8080/sub-agenda/academia");
+    await page.getByRole("button", { name: "Conversar por voz com o Norte" }).waitFor();
+    await page.evaluate(() => {
+      window.__stoppedTracks = 0;
+      Object.defineProperty(navigator.mediaDevices, "getUserMedia", {
+        configurable: true,
+        value: async () => ({
+          getTracks: () => [
+            {
+              stop: () => {
+                window.__stoppedTracks++;
+              },
+            },
+          ],
+        }),
+      });
+      window.MediaRecorder = class {
+        state = "inactive";
+        mimeType = "audio/webm";
+        start() {
+          this.state = "recording";
+        }
+        stop() {
+          this.state = "inactive";
+          this.onstop?.();
+        }
+      };
+    });
+    await page.getByRole("button", { name: "Conversar por voz com o Norte" }).click();
+    await page.getByRole("button", { name: "Parar gravação e enviar" }).waitFor();
+    assert.equal(await page.locator(".page-enter").getAttribute("inert"), "");
+    assert.equal(await page.locator(".pulse-chat.is-listening").count(), 1);
+    await page.screenshot({ path: `${out}/pulse-listening.png` });
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Abrir teclado da conversa" }).waitFor();
+    assert.ok(await page.evaluate(() => window.__stoppedTracks > 0));
+    assert.equal(new URL(page.url()).pathname, "/sub-agenda/academia");
+    await page.evaluate(() =>
+      Object.defineProperty(navigator.mediaDevices, "getUserMedia", {
+        configurable: true,
+        value: async () => {
+          throw new Error("Permission denied");
+        },
+      }),
+    );
+    await page.getByRole("button", { name: "Conversar por voz com o Norte" }).click();
+    await page.getByRole("alert").filter({ hasText: "Permita o microfone" }).waitFor();
+    assert.equal(await page.locator(".pulse-chat.is-listening").count(), 0);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Abrir teclado da conversa" }).click();
+    await page.getByRole("textbox", { name: "Mensagem para o Norte" }).fill("Teste da conversa");
+    await page.screenshot({ path: `${out}/pulse-conversation.png` });
+    await page.keyboard.press("Escape");
+    console.log(
+      "PASS pulse: listening overlay, microphone cleanup, preserved route, denied permission and keyboard fallback",
+    );
+  }
   assert.deepEqual(errors, [], "No runtime errors");
   console.log(
     `PASS: ${routes.length} routes, both themes, internal tabs at 320/375/390/430px, charts, keyboard tabs and disclosure interactions. Screenshots: ${out}`,

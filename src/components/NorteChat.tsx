@@ -6,6 +6,7 @@ import { useSupabaseUserId, getAccessToken } from "@/lib/supabase/client";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { AppMenuButton, DawnMark } from "@/components/ui/app-design-system";
 import { AgentCard, parseCard, type CardData } from "./AgentCard";
+import "./navigation/pulse-chat.css";
 
 const labels: Record<string, [string, string]> = {
   criar_plano: ["Planejamento", "/planejamento"],
@@ -89,10 +90,15 @@ export function NorteChat({
   const [ready, setReady] = useState(false);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [requestingAudio, setRequestingAudio] = useState(autoStartAudio);
+  const [transcribing, setTranscribing] = useState(false);
+  const audioCleanup = useRef<() => void>(() => undefined);
+  const chatLog = useRef<HTMLDivElement>(null);
+  const chatShell = useRef<HTMLElement>(null);
   // Margem pra considerar "está lendo o fim" — evita exigir pixel exato.
   const NEAR_BOTTOM_PX = 120;
   const isNearBottom = () => {
-    const el = document.scrollingElement ?? document.documentElement;
+    const el = chatLog.current ?? document.documentElement;
     return el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX;
   };
   const [error, setError] = useState("");
@@ -121,10 +127,29 @@ export function NorteChat({
     mounted.current = true;
     return () => {
       mounted.current = false;
+      audioCleanup.current();
       if (recorder.current) recorder.current.onstop = null;
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
+  useEffect(() => {
+    if (!fullscreen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    chatShell.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const viewport = window.visualViewport;
+    const resize = () => {
+      if (chatShell.current && viewport) chatShell.current.style.height = `${viewport.height}px`;
+    };
+    resize();
+    viewport?.addEventListener("resize", resize);
+    return () => {
+      viewport?.removeEventListener("resize", resize);
+      document.body.style.overflow = overflow;
+      previous?.focus();
+    };
+  }, [fullscreen]);
   useEffect(() => {
     if (!userId) return;
     try {
@@ -160,8 +185,9 @@ export function NorteChat({
       nearBottom.current = isNearBottom();
       if (nearBottom.current) setUnreadBelow(false);
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    const element = chatLog.current;
+    element?.addEventListener("scroll", onScroll, { passive: true });
+    return () => element?.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
@@ -209,6 +235,8 @@ export function NorteChat({
     }
   }
   async function startAudio() {
+    if (recording || busy || lock.current || transcribing) return;
+    setRequestingAudio(true);
     setError("");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -224,32 +252,80 @@ export function NorteChat({
         if (e.data.size) chunks.push(e.data);
       };
       rec.onstop = async () => {
+        audioCleanup.current();
         stream.getTracks().forEach((t) => t.stop());
+        if (!mounted.current) return;
         setRecording(false);
-        setBusy(true);
+        setTranscribing(true);
         try {
           const blob = new Blob(chunks, { type: rec.mimeType });
+          if (!blob.size) throw new Error("Nenhum áudio capturado.");
           if (blob.size > 10 * 1024 * 1024)
             throw new Error("Áudio muito longo. Grave uma mensagem menor.");
-          const audioBase64 = await new Promise<string>((resolve) => {
+          const audioBase64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(String(reader.result).split(",")[1]);
+            reader.onerror = () => reject(new Error("Não foi possível ler o áudio."));
             reader.readAsDataURL(blob);
           });
           const accessToken = await getAccessToken();
           const result = await transcribeAudio({
             data: { audioBase64, mimeType: rec.mimeType, accessToken },
           });
-          if (mounted.current) setDraft(result.text);
+          if (mounted.current) {
+            setTranscribing(false);
+            if (result.text.trim()) await send(result.text);
+            else setError("Não ouvi uma mensagem. Toque no microfone para tentar novamente.");
+          }
         } catch {
           if (mounted.current) setError("Não foi possível transcrever. Tente novamente ou digite.");
         } finally {
-          if (mounted.current) setBusy(false);
+          if (mounted.current) setTranscribing(false);
         }
       };
       rec.start();
       setRecording(true);
+      setRequestingAudio(false);
+      const limit = window.setTimeout(() => {
+        if (rec.state === "recording") rec.stop();
+      }, 60_000);
+      let context: AudioContext | undefined;
+      let poll: number | undefined;
+      audioCleanup.current = () => {
+        clearTimeout(limit);
+        clearInterval(poll);
+        if (context && context.state !== "closed") void context.close();
+      };
+      try {
+        context = new AudioContext();
+        await context.resume();
+        if (!mounted.current || rec.state !== "recording") {
+          audioCleanup.current();
+          return;
+        }
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 2048;
+        context.createMediaStreamSource(stream).connect(analyser);
+        const samples = new Float32Array(analyser.fftSize);
+        let heardSpeech = false;
+        let lastSpeech = performance.now();
+        poll = window.setInterval(() => {
+          analyser.getFloatTimeDomainData(samples);
+          const rms = Math.sqrt(
+            samples.reduce((sum, value) => sum + value * value, 0) / samples.length,
+          );
+          if (rms > 0.018) {
+            heardSpeech = true;
+            lastSpeech = performance.now();
+          }
+          if (heardSpeech && performance.now() - lastSpeech > 1800 && rec.state === "recording")
+            rec.stop();
+        }, 120);
+      } catch {
+        /* Manual stop remains available without audio analysis. */
+      }
     } catch {
+      setRequestingAudio(false);
       setError("Permita o microfone para gravar uma mensagem.");
       streamRef.current?.getTracks().forEach((t) => t.stop());
     }
@@ -264,9 +340,36 @@ export function NorteChat({
 
   return (
     <section
-      className={`flex flex-col px-5 pt-5 ${fullscreen ? "min-h-dvh" : "min-h-[calc(100dvh-112px)]"}`}
+      ref={chatShell}
+      role={fullscreen ? "dialog" : undefined}
+      aria-modal={fullscreen || undefined}
+      className={`pulse-chat ${recording || requestingAudio ? "is-listening" : ""} flex flex-col px-5 pt-5`}
       aria-label="Conversa com Norte"
+      onKeyDown={(event) => {
+        if (!fullscreen) return;
+        if (event.key === "Escape") onBack();
+        if (event.key === "Tab") {
+          const controls = Array.from(
+            chatShell.current?.querySelectorAll<HTMLElement>(
+              "button:not(:disabled),textarea:not(:disabled),a[href]",
+            ) ?? [],
+          ).filter((el) => el.getClientRects().length > 0);
+          const first = controls[0],
+            last = controls.at(-1);
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last?.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first?.focus();
+          }
+        }
+      }}
     >
+      <div className="pulse-glass" aria-hidden="true">
+        <i />
+        <i />
+      </div>
       <header className="flex items-start justify-between pb-8">
         <button
           onClick={onBack}
@@ -289,7 +392,13 @@ export function NorteChat({
           <AppMenuButton aria-label="Configurações" onClick={() => setSettings(true)} />
         )}
       </header>
-      <div className="flex-1 space-y-6 pb-6" role="log" aria-live="polite">
+      <div
+        ref={chatLog}
+        inert={transcribing || requestingAudio || recording}
+        className="pulse-chat-log flex-1 space-y-6 pb-6"
+        role="log"
+        aria-live="polite"
+      >
         {!turns.length && (
           <div className="pt-10">
             <DawnMark compact />
@@ -482,18 +591,37 @@ export function NorteChat({
           Novas mensagens
         </button>
       )}
-      <div className={`sticky ${demo || fullscreen ? "bottom-0" : "bottom-24"} bg-background py-3`}>
-        {recording && (
-          <p className="mb-2 text-sm text-primary">
-            Gravando… Toque em parar para revisar o texto.
-          </p>
+      <div className="pulse-chat-composer">
+        {(recording || requestingAudio || transcribing || busy) && (
+          <button
+            type="button"
+            className="pulse-active-pill"
+            disabled={!recording}
+            aria-label={recording ? "Parar gravação e enviar" : undefined}
+            onClick={() => recorder.current?.stop()}
+          >
+            {recording ? (
+              <Square size={17} fill="currentColor" />
+            ) : (
+              <span className="pulse-working" />
+            )}
+            <span role="status">
+              {requestingAudio
+                ? "Abrindo microfone…"
+                : recording
+                  ? "Ouvindo…"
+                  : transcribing
+                    ? "Transcrevendo…"
+                    : "Pensando…"}
+            </span>
+          </button>
         )}
         <form
           onSubmit={(e) => {
             e.preventDefault();
             void send(draft);
           }}
-          className="flex items-end gap-1 rounded-3xl border border-border bg-surface p-2"
+          className={`pulse-message-form flex items-end gap-1 rounded-3xl border border-border bg-surface p-2 ${recording || requestingAudio ? "is-hidden" : ""}`}
         >
           <input
             ref={file}
@@ -513,7 +641,7 @@ export function NorteChat({
           />
           <button
             type="button"
-            disabled={busy || recording}
+            disabled={busy || recording || transcribing}
             aria-label="Anexar texto"
             onClick={() => file.current?.click()}
             className="p-2.5"
@@ -525,14 +653,14 @@ export function NorteChat({
             rows={1}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            disabled={busy || recording}
+            disabled={busy || recording || transcribing}
             placeholder="Fale com o Norte…"
             className="max-h-32 min-h-11 flex-1 resize-none bg-transparent py-3 text-sm outline-none"
           />
           <button
             type="button"
             aria-label={recording ? "Parar gravação" : "Gravar áudio"}
-            disabled={busy}
+            disabled={busy || transcribing}
             onClick={() => (recording ? recorder.current?.stop() : void startAudio())}
             className="p-2.5"
           >
@@ -541,7 +669,7 @@ export function NorteChat({
           <button
             type="submit"
             aria-label="Enviar mensagem"
-            disabled={busy || recording || !draft.trim() || !ready}
+            disabled={busy || recording || transcribing || !draft.trim() || !ready}
             className="rounded-full bg-primary p-2.5 text-primary-foreground disabled:opacity-40"
           >
             <ArrowUp size={20} />
