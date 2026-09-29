@@ -165,6 +165,15 @@
 .norte-app .academia-hero-copy {
   min-height: 205px;
 }
+.norte-app .academia-hero-card {
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--norte-cut)) 0,
+    100% var(--norte-cut),
+    100% 100%,
+    0 100%
+  );
+}
 .norte-app .academia-hero-copy {
   padding: 18px;
 }
