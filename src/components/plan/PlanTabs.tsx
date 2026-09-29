@@ -12,5 +12,5 @@ const tabLabel: Record<PlanTab, string> = {
  * aba, texto ativo em branco, inativo em cinza, divisória discreta embaixo. */
 export function PlanTabs({ tab, onChange }: { tab: PlanTab; onChange: (t: PlanTab) => void }) {
   const items = (Object.keys(tabLabel) as PlanTab[]).map((key) => ({ key, label: tabLabel[key] }));
-  return <UnderlineTabs items={items} value={tab} onChange={onChange} />;
+  return <UnderlineTabs className="plan-tabs" items={items} value={tab} onChange={onChange} />;
 }

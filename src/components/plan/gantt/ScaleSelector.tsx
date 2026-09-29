@@ -10,9 +10,9 @@ export function ScaleSelector({
   onChange: (s: GanttScale) => void;
 }) {
   return (
-    <div className="mt-5 -mx-5 overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="plan-scale mt-5 -mx-5 overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div
-        className="flex gap-1 rounded-2xl border border-border bg-surface p-1"
+        className="plan-scale-control flex gap-1 rounded-2xl border border-border bg-surface p-1"
         style={{ width: "max-content", minWidth: "100%" }}
       >
         {(Object.keys(ganttScaleLabel) as GanttScale[]).map((s) => (

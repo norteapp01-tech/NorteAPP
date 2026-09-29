@@ -43,7 +43,7 @@ export function PlanHeader({
     pace === "behind" ? "text-danger" : pace === "ahead" ? "text-warning" : "text-primary";
 
   return (
-    <div>
+    <div className="plan-detail-header">
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}

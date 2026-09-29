@@ -154,11 +154,11 @@ export function GanttChart({
   };
 
   return (
-    <div>
+    <div className="plan-gantt">
       <ScaleSelector scale={scale} onChange={setScale} />
       <div
         ref={viewportRef}
-        className="mt-4 -mx-5 overflow-x-auto border-y border-border bg-background [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="plan-gantt-viewport mt-4 -mx-5 overflow-x-auto border-y border-border bg-background [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <div className="relative min-h-[320px]" style={{ width: totalWidth }}>
           {/* régua temporal fixa ao topo do painel */}

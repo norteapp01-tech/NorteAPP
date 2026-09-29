@@ -16,7 +16,7 @@ export function UnscheduledDrawer({
   if (executions.length === 0) return null;
 
   return (
-    <div className="mt-4 rounded-2xl border border-border bg-surface p-3">
+    <div className="plan-unscheduled mt-4 rounded-2xl border border-border bg-surface p-3">
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between"

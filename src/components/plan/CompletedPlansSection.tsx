@@ -31,7 +31,7 @@ export function CompletedPlansSection({
   const completed = goals.filter((g) => isGoalComplete(g, steps, executions));
 
   return (
-    <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-surface">
+    <div className="plan-completed mt-5 overflow-hidden rounded-2xl border border-border bg-surface">
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-surface-2"

@@ -62,6 +62,7 @@ import {
   scheduleTimesValid,
   type ScheduleValue,
 } from "@/components/plan/ScheduleFields";
+import "@/components/agenda.css";
 
 export const Route = createFileRoute("/agenda")({
   head: () => ({ meta: [{ title: "Agenda — Norte" }] }),
@@ -121,8 +122,8 @@ function AgendaScreen() {
   const availableMinutes = Math.max(0, DAY_MINUTES - occupiedMinutes);
 
   return (
-    <div className="norte-page">
-      <header className="relative min-h-24 pr-14">
+    <div className="norte-page agenda-page">
+      <header className="agenda-header relative min-h-24 pr-14">
         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Agenda</p>
         <h1 className="norte-page-title mt-2">Seus compromissos</h1>
         <p className="mt-2 text-sm text-muted-foreground">Seu tempo, com clareza.</p>
@@ -153,12 +154,12 @@ function AgendaScreen() {
         weekStart={profile.weekStart}
       />
 
-      <p className="mt-3 text-center text-[11px] text-muted-foreground">
+      <p className="agenda-week-summary mt-3 text-center text-[11px] text-muted-foreground">
         {selectedEvents.length} compromisso{selectedEvents.length === 1 ? "" : "s"} ·{" "}
         {formatMinutes(occupiedMinutes)} ocupada · {formatMinutes(availableMinutes)} livres
       </p>
 
-      <div className="mt-6 flex items-center justify-between">
+      <div className="agenda-day-heading mt-6 flex items-center justify-between">
         <h2 className="norte-section-title">{formatLongDate(selectedDate)}</h2>
         <Link
           to="/criar"
@@ -179,7 +180,7 @@ function AgendaScreen() {
       {/* Fica discreto de propósito: o DayView acima já é o card principal
           da tela, e repetir o mesmo tom aqui era a mesma mancha verde-cinza
           se repetindo logo abaixo. */}
-      <div className="card-surface-quiet mt-5 overflow-hidden">
+      <div className="agenda-details card-surface-quiet mt-5 overflow-hidden">
         <button
           onClick={() => setDetailsOpen((open) => !open)}
           className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left"
@@ -213,7 +214,7 @@ function AgendaScreen() {
         )}
       </div>
 
-      <div className="mt-6 rounded-2xl border border-border bg-surface/60 p-4 text-xs text-muted-foreground">
+      <div className="agenda-note mt-6 rounded-2xl border border-border bg-surface/60 p-4 text-xs text-muted-foreground">
         <span className="font-semibold text-foreground">Agenda ≠ Planejamento.</span> Aqui só entram
         compromissos com hora. Planejamentos vivem na aba{" "}
         <Link to="/planejamento" className="text-primary underline">
@@ -494,8 +495,8 @@ function WeekStrip({
     return d;
   });
   return (
-    <div className="card-surface mt-6 overflow-hidden">
-      <div className="flex items-center justify-between">
+    <div className="agenda-week-card card-surface mt-6 overflow-hidden">
+      <div className="agenda-week-nav flex items-center justify-between">
         <button
           onClick={() => {
             const d = new Date(cursor);
@@ -525,7 +526,7 @@ function WeekStrip({
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
-      <div className="px-3 pb-4">
+      <div className="agenda-week-days px-3 pb-4">
         <WeekdaySelector
           items={week.map((d, index) => ({ day: index, label: weekLabels[d.getDay()] }))}
           selectedDay={week.findIndex((d) => localISO(d) === selectedDate)}
@@ -568,6 +569,9 @@ function DayView({
   // Guarda para quê dia já posicionamos: reposicionar a cada atualização de
   // estado faria a tela "pular" enquanto a pessoa consulta os horários.
   const positioned = useRef<{ date: string; withEvents: boolean } | null>(null);
+  const current = nowDate();
+  const showNow = date === localISO(current);
+  const currentMinute = current.getHours() * 60 + current.getMinutes();
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -580,16 +584,16 @@ function DayView({
   }, [date, events]);
 
   return (
-    <div className="card-surface relative mt-3 overflow-hidden px-3 py-4">
+    <div className="agenda-day-sheet card-surface relative mt-3 overflow-hidden px-3 py-4">
       <div
         ref={scrollRef}
         role="region"
         tabIndex={0}
         aria-label="Linha do tempo do dia, de 00:00 às 24:00"
-        className="overflow-y-auto overscroll-contain"
+        className="agenda-day-scroll overflow-y-auto overscroll-contain"
         style={{ height: "min(62vh, 620px)" }}
       >
-        <div className="relative ml-14" style={{ height: TIMELINE_HEIGHT }}>
+        <div className="agenda-day-timeline relative ml-14" style={{ height: TIMELINE_HEIGHT }}>
           {hours.map((hour) => (
             <div
               key={hour}
@@ -601,6 +605,16 @@ function DayView({
               </span>
             </div>
           ))}
+          {showNow && (
+            <div
+              className="agenda-now-line"
+              style={{ top: (currentMinute / 60) * HOUR_HEIGHT }}
+              aria-label={`Agora, ${minutesToTime(currentMinute)}`}
+            >
+              <span />
+              <strong>{minutesToTime(currentMinute)}</strong>
+            </div>
+          )}
           {overnight.map((event) => {
             const span = spanForDay(event.startTime, event.endTime, "continuacao");
             if (!span) return null;

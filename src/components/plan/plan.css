@@ -1,0 +1,213 @@
+.plan-list-page,
+.plan-detail-page {
+  position: relative;
+  overflow-x: clip;
+  isolation: isolate;
+}
+
+.plan-list-page::before,
+.plan-detail-page::before {
+  position: absolute;
+  z-index: -1;
+  top: -155px;
+  right: -150px;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(164 111 59 / 0.14), transparent 68%);
+  content: "";
+  pointer-events: none;
+}
+
+.plan-list-page .norte-page-title {
+  max-width: 390px;
+  font-size: clamp(37px, 10.5vw, 52px);
+  line-height: 0.98;
+}
+
+.plan-horizon-tabs,
+.plan-tabs {
+  border-color: var(--border-quiet);
+}
+
+.plan-horizon-view > div > p:first-child {
+  letter-spacing: 0.13em;
+}
+
+.plan-focus-card,
+.plan-next-card,
+.plan-evolution-card {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--border-quiet);
+  border-radius: 23px;
+  clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%);
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.028), transparent 48%),
+    color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.028);
+}
+
+.plan-focus-card::after,
+.plan-next-card::after,
+.plan-evolution-card::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  border-left: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  background: linear-gradient(135deg, rgb(176 119 62 / 0.14), transparent);
+  content: "";
+  pointer-events: none;
+}
+
+.plan-focus-card {
+  padding: 22px;
+}
+
+.plan-focus-card > a > div:first-child p {
+  font-size: 18px;
+}
+
+.plan-other-list,
+.plan-completed {
+  border-color: var(--border-quiet);
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgb(255 255 255 / 0.02), transparent), var(--surface);
+}
+
+.plan-other-row {
+  min-height: 96px;
+  padding: 17px 18px;
+}
+
+.plan-other-row > div > p:first-child {
+  font-size: 16px;
+}
+
+.plan-detail-header h1 {
+  font-size: clamp(31px, 8.5vw, 42px);
+  letter-spacing: -0.045em;
+}
+
+.plan-detail-header > div:first-child {
+  min-height: 44px;
+}
+
+.plan-guidance {
+  border-block: 1px solid var(--border-quiet);
+  border-radius: 0;
+}
+
+.plan-next-card {
+  min-height: 150px;
+  padding: 23px;
+}
+
+.plan-path .norte-section-title {
+  font-size: 24px;
+}
+
+.plan-stage-card {
+  border-color: var(--border-quiet);
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgb(255 255 255 / 0.02), transparent), var(--surface);
+}
+
+.plan-stage-card.is-current {
+  border-left-color: var(--primary);
+  box-shadow: inset 12px 0 24px -24px color-mix(in srgb, var(--primary) 60%, transparent);
+}
+
+.plan-action-row {
+  border-color: var(--border-quiet);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface-2) 78%, transparent);
+}
+
+.plan-evolution {
+  display: grid;
+  gap: 14px;
+}
+
+.plan-evolution-card {
+  padding: 20px;
+}
+
+.plan-evolution-card.is-summary {
+  padding-block: 22px;
+}
+
+.plan-evolution-card.is-summary > p,
+.plan-evolution-card.is-numbers > p,
+.plan-evolution-card.is-pace > p,
+.plan-evolution-card.is-line > p {
+  letter-spacing: 0.1em;
+}
+
+.plan-evolution-stats,
+.plan-evolution-meta {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-quiet);
+  border-radius: 18px;
+}
+
+.plan-evolution-stat,
+.plan-evolution-meta > div {
+  border-radius: 0;
+  background: transparent;
+}
+
+.plan-evolution-stat + .plan-evolution-stat,
+.plan-evolution-meta > div + div {
+  border-left: 1px solid var(--border-quiet);
+}
+
+.plan-evolution-card.is-line .recharts-cartesian-grid-horizontal line,
+.plan-evolution-card.is-line .recharts-cartesian-grid-vertical line {
+  stroke: var(--border-quiet);
+}
+
+.plan-scale-control,
+.plan-unscheduled {
+  border-color: var(--border-quiet);
+  background: linear-gradient(145deg, rgb(255 255 255 / 0.02), transparent), var(--surface);
+}
+
+.plan-scale-control {
+  min-height: 58px;
+  border-radius: 22px;
+}
+
+.plan-scale-control button {
+  border-radius: 18px;
+}
+
+.plan-gantt-viewport {
+  border-color: var(--border-quiet);
+  background: linear-gradient(90deg, rgb(255 255 255 / 0.012), transparent 35%), var(--background);
+}
+
+.plan-gantt-bar {
+  border-color: var(--border-quiet);
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025);
+}
+
+.plan-unscheduled {
+  border-radius: 22px;
+}
+
+@media (min-width: 700px) {
+  .plan-evolution {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .plan-evolution-card.is-summary,
+  .plan-evolution-card.is-line {
+    grid-column: 1 / -1;
+  }
+}

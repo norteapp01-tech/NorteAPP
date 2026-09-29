@@ -15,7 +15,7 @@ export function GuidanceEntry() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex h-16 w-full items-center gap-3 rounded-2xl px-1 text-left"
+        className="plan-guidance flex h-16 w-full items-center gap-3 rounded-2xl px-1 text-left"
       >
         <Compass className="h-5 w-5 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">

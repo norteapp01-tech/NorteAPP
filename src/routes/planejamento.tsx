@@ -14,6 +14,7 @@ import { OtherPlansSection } from "@/components/plan/OtherPlansSection";
 import { PlanMenuSheet } from "@/components/plan/PlanMenuSheet";
 import { nowDate } from "@/lib/test-clock";
 import { UnderlineTabs } from "@/components/ui/app-design-system";
+import "@/components/plan/plan.css";
 
 export const Route = createFileRoute("/planejamento")({
   head: () => ({ meta: [{ title: "Planejamento — Norte" }] }),
@@ -62,7 +63,7 @@ function PlanScreen() {
   );
 
   return (
-    <div className="norte-page">
+    <div className="norte-page plan-list-page">
       <div className="flex items-start justify-between gap-3">
         <header className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -79,7 +80,7 @@ function PlanScreen() {
       </div>
 
       <UnderlineTabs
-        className="mt-6"
+        className="plan-horizon-tabs mt-6"
         items={(Object.keys(layerLabel) as Layer[]).map((key) => ({
           key,
           label: layerLabel[key],
@@ -164,7 +165,7 @@ function PlanningHorizonView({
   const others = filtered.filter((g) => g.id !== focus?.id);
 
   return (
-    <div className="mt-5 space-y-5">
+    <div className="plan-horizon-view mt-5 space-y-5">
       {focus && (
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">

@@ -35,6 +35,7 @@ import {
 } from "@/lib/goals-store";
 import { useCycleStore } from "@/lib/workout-cycle-store";
 import { CyclePage } from "@/components/academia/cycle/CyclePage";
+import "@/components/plan/plan.css";
 
 export const Route = createFileRoute("/objetivo/$id")({
   head: ({ params }) => ({
@@ -167,7 +168,7 @@ export function GoalDetail() {
   }
 
   return (
-    <div className="norte-page pb-10">
+    <div className="norte-page plan-detail-page pb-10">
       <PlanHeader
         goal={goal}
         allSteps={allSteps}
@@ -183,7 +184,7 @@ export function GoalDetail() {
       </div>
 
       {tab === "planejamento" && (
-        <div className="mt-5 space-y-6">
+        <div className="plan-planning-tab mt-5 space-y-6">
           <GuidanceEntry />
 
           {stalled && <StalledPlanAlert onDefineNext={handleDefineNext} />}

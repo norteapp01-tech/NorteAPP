@@ -28,11 +28,11 @@ export function OtherPlansSection({
 }) {
   if (goals.length === 0) return null;
   return (
-    <div>
+    <div className="plan-other-section">
       <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
         Outros planos ({goals.length})
       </p>
-      <div className="card-surface mt-3 divide-y divide-border overflow-hidden p-0">
+      <div className="plan-other-list card-surface mt-3 divide-y divide-border overflow-hidden p-0">
         {goals.map((g) => (
           <OtherPlanRow key={g.id} goal={g} steps={steps} executions={executions} />
         ))}
@@ -64,7 +64,7 @@ function OtherPlanRow({
       to="/objetivo/$id"
       params={{ id: goal.id }}
       search={action.kind === "define" ? { openStep: action.step.id, create: true } : undefined}
-      className="flex items-center gap-3 p-3.5 hover:bg-surface-2"
+      className="plan-other-row flex items-center gap-3 p-3.5 hover:bg-surface-2"
     >
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold leading-snug">{goal.title}</p>

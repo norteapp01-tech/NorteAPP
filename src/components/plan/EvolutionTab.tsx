@@ -33,9 +33,17 @@ const statusTone = {
   atrasado: "bg-danger/15 text-danger",
 };
 
-function Card({ label, children }: { label: string; children: React.ReactNode }) {
+function Card({
+  label,
+  children,
+  className = "",
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="card-surface p-4">
+    <div className={`plan-evolution-card card-surface p-4 ${className}`}>
       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
@@ -46,7 +54,7 @@ function Card({ label, children }: { label: string; children: React.ReactNode })
 
 function Stat({ n, of, label }: { n: number; of?: number; label: string }) {
   return (
-    <div className="rounded-xl bg-surface-2 p-3 text-center">
+    <div className="plan-evolution-stat rounded-xl bg-surface-2 p-3 text-center">
       <p className="text-lg font-bold">
         {n}
         {of !== undefined && <span className="text-xs text-muted-foreground">/{of}</span>}
@@ -78,8 +86,8 @@ export function EvolutionTab({
   const eta = estimatedCompletionDate(goal, allSteps, allExecutions);
 
   return (
-    <div className="mt-5 space-y-3">
-      <Card label="Resumo">
+    <div className="plan-evolution mt-5 space-y-3">
+      <Card label="Resumo" className="is-summary">
         <div className="flex items-center gap-5">
           <ProgressRing pct={progress} pace={pace} />
           <div className="min-w-0 flex-1">
@@ -111,9 +119,9 @@ export function EvolutionTab({
         </p>
       </Card>
 
-      <Card label="Números">
+      <Card label="Números" className="is-numbers">
         <div
-          className={`grid gap-2 ${goal.trackingType === "etapas" ? "grid-cols-2" : "grid-cols-3"}`}
+          className={`plan-evolution-stats grid gap-2 ${goal.trackingType === "etapas" ? "grid-cols-2" : "grid-cols-3"}`}
         >
           <Stat n={steps.filter((s) => s.done).length} of={steps.length} label="Etapas" />
           {goal.trackingType !== "etapas" && (
@@ -121,7 +129,7 @@ export function EvolutionTab({
           )}
           <Stat n={executions.length} label="Execuções" />
         </div>
-        <div className="mt-2.5 grid grid-cols-2 gap-2 text-center text-[11px]">
+        <div className="plan-evolution-meta mt-2.5 grid grid-cols-2 gap-2 text-center text-[11px]">
           <div className="rounded-xl bg-surface-2 p-2.5">
             <p className="text-muted-foreground">Prazo</p>
             <p className="mt-0.5 font-semibold">{goal.deadlineLabel || "sem prazo definido"}</p>
@@ -133,11 +141,11 @@ export function EvolutionTab({
         </div>
       </Card>
 
-      <Card label="Ritmo esperado vs. real">
+      <Card label="Ritmo esperado vs. real" className="is-pace">
         <PaceBar goal={goal} steps={allSteps} executions={allExecutions} />
       </Card>
 
-      <Card label="Linha de evolução">
+      <Card label="Linha de evolução" className="is-line">
         {line.length < 2 ? (
           <p className="text-sm text-muted-foreground">
             Ainda não há histórico suficiente pra desenhar a evolução — conclua etapas ou execuções

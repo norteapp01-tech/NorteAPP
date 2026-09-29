@@ -1,0 +1,168 @@
+.agenda-page {
+  position: relative;
+  overflow-x: clip;
+  isolation: isolate;
+}
+
+.agenda-page::before {
+  position: absolute;
+  z-index: -1;
+  top: -120px;
+  right: -155px;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(157 106 57 / 0.14), transparent 68%);
+  content: "";
+  pointer-events: none;
+}
+
+.agenda-header .norte-page-title {
+  max-width: 310px;
+  font-size: clamp(36px, 10vw, 48px);
+  line-height: 0.98;
+}
+
+.agenda-week-card {
+  position: relative;
+  border-color: var(--border-quiet);
+  border-radius: 22px;
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.025), transparent 50%),
+    color-mix(in srgb, var(--surface) 93%, transparent);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025);
+}
+
+.agenda-week-nav {
+  padding: 3px 5px 0;
+}
+
+.agenda-week-days .norte-weekdays {
+  gap: 0;
+  overflow: hidden;
+  border-top: 1px solid var(--border-quiet);
+  border-radius: 0;
+}
+
+.agenda-week-days .norte-weekdays > button {
+  position: relative;
+  min-height: 72px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.agenda-week-days .norte-weekdays > button + button::before {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 0;
+  width: 1px;
+  background: var(--border-quiet);
+  content: "";
+}
+
+.agenda-week-days .norte-weekdays > button[aria-pressed="true"] {
+  z-index: 1;
+  border: 1px solid var(--primary);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+  box-shadow: inset 0 0 20px rgb(116 238 196 / 0.035);
+}
+
+.agenda-week-days .norte-weekdays > button[aria-current="date"]:not([aria-pressed="true"]) strong {
+  color: var(--primary);
+}
+
+.agenda-week-summary {
+  letter-spacing: 0.02em;
+}
+
+.agenda-day-heading {
+  padding-inline: 1px;
+}
+
+.agenda-day-sheet {
+  min-height: min(62vh, 620px);
+  border-color: var(--border-quiet);
+  border-radius: 22px;
+  clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%);
+  background:
+    linear-gradient(135deg, transparent calc(100% - 25px), rgb(158 104 54 / 0.12)),
+    linear-gradient(165deg, rgb(255 255 255 / 0.025), transparent 42%), var(--surface);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025);
+}
+
+.agenda-day-sheet::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 22px;
+  height: 22px;
+  border-left: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  background: linear-gradient(135deg, rgb(176 119 62 / 0.12), transparent);
+  content: "";
+  pointer-events: none;
+}
+
+.agenda-day-scroll {
+  scrollbar-color: color-mix(in srgb, var(--primary) 28%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.agenda-day-timeline > div[class*="border-t"] {
+  border-color: color-mix(in srgb, var(--border) 62%, transparent);
+}
+
+.agenda-now-line {
+  position: absolute;
+  z-index: 35;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    var(--primary),
+    color-mix(in srgb, var(--primary) 42%, transparent)
+  );
+  pointer-events: none;
+}
+
+.agenda-now-line > span {
+  position: absolute;
+  top: 50%;
+  left: -4px;
+  width: 9px;
+  height: 9px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--primary) 45%, transparent);
+}
+
+.agenda-now-line > strong {
+  position: absolute;
+  top: -20px;
+  right: 0;
+  color: var(--primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.agenda-details,
+.agenda-note {
+  border-color: var(--border-quiet);
+  background: linear-gradient(145deg, rgb(255 255 255 / 0.018), transparent), var(--surface-quiet);
+}
+
+@media (max-width: 380px) {
+  .agenda-week-days {
+    padding-inline: 5px;
+  }
+
+  .agenda-week-days .norte-weekdays > button {
+    padding-inline: 2px;
+  }
+}

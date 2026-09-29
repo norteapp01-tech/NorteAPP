@@ -206,7 +206,7 @@ export function GanttBar({
 
   return (
     <div
-      className={`absolute select-none overflow-hidden rounded-lg border px-2 py-1.5 ${tone} ${dragging ? "z-20 opacity-90 shadow-lg" : "z-10 shadow-sm"} ${!dragging && !reduceMotion ? "transition-[left,width] duration-150" : ""}`}
+      className={`plan-gantt-bar absolute select-none overflow-hidden rounded-lg border px-2 py-1.5 ${tone} ${dragging ? "z-20 opacity-90 shadow-lg" : "z-10 shadow-sm"} ${!dragging && !reduceMotion ? "transition-[left,width] duration-150" : ""}`}
       style={{ left, width, top: lane * rowHeight + 4, height: rowHeight - 10 }}
       onPointerDown={onPointerDown("move")}
       onPointerMove={onPointerMove}

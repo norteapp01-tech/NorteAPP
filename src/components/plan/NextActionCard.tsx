@@ -49,7 +49,7 @@ export function NextActionCard({
 
   if (action.kind !== "action") {
     return (
-      <div className="card-surface-featured border-l-2 border-l-primary p-5">
+      <div className="plan-next-card card-surface-featured border-l-2 border-l-primary p-5">
         <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Próximo passo
         </p>
@@ -94,7 +94,7 @@ export function NextActionCard({
   };
 
   return (
-    <div className="card-surface-featured border-l-2 border-l-primary p-5">
+    <div className="plan-next-card card-surface-featured border-l-2 border-l-primary p-5">
       <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
         Próximo passo
       </p>

@@ -79,7 +79,9 @@ export function StageAccordion({
   };
 
   return (
-    <div className={`card-surface p-4 ${state === "current" ? "border-l-2 border-l-primary" : ""}`}>
+    <div
+      className={`plan-stage-card card-surface p-4 ${state === "current" ? "is-current border-l-2 border-l-primary" : ""}`}
+    >
       <div className="flex items-start gap-3">
         <button
           disabled={toggling}

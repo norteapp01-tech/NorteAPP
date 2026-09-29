@@ -38,7 +38,7 @@ export function FocusPlanCard({
 
   return (
     <>
-      <div className="card-surface border-l-2 border-l-primary p-4">
+      <div className="plan-focus-card card-surface border-l-2 border-l-primary p-4">
         <Link to="/objetivo/$id" params={{ id: goal.id }} className="block">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">

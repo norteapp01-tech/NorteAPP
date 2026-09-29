@@ -58,7 +58,7 @@ export function PlanPath({
   const firstOpenIndex = ordered.findIndex((s) => !s.done);
 
   return (
-    <div>
+    <div className="plan-path">
       <div className="flex items-center justify-between">
         <h2 className="norte-section-title mb-3">Caminho do plano</h2>
         {ordered.length > 0 && (
@@ -102,7 +102,7 @@ export function PlanPath({
                 return byEnd !== 0 ? byEnd : a.createdAt.localeCompare(b.createdAt);
               });
             return (
-              <div key={step.id} className="flex gap-3">
+              <div key={step.id} className="plan-path-stage flex gap-3">
                 <div className="flex flex-col items-center">
                   <div
                     className={`w-[1.5px] flex-1 ${i === 0 ? "invisible" : nodeGreen ? "bg-primary" : "bg-border"}`}

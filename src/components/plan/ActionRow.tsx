@@ -118,7 +118,7 @@ export function ActionRow({
 
   return (
     <div
-      className={`rounded-xl border p-3 transition-colors ${highlighted ? "border-primary bg-primary/5" : "border-border bg-surface-2"}`}
+      className={`plan-action-row rounded-xl border p-3 transition-colors ${highlighted ? "border-primary bg-primary/5" : "border-border bg-surface-2"}`}
     >
       <div className="flex items-start gap-2.5">
         <button
