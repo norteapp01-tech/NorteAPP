@@ -13,6 +13,8 @@ import {
   SlidersHorizontal,
   Moon,
   Plus,
+  ArrowRight,
+  Clock3,
 } from "lucide-react";
 import { AppMenuButton, DawnMark } from "@/components/ui/app-design-system";
 import { InlineError } from "@/components/ui/inline-error";
@@ -95,7 +97,8 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
   const total = tasks.length;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   const displayTasks = useMemo(() => orderedTodayTasks(tasks), [tasks]);
-  const nextTaskId = displayTasks.find((t) => t.status !== "concluida")?.id;
+  const nextTask = displayTasks.find((t) => t.status !== "concluida");
+  const nextTaskId = nextTask?.id;
   const agendaPreview = displayTasks.slice(0, 3);
   const hiddenAgendaItems = Math.max(0, displayTasks.length - agendaPreview.length);
   const scheduledCount = tasks.filter((task) => task.rigid || task.startTime).length;
@@ -236,7 +239,24 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
         </div>
       )}
 
-      <section className="today-agenda mt-10">
+      {nextTask && (
+        <section className="today-next-card" aria-label="Próximo passo">
+          <p className="norte-eyebrow">Próximo passo</p>
+          <h2>{nextTask.title}</h2>
+          <p className="today-next-time">
+            <Clock3 size={18} />
+            {nextTask.startTime
+              ? formatTime(nextTask.startTime, profile.timeFormat)
+              : "No seu ritmo"}
+          </p>
+          <p className="today-next-category">{categoryMeta[nextTask.category]?.label ?? "Geral"}</p>
+          <button className="today-next-open" onClick={() => setFocus(nextTask)}>
+            Abrir <ArrowRight size={20} />
+          </button>
+        </section>
+      )}
+
+      <section className="today-agenda mt-8">
         <div className="flex items-end justify-between gap-4">
           <h2 className="norte-view-title">Agenda de hoje</h2>
           <Link to="/agenda" className="norte-secondary-action min-h-11 py-3 text-xs">

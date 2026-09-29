@@ -1,0 +1,431 @@
+/* Shared phone proportions. Reference PNGs are design canvases, not CSS pixels.
+   Keep content scrollable, controls reachable, and the same light across routes. */
+:root {
+  --norte-mint: #91f5da;
+  --norte-cut: 14px;
+  --norte-panel-radius: 14px;
+  --norte-phone-gutter: 18px;
+  --norte-heading: clamp(21px, 5.6vw, 25px);
+  --norte-dawn: radial-gradient(
+    ellipse 235px 200px at 88% -45px,
+    rgb(157 106 57 / 0.18),
+    transparent 72%
+  );
+  --norte-card-dawn: radial-gradient(ellipse at 100% 0%, rgb(157 106 57 / 0.16), transparent 48%);
+  --primary: var(--norte-mint);
+  --action-green: var(--norte-mint);
+  --ring: var(--norte-mint);
+}
+
+.norte-app.norte-shell-with-controls {
+  position: relative;
+  isolation: isolate;
+  background-image: var(--norte-dawn);
+  background-repeat: no-repeat;
+  padding-bottom: calc(112px + env(safe-area-inset-bottom));
+}
+.norte-app .norte-page {
+  min-width: 0;
+  padding-inline: var(--norte-phone-gutter);
+}
+/* Page-specific glows previously escaped their containers or disappeared behind
+   opaque ancestors. One shell background now supplies the ambient light. */
+.norte-app
+  :is(
+    .reading-page,
+    .finance-page,
+    .faith-page,
+    .agenda-page,
+    .plan-list-page,
+    .plan-detail-page,
+    .nutrition-module
+  )::before {
+  content: none;
+}
+.norte-app .norte-routine-header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.norte-app .norte-tabs > button,
+.norte-app .norte-tabs [role="tab"] {
+  height: auto;
+  min-height: 48px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.25;
+  padding-inline: 4px;
+}
+.norte-app .norte-tabs [aria-selected="true"] {
+  font-weight: 650;
+}
+.norte-app
+  :is(
+    .norte-view-title,
+    .academia-section-heading h2,
+    .reading-section-heading h2,
+    .nutrition-module h2
+  ) {
+  font-size: var(--norte-heading);
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+}
+.norte-app :is(.reading-module, .finance-module, .faith-module, .esportes-page .esportes-module) {
+  margin-top: 16px;
+}
+.norte-app .nutrition-module > .norte-tabs {
+  margin-top: 16px;
+}
+
+/* The signature cut applies to the photo cards and featured surfaces. */
+.norte-app :is(.routine-card, .today-stat-card) {
+  border-radius: var(--norte-panel-radius);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--norte-cut)) 0,
+    100% var(--norte-cut),
+    100% 100%,
+    0 100%
+  );
+}
+.norte-app .routine-card {
+  width: clamp(154px, 45vw, 190px);
+  height: 144px;
+}
+.norte-app .today-stat-card {
+  min-height: 64px;
+  gap: 8px;
+  padding: 12px;
+}
+.norte-app .today-stat-card > strong {
+  font-size: 28px;
+}
+.norte-app .today-greeting {
+  font-size: clamp(32px, 9vw, 42px);
+}
+.norte-app .today-next-card {
+  position: relative;
+  margin-top: 26px;
+  min-height: 180px;
+  padding: 22px 18px 62px;
+  border: 1px solid var(--border);
+  border-radius: var(--norte-panel-radius);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--norte-cut)) 0,
+    100% var(--norte-cut),
+    100% 100%,
+    0 100%
+  );
+  background:
+    linear-gradient(90deg, rgb(7 9 8 / 0.96), rgb(7 9 8 / 0.55)),
+    url("/images/home/routine-leitura.jpg") center / cover;
+  color: #f7f8f7;
+}
+.norte-app .today-next-card h2 {
+  font-size: 26px;
+  line-height: 1.12;
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+.norte-app .today-next-time {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+  font-size: 16px;
+}
+.norte-app .today-next-category {
+  margin-top: 6px;
+  color: #bfc5c2;
+  font-size: 13px;
+}
+.norte-app .today-next-open {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 99px;
+  background: #f4f3ef;
+  color: #111513;
+}
+.norte-app :is(.agenda-header, .plan-list-page) .norte-page-title {
+  font-size: clamp(30px, 8.5vw, 40px);
+  line-height: 1.06;
+}
+.norte-app .plan-detail-header h1 {
+  font-size: clamp(27px, 7.5vw, 34px);
+}
+
+.norte-app .academia-hero-card,
+.norte-app .academia-hero-copy {
+  min-height: 205px;
+}
+.norte-app .academia-hero-copy {
+  padding: 18px;
+}
+.norte-app .academia-hero-title {
+  font-size: clamp(23px, 6vw, 28px);
+  max-width: 80%;
+}
+.norte-app .academia-hero-subtitle {
+  font-size: 14px;
+}
+.norte-app .academia-hero-meta {
+  margin-top: 28px;
+  max-width: 52%;
+}
+.norte-app .academia-hero-action {
+  right: 12px;
+  bottom: 14px;
+  padding-inline: 12px;
+  min-height: 44px;
+}
+.norte-app .academia-exercise-list > li > :is(button, div) {
+  min-height: 64px;
+  gap: 10px;
+}
+.norte-app .academia-exercise-state {
+  width: 26px;
+  height: 26px;
+}
+.norte-app .academia-week-card .norte-weekdays > button {
+  min-height: 66px;
+}
+.norte-app :is(.academy-program-hero, .evolution-dashboard .evo-hero-card) {
+  background:
+    var(--norte-card-dawn), linear-gradient(110deg, var(--surface-quiet), var(--background));
+}
+.norte-app .academy-program-hero {
+  min-height: 250px;
+  padding: 18px;
+}
+.norte-app .academy-program-hero h2 {
+  font-size: clamp(23px, 6vw, 28px);
+}
+.norte-app .academy-program-main {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 24px;
+}
+.norte-app .academy-program-main > div:first-child {
+  width: 100%;
+}
+.norte-app .academy-program-main > div:first-child > strong {
+  font-size: 21px;
+}
+.norte-app .academy-stage-line {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  width: 100%;
+}
+.norte-app .academy-program-open {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  margin: 18px 0 0 auto;
+  min-height: 44px;
+}
+.norte-app .evolution-dashboard .evo-hero-card {
+  min-height: 250px;
+}
+.norte-app .evolution-dashboard .evo-hero-copy {
+  padding: 18px;
+  width: 64%;
+}
+.norte-app .evolution-dashboard .evo-hero-copy h2 {
+  font-size: 23px;
+}
+.norte-app .evolution-dashboard .evo-constancy {
+  margin-top: 22px;
+}
+.norte-app .evolution-dashboard .evo-map-preview .evo-body-stage {
+  height: 270px;
+}
+.norte-app .evolution-dashboard .evo-map-controls > .evo-tabs button {
+  padding-inline: 10px;
+}
+.norte-app .evolution-dashboard .evo-map-compact > .evo-map-controls {
+  left: 14px;
+}
+.norte-app .evolution-dashboard .evo-view-toggle {
+  right: 10px;
+  padding-inline: 10px;
+}
+
+.norte-app .esportes-overview .sp-start-card {
+  min-height: 205px;
+}
+.norte-app .esportes-overview .sp-start-copy {
+  inset: 22px auto 20px 18px;
+  width: 70%;
+}
+.norte-app .esportes-overview .sp-start-title {
+  font-size: 28px;
+}
+.norte-app .esportes-overview .sp-start-subtitle {
+  font-size: 14px;
+}
+.norte-app .esportes-overview .sp-start-action {
+  height: 44px;
+  min-width: 96px;
+  font-size: 16px;
+  right: 12px;
+  bottom: 14px;
+}
+.norte-app .esportes-overview .sp-week-summary {
+  min-height: 150px;
+  grid-template-columns: minmax(96px, 0.8fr) minmax(0, 1.7fr);
+}
+.norte-app .esportes-overview .sp-week-next {
+  padding: 16px 12px 0;
+}
+.norte-app .esportes-overview .sp-week-next-copy strong {
+  font-size: 20px;
+}
+.norte-app .esportes-overview .sp-week-actions {
+  display: flex;
+  flex-wrap: wrap;
+}
+.norte-app .esportes-overview .sp-week-actions button {
+  min-height: 44px;
+  font-size: 12px;
+  white-space: normal;
+  flex: 1 1 110px;
+}
+.norte-app .esportes-overview .sp-week-actions button + button {
+  border-left: 0;
+}
+.norte-app .esportes-overview .sp-metric-layout {
+  grid-template-columns: minmax(140px, 1fr) minmax(0, 1.3fr);
+  gap: 8px;
+}
+.norte-app .esportes-overview .sp-metric-value {
+  font-size: 25px;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.norte-app .reading-hero-card,
+.norte-app .reading-hero-copy {
+  min-height: 285px;
+}
+.norte-app .reading-hero-copy {
+  width: 68%;
+  padding: 20px 0 18px 18px;
+}
+.norte-app .reading-hero-copy h2 {
+  font-size: 24px;
+}
+.norte-app .reading-hero-copy button {
+  font-size: 13px;
+}
+.norte-app .reading-hero-schedule {
+  font-size: 12px;
+  line-height: 1.4;
+}
+.norte-app .reading-hero-schedule--empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.norte-app .reading-hero-schedule--empty button {
+  min-height: 44px;
+}
+.norte-app .nutrition-goals-hero {
+  min-height: 300px;
+}
+.norte-app .nutrition-goals-copy {
+  width: 76%;
+  padding: 20px 0 74px 16px;
+}
+.norte-app .nutrition-goals-copy h3 {
+  font-size: 25px;
+}
+.norte-app .nutrition-macro-row {
+  grid-template-columns: 76px minmax(20px, 1fr) auto;
+  gap: 7px;
+}
+.norte-app .nutrition-panel.nutrition-featured {
+  background-image: var(--norte-card-dawn);
+}
+
+/* Safe phone controls: enough room above the dock, no horizontal page panning,
+   and readable form text without iOS focus zoom. */
+.norte-app .norte-voice-dock {
+  grid-template-columns: minmax(100px, 1fr) minmax(16px, 0.35fr) 56px minmax(16px, 0.35fr) 44px;
+  min-height: 76px;
+  padding: 8px 12px;
+}
+.norte-app .norte-voice-mic {
+  width: 56px;
+  height: 56px;
+}
+.norte-app .norte-voice-copy {
+  font-size: 13px;
+}
+@media (max-width: 480px) {
+  .norte-app :is(input, textarea, select) {
+    font-size: 16px;
+  }
+  [role="dialog"] :is(input, textarea, select) {
+    font-size: 16px;
+  }
+}
+@media (max-width: 360px) {
+  :root {
+    --norte-phone-gutter: 14px;
+    --norte-cut: 12px;
+  }
+  .norte-app .norte-tabs [role="tab"] {
+    font-size: 12px;
+  }
+  .norte-app .esportes-modalities button {
+    gap: 4px;
+    font-size: 12px;
+    flex-direction: column;
+    min-height: 52px;
+  }
+  .norte-app .sp-flip-controls > span {
+    display: none;
+  }
+  .norte-app .nutrition-goals-copy {
+    width: 86%;
+  }
+  .norte-app .reading-hero-copy {
+    width: 78%;
+  }
+  .norte-app .esportes-overview .sp-metric-layout {
+    grid-template-columns: minmax(120px, 1fr) minmax(0, 1fr);
+  }
+  .norte-app .esportes-overview .sp-metric-value {
+    font-size: 21px;
+  }
+  .norte-app .academy-program-hero {
+    min-height: 275px;
+  }
+  .norte-app .academy-program-main > div:first-child > strong {
+    font-size: 18px;
+  }
+  .norte-app .evolution-dashboard .evo-map-controls > .evo-tabs {
+    gap: 4px;
+  }
+  .norte-app .evolution-dashboard .evo-map-controls > .evo-tabs button {
+    padding-inline: 7px;
+    font-size: 11px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .norte-app .norte-voice-wave i {
+    animation: none;
+  }
+}

@@ -2,6 +2,7 @@
 @source "../src";
 @import "tw-animate-css";
 @import "./brand.css";
+@import "./mobile-identity.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -67,7 +68,7 @@
   --card-foreground: oklch(0.98 0 0);
   --popover: #171a18;
   --popover-foreground: oklch(0.98 0 0);
-  --primary: #82efb1;
+  --primary: #91f5da;
   --primary-foreground: oklch(0.15 0.02 150);
   --secondary: oklch(0.27 0.008 260);
   --secondary-foreground: oklch(0.98 0 0);
@@ -82,8 +83,8 @@
   --danger: oklch(0.7 0.2 25);
   --border: #333936;
   --input: oklch(0.27 0.008 260);
-  --ring: oklch(0.82 0.18 145);
-  --action-green: #82efb1;
+  --ring: #91f5da;
+  --action-green: #91f5da;
   --action-ink: #06260d;
   --surface-sheen: linear-gradient(145deg, rgb(255 255 255 / 0.018), transparent 48%);
   --surface-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025);

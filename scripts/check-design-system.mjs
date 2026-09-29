@@ -2,7 +2,7 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
-const out = "/tmp/norte-harmony";
+const out = process.env.AUDIT_OUTPUT ?? "/tmp/norte-harmony";
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({
@@ -14,6 +14,90 @@ page.on("pageerror", (e) => errors.push(e.message));
 await page.addInitScript(() => sessionStorage.setItem("norte-welcome-entered", "true"));
 const day = new Date().toLocaleDateString("en-CA");
 const tables = {
+  workout_plans: [{ id: "p1", name: "Peito e tríceps", letter: "A", order_index: 0 }],
+  workout_exercises: [
+    {
+      id: "e1",
+      plan_id: "p1",
+      lineage_id: "e1",
+      name: "Supino reto com barra",
+      sets_target: 4,
+      reps_target: 10,
+      load_target: 70,
+      rest_seconds: 90,
+    },
+  ],
+  workout_cycles: [
+    {
+      id: "cycle",
+      name: "Hipertrofia — 2º semestre",
+      start_date: "2026-09-07",
+      end_date: "2026-12-14",
+      status: "ativo",
+      created_at: "2026-09-07",
+    },
+  ],
+  workout_cycle_blocks: [
+    {
+      id: "block",
+      cycle_id: "cycle",
+      name: "Hipertrofia",
+      focus: "Força",
+      start_date: "2026-09-07",
+      end_date: "2026-12-14",
+      order_index: 0,
+    },
+  ],
+  workout_block_plans: [{ id: "bp1", block_id: "block", plan_id: "p1", order_index: 0 }],
+  workout_block_days: Array.from({ length: 7 }, (_, weekday) => ({
+    id: `bd${weekday}`,
+    block_id: "block",
+    plan_id: "p1",
+    weekday,
+    time: "19:00",
+  })),
+  goals: [
+    {
+      id: "visual-plan",
+      title: "Criar uma loja",
+      kind: "goal",
+      category: "trabalho",
+      life_area: "profissional",
+      tracking_type: "steps",
+      deadline_date: "2026-12-28",
+      created_at: "2026-09-28",
+    },
+  ],
+  steps: [
+    {
+      id: "visual-step",
+      goal_id: "visual-plan",
+      title: "Mercado",
+      target_date: "2026-10-20",
+      done: false,
+      order_index: 0,
+    },
+  ],
+  reading_notes: [
+    {
+      id: "note-1",
+      book_id: "b1",
+      type: "insight",
+      content: "Vale mais desenhar o ambiente do que confiar na força de vontade.",
+      page: 94,
+      tags: [],
+      created_at: "2026-09-17T12:00:00Z",
+    },
+  ],
+  prayer_subjects: [
+    {
+      id: "prayer-1",
+      title: "Saúde da minha avó",
+      category: "Família",
+      status: "em_oracao",
+      created_at: "2026-09-17T12:00:00Z",
+    },
+  ],
   meals: ["Café da manhã", "Almoço", "Jantar"].map((name, i) => ({
     id: `m${i}`,
     name,
@@ -114,6 +198,15 @@ const tomorrow = tomorrowDate.toLocaleDateString("en-CA");
 tables.profiles = { mood_date: day, mood_extra_execution_ids: ["extra"], water_goal_ml: 2000 };
 tables.executions = [
   {
+    id: "plan-action",
+    goal_id: "visual-plan",
+    step_id: "visual-step",
+    title: "Definir qual nicho entrar",
+    due_date: tomorrow,
+    planned_start_date: day,
+    planned_end_date: tomorrow,
+  },
+  {
     id: "today-task",
     title: "Preparar a semana",
     due_date: day,
@@ -168,6 +261,7 @@ const routes = [
   ["hoje", "/"],
   ["agenda", "/agenda"],
   ["planos", "/planejamento"],
+  ["plano-detalhe", "/objetivo/visual-plan"],
   ["espelho", "/dashboard"],
   ["esportes", "/sub-agenda/esportes"],
   ["academia", "/sub-agenda/academia"],
@@ -208,6 +302,22 @@ try {
       await check(`${theme}-${name}`);
       await page.setViewportSize({ width: 320, height: 740 });
       await check(`${theme}-${name}-320`);
+      await page.setViewportSize({ width: 390, height: 844 });
+      // Check every internal tab, not just each module's landing screen.
+      const tabNames = await page.locator('.norte-tabs [role="tab"]').allTextContents();
+      for (let index = 0; index < tabNames.length; index++) {
+        const tab = page.locator('.norte-tabs [role="tab"]').nth(index);
+        await tab.click();
+        await page.waitForLoadState("networkidle");
+        if (name === "plano-detalhe" && tabNames[index].trim() === "Evolução") {
+          await page.locator(".plan-evolution").waitFor();
+        }
+        for (const width of [320, 375, 390, 430]) {
+          await page.setViewportSize({ width, height: 844 });
+          await check(`${theme}-${name}-tab-${index}-${width}`);
+        }
+      }
+      if (tabNames.length) await page.locator('.norte-tabs [role="tab"]').first().click();
       await page.setViewportSize({ width: 390, height: 844 });
       if (name === "alimentacao") {
         await page.getByRole("tab", { name: "Análise", exact: true }).click();
@@ -269,7 +379,7 @@ try {
   }
   assert.deepEqual(errors, [], "No runtime errors");
   console.log(
-    `PASS: ${routes.length} routes, both themes, 320/390px, charts, keyboard tabs and disclosure interactions. Screenshots: ${out}`,
+    `PASS: ${routes.length} routes, both themes, internal tabs at 320/375/390/430px, charts, keyboard tabs and disclosure interactions. Screenshots: ${out}`,
   );
 } catch (error) {
   console.error(errors);
