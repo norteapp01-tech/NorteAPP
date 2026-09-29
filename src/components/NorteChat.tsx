@@ -75,10 +75,14 @@ export function NorteChat({
   onBack,
   demo = false,
   onDemoComplete,
+  autoStartAudio = false,
+  fullscreen = false,
 }: {
   onBack: () => void;
   demo?: boolean;
   onDemoComplete?: () => void;
+  autoStartAudio?: boolean;
+  fullscreen?: boolean;
 }) {
   const userId = useSupabaseUserId();
   const [turns, setTurns] = useState<ChatTurn[]>([]);
@@ -94,6 +98,8 @@ export function NorteChat({
   const [error, setError] = useState("");
   const [settings, setSettings] = useState(false);
   const [recording, setRecording] = useState(false);
+  const autoAudioStarted = useRef(false);
+  const startAudioRef = useRef<() => void>(() => undefined);
   const lock = useRef(false);
   const recorder = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -248,9 +254,17 @@ export function NorteChat({
       streamRef.current?.getTracks().forEach((t) => t.stop());
     }
   }
+  startAudioRef.current = () => void startAudio();
+
+  useEffect(() => {
+    if (!autoStartAudio || !ready || autoAudioStarted.current) return;
+    autoAudioStarted.current = true;
+    startAudioRef.current();
+  }, [autoStartAudio, ready]);
+
   return (
     <section
-      className="flex min-h-[calc(100dvh-112px)] flex-col px-5 pt-5"
+      className={`flex flex-col px-5 pt-5 ${fullscreen ? "min-h-dvh" : "min-h-[calc(100dvh-112px)]"}`}
       aria-label="Conversa com Norte"
     >
       <header className="flex items-start justify-between pb-8">
@@ -258,7 +272,7 @@ export function NorteChat({
           onClick={onBack}
           className="flex min-h-11 items-center gap-1 text-sm text-muted-foreground"
         >
-          <ArrowLeft size={18} /> {demo ? "Voltar" : "Hoje"}
+          <ArrowLeft size={18} /> {demo || fullscreen ? "Voltar" : "Hoje"}
         </button>
         <div className="text-center">
           <DawnMark compact />
@@ -462,13 +476,13 @@ export function NorteChat({
       {unreadBelow && (
         <button
           onClick={scrollToBottom}
-          className={`interactive-press state-fade sticky ${demo ? "bottom-16" : "bottom-40"} z-10 mx-auto flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold shadow-lg`}
+          className={`interactive-press state-fade sticky ${demo || fullscreen ? "bottom-16" : "bottom-40"} z-10 mx-auto flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold shadow-lg`}
         >
           <ArrowDown className="h-3.5 w-3.5" />
           Novas mensagens
         </button>
       )}
-      <div className={`sticky ${demo ? "bottom-0" : "bottom-24"} bg-background py-3`}>
+      <div className={`sticky ${demo || fullscreen ? "bottom-0" : "bottom-24"} bg-background py-3`}>
         {recording && (
           <p className="mb-2 text-sm text-primary">
             Gravando… Toque em parar para revisar o texto.

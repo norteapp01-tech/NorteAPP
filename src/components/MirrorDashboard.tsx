@@ -76,7 +76,7 @@ export function MirrorDashboard() {
             Um reflexo honesto da sua {range === "dia" ? "rotina" : range}.
           </p>
         </div>
-        <AppMenuButton />
+        <AppMenuButton className="norte-local-global-action" />
       </header>
 
       <UnderlineTabs

@@ -58,7 +58,7 @@ export function QuickSetPanel({
       setRect(el.getBoundingClientRect());
       // Medido, não chutado: o rodapé não existe na tela de gravação do
       // Esportes, e um valor fixo sobraria justamente onde há espaço.
-      const nav = document.querySelector(".norte-bottom-nav");
+      const nav = document.querySelector(".norte-voice-dock, .norte-bottom-nav");
       setNavHeight(nav ? nav.getBoundingClientRect().height : 0);
     };
     measure();

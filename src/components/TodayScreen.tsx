@@ -155,7 +155,7 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
       <header className="today-hero relative">
         <div className="flex items-center justify-between gap-4">
           <DawnMark />
-          <div className="flex items-center gap-1">
+          <div className="norte-local-global-action flex items-center gap-1">
             {onOpenChat && (
               <button
                 aria-label="Conversar com o Norte"

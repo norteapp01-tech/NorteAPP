@@ -11,7 +11,7 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 import { WelcomeScreen } from "../components/WelcomeScreen";
 import { OnboardingFlow } from "../components/OnboardingFlow";
-import { Home, Plus, BarChart3, CalendarDays, CalendarRange } from "lucide-react";
+import { Menu, MoreVertical } from "lucide-react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -22,6 +22,11 @@ import { ActiveRecordingBar } from "../components/esportes/ActiveRecordingBar";
 import { GymSessionProvider } from "../lib/gym-session-context";
 import { WorkoutBubble } from "../components/academia/WorkoutBubble";
 import { themeBootScript } from "../lib/theme";
+import { VoiceDock } from "../components/navigation/VoiceDock";
+import { MoreFunctionsSheet } from "../components/navigation/MoreFunctionsSheet";
+import { NorteChat } from "../components/NorteChat";
+import { SettingsPanel } from "../components/settings/SettingsPanel";
+import "../components/navigation/navigation.css";
 
 function NotFoundComponent() {
   return (
@@ -122,55 +127,6 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
-type NavItem = { to: string; label: string; icon: typeof Home; primary?: boolean };
-const navItems: NavItem[] = [
-  { to: "/", label: "Hoje", icon: Home },
-  { to: "/agenda", label: "Agenda", icon: CalendarDays },
-  { to: "/criar", label: "", icon: Plus, primary: true },
-  { to: "/planejamento", label: "Plano", icon: CalendarRange },
-  { to: "/dashboard", label: "Espelho", icon: BarChart3 },
-];
-
-function BottomNav() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  // A gravação é uma tela cheia dedicada — o nav fixo no rodapé cobria
-  // exatamente a fileira de Pausar/Continuar/Finalizar por cima.
-  if (pathname === "/esportes/gravar") return null;
-  return (
-    <nav aria-label="Navegação principal" className="norte-bottom-nav">
-      <div className="norte-bottom-nav-items">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.to;
-          if (item.primary) {
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                aria-label="Adicionar"
-                className="interactive-press norte-create-button"
-              >
-                <Icon className="h-6 w-6" strokeWidth={2.5} />
-              </Link>
-            );
-          }
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              aria-current={active ? "page" : undefined}
-              className={`interactive-press flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[11px] ${active ? "text-primary" : "text-muted-foreground"}`}
-            >
-              <Icon className="h-5 w-5" />
-              <span className="font-medium">{item.label}</span>
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
-  );
-}
-
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -178,6 +134,10 @@ function RootComponent() {
   const [demo, setDemo] = useState(false);
   const [manualLogin, setManualLogin] = useState(false);
   const [recovering, setRecovering] = useState(false);
+  const [voiceChatOpen, setVoiceChatOpen] = useState(false);
+  const [startChatWithVoice, setStartChatWithVoice] = useState(false);
+  const [functionsOpen, setFunctionsOpen] = useState(false);
+  const [globalSettingsOpen, setGlobalSettingsOpen] = useState(false);
 
   function markEntered() {
     try {
@@ -345,7 +305,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <div
-        className={`norte-app mx-auto min-h-screen max-w-md bg-background ${isFullScreenRoute ? "" : "pb-28"}`}
+        className={`norte-app mx-auto min-h-screen max-w-md bg-background ${isFullScreenRoute ? "" : "norte-shell-with-controls pb-28"}`}
       >
         <AuthGate>
           <SportRecorderProvider>
@@ -357,10 +317,61 @@ function RootComponent() {
                 <Outlet />
               </div>
               <ActiveRecordingBar />
-              {/* Depois do nav: bolha e painel são controle de algo em curso e
-                  não podem ficar enterrados sob a navegação, que é fixa e
-                  ocupa a mesma camada. */}
-              <BottomNav />
+              {!isFullScreenRoute && !voiceChatOpen && (
+                <>
+                  <div className="norte-global-utilities" aria-label="Acessos globais">
+                    <button
+                      type="button"
+                      onClick={() => setFunctionsOpen(true)}
+                      className="interactive-press"
+                      aria-label="Abrir mais funções"
+                    >
+                      <Menu className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGlobalSettingsOpen(true)}
+                      className="interactive-press"
+                      aria-label="Abrir configurações"
+                    >
+                      <MoreVertical className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <VoiceDock
+                    onVoice={() => {
+                      setStartChatWithVoice(true);
+                      setVoiceChatOpen(true);
+                    }}
+                    onKeyboard={() => {
+                      setStartChatWithVoice(false);
+                      setVoiceChatOpen(true);
+                    }}
+                  />
+                </>
+              )}
+              {voiceChatOpen && (
+                <div className="norte-global-chat">
+                  <NorteChat
+                    fullscreen
+                    autoStartAudio={startChatWithVoice}
+                    onBack={() => {
+                      setVoiceChatOpen(false);
+                      setStartChatWithVoice(false);
+                    }}
+                  />
+                </div>
+              )}
+              {functionsOpen && (
+                <MoreFunctionsSheet
+                  onClose={() => setFunctionsOpen(false)}
+                  onOpenChat={() => {
+                    setStartChatWithVoice(false);
+                    setVoiceChatOpen(true);
+                  }}
+                  onOpenSettings={() => setGlobalSettingsOpen(true)}
+                />
+              )}
+              {globalSettingsOpen && <SettingsPanel onClose={() => setGlobalSettingsOpen(false)} />}
               <WorkoutBubble />
             </GymSessionProvider>
           </SportRecorderProvider>

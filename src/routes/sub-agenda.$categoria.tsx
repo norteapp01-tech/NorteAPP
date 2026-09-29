@@ -128,7 +128,11 @@ function SubAgenda() {
           <ChevronLeft className="h-4 w-4" /> Hoje
         </Link>
         <h1>{meta.label}</h1>
-        <AppMenuButton onClick={() => setSettingsOpen(true)} aria-label="Abrir configurações" />
+        <AppMenuButton
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Abrir configurações"
+          className="norte-local-global-action"
+        />
       </header>
 
       {categoria !== "leitura" &&

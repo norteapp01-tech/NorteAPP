@@ -130,7 +130,7 @@ function AgendaScreen() {
         <AppMenuButton
           onClick={() => setSettingsOpen(true)}
           aria-label="Abrir configurações"
-          className="absolute -right-2 -top-2"
+          className="norte-local-global-action absolute -right-2 -top-2"
         />
         <button
           onClick={() => setCalendarOpen(true)}
