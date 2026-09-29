@@ -19,14 +19,20 @@ export function VoiceDock({
   onVoice: () => void;
   onKeyboard: () => void;
 }) {
-  // Pulso de disparo único no toque do microfone — o "morph" da referência,
-  // sem um passo de pill-de-status que não existe aqui. Limpo pelo próprio
-  // fim da animação (mesmo padrão de check-enter/page-enter em styles.css),
-  // nunca preso em "true" se o clique disparar mais rápido que o CSS carrega.
-  const [pulsing, setPulsing] = useState(false);
+  // Animação de "entrega" ao tocar o microfone: o botão cresce e os
+  // elementos ao lado somem — o morph da referência, adaptado (aqui não há
+  // um passo de pill-de-status pra virar botão; o próprio botão já É o
+  // ponto de partida). Dispara junto com onVoice, sem atraso artificial —
+  // o dock some da árvore quase junto (voiceChatOpen vira true no pai), mas
+  // o começo do movimento já fica visível no primeiro frame.
+  const [activating, setActivating] = useState(false);
 
   return (
-    <div className="norte-voice-dock" role="group" aria-label="Conversa com o Norte">
+    <div
+      className={`norte-voice-dock ${activating ? "is-activating" : ""}`}
+      role="group"
+      aria-label="Conversa com o Norte"
+    >
       <button
         type="button"
         onClick={onKeyboard}
@@ -41,11 +47,10 @@ export function VoiceDock({
       <button
         type="button"
         onClick={() => {
-          setPulsing(true);
+          setActivating(true);
           onVoice();
         }}
-        onAnimationEnd={() => setPulsing(false)}
-        className={`norte-voice-mic interactive-press ${pulsing ? "is-pulsing" : ""}`}
+        className="norte-voice-mic interactive-press"
         aria-label="Conversar por voz com o Norte"
       >
         <Mic className="h-7 w-7" strokeWidth={2} />

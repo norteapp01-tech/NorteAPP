@@ -6,6 +6,27 @@ import { useSupabaseUserId, getAccessToken } from "@/lib/supabase/client";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { AppMenuButton, DawnMark } from "@/components/ui/app-design-system";
 import { AgentCard, parseCard, type CardData } from "./AgentCard";
+import { useMicWaveform } from "@/lib/use-mic-waveform";
+
+/** Barras com a amplitude REAL do microfone (useMicWaveform) — nada de CSS
+ * em loop fingindo reagir à voz. */
+function LiveWaveform({ levels }: { levels: number[] }) {
+  return (
+    <div
+      className="flex h-12 items-center justify-center gap-[3px]"
+      role="img"
+      aria-label="Gravando"
+    >
+      {levels.map((level, i) => (
+        <span
+          key={i}
+          className="w-1 rounded-full bg-primary"
+          style={{ height: `${8 + level * 40}px`, transition: "height 80ms linear" }}
+        />
+      ))}
+    </div>
+  );
+}
 
 const labels: Record<string, [string, string]> = {
   criar_plano: ["Planejamento", "/planejamento"],
@@ -109,6 +130,10 @@ export function NorteChat({
   const successfulReplies = useRef(0);
   const nearBottom = useRef(true);
   const [unreadBelow, setUnreadBelow] = useState(false);
+  // streamRef já existe no momento em que `recording` vira true (é setado
+  // antes de setRecording na mesma função) — ler .current aqui no render
+  // pega o stream certo, sem precisar duplicar em estado React.
+  const waveformLevels = useMicWaveform(recording, recording ? streamRef.current : null);
 
   const scrollToBottom = () => {
     bottom.current?.scrollIntoView({
@@ -482,11 +507,16 @@ export function NorteChat({
           Novas mensagens
         </button>
       )}
-      <div className={`sticky ${demo || fullscreen ? "bottom-0" : "bottom-24"} bg-background py-3`}>
+      <div
+        className={`sticky ${demo || fullscreen ? "bottom-0" : "bottom-24"} ${fullscreen ? "bg-surface" : "bg-background"} py-3`}
+      >
         {recording && (
-          <p className="mb-2 text-sm text-primary">
-            Gravando… Toque em parar para revisar o texto.
-          </p>
+          <div className="mb-2">
+            <LiveWaveform levels={waveformLevels} />
+            <p className="text-center text-xs text-muted-foreground">
+              Gravando… Toque em parar para revisar o texto.
+            </p>
+          </div>
         )}
         <form
           onSubmit={(e) => {

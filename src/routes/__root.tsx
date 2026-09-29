@@ -26,7 +26,7 @@ import { VoiceDock } from "../components/navigation/VoiceDock";
 import { MoreFunctionsSheet } from "../components/navigation/MoreFunctionsSheet";
 import { NorteChat } from "../components/NorteChat";
 import { SettingsPanel } from "../components/settings/SettingsPanel";
-import { FullScreenSheet } from "../components/ui/modal";
+import { VoiceRevealSheet } from "../components/ui/modal";
 import "../components/navigation/navigation.css";
 
 function NotFoundComponent() {
@@ -351,9 +351,7 @@ function RootComponent() {
                 </>
               )}
               {voiceChatOpen && (
-                <FullScreenSheet
-                  hideHeader
-                  overlayVariant="dim"
+                <VoiceRevealSheet
                   title="Conversa com Norte"
                   onClose={() => {
                     setVoiceChatOpen(false);
@@ -367,7 +365,7 @@ function RootComponent() {
                       onBack={requestClose}
                     />
                   )}
-                </FullScreenSheet>
+                </VoiceRevealSheet>
               )}
               {functionsOpen && (
                 <MoreFunctionsSheet
