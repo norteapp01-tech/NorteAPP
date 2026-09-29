@@ -327,6 +327,20 @@ try {
         assert.equal(await page.getByLabel("Nutriente", { exact: true }).inputValue(), "1");
       }
       if (name === "hoje") {
+        assert.equal(await page.locator(".norte-global-utilities > button").count(), 1);
+        assert.equal(await page.locator(".routine-card-image img").count(), 6);
+        assert.equal(
+          await page
+            .locator(".routine-card-image img")
+            .evaluateAll((images) =>
+              images.every((image) => image.complete && image.naturalWidth > 0),
+            ),
+          true,
+          "Every routine card image loaded",
+        );
+        await page.getByRole("button", { name: "Abrir mais funções" }).click();
+        await page.getByRole("dialog", { name: "Mais funções" }).waitFor();
+        await page.getByRole("button", { name: "Fechar mais funções" }).click();
         const extras = page.locator("details").filter({ hasText: "Extras de hoje" });
         assert.equal(await extras.getAttribute("open"), null);
         await extras.locator("summary").focus();

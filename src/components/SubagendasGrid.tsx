@@ -1,14 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import {
-  Dumbbell,
-  BookOpen,
-  Salad,
-  Wallet,
-  HandHeart,
-  Footprints,
-  type LucideIcon,
-  ChevronRight,
-} from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { categoryMeta } from "@/lib/mock-data";
 
 /** Categorias que representam módulos pessoais de rotina — Trabalho e Geral continuam
@@ -16,25 +7,13 @@ import { categoryMeta } from "@/lib/mock-data";
  * como "módulo dedicado" nessa faixa. */
 const routineCategories = ["academia", "esportes", "leitura", "alimentacao", "financas", "fe"];
 
-/** Ícones lucide (consistentes com o resto do app) só pra essa faixa compacta — o
- * emoji de categoryMeta continua sendo a fonte usada em badges/cards em outras telas,
- * não é substituído, só não é o ideal pra um círculo de ícone pequeno e uniforme. */
-const routineIcons: Record<string, LucideIcon> = {
-  academia: Dumbbell,
-  esportes: Footprints,
-  leitura: BookOpen,
-  alimentacao: Salad,
-  financas: Wallet,
-  fe: HandHeart,
-};
-
-const routineVisuals: Record<string, { image?: string; detail: string }> = {
+const routineVisuals: Record<string, { image: string; detail: string }> = {
   academia: { image: "/images/home/routine-academia.jpg", detail: "Treino de hoje" },
   leitura: { image: "/images/home/routine-leitura.jpg", detail: "Continuar leitura" },
   alimentacao: { image: "/images/home/routine-alimentacao.jpg", detail: "Refeições de hoje" },
-  esportes: { detail: "Visão geral" },
-  financas: { detail: "Resumo do mês" },
-  fe: { detail: "Seu espaço" },
+  esportes: { image: "/images/esportes/running-sunrise.jpg", detail: "Visão geral" },
+  financas: { image: "/images/home/routine-financas.jpg", detail: "Resumo do mês" },
+  fe: { image: "/images/home/routine-fe.jpg", detail: "Seu espaço" },
 };
 
 /** Faixa horizontal de sub-agendas ("Minha rotina") — usada na Hoje. Fonte única, não duplicar. */
@@ -45,7 +24,6 @@ export function SubagendasGrid() {
         {Object.entries(categoryMeta)
           .filter(([key]) => routineCategories.includes(key))
           .map(([key, m]) => {
-            const Icon = routineIcons[key];
             const visual = routineVisuals[key];
             return (
               <Link
@@ -62,12 +40,6 @@ export function SubagendasGrid() {
                   />
                 )}
                 <span className="routine-card-shade absolute inset-0" aria-hidden="true" />
-                {!visual?.image && Icon && (
-                  <Icon
-                    className="absolute right-5 top-5 h-16 w-16 text-foreground/10"
-                    strokeWidth={1.1}
-                  />
-                )}
                 <span className="absolute inset-x-0 bottom-0 flex items-end gap-3 p-4">
                   <span className="min-w-0 flex-1">
                     <strong className="block text-[17px] font-semibold tracking-[-0.02em] text-white">

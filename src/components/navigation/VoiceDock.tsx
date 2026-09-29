@@ -1,13 +1,13 @@
-import { Keyboard, Mic, Plus } from "lucide-react";
+import { Keyboard, Menu, Mic } from "lucide-react";
 
 export function VoiceDock({
   onVoice,
   onKeyboard,
-  onCreate,
+  onMenu,
 }: {
   onVoice: () => void;
   onKeyboard: () => void;
-  onCreate: () => void;
+  onMenu: () => void;
 }) {
   return (
     <div
@@ -17,11 +17,11 @@ export function VoiceDock({
     >
       <button
         type="button"
-        onClick={onCreate}
+        onClick={onMenu}
         className="pulse-side interactive-press"
-        aria-label="Adicionar no Norte"
+        aria-label="Abrir mais funções"
       >
-        <Plus size={26} />
+        <Menu size={24} />
       </button>
 
       <button

@@ -11,7 +11,7 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 import { WelcomeScreen } from "../components/WelcomeScreen";
 import { OnboardingFlow } from "../components/OnboardingFlow";
-import { Menu, MoreVertical } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -128,7 +128,6 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function RootComponent() {
-  const router = useRouter();
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [entered, setEntered] = useState(false);
@@ -323,14 +322,6 @@ function RootComponent() {
                   <div className="norte-global-utilities" aria-label="Acessos globais">
                     <button
                       type="button"
-                      onClick={() => setFunctionsOpen(true)}
-                      className="interactive-press"
-                      aria-label="Abrir mais funções"
-                    >
-                      <Menu className="h-5 w-5" />
-                    </button>
-                    <button
-                      type="button"
                       onClick={() => setGlobalSettingsOpen(true)}
                       className="interactive-press"
                       aria-label="Abrir configurações"
@@ -339,9 +330,7 @@ function RootComponent() {
                     </button>
                   </div>
                   <VoiceDock
-                    onCreate={() => {
-                      void router.navigate({ to: "/criar" });
-                    }}
+                    onMenu={() => setFunctionsOpen(true)}
                     onVoice={() => {
                       setStartChatWithVoice(true);
                       setVoiceChatOpen(true);
