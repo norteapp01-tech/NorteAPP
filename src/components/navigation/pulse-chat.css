@@ -1,7 +1,7 @@
 /* A single Norte surface: quiet graphite, dawn light and mint only as state. */
 .norte-app .norte-voice-dock.norte-pulse-dock {
   display: grid;
-  grid-template-columns: 1fr 1.08fr 1fr;
+  grid-template-columns: minmax(0, 1fr) 62px minmax(0, 1fr);
   width: min(calc(100% - 28px), 420px);
   min-height: 78px;
   padding: 0 12px;
@@ -19,20 +19,20 @@
   backdrop-filter: blur(24px) saturate(1.08);
   -webkit-backdrop-filter: blur(24px) saturate(1.08);
   transition:
-    width 360ms cubic-bezier(0.4, 0, 0.2, 1),
-    padding 280ms cubic-bezier(0.4, 0, 0.2, 1),
-    grid-template-columns 320ms cubic-bezier(0.4, 0, 0.2, 1),
-    border-radius 280ms ease,
-    clip-path 280ms ease;
+    width 520ms cubic-bezier(0.45, 0, 0.2, 1),
+    min-height 520ms cubic-bezier(0.45, 0, 0.2, 1),
+    bottom 520ms cubic-bezier(0.45, 0, 0.2, 1),
+    padding 520ms cubic-bezier(0.45, 0, 0.2, 1),
+    border-radius 520ms ease,
+    clip-path 520ms ease;
 }
 .norte-app .norte-voice-dock.norte-pulse-dock.is-launching {
   width: 62px;
   min-height: 62px;
   padding: 0;
-  grid-template-columns: 0 62px 0;
+  bottom: calc(max(10px, env(safe-area-inset-bottom)) + 8px);
   border-radius: 50%;
-  clip-path: circle(50% at 50% 50%);
-  overflow: visible;
+  clip-path: polygon(0 0, 100% 0, 100% 0, 100% 100%, 0 100%);
 }
 .norte-pulse-dock.is-launching .pulse-side {
   opacity: 0;
@@ -40,9 +40,12 @@
   pointer-events: none;
 }
 .norte-pulse-dock.is-launching .pulse-microphone {
-  width: 62px;
-  height: 62px;
-  transform: scale(1.02);
+  width: 58px;
+  height: 58px;
+  transform: scale(1);
+  border-color: transparent;
+  box-shadow: none;
+  background: transparent;
 }
 .pulse-side,
 .pulse-microphone,
@@ -105,13 +108,16 @@
 /* Explicit blur also works when a browser isolates backdrop sampling. */
 .norte-app > :where(.page-enter),
 .norte-app .page-enter {
-  transition: filter 680ms cubic-bezier(0.22, 0.8, 0.2, 1);
+  transition: filter 1100ms cubic-bezier(0.4, 0, 0.2, 1) 140ms;
 }
 .norte-app:has(.pulse-chat) .page-enter {
   filter: blur(7px) saturate(0.65);
 }
 .norte-app:has(.pulse-chat.is-listening) .page-enter {
   filter: blur(11px) saturate(0.7);
+}
+.norte-app:has(.pulse-chat.is-listening:not(.is-voice-entry)) .page-enter {
+  transition-delay: 480ms;
 }
 .norte-global-chat > .pulse-chat,
 .pulse-chat {
@@ -140,7 +146,7 @@
   z-index: 2;
   flex-shrink: 0;
   padding-bottom: 20px;
-  animation: norte-content-reveal 360ms 300ms both;
+  animation: norte-content-reveal 500ms 650ms both;
 }
 .pulse-chat > header .norte-dawn-mark {
   display: block;
@@ -192,7 +198,7 @@
   backdrop-filter: blur(22px);
   font-size: 14px;
   font-weight: 550;
-  animation: pulse-expand 450ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  white-space: nowrap;
 }
 .pulse-working {
   width: 15px;
@@ -209,21 +215,16 @@
   overflow: hidden;
   pointer-events: none;
   opacity: 1;
-  backdrop-filter: blur(12px) saturate(0.65);
-  -webkit-backdrop-filter: blur(12px) saturate(0.65);
-  transition:
-    opacity 450ms ease,
-    backdrop-filter 650ms ease;
+  /* The page supplies one blur pass; avoid filtering the same pixels twice. */
+  transition: opacity 700ms ease;
   background: linear-gradient(145deg, #101718b8, #182022a6 55%, #0c1416b8);
   box-shadow:
     inset 0 0 0 1px #ffffff12,
     inset 0 0 60px #ffffff08;
-  animation: norte-glass-reveal 680ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
+  animation: norte-glass-reveal 1100ms cubic-bezier(0.4, 0, 0.2, 1) 80ms both;
 }
 .is-listening .pulse-glass {
   opacity: 1;
-  backdrop-filter: blur(19px) saturate(0.8);
-  -webkit-backdrop-filter: blur(19px) saturate(0.8);
 }
 .pulse-glass i {
   position: absolute;
@@ -232,12 +233,12 @@
   left: -15%;
   bottom: -20%;
   border-radius: 45%;
-  border: 1px solid #ffffff12;
+  border: 1px solid #ffffff1c;
   background: radial-gradient(ellipse, #bec9cc0d, transparent 65%);
   box-shadow:
     inset 0 10px 40px #ffffff08,
     0 -12px 70px #c4d9ff08;
-  animation: pulse-liquid 5.4s ease-in-out infinite alternate;
+  animation: pulse-liquid 8s ease-in-out infinite alternate;
 }
 .pulse-glass i + i {
   bottom: 20%;
@@ -245,6 +246,33 @@
   animation-delay: -3s;
   opacity: 0.5;
   animation-name: pulse-liquid-secondary;
+  animation-duration: 10s;
+}
+.pulse-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse at 50% 100%, #cae5de22, transparent 70%);
+  transform-origin: 50% 100%;
+}
+.is-listening .pulse-glass::after {
+  animation: norte-glass-breath 2800ms ease-in-out 480ms both;
+}
+.is-voice-entry.is-listening .pulse-glass::after {
+  animation-delay: 80ms;
+}
+@keyframes norte-glass-breath {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  40% {
+    opacity: 0.8;
+    transform: scale(1.08);
+  }
 }
 @keyframes pulse-liquid {
   from {
@@ -260,18 +288,6 @@
   }
   to {
     transform: translate(-9%, 9%) rotate(-14deg) scale(0.92);
-  }
-}
-@keyframes pulse-expand {
-  from {
-    width: 124px;
-    transform: translateY(5px);
-    opacity: 0.6;
-  }
-  to {
-    width: 184px;
-    transform: translateY(0);
-    opacity: 1;
   }
 }
 @keyframes pulse-spin {
@@ -323,16 +339,47 @@
     width: calc(100% + 8px);
     margin-left: -4px;
     border-radius: 40px;
+    height: 78px;
+    transform: translateY(0);
   }
-  45% {
+  42% {
     width: 62px;
     margin-left: calc(50% - 31px);
     border-radius: 50%;
+    height: 62px;
+    transform: translateY(-8px);
   }
   100% {
     width: 184px;
     margin-left: calc(50% - 92px);
     border-radius: 40px;
+    height: 78px;
+    transform: translateY(0);
+  }
+}
+/* Continue from the circle already formed on the previous screen. */
+@keyframes norte-voice-open {
+  from {
+    width: 62px;
+    margin-left: calc(50% - 31px);
+    height: 62px;
+    transform: translateY(-8px);
+  }
+  to {
+    width: 184px;
+    margin-left: calc(50% - 92px);
+    height: 78px;
+    transform: translateY(0);
+  }
+}
+@keyframes norte-listening-label {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 .norte-global-chat > .pulse-chat {
@@ -353,7 +400,7 @@
   position: relative;
   z-index: 1;
   padding-top: 32px;
-  animation: norte-message-reveal 420ms 330ms both;
+  animation: norte-message-reveal 500ms 650ms both;
 }
 .pulse-user-message,
 .pulse-assistant-message > p {
@@ -435,6 +482,8 @@
   background: transparent;
   box-shadow: none;
   backdrop-filter: none;
+  min-width: 0;
+  overflow: hidden;
 }
 .pulse-message-form {
   max-height: 0;
@@ -473,20 +522,34 @@
   background: transparent;
   box-shadow: none;
 }
-.pulse-chat.is-listening .pulse-chat-composer {
+.pulse-chat.is-voice-active .pulse-chat-composer {
   width: 184px;
   margin-left: calc(50% - 92px);
-  padding-inline: 0;
+  padding: 0;
+  height: 78px;
+  overflow: hidden;
   border-radius: 40px;
-  animation: norte-listening-accordion 660ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
+  animation: norte-listening-accordion 1120ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
-.pulse-chat.is-listening .pulse-composer-controls {
+.pulse-chat.is-voice-active .pulse-composer-controls {
   grid-template-columns: 0 minmax(0, 184px) 0;
+  height: 100%;
+  min-height: 0;
 }
-.pulse-chat.is-listening .pulse-composer-controls > .pulse-side {
+.pulse-chat.is-voice-active .pulse-composer-controls > .pulse-side {
   opacity: 0;
   transform: scale(0.2);
   pointer-events: none;
+}
+.pulse-chat.is-voice-active .pulse-active-pill > * {
+  flex-shrink: 0;
+  animation: norte-listening-label 300ms 480ms both;
+}
+.pulse-chat.is-voice-entry.is-voice-active .pulse-chat-composer {
+  animation: norte-voice-open 720ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+.pulse-chat.is-voice-entry.is-voice-active .pulse-active-pill > * {
+  animation-delay: 200ms;
 }
 .pulse-chat button:focus-visible,
 .pulse-chat textarea:focus-visible {
@@ -512,6 +575,9 @@
   }
   .norte-app .norte-voice-dock.norte-pulse-dock {
     transition: none;
+  }
+  .norte-pulse-dock * {
+    transition: none !important;
   }
   .pulse-chat *,
   .pulse-chat *::before,

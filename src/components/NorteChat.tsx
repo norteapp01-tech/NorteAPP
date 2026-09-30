@@ -104,6 +104,7 @@ export function NorteChat({
   const [ready, setReady] = useState(false);
   const [draft, setDraft] = useState("");
   const [keyboardOpen, setKeyboardOpen] = useState(!autoStartAudio);
+  const [voiceEntry, setVoiceEntry] = useState(autoStartAudio);
   const [menuOpen, setMenuOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const openKeyboard = () => {
@@ -382,7 +383,7 @@ export function NorteChat({
       ref={chatShell}
       role={fullscreen ? "dialog" : undefined}
       aria-modal={fullscreen || undefined}
-      className={`pulse-chat ${recording || requestingAudio ? "is-listening" : ""} flex flex-col px-5 pt-5`}
+      className={`pulse-chat ${recording || requestingAudio ? "is-listening" : ""} ${recording || requestingAudio || (!keyboardOpen && (transcribing || busy)) ? "is-voice-active" : ""} ${voiceEntry ? "is-voice-entry" : ""} flex flex-col px-5 pt-5`}
       aria-label="Conversa com Norte"
       onKeyDown={(event) => {
         if (!fullscreen) return;
@@ -658,7 +659,10 @@ export function NorteChat({
               className="pulse-microphone"
               aria-label="Gravar áudio"
               disabled={!ready}
-              onClick={() => void startAudio()}
+              onClick={() => {
+                setVoiceEntry(false);
+                void startAudio();
+              }}
             >
               <Mic size={25} />
             </button>

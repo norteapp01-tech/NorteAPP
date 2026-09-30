@@ -6,7 +6,12 @@ import { mkdir } from "node:fs/promises";
 const out = process.env.AUDIT_OUTPUT ?? "/tmp/norte-conversation";
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+const page = await browser.newPage({
+  viewport: { width: 390, height: 844 },
+  ...(process.env.AUDIT_VIDEO
+    ? { recordVideo: { dir: out, size: { width: 390, height: 844 } } }
+    : {}),
+});
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 await page.addInitScript(() => {
@@ -88,12 +93,30 @@ await page.route("**/*", async (route) => {
 
 try {
   await page.goto(process.env.AUDIT_URL ?? "http://127.0.0.1:4173");
-  for (const width of [320, 390, 430]) {
+  for (const width of (process.env.AUDIT_WIDTHS ?? "320,390,430").split(",").map(Number)) {
     await page.setViewportSize({ width, height: 844 });
     const restingDock = page.locator(".norte-pulse-dock");
     const restingWidth = (await restingDock.boundingBox()).width;
+    await page.evaluate(() => {
+      window.motionSamples = [];
+      const until = performance.now() + 2200;
+      const sample = () => {
+        const el = document.querySelector(".norte-pulse-dock, .pulse-chat-composer");
+        if (el) {
+          const box = el.getBoundingClientRect();
+          window.motionSamples.push({
+            chat: el.classList.contains("pulse-chat-composer"),
+            width: box.width,
+            x: box.x + box.width / 2,
+            y: box.y + box.height / 2,
+          });
+        }
+        if (performance.now() < until) requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    });
     await page.getByRole("button", { name: "Conversar por voz com o Norte" }).click();
-    await page.waitForTimeout(180);
+    await page.waitForTimeout(320);
     const collapsingWidth = (await restingDock.boundingBox()).width;
     assert.ok(
       collapsingWidth < restingWidth * 0.7,
@@ -102,6 +125,22 @@ try {
     if (width === 390) await page.screenshot({ path: `${out}/voice-collapse-${width}.png` });
     await page.getByRole("button", { name: "Parar gravação e enviar" }).waitFor();
     await page.waitForTimeout(800);
+    const samples = await page.evaluate(() => window.motionSamples);
+    const chatSamples = samples.filter((sample) => sample.chat);
+    assert.ok(chatSamples.length > 5, `${width}: missing transition frames`);
+    assert.ok(
+      chatSamples.every((sample) => sample.width <= 185),
+      `${width}: full-width flash during handoff`,
+    );
+    assert.ok(
+      samples.every((sample) => Math.abs(sample.x - width / 2) < 2),
+      `${width}: microphone moves sideways`,
+    );
+    const centres = samples.map((sample) => sample.y);
+    assert.ok(
+      Math.max(...centres) - Math.min(...centres) < 4,
+      `${width}: microphone jumps vertically`,
+    );
     const listeningDock = page.locator(".pulse-chat-composer");
     const listeningWidth = (await listeningDock.boundingBox()).width;
     assert.ok(
@@ -142,6 +181,15 @@ try {
       await page.getByRole("textbox", { name: "Mensagem para o Norte" }).inputValue(),
       "Mudar para amanhã",
     );
+    await page.getByRole("button", { name: "Gravar áudio", exact: true }).click();
+    await page.getByRole("button", { name: "Parar gravação e enviar" }).waitFor();
+    await page.waitForTimeout(1250);
+    assert.ok(
+      Math.abs((await page.locator(".pulse-chat-composer").boundingBox()).width - 184) < 1,
+      `${width}: internal voice transition did not settle`,
+    );
+    await page.getByRole("button", { name: "Voltar", exact: true }).click();
+    await page.getByRole("button", { name: "Abrir teclado da conversa" }).click();
     await page.getByRole("button", { name: "Abrir mais funções", exact: true }).click();
     await page
       .getByRole("dialog", { name: "Mais funções" })
@@ -158,5 +206,8 @@ try {
   assert.deepEqual(errors, []);
   console.log(`Conversation audit passed at 320, 390, 430px; screenshots: ${out}`);
 } finally {
+  const video = page.video();
+  await page.context().close();
+  if (video) await video.saveAs(`${out}/motion-preview.webm`);
   await browser.close();
 }

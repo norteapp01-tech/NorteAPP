@@ -150,7 +150,7 @@ function RootComponent() {
         setVoiceChatOpen(true);
         setVoiceLaunching(false);
       },
-      reducedMotion ? 0 : 360,
+      reducedMotion ? 0 : 520,
     );
     return () => window.clearTimeout(timer);
   }, [voiceLaunching]);
