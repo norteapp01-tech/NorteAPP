@@ -90,9 +90,37 @@ try {
   await page.goto(process.env.AUDIT_URL ?? "http://127.0.0.1:4173");
   for (const width of [320, 390, 430]) {
     await page.setViewportSize({ width, height: 844 });
+    const restingDock = page.locator(".norte-pulse-dock");
+    const restingWidth = (await restingDock.boundingBox()).width;
     await page.getByRole("button", { name: "Conversar por voz com o Norte" }).click();
+    await page.waitForTimeout(180);
+    const collapsingWidth = (await restingDock.boundingBox()).width;
+    assert.ok(
+      collapsingWidth < restingWidth * 0.7,
+      `${width}: dock did not contract toward microphone`,
+    );
+    if (width === 390) await page.screenshot({ path: `${out}/voice-collapse-${width}.png` });
     await page.getByRole("button", { name: "Parar gravação e enviar" }).waitFor();
     await page.waitForTimeout(800);
+    const listeningDock = page.locator(".pulse-chat-composer");
+    const listeningWidth = (await listeningDock.boundingBox()).width;
+    assert.ok(
+      listeningWidth >= 180 && listeningWidth <= 188,
+      `${width}: listening pill has wrong width`,
+    );
+    assert.equal(
+      await page
+        .locator(".pulse-active-pill")
+        .evaluate((el) => getComputedStyle(el).borderTopWidth),
+      "0px",
+    );
+    assert.equal(
+      await page
+        .locator(".pulse-composer-controls > .pulse-side")
+        .first()
+        .evaluate((el) => Number(getComputedStyle(el).opacity)),
+      0,
+    );
     assert.equal(await page.locator("body").evaluate((el) => el.scrollWidth > innerWidth), false);
     await page.screenshot({ path: `${out}/listening-${width}.png` });
     await page.getByRole("button", { name: "Voltar", exact: true }).click();

@@ -136,9 +136,24 @@ function RootComponent() {
   const [manualLogin, setManualLogin] = useState(false);
   const [recovering, setRecovering] = useState(false);
   const [voiceChatOpen, setVoiceChatOpen] = useState(false);
+  const [voiceLaunching, setVoiceLaunching] = useState(false);
   const [startChatWithVoice, setStartChatWithVoice] = useState(false);
   const [functionsOpen, setFunctionsOpen] = useState(false);
   const [globalSettingsOpen, setGlobalSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    if (!voiceLaunching) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timer = window.setTimeout(
+      () => {
+        setStartChatWithVoice(true);
+        setVoiceChatOpen(true);
+        setVoiceLaunching(false);
+      },
+      reducedMotion ? 0 : 360,
+    );
+    return () => window.clearTimeout(timer);
+  }, [voiceLaunching]);
 
   function markEntered() {
     try {
@@ -331,11 +346,9 @@ function RootComponent() {
                     </button>
                   </div>
                   <VoiceDock
+                    launching={voiceLaunching}
                     onMenu={() => setFunctionsOpen(true)}
-                    onVoice={() => {
-                      setStartChatWithVoice(true);
-                      setVoiceChatOpen(true);
-                    }}
+                    onVoice={() => setVoiceLaunching(true)}
                     onKeyboard={() => {
                       flushSync(() => {
                         setStartChatWithVoice(false);

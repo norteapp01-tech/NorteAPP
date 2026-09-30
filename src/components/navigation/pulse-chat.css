@@ -18,6 +18,31 @@
     0 18px 46px rgb(0 0 0 / 0.32);
   backdrop-filter: blur(24px) saturate(1.08);
   -webkit-backdrop-filter: blur(24px) saturate(1.08);
+  transition:
+    width 360ms cubic-bezier(0.4, 0, 0.2, 1),
+    padding 280ms cubic-bezier(0.4, 0, 0.2, 1),
+    grid-template-columns 320ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-radius 280ms ease,
+    clip-path 280ms ease;
+}
+.norte-app .norte-voice-dock.norte-pulse-dock.is-launching {
+  width: 62px;
+  min-height: 62px;
+  padding: 0;
+  grid-template-columns: 0 62px 0;
+  border-radius: 50%;
+  clip-path: circle(50% at 50% 50%);
+  overflow: visible;
+}
+.norte-pulse-dock.is-launching .pulse-side {
+  opacity: 0;
+  transform: scale(0.25);
+  pointer-events: none;
+}
+.norte-pulse-dock.is-launching .pulse-microphone {
+  width: 62px;
+  height: 62px;
+  transform: scale(1.02);
 }
 .pulse-side,
 .pulse-microphone,
@@ -33,6 +58,9 @@
   align-self: center;
   border-radius: 0;
   background: transparent;
+  transition:
+    opacity 180ms ease,
+    transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 .pulse-side:first-child {
   border-right: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
@@ -52,6 +80,11 @@
   box-shadow:
     0 0 24px color-mix(in srgb, var(--primary) 10%, transparent),
     inset 0 1px 0 rgb(255 255 255 / 0.06);
+  transition:
+    width 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    height 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-radius 300ms ease;
 }
 .pulse-microphone::after {
   position: absolute;
@@ -107,6 +140,7 @@
   z-index: 2;
   flex-shrink: 0;
   padding-bottom: 20px;
+  animation: norte-content-reveal 360ms 300ms both;
 }
 .pulse-chat > header .norte-dawn-mark {
   display: block;
@@ -203,13 +237,14 @@
   box-shadow:
     inset 0 10px 40px #ffffff08,
     0 -12px 70px #c4d9ff08;
-  animation: pulse-liquid 7s ease-in-out infinite alternate;
+  animation: pulse-liquid 5.4s ease-in-out infinite alternate;
 }
 .pulse-glass i + i {
   bottom: 20%;
   left: 25%;
   animation-delay: -3s;
   opacity: 0.5;
+  animation-name: pulse-liquid-secondary;
 }
 @keyframes pulse-liquid {
   from {
@@ -217,6 +252,14 @@
   }
   to {
     transform: translate(8%, -8%) rotate(12deg) scale(1.12);
+  }
+}
+@keyframes pulse-liquid-secondary {
+  from {
+    transform: translate(8%, -6%) rotate(10deg) scale(1.08);
+  }
+  to {
+    transform: translate(-9%, 9%) rotate(-14deg) scale(0.92);
   }
 }
 @keyframes pulse-expand {
@@ -265,6 +308,33 @@
     transform: translateY(0);
   }
 }
+@keyframes norte-content-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes norte-listening-accordion {
+  0% {
+    width: calc(100% + 8px);
+    margin-left: -4px;
+    border-radius: 40px;
+  }
+  45% {
+    width: 62px;
+    margin-left: calc(50% - 31px);
+    border-radius: 50%;
+  }
+  100% {
+    width: 184px;
+    margin-left: calc(50% - 92px);
+    border-radius: 40px;
+  }
+}
 .norte-global-chat > .pulse-chat {
   min-height: 0;
   padding: max(18px, env(safe-area-inset-top)) 18px max(10px, env(safe-area-inset-bottom));
@@ -283,7 +353,7 @@
   position: relative;
   z-index: 1;
   padding-top: 32px;
-  animation: norte-message-reveal 420ms 180ms both;
+  animation: norte-message-reveal 420ms 330ms both;
 }
 .pulse-user-message,
 .pulse-assistant-message > p {
@@ -342,6 +412,7 @@
   grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
   min-height: 58px;
+  transition: grid-template-columns 420ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 .pulse-composer-controls .pulse-side {
   border: 0;
@@ -360,7 +431,10 @@
   justify-self: center;
   font-size: 12px;
   gap: 8px;
-  animation: none;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 .pulse-message-form {
   max-height: 0;
@@ -395,11 +469,24 @@
   opacity: 0.45;
 }
 .is-listening .pulse-active-pill {
-  border-color: #d4e0dc70;
-  background: linear-gradient(145deg, #263431ed, #111a19e8);
-  box-shadow:
-    0 0 22px #dcece413,
-    inset 0 1px 0 #ffffff1c;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.pulse-chat.is-listening .pulse-chat-composer {
+  width: 184px;
+  margin-left: calc(50% - 92px);
+  padding-inline: 0;
+  border-radius: 40px;
+  animation: norte-listening-accordion 660ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
+}
+.pulse-chat.is-listening .pulse-composer-controls {
+  grid-template-columns: 0 minmax(0, 184px) 0;
+}
+.pulse-chat.is-listening .pulse-composer-controls > .pulse-side {
+  opacity: 0;
+  transform: scale(0.2);
+  pointer-events: none;
 }
 .pulse-chat button:focus-visible,
 .pulse-chat textarea:focus-visible {
@@ -422,6 +509,9 @@
   .pulse-active-pill,
   .pulse-working {
     animation: none;
+  }
+  .norte-app .norte-voice-dock.norte-pulse-dock {
+    transition: none;
   }
   .pulse-chat *,
   .pulse-chat *::before,
