@@ -8,13 +8,18 @@ export function DawnMark({ compact = false }: { compact?: boolean }) {
   return (
     <div className="norte-dawn-brand" aria-label="Norte">
       <svg
-        className={compact ? "h-4 w-10" : "h-6 w-[72px]"}
-        viewBox="0 0 72 24"
+        className={compact ? "h-4 w-12" : "h-7 w-[104px]"}
+        viewBox="0 0 104 28"
         fill="none"
         aria-hidden="true"
       >
-        <path d="M2 19.5C16 7.5 55 7.5 70 19.5" stroke="currentColor" strokeWidth="1.25" />
-        <circle cx="36" cy="8" r="3.75" fill="var(--primary)" />
+        <path
+          d="M2 23C27 9.5 77 9.5 102 23"
+          stroke="currentColor"
+          strokeWidth="1.65"
+          strokeLinecap="round"
+        />
+        <circle cx="52" cy="6" r="4" fill="currentColor" />
       </svg>
       {!compact && <span>N O R T E</span>}
     </div>

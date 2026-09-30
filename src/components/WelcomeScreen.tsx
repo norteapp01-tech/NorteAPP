@@ -6,18 +6,14 @@ import "./welcome-live.css";
 
 const scenes = [
   {
-    name: "Planejamento",
-    message: "Quero abrir uma loja em 90 dias. Monte uma proposta.",
-    reply: "Preparei uma proposta para você revisar.",
-    title: "Conte o objetivo. Enxergue o caminho.",
-    description: "O Norte transforma uma intenção em um plano estruturado para você revisar.",
+    name: "Reorganização",
+    message: "Acordei doente. Reorganize meu dia.",
+    reply: "Deixei só o essencial.",
   },
   {
-    name: "Reorganização",
-    message: "Acordei doente. Mostre meus compromissos de hoje para eu decidir o que reagendar.",
-    reply: "Seus compromissos de hoje são:",
-    title: "Diga como você está. Reorganize o necessário.",
-    description: "Veja seus compromissos e decida o que mudar no seu dia.",
+    name: "Planejamento",
+    message: "Quero abrir uma loja em 90 dias. Monte uma proposta.",
+    reply: "Transformei seu objetivo nos próximos passos.",
   },
   {
     name: "Finanças",
@@ -37,6 +33,27 @@ const scenes = [
 
 function ExampleCard({ index }: { index: number }) {
   if (index === 0)
+    return (
+      <div className="welcome-card welcome-agenda-card">
+        {[
+          ["10:00", "Entregar relatório", "mantido", "kept"],
+          ["14:00", "Reunião", "amanhã", "tomorrow"],
+        ].map(([time, title, status, tone]) => (
+          <div className="welcome-appointment" key={title}>
+            <b>{time}</b>
+            <div>
+              <strong>{title}</strong>
+            </div>
+            <span className={`welcome-status ${tone}`}>
+              <i aria-hidden="true" />
+              {status}
+            </span>
+          </div>
+        ))}
+        <p className="welcome-note">Você decide o que muda.</p>
+      </div>
+    );
+  if (index === 1)
     return (
       <div className="welcome-card">
         <small>PROPOSTA DE PLANEJAMENTO</small>
@@ -60,27 +77,6 @@ function ExampleCard({ index }: { index: number }) {
           <span>Ajustar proposta</span>
           <span className="filled">Confirmar</span>
         </div>
-      </div>
-    );
-  if (index === 1)
-    return (
-      <div className="welcome-card">
-        <small>COMPROMISSOS DE HOJE</small>
-        {[
-          ["10:00", "Entregar relatório", "Trabalho"],
-          ["14:00", "Reunião", "Trabalho"],
-          ["18:30", "Treino", "Academia"],
-        ].map(([time, title, category]) => (
-          <div className="welcome-appointment" key={title}>
-            <b>{time}</b>
-            <div>
-              <strong>{title}</strong>
-              <p>{category}</p>
-            </div>
-            <span>Reagendar</span>
-          </div>
-        ))}
-        <p className="welcome-note">Você decide o que muda.</p>
       </div>
     );
   if (index === 2)
@@ -130,13 +126,6 @@ function ExampleCard({ index }: { index: number }) {
     </div>
   );
 }
-
-const subtitles = [
-  "Você conta o objetivo. O Norte traça o caminho.",
-  "Você conta como está. O Norte reorganiza seu dia.",
-  "Você fala o que gastou. O Norte faz o resto.",
-  "Você fala o que comeu. O Norte faz o resto.",
-];
 
 // One clock drives typing, reply, card and scene changes, so pause freezes everything.
 export function WelcomeScreen({ onEnter, onLogin }: { onEnter: () => void; onLogin: () => void }) {
@@ -195,14 +184,12 @@ export function WelcomeScreen({ onEnter, onLogin }: { onEnter: () => void; onLog
         <div className="welcome-brand">
           <DawnMark />
         </div>
+        <p className="welcome-eyebrow">SEU DIA, NO RUMO</p>
         <h1>
-          Você vive. O Norte
-          <br />
-          organiza.
+          Você vive.
+          <br />O Norte organiza.
         </h1>
-        <p key={active} className="welcome-subtitle">
-          {subtitles[active]}
-        </p>
+        <p className="welcome-subtitle">Conte do seu jeito. O Norte transforma intenção em ação.</p>
       </header>
       <section
         className="welcome-carousel"
@@ -245,7 +232,6 @@ export function WelcomeScreen({ onEnter, onLogin }: { onEnter: () => void; onLog
             setHolding(false);
           }}
         >
-          <div className="welcome-example-label">Exemplo</div>
           <article key={active} aria-label={scene.name} aria-roledescription="slide">
             <div className="welcome-user-slot">
               <div className="welcome-message" aria-label={scene.message}>
@@ -279,6 +265,9 @@ export function WelcomeScreen({ onEnter, onLogin }: { onEnter: () => void; onLog
             </div>
           </article>
         </div>
+        <p className="welcome-capabilities" aria-label="Recursos do Norte">
+          Agenda <i /> Rotina <i /> Planos <i /> Bem-estar
+        </p>
         <div className="welcome-controls">
           <div className="welcome-dots">
             {scenes.map((item, index) => (

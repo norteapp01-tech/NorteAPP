@@ -1,145 +1,220 @@
 .welcome-screen {
+  position: relative;
+  isolation: isolate;
   min-height: 100svh;
+  width: 100%;
   max-width: 480px;
   margin: auto;
-  padding: max(30px, env(safe-area-inset-top)) 24px max(20px, env(safe-area-inset-bottom));
+  padding: max(34px, env(safe-area-inset-top)) 28px max(20px, env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  background: radial-gradient(
-    circle at 95% 0%,
-    color-mix(in oklch, var(--primary) 6%, transparent),
-    transparent 40%
-  );
+  overflow: hidden;
+  background: #050808;
+  color: #f6f7f6;
+}
+.welcome-screen::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  background: url("/images/welcome/norte-dawn-mountains.jpg") top center / cover no-repeat;
+  opacity: 0.72;
+  pointer-events: none;
+}
+.welcome-screen::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgb(2 7 7 / 0.5), rgb(2 7 7 / 0.12)),
+    linear-gradient(
+      180deg,
+      rgb(2 7 7 / 0.28) 0%,
+      rgb(2 7 7 / 0.62) 27%,
+      rgb(2 7 7 / 0.92) 64%,
+      #050808 100%
+    ),
+    radial-gradient(circle at 94% 5%, rgb(229 165 86 / 0.16), transparent 34%);
+  pointer-events: none;
+}
+.welcome-screen header,
+.welcome-carousel,
+.welcome-screen footer {
+  position: relative;
+  z-index: 1;
 }
 .welcome-brand {
   display: flex;
   align-items: center;
-  gap: 9px;
-  font-size: 11px;
-  letter-spacing: 0.25em;
-  font-weight: 700;
-  color: var(--muted-foreground);
+  color: #f6f7f6;
 }
-.welcome-brand svg,
-.welcome-chat-brand svg,
-.welcome-reply svg {
-  color: var(--primary);
+.welcome-brand .norte-dawn-brand {
+  gap: 12px;
+}
+.welcome-brand .norte-dawn-brand svg {
+  width: 61px;
+  height: 19px;
+}
+.welcome-brand .norte-dawn-brand span {
+  font-size: 10px;
+  letter-spacing: 0.52em;
+}
+.welcome-eyebrow {
+  margin-top: 38px;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.44em;
+  color: rgb(246 247 246 / 0.72);
 }
 .welcome-screen h1 {
-  font-size: clamp(29px, 8vw, 39px);
-  font-weight: 800;
-  line-height: 1.08;
-  letter-spacing: -0.05em;
-  margin: 24px 0 12px;
+  max-width: 390px;
+  margin: 20px 0 10px;
+  font-size: clamp(38px, 10.8vw, 52px);
+  font-weight: 750;
+  line-height: 0.99;
+  letter-spacing: -0.052em;
 }
-.welcome-screen header > p {
-  font-size: 14px;
-  line-height: 1.55;
-  color: var(--muted-foreground);
+.welcome-screen .welcome-subtitle {
+  max-width: 360px;
+  font-size: 15px;
+  line-height: 1.42;
+  color: rgb(246 247 246 / 0.7);
 }
 .welcome-carousel {
-  margin-top: 25px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  margin-top: 26px;
 }
-.welcome-viewport {
-  overflow: hidden;
+.welcome-live-stage {
+  min-height: 342px;
   touch-action: pan-y pinch-zoom;
-  border-radius: 20px;
+  outline-offset: 5px;
 }
-.welcome-viewport:focus-visible {
+.welcome-live-stage:focus-visible {
+  border-radius: 20px;
   outline: 2px solid var(--primary);
-  outline-offset: 3px;
 }
-.welcome-track {
+.welcome-user-slot {
+  min-height: 58px;
   display: flex;
-}
-.welcome-slide {
-  flex: 0 0 100%;
-  min-width: 0;
-  padding: 0 1px;
-  display: flex;
-}
-.welcome-demo {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  background: var(--surface-sheen), var(--surface);
-  padding: 16px;
-  min-height: 365px;
-}
-.welcome-chat-brand {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  color: var(--muted-foreground);
-  margin-bottom: 15px;
-}
-.welcome-chat-brand > span {
-  margin-left: auto;
-  font-size: 10px;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-left: 46px;
 }
 .welcome-message {
-  margin-left: 22px;
-  background: var(--surface-2);
-  border-radius: 16px;
-  padding: 11px 13px;
-  font-size: 12px;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 26px;
+  margin: 0;
+  padding: 12px 15px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 16px 16px 4px 16px;
+  background: linear-gradient(140deg, rgb(255 255 255 / 0.095), rgb(255 255 255 / 0.04));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.035);
+  font-size: 13px;
   line-height: 1.45;
+  color: #f2f4f3;
+  backdrop-filter: blur(12px);
+}
+.welcome-cursor {
+  color: var(--primary);
 }
 .welcome-reply {
-  font-size: 12px;
-  margin: 14px 0 10px;
+  min-height: 59px;
+  margin: 14px 0 13px;
+  transition: opacity 220ms ease;
 }
 .welcome-reply > div {
   display: flex;
-  gap: 6px;
   align-items: center;
-  color: var(--muted-foreground);
-  font-size: 10px;
-  margin-bottom: 6px;
+  gap: 9px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  color: rgb(246 247 246 / 0.66);
+}
+.welcome-reply .norte-dawn-brand span {
+  display: none;
+}
+.welcome-reply .norte-dawn-brand svg {
+  width: 42px;
+  height: 13px;
+}
+.welcome-reply > p {
+  font-size: 15px;
+  line-height: 1.35;
+  color: #f6f7f6;
+}
+.welcome-card-reveal {
+  transition:
+    opacity 300ms ease,
+    transform 300ms ease;
 }
 .welcome-card {
-  background: var(--background);
-  border: 1px solid var(--border);
+  position: relative;
+  min-height: 176px;
+  padding: 16px;
+  clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%);
+  border: 1px solid rgb(255 255 255 / 0.17);
   border-radius: 17px;
-  padding: 13px;
+  background:
+    radial-gradient(circle at 100% 0, rgb(221 157 73 / 0.15), transparent 31%),
+    linear-gradient(145deg, rgb(12 18 17 / 0.96), rgb(7 11 11 / 0.93));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.035),
+    0 18px 45px rgb(0 0 0 / 0.22);
   font-size: 11px;
+  backdrop-filter: blur(12px);
+}
+.welcome-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 28px;
+  height: 28px;
+  border-top: 1px solid rgb(231 166 77 / 0.86);
+  transform: rotate(45deg) translate(8px, -12px);
+  pointer-events: none;
 }
 .welcome-card > small {
   color: var(--primary);
-  letter-spacing: 0.1em;
   font-size: 9px;
   font-weight: 700;
+  letter-spacing: 0.13em;
 }
 .welcome-card h3 {
-  font-weight: 700;
+  margin: 7px 0 2px;
   font-size: 17px;
+  font-weight: 650;
   line-height: 1.25;
-  margin: 8px 0 3px;
 }
 .welcome-card p {
-  color: var(--muted-foreground);
   font-size: 10px;
   line-height: 1.4;
+  color: rgb(246 247 246 / 0.62);
 }
 .welcome-step {
   display: flex;
   gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
+  padding: 7px 0;
+  border-bottom: 1px solid rgb(255 255 255 / 0.1);
 }
-.welcome-step > b {
+.welcome-step > b,
+.welcome-appointment > b {
   color: var(--primary);
 }
 .welcome-step strong {
   font-size: 11px;
 }
 .welcome-step p {
-  font-size: 9px;
   margin-top: 2px;
+  font-size: 9px;
 }
 .welcome-note {
-  margin-top: 9px;
+  margin-top: 10px;
 }
 .welcome-example-actions {
   display: flex;
@@ -148,9 +223,9 @@
   margin-top: 10px;
 }
 .welcome-example-actions span {
-  border: 1px solid var(--border);
-  border-radius: 15px;
   padding: 6px 9px;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 15px;
   font-size: 9px;
 }
 .welcome-example-actions .filled {
@@ -158,141 +233,204 @@
   color: var(--primary-foreground);
   font-weight: 700;
 }
+.welcome-agenda-card {
+  min-height: 160px;
+  padding: 9px 16px 13px;
+}
 .welcome-appointment {
-  display: flex;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  border-bottom: 1px solid var(--border);
-  padding: 14px 0;
+  gap: 12px;
+  min-height: 52px;
+  border-bottom: 1px solid rgb(255 255 255 / 0.1);
 }
 .welcome-appointment > b {
-  color: var(--primary);
+  font-size: 15px;
+  letter-spacing: -0.03em;
 }
-.welcome-appointment > div {
-  flex: 1;
+.welcome-appointment strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
 }
-.welcome-appointment > span {
+.welcome-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.07);
+  color: rgb(246 247 246 / 0.78);
+  font-size: 10px;
+}
+.welcome-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.welcome-status.kept {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
   color: var(--primary);
-  font-size: 9px;
 }
 .welcome-card .welcome-money {
-  font-size: 29px;
-  margin: 12px 0 5px;
+  margin: 10px 0 4px;
+  font-size: 27px;
 }
 .welcome-total {
   display: flex;
   justify-content: space-between;
-  padding: 12px 0 4px;
-  color: var(--muted-foreground);
+  padding: 10px 0 3px;
+  color: rgb(246 247 246 / 0.62);
 }
 .welcome-total b {
-  color: var(--foreground);
+  color: #f6f7f6;
 }
 .welcome-meal {
   display: flex;
-  gap: 8px;
   align-items: center;
+  gap: 8px;
 }
 .welcome-meal svg {
-  color: var(--primary);
   flex-shrink: 0;
+  color: var(--primary);
 }
 .welcome-macros {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 7px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 .welcome-macros > div {
-  border: 1px solid var(--border);
-  background: var(--surface-sheen), var(--surface);
+  padding: 7px;
+  border: 1px solid rgb(255 255 255 / 0.1);
   border-radius: 10px;
-  padding: 8px;
+  background: rgb(255 255 255 / 0.025);
 }
 .welcome-macros b {
-  font-size: 14px;
+  font-size: 13px;
 }
-.welcome-caption {
-  margin-top: 18px;
-  min-height: 85px;
+.welcome-capabilities {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 17px 0 2px;
+  white-space: nowrap;
+  font-size: 11px;
+  color: rgb(246 247 246 / 0.58);
 }
-.welcome-caption h2 {
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.35;
-  letter-spacing: -0.02em;
-}
-.welcome-caption > p {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--muted-foreground);
-  margin-top: 5px;
+.welcome-capabilities i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
 }
 .welcome-controls {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
 }
 .welcome-dots {
   display: flex;
 }
 .welcome-dots button {
-  width: 30px;
-  height: 44px;
+  width: 28px;
+  height: 38px;
   display: grid;
   place-items: center;
   cursor: pointer;
 }
 .welcome-dots span {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 9px;
-  background: var(--border);
+  background: rgb(255 255 255 / 0.2);
   transition:
-    width 0.2s,
-    background 0.2s;
+    width 220ms ease,
+    background 220ms ease;
 }
 .welcome-dots [aria-current="true"] span {
-  width: 23px;
+  width: 26px;
   background: var(--primary);
 }
 .welcome-pause {
-  height: 44px;
-  width: 44px;
+  width: 38px;
+  height: 38px;
   display: grid;
   place-items: center;
-  color: var(--muted-foreground);
+  color: rgb(246 247 246 / 0.62);
 }
 .welcome-screen footer {
-  padding-top: 20px;
-  margin-top: auto;
+  margin-top: 0;
+  padding-top: 12px;
 }
 .welcome-cta {
   width: 100%;
-  padding: 15px 8px;
+  padding: 16px 8px;
+  border-radius: 17px;
   background: var(--primary);
-  color: var(--primary-foreground);
-  border-radius: 16px;
-  font-size: 14px;
-  font-weight: 700;
+  color: #07110e;
+  font-size: 15px;
+  font-weight: 750;
   cursor: pointer;
+  box-shadow: 0 12px 34px color-mix(in srgb, var(--primary) 13%, transparent);
 }
 .welcome-cta:active {
-  opacity: 0.85;
+  opacity: 0.86;
 }
 .welcome-login {
   display: block;
-  margin: 8px auto 0;
-  padding: 12px;
+  margin: 7px auto 0;
+  padding: 10px;
   font-size: 12px;
-  color: var(--muted-foreground);
+  color: rgb(246 247 246 / 0.6);
 }
 .welcome-screen button:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 3px;
 }
+@media (max-height: 760px) {
+  .welcome-screen {
+    padding-top: max(24px, env(safe-area-inset-top));
+  }
+  .welcome-eyebrow {
+    margin-top: 25px;
+  }
+  .welcome-screen h1 {
+    margin-top: 15px;
+    font-size: clamp(34px, 9.5vw, 43px);
+  }
+  .welcome-carousel {
+    margin-top: 18px;
+  }
+  .welcome-live-stage {
+    min-height: 305px;
+  }
+  .welcome-capabilities {
+    margin-top: 10px;
+  }
+  .welcome-screen footer {
+    padding-top: 5px;
+  }
+}
+@media (max-width: 360px) {
+  .welcome-screen {
+    padding-inline: 20px;
+  }
+  .welcome-capabilities {
+    gap: 7px;
+    font-size: 10px;
+  }
+  .welcome-status {
+    padding-inline: 7px;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .welcome-dots span {
+  .welcome-dots span,
+  .welcome-reply,
+  .welcome-card-reveal {
     transition: none;
   }
 }

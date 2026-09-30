@@ -48,17 +48,18 @@
 .norte-dawn-brand {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   color: var(--foreground);
 }
 .norte-dawn-brand svg {
-  color: color-mix(in srgb, var(--primary) 72%, var(--foreground));
+  color: var(--primary);
   overflow: visible;
+  flex: none;
 }
 .norte-dawn-brand span {
   font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.38em;
+  font-weight: 400;
+  letter-spacing: 0.5em;
   white-space: nowrap;
 }
 

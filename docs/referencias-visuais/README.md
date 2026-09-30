@@ -11,19 +11,21 @@ Esta pasta é a biblioteca de referência dos layouts definidos para o aplicativ
 
 ## Índice
 
-| Área | Telas |
-| --- | --- |
-| `home/` | Início |
-| `academia/` | Treino, Evolução e Programa |
-| `esportes/` | Visão geral e Planejamento |
-| `leitura/` | Leitura e Caderno |
-| `alimentacao/` | Hoje, Análise e Plano alimentar |
-| `financas/` | Visão, Registros, Planejar e Objetivos |
-| `fe/` | Registros, Orações e Bíblia |
-| `agenda/` | Agenda |
-| `planos/` | Visão geral, Planejamento, Cronograma e Evolução |
-| `navegacao/` | Controle fixo de voz “Fale com o Norte” |
-| `propostas/` | Estudos ainda aguardando aprovação |
+| Área           | Telas                                            |
+| -------------- | ------------------------------------------------ |
+| `introducao/`  | Entrada e apresentação do Norte                  |
+| `marca/`       | Logo oficial do Norte                            |
+| `home/`        | Início                                           |
+| `academia/`    | Treino, Evolução e Programa                      |
+| `esportes/`    | Visão geral e Planejamento                       |
+| `leitura/`     | Leitura e Caderno                                |
+| `alimentacao/` | Hoje, Análise e Plano alimentar                  |
+| `financas/`    | Visão, Registros, Planejar e Objetivos           |
+| `fe/`          | Registros, Orações e Bíblia                      |
+| `agenda/`      | Agenda                                           |
+| `planos/`      | Visão geral, Planejamento, Cronograma e Evolução |
+| `navegacao/`   | Controle fixo de voz “Fale com o Norte”          |
+| `propostas/`   | Estudos ainda aguardando aprovação               |
 
 ## Convenção de nomes
 
