@@ -277,6 +277,119 @@ describe("Agente Norte — três personas e cenários adversariais", () => {
     expect(reply.toolTrace?.[0].result).toContain("Não executei");
   });
 
+  it("manda o turno atual como multimodal quando há foto, sem alterar o histórico", async () => {
+    let sentMessages: unknown[] = [];
+    const step = vi.fn(async ({ data }: { data: { messages: unknown[] } }) => {
+      sentMessages = data.messages;
+      return { content: "Registrado (estimativa): frango com arroz.", tool_calls: undefined };
+    });
+    const history: ChatTurn[] = [
+      { role: "user", text: "oi" },
+      { role: "assistant", text: "Oi!" },
+    ];
+    await runAgentTurnWith(
+      history,
+      "comi isso",
+      { step: step as never, execute: vi.fn() as never },
+      "data:image/jpeg;base64,ZmFrZQ==",
+    );
+    const last = sentMessages.at(-1) as { role: string; content: unknown };
+    expect(last.role).toBe("user");
+    expect(last.content).toEqual([
+      { type: "text", text: "comi isso" },
+      { type: "image_url", image_url: { url: "data:image/jpeg;base64,ZmFrZQ==" } },
+    ]);
+    // Histórico replay continua texto puro — nunca carrega base64.
+    const historyMessages = sentMessages.slice(0, -1) as { content: unknown }[];
+    for (const m of historyMessages) expect(typeof m.content).toBe("string");
+  });
+
+  it("usa uma legenda padrão quando a foto vem sem texto nenhum", async () => {
+    let sentMessages: unknown[] = [];
+    const step = vi.fn(async ({ data }: { data: { messages: unknown[] } }) => {
+      sentMessages = data.messages;
+      return { content: "Ok.", tool_calls: undefined };
+    });
+    await runAgentTurnWith(
+      [],
+      "",
+      { step: step as never, execute: vi.fn() as never },
+      "data:image/jpeg;base64,ZmFrZQ==",
+    );
+    const last = sentMessages.at(-1) as { content: { type: string; text?: string }[] };
+    expect(last.content[0]).toEqual({ type: "text", text: "Foto de refeição anexada." });
+  });
+
+  it("registra refeição estimada (por foto ou texto livre) sem exigir confirmação", async () => {
+    const execute = vi.fn(async () => "Refeição registrada (estimativa): frango com arroz.");
+    const reply = await runAgentTurnWith([], "comi frango grelhado com arroz", {
+      step: stepReturning([
+        {
+          name: "registrar_refeicao_estimada",
+          args: {
+            mealId: "11111111-1111-1111-1111-111111111111",
+            description: "Frango grelhado com arroz",
+            protein: 35,
+            carbs: 50,
+            calories: 480,
+          },
+        },
+      ]) as never,
+      execute: execute as never,
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(reply.pendingActions).toBeUndefined();
+  });
+
+  it("rejeita registrar_refeicao_estimada sem description", async () => {
+    const execute = vi.fn();
+    const reply = await runAgentTurnWith([], "comi algo", {
+      step: stepReturning([
+        {
+          name: "registrar_refeicao_estimada",
+          args: { mealId: "11111111-1111-1111-1111-111111111111" },
+        },
+      ]) as never,
+      execute: execute as never,
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(reply.toolTrace?.[0].result).toContain("Não executei");
+  });
+
+  it("registra refeição estimada sem mealId quando vem mealTime + mealName (nada planejado pro horário)", async () => {
+    const execute = vi.fn(async () => "Refeição registrada (estimativa): iogurte com granola.");
+    const reply = await runAgentTurnWith([], "comi um lanche", {
+      step: stepReturning([
+        {
+          name: "registrar_refeicao_estimada",
+          args: {
+            mealTime: "16:30",
+            mealName: "Lanche",
+            description: "Iogurte com granola",
+            protein: 12,
+            carbs: 30,
+            calories: 220,
+          },
+        },
+      ]) as never,
+      execute: execute as never,
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(reply.pendingActions).toBeUndefined();
+  });
+
+  it("rejeita registrar_refeicao_estimada sem mealId e sem mealTime/mealName", async () => {
+    const execute = vi.fn();
+    const reply = await runAgentTurnWith([], "comi algo", {
+      step: stepReturning([
+        { name: "registrar_refeicao_estimada", args: { description: "Alguma coisa" } },
+      ]) as never,
+      execute: execute as never,
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(reply.toolTrace?.[0].result).toContain("Não executei");
+  });
+
   it("relata falha após confirmação sem afirmar que a alteração foi concluída", async () => {
     const proposal: ChatTurn = {
       role: "assistant",

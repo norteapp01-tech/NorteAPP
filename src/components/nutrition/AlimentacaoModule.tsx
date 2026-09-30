@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { Check, Circle, RotateCw, Plus, ChevronRight, Utensils, Settings2 } from "lucide-react";
+import {
+  Check,
+  Circle,
+  RotateCw,
+  Plus,
+  ChevronRight,
+  Utensils,
+  Settings2,
+  Camera,
+} from "lucide-react";
+import { useNorteChatLauncher } from "@/lib/norte-chat-launcher";
 import { InlineError } from "@/components/ui/inline-error";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { todayISO } from "@/lib/goals-store";
@@ -94,6 +104,7 @@ function TodayTab({
     logForMealOnDate(state.logs, meal.id, todayISO()),
   ).length;
   const next = meals.find((meal) => !logForMealOnDate(state.logs, meal.id, todayISO()));
+  const { openChatWithPhoto } = useNorteChatLauncher();
   return (
     <div className="nutrition-today">
       <p className="nutrition-date">Hoje, {todayLabel}</p>
@@ -101,9 +112,18 @@ function TodayTab({
       <section className="nutrition-meals-section">
         <div className="nutrition-section-heading">
           <h3>Refeições de hoje</h3>
-          <span>
-            {completed} de {meals.length} concluídas
-          </span>
+          <div className="flex items-center gap-3">
+            <span>
+              {completed} de {meals.length} concluídas
+            </span>
+            <button
+              onClick={openChatWithPhoto}
+              className="nutrition-photo-action interactive-press"
+              aria-label="Registrar refeição por foto"
+            >
+              <Camera /> Foto
+            </button>
+          </div>
         </div>
         <div className="nutrition-timeline">
           {meals.length === 0 ? (

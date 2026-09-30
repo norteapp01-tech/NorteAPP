@@ -4,12 +4,15 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
+  Camera,
+  Image as ImageIcon,
   Keyboard,
   Menu,
   Mic,
   Paperclip,
   Square,
   ChevronDown,
+  X,
 } from "lucide-react";
 import { runAgentTurn, type ChatTurn } from "@/lib/agent/run-agent";
 import { transcribeAudio } from "@/lib/agent/chat.functions";
@@ -19,6 +22,13 @@ import { AppMenuButton, DawnMark } from "@/components/ui/app-design-system";
 import { AgentCard, parseCard, type CardData } from "./AgentCard";
 import "./navigation/pulse-chat.css";
 import { MoreFunctionsSheet } from "./navigation/MoreFunctionsSheet";
+import { compressImageToDataUrl } from "@/lib/image-compress";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
 const labels: Record<string, [string, string]> = {
   criar_plano: ["Planejamento", "/planejamento"],
@@ -28,6 +38,7 @@ const labels: Record<string, [string, string]> = {
   registrar_transacao: ["Movimentação", "/sub-agenda/financas"],
   consultar_financas: ["Finanças", "/sub-agenda/financas"],
   registrar_refeicao: ["Confirmar refeição", "/sub-agenda/alimentacao"],
+  registrar_refeicao_estimada: ["Refeição registrada", "/sub-agenda/alimentacao"],
   criar_lembrete: ["Lembrete", "/agenda"],
   gerenciar_lembrete: ["Lembrete", "/agenda"],
 };
@@ -89,6 +100,7 @@ export function NorteChat({
   demo = false,
   onDemoComplete,
   autoStartAudio = false,
+  autoOpenPhotoPicker = false,
   fullscreen = false,
   onMenu,
 }: {
@@ -96,6 +108,9 @@ export function NorteChat({
   demo?: boolean;
   onDemoComplete?: () => void;
   autoStartAudio?: boolean;
+  /** Abre direto o seletor de câmera assim que a conversa monta — usado pelo
+   * botão de foto da aba Alimentação, espelhando autoStartAudio. */
+  autoOpenPhotoPicker?: boolean;
   fullscreen?: boolean;
   onMenu?: () => void;
 }) {
@@ -140,6 +155,11 @@ export function NorteChat({
   const mounted = useRef(true);
   const bottom = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
+  const galleryInput = useRef<HTMLInputElement>(null);
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [compressingPhoto, setCompressingPhoto] = useState(false);
+  const autoPhotoStarted = useRef(false);
   const successfulReplies = useRef(0);
   const nearBottom = useRef(true);
   const [unreadBelow, setUnreadBelow] = useState(false);
@@ -230,7 +250,8 @@ export function NorteChat({
   }, [turns]);
 
   async function send(text: string) {
-    if (!text.trim() || lock.current || !ready) return;
+    const image = pendingImage;
+    if ((!text.trim() && !image) || lock.current || !ready) return;
     if (demo && Number(sessionStorage.getItem(`norte-demo-replies:${userId}`) || 0) >= 3) {
       onDemoComplete?.();
       return;
@@ -239,9 +260,13 @@ export function NorteChat({
     setBusy(true);
     setError("");
     setDraft("");
-    setTurns((old) => [...old, { role: "user", text: text.trim() }]);
+    setPendingImage(null);
+    setTurns((old) => [
+      ...old,
+      { role: "user", text: text.trim() || (image ? "📷 Foto de refeição" : "") },
+    ]);
     try {
-      const reply = await runAgentTurn(turns.slice(-30), text.trim());
+      const reply = await runAgentTurn(turns.slice(-30), text.trim(), image ?? undefined);
       if (mounted.current) {
         setTurns((old) => [...old, reply]);
         if (demo) {
@@ -377,6 +402,29 @@ export function NorteChat({
     autoAudioStarted.current = true;
     startAudioRef.current();
   }, [autoStartAudio, ready]);
+
+  async function handlePhotoFile(picked: File | undefined) {
+    if (!picked) return;
+    setError("");
+    if (picked.size > 20 * 1024 * 1024) {
+      setError("Essa imagem é grande demais. Escolha uma foto menor.");
+      return;
+    }
+    setCompressingPhoto(true);
+    try {
+      setPendingImage(await compressImageToDataUrl(picked));
+    } catch {
+      setError("Não foi possível processar essa foto. Tente outra.");
+    } finally {
+      setCompressingPhoto(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!autoOpenPhotoPicker || !ready || autoPhotoStarted.current) return;
+    autoPhotoStarted.current = true;
+    cameraInput.current?.click();
+  }, [autoOpenPhotoPicker, ready]);
 
   return (
     <section
@@ -706,6 +754,32 @@ export function NorteChat({
             {keyboardOpen ? <ChevronDown size={23} /> : <Keyboard size={23} />}
           </button>
         </div>
+        {(pendingImage || compressingPhoto) && (
+          <div className="mb-1.5 flex items-center gap-2 rounded-xl border border-border bg-surface-2 p-1.5">
+            {pendingImage ? (
+              <img
+                src={pendingImage}
+                alt="Prévia da foto anexada"
+                className="h-10 w-10 rounded-lg object-cover"
+              />
+            ) : (
+              <div className="h-10 w-10 animate-pulse rounded-lg bg-surface" />
+            )}
+            <span className="flex-1 text-xs text-muted-foreground">
+              {compressingPhoto ? "Processando foto…" : "Foto pronta pra enviar"}
+            </span>
+            {pendingImage && (
+              <button
+                type="button"
+                aria-label="Remover foto"
+                onClick={() => setPendingImage(null)}
+                className="p-1.5 text-muted-foreground hover:text-foreground"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        )}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -731,6 +805,27 @@ export function NorteChat({
               }
             }}
           />
+          <input
+            ref={cameraInput}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              void handlePhotoFile(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+          <input
+            ref={galleryInput}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              void handlePhotoFile(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
           <button
             type="button"
             disabled={busy || recording || transcribing}
@@ -740,6 +835,26 @@ export function NorteChat({
           >
             <Paperclip size={19} />
           </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                disabled={busy || recording || transcribing || compressingPhoto}
+                aria-label="Enviar foto da refeição"
+                className="p-2.5"
+              >
+                <Camera size={19} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onSelect={() => cameraInput.current?.click()} className="gap-2">
+                <Camera className="h-3.5 w-3.5" /> Tirar foto
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => galleryInput.current?.click()} className="gap-2">
+                <ImageIcon className="h-3.5 w-3.5" /> Anexar foto
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <textarea
             ref={inputRef}
             autoFocus={!autoStartAudio}
@@ -754,7 +869,14 @@ export function NorteChat({
           <button
             type="submit"
             aria-label="Enviar mensagem"
-            disabled={busy || recording || transcribing || !draft.trim() || !ready}
+            disabled={
+              busy ||
+              recording ||
+              transcribing ||
+              compressingPhoto ||
+              (!draft.trim() && !pendingImage) ||
+              !ready
+            }
             className="rounded-full bg-primary p-2.5 text-primary-foreground disabled:opacity-40"
           >
             <ArrowUp size={20} />

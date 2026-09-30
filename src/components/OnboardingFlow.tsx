@@ -386,7 +386,7 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
               </a>
               .
             </p>
-            {manual && (
+            {manual ? (
               <button
                 disabled={busy}
                 className="signup-sheet-return"
@@ -394,6 +394,18 @@ export function OnboardingFlow({ onBack }: { onBack: () => void }) {
                   setManual(false);
                   setError("");
                 }}
+              >
+                Voltar
+              </button>
+            ) : (
+              // Sem isso, quem abre "criar conta" por engano (ou muda de ideia —
+              // "ah, eu já tenho conta") fica preso: a gaveta não tinha nenhum jeito
+              // de fechar. Isso revela a conversa demo atrás, que já tem sua própria
+              // seta até a vitrine — duas etapas de volta, como o resto do app.
+              <button
+                disabled={busy}
+                className="signup-sheet-return"
+                onClick={() => setAccount(false)}
               >
                 Voltar
               </button>

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { SignInScreen } from "./AuthGate";
-import { supabase } from "@/lib/supabase/client";
+import { AuthGate, SignInScreen } from "./AuthGate";
+import { supabase, hasLinkedAccount } from "@/lib/supabase/client";
 
 vi.mock("@/lib/supabase/client", () => ({
   supabase: {
@@ -72,6 +72,41 @@ it("troca a senha depois do retorno do link", async () => {
     expect(supabase.auth.updateUser).toHaveBeenCalledWith({ password: "uma-senha-nova" }),
   );
   expect(onSuccess).toHaveBeenCalledOnce();
+});
+
+it("dá um jeito de voltar pra vitrine quando a sessão expira/desconecta e AuthGate recebe onBack", async () => {
+  // Sessão expirada de uma conta já vinculada -> needs-login (o caso real de
+  // "sair da conta": signOutNorte limpa a sessão mas o dispositivo continua
+  // marcado como já tendo conta). Sem onBack, essa tela ficava sem saída.
+  vi.mocked(supabase.auth.getSession).mockResolvedValue({
+    data: { session: null },
+    error: null,
+  } as Awaited<ReturnType<typeof supabase.auth.getSession>>);
+  vi.mocked(hasLinkedAccount).mockReturnValue(true);
+  const onBack = vi.fn();
+  render(
+    <AuthGate onBack={onBack}>
+      <p>App de verdade</p>
+    </AuthGate>,
+  );
+  const back = await screen.findByRole("button", { name: "Voltar" });
+  fireEvent.click(back);
+  expect(onBack).toHaveBeenCalledOnce();
+});
+
+it("sem onBack, a tela de login pós-expiração fica sem botão Voltar (comportamento padrão inalterado)", async () => {
+  vi.mocked(supabase.auth.getSession).mockResolvedValue({
+    data: { session: null },
+    error: null,
+  } as Awaited<ReturnType<typeof supabase.auth.getSession>>);
+  vi.mocked(hasLinkedAccount).mockReturnValue(true);
+  render(
+    <AuthGate>
+      <p>App de verdade</p>
+    </AuthGate>,
+  );
+  await screen.findByRole("heading", { name: "Entre na sua conta." });
+  expect(screen.queryByRole("button", { name: "Voltar" })).not.toBeInTheDocument();
 });
 
 it("oferece login Apple para contas criadas com Apple", async () => {

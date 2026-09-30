@@ -67,7 +67,12 @@ import {
 import { fetchState as fetchReadingState, addNote as addReadingNote } from "../reading-store";
 import { fetchState as fetchFeState, addNotebookEntry } from "../fe-store";
 import { captureToInbox } from "./inbox-store";
-import { fetchState as fetchNutritionState, confirmMealOption } from "../nutrition-store";
+import {
+  fetchState as fetchNutritionState,
+  confirmMealOption,
+  confirmMealCustom,
+  addMeal,
+} from "../nutrition-store";
 import {
   fetchCycleState,
   createCycle,
@@ -150,6 +155,36 @@ export const AGENT_TOOLS = [
         type: "object",
         properties: { mealId: { type: "string" }, optionId: { type: "string" } },
         required: ["mealId", "optionId"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "registrar_refeicao_estimada",
+      description:
+        "Registra uma refeição com macros ESTIMADOS — por foto (você analisa a imagem e estima porções/ingredientes) ou por descrição livre em texto (ex.: 'comi uma pizza'). Nunca é medição exata: sempre deixe isso claro na resposta. Consulte consultar_rotina area=alimentacao pra escolher o mealId certo pelo horário. Se não houver nenhuma refeição planejada pro horário (comum em lanches fora do plano, ou em contas sem plano alimentar configurado), NÃO invente um mealId: omita mealId e informe mealTime (HH:MM, o horário agora ou o que a pessoa disse) + mealName (nome curto, ex. 'Lanche') — uma refeição nova é criada na hora pra guardar o registro.",
+      parameters: {
+        type: "object",
+        properties: {
+          mealId: {
+            type: "string",
+            description:
+              "Omitido quando não há refeição planejada pro horário — use mealTime/mealName nesse caso",
+          },
+          mealTime: { type: "string", description: "HH:MM — só quando mealId for omitido" },
+          mealName: {
+            type: "string",
+            description:
+              "Nome curto pra refeição nova, ex. 'Lanche' — só quando mealId for omitido",
+          },
+          description: { type: "string", description: "O que a foto/descrição mostra" },
+          protein: { type: "number", description: "Gramas, estimado" },
+          carbs: { type: "number", description: "Gramas, estimado" },
+          fat: { type: "number", description: "Gramas, estimado" },
+          calories: { type: "number", description: "kcal, estimado" },
+        },
+        required: ["description"],
       },
     },
   },
@@ -736,6 +771,30 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
         card: "nutrition",
         ...option,
         summary: "Refeição registrada.",
+        date: todayISO(),
+      });
+    }
+    case "registrar_refeicao_estimada": {
+      const mealId =
+        (args.mealId as string | undefined) ??
+        (await addMeal({
+          time: args.mealTime as string,
+          name: args.mealName as string,
+        }));
+      await confirmMealCustom(mealId, args.description as string, {
+        protein: args.protein as number | undefined,
+        carbs: args.carbs as number | undefined,
+        fat: args.fat as number | undefined,
+        calories: args.calories as number | undefined,
+      });
+      return JSON.stringify({
+        card: "nutrition",
+        description: args.description,
+        protein: args.protein,
+        carbs: args.carbs,
+        fat: args.fat,
+        calories: args.calories,
+        summary: `Refeição registrada (estimativa): ${args.description}.`,
         date: todayISO(),
       });
     }

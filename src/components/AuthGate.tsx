@@ -10,7 +10,17 @@ type Provider = "google" | "apple";
 type LoginView = "login" | "forgot" | "sent" | "new-password";
 
 /** Keep returning accounts out of a fresh anonymous session when their session expires. */
-export function AuthGate({ children }: { children: ReactNode }) {
+export function AuthGate({
+  children,
+  onBack,
+}: {
+  children: ReactNode;
+  /** Opcional: dá um jeito de sair da tela de login (ex.: voltar pra vitrine
+   * inicial). Sem isso, quem cai aqui — sessão expirada, ou logo após "sair
+   * da conta" — fica sem nenhum caminho de volta. Não muda o comportamento
+   * padrão pra ninguém que não tocar em "Voltar". */
+  onBack?: () => void;
+}) {
   const [status, setStatus] = useState<Status>("checking");
   const [errorMessage, setErrorMessage] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -50,7 +60,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
       <ConnectionErrorScreen message={errorMessage} onRetry={() => setAttempt((a) => a + 1)} />
     );
   }
-  if (status === "needs-login") return <SignInScreen onSuccess={() => setStatus("ready")} />;
+  if (status === "needs-login")
+    return <SignInScreen onSuccess={() => setStatus("ready")} onBack={onBack} />;
   return <>{children}</>;
 }
 

@@ -85,6 +85,23 @@ const schemas: Record<string, z.ZodType<Record<string, unknown>>> = {
     endTime: hhmm.optional(),
   }),
   registrar_refeicao: z.object({ mealId: z.string().uuid(), optionId: z.string().uuid() }),
+  registrar_refeicao_estimada: z
+    .object({
+      mealId: z.string().uuid().optional(),
+      mealTime: z
+        .string()
+        .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+        .optional(),
+      mealName: z.string().trim().min(1).max(60).optional(),
+      description: z.string().trim().min(1).max(240),
+      protein: z.number().min(0).max(1_000).optional(),
+      carbs: z.number().min(0).max(1_000).optional(),
+      fat: z.number().min(0).max(1_000).optional(),
+      calories: z.number().min(0).max(10_000).optional(),
+    })
+    .refine((v) => v.mealId || (v.mealTime && v.mealName), {
+      message: "Sem mealId, informe mealTime e mealName pra criar a refeição.",
+    }),
   registrar_agua: z.object({ amountMl: positive.max(10_000) }),
   corrigir_ultima_agua: z.object({ amountMl: positive.max(10_000) }),
   registrar_transacao: z.object({

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pause, Play, Utensils } from "lucide-react";
+import { Pause, Play } from "lucide-react";
 import { DawnMark } from "./ui/app-design-system";
+import { AgentCard, type CardData } from "./AgentCard";
 import "./welcome.css";
 import "./welcome-live.css";
 
@@ -31,99 +32,56 @@ const scenes = [
   },
 ];
 
+// Os mesmos cards que o agente Norte realmente entrega (AgentCard.tsx) — não
+// uma maquete à parte. Uma maquete separada diverge silenciosamente a cada
+// atualização visual real; isto nunca diverge, porque É o componente real.
+const exampleCards: CardData[] = [
+  {
+    card: "agenda",
+    title: "Seu dia",
+    items: [
+      { id: "demo-1", title: "Entregar relatório", startTime: "10:00", status: "concluida" },
+      { id: "demo-2", title: "Reunião", startTime: "14:00" },
+    ],
+  },
+  {
+    card: "plan",
+    title: "Abrir loja",
+    deadlineLabel: "90 dias",
+    steps: [
+      {
+        title: "Pesquisa de mercado",
+        actions: ["Analisar concorrência", "Definir público-alvo"],
+      },
+      { title: "Estruturação do negócio", actions: ["Plano de negócios", "Buscar fornecedores"] },
+      { title: "Inauguração", actions: ["Marketing de lançamento", "Evento"] },
+    ],
+  },
+  {
+    card: "finance",
+    amount: 23,
+    description: "barra de proteína",
+    category: "Alimentação",
+    date: "2026-09-11",
+    breakdown: [{ category: "Alimentação", amount: 23 }],
+  },
+  {
+    card: "nutrition",
+    description: "Frango grelhado com arroz e legumes",
+    protein: 38,
+    carbs: 62,
+    fat: 18,
+    calories: 570,
+  },
+];
+
 function ExampleCard({ index }: { index: number }) {
-  if (index === 0)
-    return (
-      <div className="welcome-card welcome-agenda-card">
-        {[
-          ["10:00", "Entregar relatório", "mantido", "kept"],
-          ["14:00", "Reunião", "amanhã", "tomorrow"],
-        ].map(([time, title, status, tone]) => (
-          <div className="welcome-appointment" key={title}>
-            <b>{time}</b>
-            <div>
-              <strong>{title}</strong>
-            </div>
-            <span className={`welcome-status ${tone}`}>
-              <i aria-hidden="true" />
-              {status}
-            </span>
-          </div>
-        ))}
-        <p className="welcome-note">Você decide o que muda.</p>
-      </div>
-    );
-  if (index === 1)
-    return (
-      <div className="welcome-card">
-        <small>PROPOSTA DE PLANEJAMENTO</small>
-        <h3>Abrir loja</h3>
-        <p>90 dias</p>
-        {[
-          ["Pesquisa de mercado", "Analisar concorrência · Definir público-alvo"],
-          ["Estruturação do negócio", "Plano de negócios · Buscar fornecedores"],
-          ["Inauguração", "Marketing de lançamento · Evento"],
-        ].map(([title, text], i) => (
-          <div className="welcome-step" key={title}>
-            <b>{i + 1}</b>
-            <div>
-              <strong>{title}</strong>
-              <p>{text}</p>
-            </div>
-          </div>
-        ))}
-        <p className="welcome-note">Etapas sugeridas · ainda não salvas</p>
-        <div className="welcome-example-actions">
-          <span>Ajustar proposta</span>
-          <span className="filled">Confirmar</span>
-        </div>
-      </div>
-    );
-  if (index === 2)
-    return (
-      <div className="welcome-card">
-        <small>MOVIMENTAÇÃO REGISTRADA</small>
-        <h3 className="welcome-money">R$ 23,00</h3>
-        <strong>Alimentação · barra de proteína</strong>
-        <p>11/09/2026</p>
-        <div className="welcome-total">
-          <span>Gastos do mês</span>
-          <b>R$ 23,00</b>
-        </div>
-        <div className="welcome-total">
-          <span>Categoria</span>
-          <b>Alimentação</b>
-        </div>
-        <div className="welcome-example-actions">
-          <span>Ajustar registro</span>
-        </div>
-      </div>
-    );
   return (
-    <div className="welcome-card">
-      <small>REFEIÇÃO REGISTRADA</small>
-      <h3 className="welcome-meal">
-        <Utensils size={22} />
-        Frango grelhado com arroz e legumes
-      </h3>
-      <p>Almoço</p>
-      <div className="welcome-macros">
-        {[
-          ["Proteína", "38 g"],
-          ["Carboidratos", "62 g"],
-          ["Gorduras", "18 g"],
-          ["Calorias", "570 kcal"],
-        ].map(([label, value]) => (
-          <div key={label}>
-            <p>{label}</p>
-            <b>{value}</b>
-          </div>
-        ))}
-      </div>
-      <div className="welcome-example-actions">
-        <span>Ver alimentação →</span>
-      </div>
-    </div>
+    <AgentCard
+      data={exampleCards[index]}
+      proposed={exampleCards[index].card === "plan"}
+      onPrompt={() => {}}
+    />
   );
 }
 

@@ -21,6 +21,7 @@ import { hasLinkedAccount, supabase } from "../lib/supabase/client";
 import { SportRecorderProvider } from "../lib/sport-recorder-context";
 import { ActiveRecordingBar } from "../components/esportes/ActiveRecordingBar";
 import { GymSessionProvider } from "../lib/gym-session-context";
+import { NorteChatLauncherProvider } from "../lib/norte-chat-launcher";
 import { WorkoutBubble } from "../components/academia/WorkoutBubble";
 import { themeBootScript } from "../lib/theme";
 import { VoiceDock } from "../components/navigation/VoiceDock";
@@ -138,6 +139,7 @@ function RootComponent() {
   const [voiceChatOpen, setVoiceChatOpen] = useState(false);
   const [voiceLaunching, setVoiceLaunching] = useState(false);
   const [startChatWithVoice, setStartChatWithVoice] = useState(false);
+  const [startChatWithPhoto, setStartChatWithPhoto] = useState(false);
   const [functionsOpen, setFunctionsOpen] = useState(false);
   const [globalSettingsOpen, setGlobalSettingsOpen] = useState(false);
 
@@ -147,6 +149,7 @@ function RootComponent() {
     const timer = window.setTimeout(
       () => {
         setStartChatWithVoice(true);
+        setStartChatWithPhoto(false);
         setVoiceChatOpen(true);
         setVoiceLaunching(false);
       },
@@ -323,15 +326,27 @@ function RootComponent() {
       <div
         className={`norte-app mx-auto min-h-screen max-w-md bg-background ${isFullScreenRoute ? "" : "norte-shell-with-controls pb-28"}`}
       >
-        <AuthGate>
+        <AuthGate onBack={() => setEntered(false)}>
           <SportRecorderProvider>
             {/* Bolha e painel ficam FORA do `div key={pathname}` de propósito:
                 é isso que os mantém montados ao trocar de tela, em vez de
                 remontar (e perder o painel aberto) a cada navegação. */}
             <GymSessionProvider>
-              <div key={pathname} className="page-enter" inert={voiceChatOpen}>
-                <Outlet />
-              </div>
+              <NorteChatLauncherProvider
+                value={{
+                  openChatWithPhoto: () => {
+                    flushSync(() => {
+                      setStartChatWithVoice(false);
+                      setStartChatWithPhoto(true);
+                      setVoiceChatOpen(true);
+                    });
+                  },
+                }}
+              >
+                <div key={pathname} className="page-enter" inert={voiceChatOpen}>
+                  <Outlet />
+                </div>
+              </NorteChatLauncherProvider>
               <ActiveRecordingBar />
               {!isFullScreenRoute && !voiceChatOpen && (
                 <>
@@ -352,6 +367,7 @@ function RootComponent() {
                     onKeyboard={() => {
                       flushSync(() => {
                         setStartChatWithVoice(false);
+                        setStartChatWithPhoto(false);
                         setVoiceChatOpen(true);
                       });
                       document
@@ -367,9 +383,11 @@ function RootComponent() {
                     fullscreen
                     onMenu={() => setFunctionsOpen(true)}
                     autoStartAudio={startChatWithVoice}
+                    autoOpenPhotoPicker={startChatWithPhoto}
                     onBack={() => {
                       setVoiceChatOpen(false);
                       setStartChatWithVoice(false);
+                      setStartChatWithPhoto(false);
                     }}
                   />
                 </div>
@@ -383,6 +401,7 @@ function RootComponent() {
                   }}
                   onOpenChat={() => {
                     setStartChatWithVoice(false);
+                    setStartChatWithPhoto(false);
                     setVoiceChatOpen(true);
                   }}
                   onOpenSettings={() => setGlobalSettingsOpen(true)}

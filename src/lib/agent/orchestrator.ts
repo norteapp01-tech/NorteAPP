@@ -8,8 +8,12 @@ import {
   type PendingAgentAction,
 } from "./policy";
 
+type AgentMessageContentPart =
+  { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+
 type AgentMessage =
-  | { role: "system" | "user" | "assistant"; content: string }
+  | { role: "system" | "assistant"; content: string }
+  | { role: "user"; content: string | AgentMessageContentPart[] }
   | { role: "assistant"; content: string | null; tool_calls: AgentToolCall[] }
   | { role: "tool"; tool_call_id: string; content: string };
 
@@ -32,6 +36,11 @@ export async function runAgentTurnWith(
   history: ChatTurn[],
   userMessage: string,
   deps: AgentRunnerDeps,
+  /** Data URL já comprimida (ver src/lib/image-compress.ts) — só o turno
+   * ATUAL vira multimodal. O histórico salvo (ChatTurn.text, persistido no
+   * localStorage) nunca guarda o base64, senão 100 mensagens salvas com
+   * fotos incham o armazenamento do navegador rápido. */
+  imageDataUrl?: string,
 ): Promise<ChatTurn> {
   const previousTurn = history.at(-1);
   // Só a proposta imediatamente anterior pode ser confirmada. Isso impede que
@@ -71,15 +80,30 @@ export async function runAgentTurnWith(
     }
   }
 
-  const messages: AgentMessage[] = history.map((turn) => ({
-    role: turn.role,
-    content:
-      turn.text +
-      (turn.toolTrace?.length
-        ? `\nResultados reais anteriores: ${JSON.stringify(turn.toolTrace)}`
-        : ""),
-  }));
-  messages.push({ role: "user", content: userMessage });
+  // Histórico é sempre texto puro (nunca carrega tool_calls nem imagem — só o
+  // turno atual, abaixo, pode virar multimodal), então cada item bate certinho
+  // com a variante "content: string" da união; o TS só não enxerga isso porque
+  // `turn.role` chega como "user" | "assistant" solto, não literal por item.
+  const messages: AgentMessage[] = history.map(
+    (turn) =>
+      ({
+        role: turn.role,
+        content:
+          turn.text +
+          (turn.toolTrace?.length
+            ? `\nResultados reais anteriores: ${JSON.stringify(turn.toolTrace)}`
+            : ""),
+      }) as AgentMessage,
+  );
+  messages.push({
+    role: "user",
+    content: imageDataUrl
+      ? [
+          { type: "text", text: userMessage || "Foto de refeição anexada." },
+          { type: "image_url", image_url: { url: imageDataUrl } },
+        ]
+      : userMessage,
+  });
   const toolTrace: { name: string; args: Record<string, unknown>; result: string }[] = [];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
