@@ -1,0 +1,80 @@
+.academia-quick-panel {
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow:
+    0 24px 70px rgb(0 0 0 / 0.48),
+    inset 0 1px 0 rgb(255 255 255 / 0.025);
+}
+
+.academia-quick-header {
+  background: var(--surface-quiet);
+}
+
+.academia-quick-number {
+  min-height: 58px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.018);
+}
+
+.academia-timer-face {
+  border-radius: 20px;
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--norte-cut)) 0,
+    100% var(--norte-cut),
+    100% 100%,
+    0 100%
+  );
+  background-image: none;
+  box-shadow: none;
+}
+
+.academia-exercise-modal {
+  border-radius: 28px;
+  background: var(--surface);
+}
+
+.academia-exercise-modal > div:first-child h2 {
+  font-size: 1.5rem;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+  text-transform: lowercase;
+}
+
+.academia-series-list {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.018);
+}
+
+.academia-series-row:last-child {
+  border-bottom: 0;
+}
+
+.academia-series-input {
+  font-variant-numeric: tabular-nums;
+}
+
+.academia-evolution-card {
+  border-radius: 20px;
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--norte-cut)) 0,
+    100% var(--norte-cut),
+    100% 100%,
+    0 100%
+  );
+  background-image: none;
+}
+
+@media (max-width: 380px) {
+  .academia-quick-panel > div {
+    padding-inline: 14px;
+  }
+
+  .academia-series-row {
+    gap: 6px;
+    padding-inline: 10px;
+  }
+
+  .academia-series-input {
+    width: 52px !important;
+  }
+}

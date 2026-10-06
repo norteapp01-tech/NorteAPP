@@ -70,10 +70,10 @@ export function TimerBlock({
   };
 
   return (
-    <div className="mt-4">
-      <div className="mb-2 flex items-center justify-between gap-2">
+    <div className="academia-timer mt-5">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <FaceToggle face={face} onChange={onChangeFace} />
-        <span className="text-[10px] text-muted-foreground">deslize para virar</span>
+        <span className="text-[10px] tracking-wide text-muted-foreground">deslize para virar</span>
       </div>
 
       <TimerPrism
@@ -157,7 +157,7 @@ export function TimerBlock({
 function FaceShell({ tone, children }: { tone: "normal" | "done"; children: React.ReactNode }) {
   return (
     <div
-      className={`flex h-full items-center gap-2 rounded-2xl border px-3 ${
+      className={`academia-timer-face flex h-full items-center gap-3 border px-4 ${
         tone === "done" ? "border-primary/50 bg-surface-2" : "border-border bg-surface-2"
       }`}
     >
@@ -180,7 +180,7 @@ function IconButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="interactive-press flex h-10 w-10 items-center justify-center rounded-full border border-border text-foreground"
+      className="interactive-press flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background/20 text-foreground hover:border-primary/40"
     >
       {children}
     </button>
@@ -194,7 +194,7 @@ function FaceToggle({ face, onChange }: { face: TimerFace; onChange: (f: TimerFa
     <div
       role="group"
       aria-label="Qual cronômetro mostrar"
-      className="flex rounded-full border border-border p-0.5"
+      className="flex rounded-full border border-border bg-background/20 p-0.5"
     >
       {(["descanso", "treino"] as const).map((option) => (
         <button
@@ -202,7 +202,7 @@ function FaceToggle({ face, onChange }: { face: TimerFace; onChange: (f: TimerFa
           onClick={() => onChange(option)}
           aria-pressed={face === option}
           className={`interactive-press rounded-full px-3 py-1 text-[11px] font-semibold capitalize ${
-            face === option ? "bg-surface-2 text-foreground" : "text-muted-foreground"
+            face === option ? "bg-primary/10 text-primary" : "text-muted-foreground"
           }`}
         >
           {option}

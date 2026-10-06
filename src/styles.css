@@ -3,6 +3,7 @@
 @import "tw-animate-css";
 @import "./brand.css";
 @import "./mobile-identity.css";
+@import "./components/academia/academia-modals.css";
 
 @custom-variant dark (&:is(.dark *));
 

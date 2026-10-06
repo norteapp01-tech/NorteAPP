@@ -169,10 +169,10 @@ export function QuickSetPanel({
     <section
       role="dialog"
       aria-label="Controle rápido do treino"
-      className="card-surface pointer-events-auto absolute flex flex-col overflow-hidden rounded-[22px] shadow-2xl"
+      className="academia-quick-panel card-surface pointer-events-auto absolute flex flex-col overflow-hidden shadow-2xl"
       style={style}
     >
-      <header className="flex items-center gap-1 border-b border-border px-2 py-2.5">
+      <header className="academia-quick-header flex items-center gap-1 border-b border-border px-3 py-3">
         <button
           onClick={() => step(-1)}
           disabled={planned.length < 2}
@@ -206,7 +206,7 @@ export function QuickSetPanel({
         </button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
         {confirmFinish ? (
           <FinishConfirmation
             partial={planned.filter((p) => {
@@ -314,10 +314,10 @@ export function QuickSetPanel({
             ) : (
               current && (
                 <>
-                  <p className="text-center text-sm font-semibold text-foreground">
+                  <p className="text-center text-base font-semibold tracking-[-0.02em] text-foreground">
                     Série {setIndex + 1} de {Math.max(current.setsTarget, setIndex + 1)}
                   </p>
-                  <div className="mt-4 flex items-end justify-center gap-2">
+                  <div className="mt-5 flex items-end justify-center gap-2.5">
                     <label className="flex-1">
                       <span className="mb-1.5 block text-center text-xs text-muted-foreground">
                         Peso (kg)
@@ -329,7 +329,7 @@ export function QuickSetPanel({
                         onChange={(e) =>
                           setDraft({ key: draftKey, weight: e.target.value, reps: values.reps })
                         }
-                        className="w-full min-w-0 rounded-2xl border border-border bg-surface-quiet px-2 py-3 text-center font-mono text-xl font-bold tabular-nums outline-none focus:border-primary"
+                        className="academia-quick-number w-full min-w-0 rounded-[22px] border border-border bg-background/55 px-2 py-3.5 text-center font-mono text-2xl font-bold tabular-nums outline-none focus:border-primary"
                       />
                     </label>
                     <label className="flex-1">
@@ -343,14 +343,14 @@ export function QuickSetPanel({
                         onChange={(e) =>
                           setDraft({ key: draftKey, weight: values.weight, reps: e.target.value })
                         }
-                        className="w-full min-w-0 rounded-2xl border border-border bg-surface-quiet px-2 py-3 text-center font-mono text-xl font-bold tabular-nums outline-none focus:border-primary"
+                        className="academia-quick-number w-full min-w-0 rounded-[22px] border border-border bg-background/55 px-2 py-3.5 text-center font-mono text-2xl font-bold tabular-nums outline-none focus:border-primary"
                       />
                     </label>
                     <button
                       onClick={confirmSet}
                       disabled={setAction.pending}
                       aria-label={`Registrar série ${setIndex + 1}`}
-                      className="interactive-press flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground disabled:opacity-40"
+                      className="interactive-press flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_0_0_1px_rgb(145_245_218/0.12)] disabled:opacity-40"
                     >
                       <Check className="h-6 w-6" strokeWidth={3} />
                     </button>
@@ -386,19 +386,19 @@ export function QuickSetPanel({
       </div>
 
       {!confirmFinish && (
-        <footer className="flex items-center gap-2 border-t border-border px-4 py-3">
+        <footer className="flex items-center gap-3 border-t border-border px-5 py-4">
           <button
             onClick={() => {
               onClose();
               void navigate({ to: "/sub-agenda/$categoria", params: { categoria: "academia" } });
             }}
-            className="interactive-press min-h-11 flex-1 rounded-xl px-2 py-2 text-xs font-semibold text-muted-foreground"
+            className="interactive-press min-h-12 flex-1 rounded-2xl border border-transparent px-2 py-2 text-xs font-semibold text-muted-foreground hover:border-border hover:text-foreground"
           >
             Abrir treino
           </button>
           <button
             onClick={() => setConfirmFinish(true)}
-            className="interactive-press min-h-11 flex-1 rounded-xl border border-border px-2 py-2 text-xs font-semibold text-foreground"
+            className="interactive-press min-h-12 flex-1 rounded-2xl border border-border px-2 py-2 text-xs font-semibold text-foreground hover:border-primary/40"
           >
             Finalizar treino
           </button>

@@ -972,18 +972,18 @@ function ExerciseModal({
     });
 
   return (
-    <Modal onClose={onClose} title={exercise.name}>
-      <p className="text-xs text-muted-foreground/70">
+    <Modal onClose={onClose} title={exercise.name} panelClassName="academia-exercise-modal">
+      <p className="text-sm text-muted-foreground/75">
         Meta: {planned.setsTarget} séries × {planned.repsTarget} reps — {planned.loadTarget} kg
       </p>
 
-      <div className="mt-4 space-y-1.5">
+      <div className="academia-series-list mt-5 overflow-hidden rounded-[22px] border border-border bg-surface-quiet">
         {(log?.sets ?? []).map((s, i, arr) => {
           const isLast = i === arr.length - 1;
           return (
             <div
               key={s.setIndex}
-              className="flex items-center gap-2 rounded-lg border border-dashed border-success/40 bg-success/5 p-2 opacity-90"
+              className="academia-series-row flex min-h-14 items-center gap-2 border-b border-border px-3 py-2.5 last:border-b-0"
             >
               <span className="w-12 shrink-0 text-[11px] text-muted-foreground">
                 Série {s.setIndex + 1}
@@ -996,7 +996,7 @@ function ExerciseModal({
                     weight: parseFloat(e.target.value) || 0,
                   })
                 }
-                className="w-16 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
+                className="academia-series-input w-16 rounded-xl border border-border bg-background/45 px-2 py-2 text-center text-sm tabular-nums outline-none focus:border-primary"
               />
               <span className="text-[10px] text-muted-foreground">kg</span>
               <input
@@ -1007,7 +1007,7 @@ function ExerciseModal({
                     reps: parseInt(e.target.value, 10) || 0,
                   })
                 }
-                className="w-14 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
+                className="academia-series-input w-14 rounded-xl border border-border bg-background/45 px-2 py-2 text-center text-sm tabular-nums outline-none focus:border-primary"
               />
               <span className="text-[10px] text-muted-foreground">reps</span>
               {isLast ? (
@@ -1030,46 +1030,45 @@ function ExerciseModal({
             </div>
           );
         })}
+        {plannedRemaining > 0 && (
+          <>
+            {Array.from({ length: plannedRemaining }, (_, i) => registeredCount + i).map((idx) => {
+              const d = draftFor(idx);
+              return (
+                <div
+                  key={idx}
+                  className="academia-series-row flex min-h-14 items-center gap-2 border-b border-border px-3 py-2.5 last:border-b-0"
+                >
+                  <span className="w-12 shrink-0 text-[11px] text-muted-foreground">
+                    Série {idx + 1}
+                  </span>
+                  <input
+                    type="number"
+                    value={d.weight}
+                    onChange={(e) => setDraftFor(idx, { weight: e.target.value })}
+                    className="academia-series-input w-16 rounded-xl border border-border bg-background/45 px-2 py-2 text-center text-sm tabular-nums outline-none focus:border-primary"
+                  />
+                  <span className="text-[10px] text-muted-foreground">kg</span>
+                  <input
+                    type="number"
+                    value={d.reps}
+                    onChange={(e) => setDraftFor(idx, { reps: e.target.value })}
+                    className="academia-series-input w-14 rounded-xl border border-border bg-background/45 px-2 py-2 text-center text-sm tabular-nums outline-none focus:border-primary"
+                  />
+                  <span className="text-[10px] text-muted-foreground">reps</span>
+                  <button
+                    onClick={() => registerPlanned(idx)}
+                    disabled={setAction.pending}
+                    aria-label="Concluir série"
+                    title="Concluir série"
+                    className="interactive-press ml-auto h-6 w-6 shrink-0 rounded-full border-2 border-muted-foreground/50 hover:border-primary disabled:opacity-40"
+                  />
+                </div>
+              );
+            })}
+          </>
+        )}
       </div>
-
-      {plannedRemaining > 0 && (
-        <div className="mt-1.5 space-y-1.5">
-          {Array.from({ length: plannedRemaining }, (_, i) => registeredCount + i).map((idx) => {
-            const d = draftFor(idx);
-            return (
-              <div
-                key={idx}
-                className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 p-2"
-              >
-                <span className="w-12 shrink-0 text-[11px] text-muted-foreground">
-                  Série {idx + 1}
-                </span>
-                <input
-                  type="number"
-                  value={d.weight}
-                  onChange={(e) => setDraftFor(idx, { weight: e.target.value })}
-                  className="w-16 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
-                />
-                <span className="text-[10px] text-muted-foreground">kg</span>
-                <input
-                  type="number"
-                  value={d.reps}
-                  onChange={(e) => setDraftFor(idx, { reps: e.target.value })}
-                  className="w-14 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
-                />
-                <span className="text-[10px] text-muted-foreground">reps</span>
-                <button
-                  onClick={() => registerPlanned(idx)}
-                  disabled={setAction.pending}
-                  aria-label="Concluir série"
-                  title="Concluir série"
-                  className="interactive-press ml-auto h-5 w-5 shrink-0 rounded-full border-2 border-muted-foreground/40 disabled:opacity-40"
-                />
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       {setAction.error && (
         <InlineError message={setAction.error} onRetry={setAction.clearError} className="mt-2" />
@@ -1085,7 +1084,7 @@ function ExerciseModal({
       )}
 
       {plannedRemaining === 0 && showExtraSet && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-surface-2 p-2">
+        <div className="mt-3 flex items-center gap-2 rounded-2xl border border-border bg-surface-quiet p-3">
           <span className="w-12 shrink-0 text-[11px] text-muted-foreground">
             Série {registeredCount + 1}
           </span>
@@ -1113,7 +1112,7 @@ function ExerciseModal({
         </div>
       )}
 
-      <div className="mt-5">
+      <div className="academia-evolution-card mt-5 border border-border bg-surface-quiet p-4">
         <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           Evolução de carga
         </p>
@@ -1153,7 +1152,7 @@ function ExerciseModal({
           onClose();
         }}
         disabled={!log || log.sets.length === 0}
-        className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+        className="interactive-press mt-5 flex min-h-14 w-full items-center justify-center gap-2 rounded-[20px] bg-primary py-3 text-base font-semibold text-primary-foreground disabled:opacity-40"
       >
         <Check className="h-4 w-4" /> Concluir exercício
       </button>
