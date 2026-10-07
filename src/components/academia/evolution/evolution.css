@@ -425,14 +425,45 @@
   display: none;
 }
 .evolution-dashboard .evo-hero-card {
+  --evo-hero-cut: 18px;
   position: relative;
   min-height: 300px;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 16px;
-  background:
-    radial-gradient(circle at 92% 24%, rgb(124 89 48 / 0.2), transparent 40%),
-    linear-gradient(110deg, rgb(17 19 18 / 0.98), rgb(8 10 9 / 0.98));
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--evo-hero-cut)) 0,
+    100% var(--evo-hero-cut),
+    100% 100%,
+    0 100%
+  );
+  background: #000;
+}
+.evolution-dashboard .evo-hero-card::before {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  background: radial-gradient(circle at 100% 0%, rgb(176 119 62 / 0.2), transparent 31%);
+  content: "";
+  pointer-events: none;
+}
+.evolution-dashboard .evo-hero-card::after {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  left: calc(100% - var(--evo-hero-cut));
+  width: 26px;
+  height: 1px;
+  transform: rotate(45deg);
+  transform-origin: left center;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--border) 72%, transparent),
+    color-mix(in srgb, #b8783d 45%, var(--border))
+  );
+  content: "";
+  pointer-events: none;
 }
 .evolution-dashboard .evo-hero-copy {
   position: relative;
