@@ -4,7 +4,12 @@ import { supabase } from "./supabase/client";
 import { clearRecordingState } from "./sport-recording-db";
 
 vi.mock("./supabase/client", () => ({
-  supabase: { functions: { invoke: vi.fn() }, auth: { signOut: vi.fn() } },
+  supabase: {
+    functions: { invoke: vi.fn() },
+    auth: { signOut: vi.fn() },
+    rpc: vi.fn(),
+    storage: { from: vi.fn(() => ({ list: vi.fn(async () => ({ data: [] })), remove: vi.fn() })) },
+  },
 }));
 vi.mock("./sport-recording-db", () => ({ clearRecordingState: vi.fn() }));
 vi.mock("./query-client", () => ({ queryClient: { cancelQueries: vi.fn(), clear: vi.fn() } }));
@@ -15,11 +20,24 @@ beforeEach(() => {
   sessionStorage.clear();
 });
 
+it("reseta direto pelo banco quando a função de servidor não existe", async () => {
+  vi.mocked(supabase.functions.invoke).mockResolvedValue({
+    data: null,
+    error: new Error("Requested function was not found"),
+  } as never);
+  vi.mocked(supabase.rpc).mockResolvedValue({ error: null } as never);
+  localStorage.setItem("norte-chat:user-1", "conteúdo");
+  await resetAccountContent("user-1");
+  expect(supabase.rpc).toHaveBeenCalledWith("reset_my_account_content");
+  expect(localStorage.getItem("norte-chat:user-1")).toBeNull();
+});
+
 it("não limpa conteúdo local se o reset remoto falhar", async () => {
   vi.mocked(supabase.functions.invoke).mockResolvedValue({
     data: null,
     error: new Error("offline"),
   } as never);
+  vi.mocked(supabase.rpc).mockResolvedValue({ error: new Error("sem rede") } as never);
   await expect(resetAccountContent("user-1")).rejects.toThrow();
   expect(clearRecordingState).not.toHaveBeenCalled();
 });

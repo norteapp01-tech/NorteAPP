@@ -52,14 +52,28 @@ export type Exercise = {
  * "Não classificado" em vez de adivinhar. */
 export type MuscleGroup =
   | "peito"
+  | "peito_superior"
+  | "peito_medio"
+  | "peito_inferior"
   | "costas"
+  | "dorsais"
+  | "costas_meio"
+  | "trapezio"
+  | "lombar"
   | "ombros"
+  | "ombro_anterior"
+  | "ombro_lateral"
+  | "ombro_posterior"
   | "biceps"
   | "triceps"
+  | "triceps_longa"
+  | "triceps_lateral"
+  | "triceps_medial"
   | "antebraco"
   | "quadriceps"
   | "posteriores"
   | "gluteos"
+  | "adutores"
   | "panturrilhas"
   | "abdomen"
   | "corpo_inteiro"
@@ -79,10 +93,23 @@ export type ExerciseEquipment =
   | "outro";
 
 export type SetTarget = { reps: number; weight: number; restSeconds: number };
-export type SetLog = { setIndex: number; weight: number; reps: number };
+/** `isDrop`: série extra feita logo depois de soltar o peso. Não conta como
+ * série planejada nem avança o exercício. */
+export type SetLog = { setIndex: number; weight: number; reps: number; isDrop?: boolean };
 /** `exerciseId` é nulo quando o exercício foi excluído do treino depois deste
  * registro — as séries continuam valendo e o nome vem do retrato da sessão. */
-export type ExerciseLog = { exerciseId: string | null; sets: SetLog[]; done: boolean };
+export type ExerciseLog = {
+  exerciseId: string | null;
+  sets: SetLog[];
+  done: boolean;
+  /** Pulado de propósito, sem nenhuma série — é diferente de "não chegou lá". */
+  skipped?: boolean;
+};
+
+/** Séries planejadas feitas — drops ficam de fora. */
+export function regularSetCount(log: ExerciseLog | undefined): number {
+  return log?.sets.filter((s) => !s.isDrop).length ?? 0;
+}
 export type WorkoutSessionStatus = "em_andamento" | "concluido";
 
 /** O que o treino planejava no instante em que a sessão começou. Sem isso, um
@@ -223,6 +250,20 @@ export function restRemainingSeconds(session: WorkoutSession, now = nowMs()): nu
   return Math.max(0, Math.round(session.restTotalSeconds - elapsed));
 }
 
+/** Como `restRemainingSeconds`, mas sem travar em zero: negativo é o quanto o
+ * descanso já passou do fim. */
+export function restSignedSeconds(session: WorkoutSession, now = nowMs()): number {
+  if (!session.restStartedAt || !session.restTotalSeconds) return 0;
+  const activePause = session.restPausedAt
+    ? Math.max(0, (now - new Date(session.restPausedAt).getTime()) / 1000)
+    : 0;
+  const elapsed =
+    (now - new Date(session.restStartedAt).getTime()) / 1000 -
+    session.restPausedSeconds -
+    activePause;
+  return Math.round(session.restTotalSeconds - elapsed);
+}
+
 export function isRestRunning(session: WorkoutSession): boolean {
   return Boolean(session.restStartedAt && !session.restPausedAt);
 }
@@ -238,6 +279,9 @@ export type RestState = {
   remaining: number;
   /** Duração que um Play/Reiniciar vai carregar. */
   base: number;
+  /** Segundos além do zero: o descanso estourado continua contando, para
+   * saber quanto tempo se descansou de verdade. */
+  overtime: number;
 };
 
 /** Descanso cadastrado para a série atual, com a escolha temporária da sessão
@@ -257,11 +301,19 @@ export const MAX_REST_SECONDS = 60 * 60;
 
 export function restState(session: WorkoutSession, base: number, now = nowMs()): RestState {
   if (!session.restStartedAt || !session.restTotalSeconds) {
-    return { status: "pronto", remaining: base, base };
+    return { status: "pronto", remaining: base, base, overtime: 0 };
   }
   const remaining = restRemainingSeconds(session, now) ?? 0;
-  if (remaining <= 0) return { status: "fim", remaining: 0, base };
-  return { status: session.restPausedAt ? "pausado" : "correndo", remaining, base };
+  if (remaining <= 0) {
+    const overtime = Math.max(0, -restSignedSeconds(session, now));
+    return { status: "fim", remaining: 0, base, overtime };
+  }
+  return {
+    status: session.restPausedAt ? "pausado" : "correndo",
+    remaining,
+    base,
+    overtime: 0,
+  };
 }
 
 /** Converte um exercício vivo no formato do retrato — usado tanto pra gravar o
@@ -310,9 +362,10 @@ export function exerciseCompletionState(
   log: ExerciseLog | undefined,
   planned: PlannedExercise | undefined,
 ): ExerciseCompletion {
-  const done = log?.sets.length ?? 0;
+  const done = regularSetCount(log);
   if (log?.done) return "concluido";
-  if (done === 0) return "nao_realizado";
+  if (done === 0 && (log?.sets.length ?? 0) === 0) return "nao_realizado";
+  if (done === 0) return "parcial";
   const target = planned?.setsTarget ?? 0;
   return target > 0 && done >= target ? "concluido" : "parcial";
 }
@@ -332,6 +385,7 @@ export function nextPendingExerciseId(
   for (let step = 1; step <= planned.length; step += 1) {
     const candidate = planned[(start + step) % planned.length];
     const log = logs.find((l) => l.exerciseId === candidate.exerciseId);
+    if (log?.skipped && log.sets.length === 0) continue;
     if (exerciseCompletionState(log, candidate) !== "concluido") return candidate.exerciseId;
   }
   return null;
@@ -804,8 +858,10 @@ export async function fetchState(): Promise<State> {
         setIndex: s.set_index as number,
         weight: s.weight as number,
         reps: s.reps as number,
+        isDrop: (s.is_drop as boolean) ?? false,
       })),
       done: el.done as boolean,
+      skipped: (el.skipped as boolean) ?? false,
     }));
     return mapSession(r, exerciseLogs);
   });
@@ -1122,6 +1178,17 @@ export async function resumeRest(session: WorkoutSession) {
   });
 }
 
+/** Soma (ou tira) segundos do descanso em andamento. Parado, ajusta a duração
+ * que o Play vai carregar. */
+export async function adjustRest(session: WorkoutSession, deltaSeconds: number, base: number) {
+  if (!session.restStartedAt || !session.restTotalSeconds) {
+    const next = Math.max(1, Math.min(MAX_REST_SECONDS, base + deltaSeconds));
+    return resetRest(session.id, next);
+  }
+  const total = Math.max(1, Math.min(MAX_REST_SECONDS, session.restTotalSeconds + deltaSeconds));
+  await patchSession(session.id, { rest_total_seconds: total });
+}
+
 /** Encerra o descanso. Mexe só no descanso — nenhuma série registrada é tocada. */
 export async function clearRest(sessionId: string) {
   await patchSession(sessionId, {
@@ -1176,7 +1243,13 @@ async function findExerciseLogId(sessionId: string, exerciseId: string): Promise
   return row.id;
 }
 
-export async function logSet(sessionId: string, exerciseId: string, weight: number, reps: number) {
+export async function logSet(
+  sessionId: string,
+  exerciseId: string,
+  weight: number,
+  reps: number,
+  options: { isDrop?: boolean } = {},
+) {
   const userId = await ensureSession();
   const exerciseLogId = await findExerciseLogId(sessionId, exerciseId);
   const { count } = await supabase
@@ -1192,6 +1265,9 @@ export async function logSet(sessionId: string, exerciseId: string, weight: numb
         set_index: count ?? 0,
         weight,
         reps,
+        // Só manda a coluna quando é drop: série normal continua gravando
+        // mesmo antes da migração 0051 ser aplicada.
+        ...(options.isDrop ? { is_drop: true } : {}),
       })
       .select()
       .single(),
@@ -1236,6 +1312,22 @@ export async function removeLastSet(sessionId: string, exerciseId: string) {
       .eq("id", sets[0].id as string);
     await invalidate();
   }
+}
+
+/** Pula o exercício: fica registrado como pulado e sai da fila de pendentes.
+ * Registrar uma série depois dele desfaz o "pulado" na prática (ele passa a ter
+ * séries). */
+export async function skipExercise(sessionId: string, exerciseId: string, skipped = true) {
+  const exerciseLogId = await findExerciseLogId(sessionId, exerciseId);
+  unwrap(
+    await supabase
+      .from("workout_exercise_logs")
+      .update({ skipped })
+      .eq("id", exerciseLogId)
+      .select()
+      .single(),
+  );
+  await invalidate();
 }
 
 export async function completeExerciseLog(sessionId: string, exerciseId: string) {

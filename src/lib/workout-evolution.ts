@@ -27,19 +27,84 @@ import type {
 
 export const muscleGroupLabel: Record<MuscleGroup, string> = {
   peito: "Peito",
+  peito_superior: "Peito superior",
+  peito_medio: "Peito médio",
+  peito_inferior: "Peito inferior",
   costas: "Costas",
+  dorsais: "Costas · dorsais",
+  costas_meio: "Costas · meio (romboides)",
+  trapezio: "Costas · trapézio",
+  lombar: "Costas · lombar",
   ombros: "Ombros",
+  ombro_anterior: "Ombro anterior (frente)",
+  ombro_lateral: "Ombro lateral (lado)",
+  ombro_posterior: "Ombro posterior (trás)",
   biceps: "Bíceps",
   triceps: "Tríceps",
+  triceps_longa: "Tríceps · cabeça longa",
+  triceps_lateral: "Tríceps · cabeça lateral",
+  triceps_medial: "Tríceps · cabeça medial",
   antebraco: "Antebraço",
-  quadriceps: "Quadríceps",
-  posteriores: "Posteriores",
+  quadriceps: "Quadríceps (coxa)",
+  posteriores: "Posterior de coxa",
+  adutores: "Adutores (parte interna da coxa)",
   gluteos: "Glúteos",
   panturrilhas: "Panturrilhas",
   abdomen: "Abdômen",
   corpo_inteiro: "Corpo inteiro",
   cardio: "Cardio",
 };
+
+/** Grupo "pai" de cada subgrupo. Tudo que agrega (radar, filtros, totais por
+ * grupo) usa o pai; só o mapa do corpo olha o detalhe. */
+export const muscleParent: Record<MuscleGroup, MuscleGroup> = {
+  peito: "peito",
+  peito_superior: "peito",
+  peito_medio: "peito",
+  peito_inferior: "peito",
+  costas: "costas",
+  dorsais: "costas",
+  costas_meio: "costas",
+  trapezio: "costas",
+  lombar: "costas",
+  ombros: "ombros",
+  ombro_anterior: "ombros",
+  ombro_lateral: "ombros",
+  ombro_posterior: "ombros",
+  biceps: "biceps",
+  triceps: "triceps",
+  triceps_longa: "triceps",
+  triceps_lateral: "triceps",
+  triceps_medial: "triceps",
+  antebraco: "antebraco",
+  quadriceps: "quadriceps",
+  posteriores: "posteriores",
+  adutores: "quadriceps",
+  gluteos: "gluteos",
+  panturrilhas: "panturrilhas",
+  abdomen: "abdomen",
+  corpo_inteiro: "corpo_inteiro",
+  cardio: "cardio",
+};
+
+/** Opções do seletor "Grupo principal": grupos em ordem alfabética, cada um
+ * com o "geral" primeiro e os subgrupos também em ordem alfabética. */
+export function muscleSelectGroups(): { parent: MuscleGroup; options: MuscleGroup[] }[] {
+  const collator = new Intl.Collator("pt-BR");
+  const all = Object.keys(muscleGroupLabel) as MuscleGroup[];
+  const parents = [...new Set(all.map((g) => muscleParent[g]))].sort((a, b) =>
+    collator.compare(muscleGroupLabel[a], muscleGroupLabel[b]),
+  );
+  return parents.map((parent) => ({
+    parent,
+    options: [
+      ...all.filter((g) => muscleParent[g] === parent && g === parent),
+      ...all
+        .filter((g) => muscleParent[g] === parent && g !== parent)
+        .sort((a, b) => collator.compare(muscleGroupLabel[a], muscleGroupLabel[b])),
+    ],
+  }));
+}
 
 export const equipmentLabel: Record<ExerciseEquipment, string> = {
   barra: "Barra",
@@ -109,12 +174,17 @@ export type ResolvedSet = {
   exerciseId: string;
   lineageId: string;
   name: string;
+  /** Sempre o grupo PAI — é o que filtros, radar e totais usam. */
   muscleGroup: MuscleGroup | null;
+  /** O que a pessoa escolheu de fato (pode ser um subgrupo) — só o mapa do
+   * corpo usa, para acender a região certa. */
+  muscleDetail?: MuscleGroup | null;
   secondaryMuscles: MuscleGroup[];
   equipment: ExerciseEquipment | null;
   weight: number;
   reps: number;
   setIndex: number;
+  isDrop?: boolean;
 };
 
 /** Chave de comparabilidade: mesma linhagem E mesmo equipamento. Trocar de
@@ -150,9 +220,12 @@ export function resolveSets(
       const live = byId.get(log.exerciseId);
       const lineageId = snap?.lineageId ?? live?.lineageId ?? log.exerciseId;
       const name = snap?.name ?? live?.name ?? "Exercício";
-      const muscleGroup = snap?.muscleGroup ?? live?.muscleGroup ?? null;
+      const muscleDetail = snap?.muscleGroup ?? live?.muscleGroup ?? null;
+      const muscleGroup = muscleDetail ? muscleParent[muscleDetail] : null;
       const equipment = snap?.equipment ?? live?.equipment ?? null;
-      const secondaryMuscles = snap?.secondaryMuscles ?? live?.secondaryMuscles ?? [];
+      const secondaryMuscles = (snap?.secondaryMuscles ?? live?.secondaryMuscles ?? []).map(
+        (m) => muscleParent[m],
+      );
       for (const set of log.sets) {
         out.push({
           sessionId: session.id,
@@ -163,11 +236,13 @@ export function resolveSets(
           lineageId,
           name,
           muscleGroup,
+          muscleDetail,
           secondaryMuscles,
           equipment,
           weight: set.weight,
           reps: set.reps,
           setIndex: set.setIndex,
+          isDrop: set.isDrop ?? false,
         });
       }
     }
@@ -763,7 +838,7 @@ export function muscleStimulus(sets: ResolvedSet[]): MuscleStimulus[] {
   for (const set of sets) {
     const primary = (set.muscleGroup ?? UNCLASSIFIED) as MuscleGroupFilter;
     const row = ensure(primary);
-    row.directSets += 1;
+    if (!set.isDrop) row.directSets += 1;
     if (!row.lastDate || set.date > row.lastDate) row.lastDate = set.date;
     if (!sessionsByGroup.has(primary)) sessionsByGroup.set(primary, new Set());
     sessionsByGroup.get(primary)!.add(set.sessionId);
@@ -782,6 +857,37 @@ export function muscleStimulus(sets: ResolvedSet[]): MuscleStimulus[] {
     if (row) row.sessions = ids.size;
   }
   return [...map.values()].sort((a, b) => b.directSets - a.directSets);
+}
+
+/** Séries diretas por grupo EXATAMENTE como foram classificadas (subgrupo ou
+ * geral). É o que permite o mapa do corpo acender só a região treinada. */
+export function detailSetCounts(sets: ResolvedSet[]): Map<MuscleGroup, number> {
+  const counts = new Map<MuscleGroup, number>();
+  for (const set of sets) {
+    if (set.isDrop) continue;
+    const key = set.muscleDetail ?? set.muscleGroup;
+    if (!key) continue;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** Séries (diretas) que acendem uma região do mapa.
+ *
+ * Região com subgrupo próprio (ex.: peito superior) soma as séries daquele
+ * subgrupo + as classificadas só como grupo geral ("Peito"). Região sem
+ * subgrupo soma o grupo inteiro. Assim, treinar um exercício de peito superior
+ * não pinta o peito todo, e um exercício de ombro não pinta mais que quatro de
+ * peito. */
+export function regionSetCount(
+  counts: Map<MuscleGroup, number>,
+  parent: MuscleGroup,
+  detail?: MuscleGroup,
+): number {
+  if (detail && detail !== parent) return (counts.get(detail) ?? 0) + (counts.get(parent) ?? 0);
+  let total = 0;
+  for (const [group, n] of counts) if (muscleParent[group] === parent) total += n;
+  return total;
 }
 
 /** Grupo com mais séries DIRETAS — descrição do registro, não julgamento de

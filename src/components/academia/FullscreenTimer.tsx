@@ -3,6 +3,7 @@ import { Minimize2, Pause, Play, RotateCcw, SlidersHorizontal } from "lucide-rea
 import { useGymSession } from "@/lib/gym-session-context";
 import { formatDurationClock } from "@/lib/sport-store";
 import {
+  adjustRest,
   exerciseCompletionState,
   pauseRest,
   pauseSession,
@@ -16,6 +17,7 @@ import {
   startRest,
 } from "@/lib/workout-store";
 import { RestDurationEditor } from "./TimerBlock";
+import { restClockLabel } from "./rest-clock";
 
 // ---------------------------------------------------------------------------
 // Cronômetro em tela cheia — o MESMO que estiver à mostra no painel compacto,
@@ -79,8 +81,14 @@ export function FullscreenTimer() {
             <p
               className={`mt-1 font-mono text-7xl font-bold tabular-nums ${rest.status === "fim" ? "text-success" : ""}`}
             >
-              {formatDurationClock(rest.remaining)}
+              {restClockLabel(rest)}
             </p>
+            {rest.status === "fim" && (
+              <p className="mt-1 text-xs text-success">
+                Descanso passou da meta de {formatDurationClock(rest.base)} — total{" "}
+                {formatDurationClock(rest.base + rest.overtime)}
+              </p>
+            )}
             <div className="mt-6 flex items-center justify-center gap-2">
               <button
                 onClick={() => void resetRest(session.id, base)}
@@ -103,6 +111,13 @@ export function FullscreenTimer() {
                     {rest.status === "pausado" ? "Continuar" : "Iniciar"}
                   </>
                 )}
+              </button>
+              <button
+                onClick={() => void adjustRest(session, 30, base)}
+                aria-label="Somar 30 segundos ao descanso"
+                className="interactive-press flex h-12 items-center justify-center rounded-xl border border-border px-3 text-sm font-semibold tabular-nums"
+              >
+                +30s
               </button>
               <button
                 onClick={() => setEditing((v) => !v)}

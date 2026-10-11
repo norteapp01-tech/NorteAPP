@@ -1,6 +1,16 @@
 import { useLayoutEffect, useState, type CSSProperties, type RefObject } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Check, ChevronLeft, ChevronRight, ChevronUp, Plus, X } from "lucide-react";
+import {
+  ArrowDownToLine,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Plus,
+  SkipForward,
+  X,
+} from "lucide-react";
+import { NumberField } from "@/components/ui/number-field";
 import { InlineError } from "@/components/ui/inline-error";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { useGymSession } from "@/lib/gym-session-context";
@@ -9,7 +19,9 @@ import {
   exerciseCompletionState,
   finishSession,
   logSet,
+  regularSetCount,
   restBaseSeconds,
+  skipExercise,
   startRest,
   updateSet,
   type PlannedExercise,
@@ -47,6 +59,11 @@ export function QuickSetPanel({
   const [navHeight, setNavHeight] = useState(0);
   const [draft, setDraft] = useState<{ key: string; weight: string; reps: string } | null>(null);
   const [showDone, setShowDone] = useState(false);
+  // Séries somadas à meta com "Adicionar série", por exercício. A série nova
+  // aparece como as outras, com kg e repetições para preencher.
+  const [extraByExercise, setExtraByExercise] = useState<Record<string, number>>({});
+  const [dropOpen, setDropOpen] = useState(false);
+  const [dropDraft, setDropDraft] = useState({ weight: "0", reps: "0" });
   const [confirmFinish, setConfirmFinish] = useState(false);
   const setAction = useAsyncAction();
   const finishAction = useAsyncAction();
@@ -76,8 +93,14 @@ export function QuickSetPanel({
   const current: PlannedExercise | undefined = planned[index] ?? planned[0];
   const log = session.exerciseLogs.find((l) => l.exerciseId === current?.exerciseId);
   const doneSets = log?.sets ?? [];
-  const completion = exerciseCompletionState(log, current);
-  const setIndex = doneSets.length;
+  const extra = current ? (extraByExercise[current.exerciseId] ?? 0) : 0;
+  // Drops não contam como série planejada.
+  const setIndex = regularSetCount(log);
+  const totalSets = (current?.setsTarget ?? 0) + extra;
+  // Com séries somadas ainda por fazer, o exercício não está concluído.
+  const completion =
+    extra > 0 && setIndex < totalSets ? "parcial" : exerciseCompletionState(log, current);
+  const lastRegular = [...doneSets].reverse().find((s) => !s.isDrop);
   const target = current?.setTargets[setIndex] ??
     current?.setTargets.at(-1) ?? {
       reps: current?.repsTarget ?? 0,
@@ -85,8 +108,13 @@ export function QuickSetPanel({
       restSeconds: current?.restSeconds ?? 60,
     };
   const draftKey = `${current?.exerciseId ?? ""}:${setIndex}`;
-  const values =
-    draft?.key === draftKey ? draft : { weight: String(target.weight), reps: String(target.reps) };
+  // Série além da meta parte do que a pessoa acabou de fazer.
+  const beyondPlan = setIndex >= (current?.setTargets.length ?? 0);
+  const defaults =
+    beyondPlan && lastRegular
+      ? { weight: String(lastRegular.weight), reps: String(lastRegular.reps) }
+      : { weight: String(target.weight), reps: String(target.reps) };
+  const values = draft?.key === draftKey ? draft : defaults;
 
   const pending = planned.filter(
     (p) =>
@@ -132,6 +160,8 @@ export function QuickSetPanel({
     const next = planned[(index + delta + planned.length) % planned.length];
     select(next.exerciseId);
     setShowDone(false);
+    setDropOpen(false);
+    setDraft(null);
   };
 
   const confirmSet = () =>
@@ -139,8 +169,9 @@ export function QuickSetPanel({
       if (!current) return;
       const weight = parseFloat(values.weight) || 0;
       const reps = parseInt(values.reps, 10) || 0;
+      const wasDone = Boolean(log?.done);
       await logSet(session.id, current.exerciseId, weight, reps);
-      const isLastPlanned = setIndex + 1 >= current.setsTarget;
+      const isLastPlanned = setIndex + 1 >= totalSets;
       if (isLastPlanned) await completeExerciseLog(session.id, current.exerciseId);
       // Duração da série que acabou de ser concluída — com a escolha temporária
       // deste exercício tendo precedência, se houver uma.
@@ -153,16 +184,44 @@ export function QuickSetPanel({
       // Só depois de tudo gravado: uma falha acima interrompe aqui e mantém os
       // valores digitados na tela, sem avançar.
       setDraft(null);
-      if (isLastPlanned) advance(current.exerciseId);
+      // Série extra num exercício que já estava concluído não puxa a pessoa
+      // para o próximo: ela escolheu ficar nele.
+      if (isLastPlanned && !wasDone) advance(current.exerciseId);
     });
 
-  const addExtraSet = () =>
+  const addSet = () => {
+    if (!current) return;
+    setDraft(null);
+    setExtraByExercise((m) => ({ ...m, [current.exerciseId]: (m[current.exerciseId] ?? 0) + 1 }));
+  };
+
+  const openDrop = () => {
+    setDropDraft({
+      weight: String(Math.max(0, Math.round((lastRegular?.weight ?? target.weight) * 0.75))),
+      reps: String(Math.max(1, Math.round((lastRegular?.reps ?? target.reps) / 2))),
+    });
+    setDropOpen(true);
+  };
+
+  const confirmDrop = () =>
     setAction.run(async () => {
       if (!current) return;
-      const weight = parseFloat(values.weight) || 0;
-      const reps = parseInt(values.reps, 10) || 0;
-      await logSet(session.id, current.exerciseId, weight, reps);
+      await logSet(
+        session.id,
+        current.exerciseId,
+        parseFloat(dropDraft.weight) || 0,
+        parseInt(dropDraft.reps, 10) || 0,
+        { isDrop: true },
+      );
+      setDropOpen(false);
+    });
+
+  const skipCurrent = () =>
+    setAction.run(async () => {
+      if (!current) return;
+      await skipExercise(session.id, current.exerciseId, true);
       setDraft(null);
+      advance(current.exerciseId);
     });
 
   return (
@@ -246,45 +305,50 @@ export function QuickSetPanel({
                 </button>
                 {showDone && current && (
                   <ul className="mt-1 space-y-1">
-                    {doneSets.map((s) => (
-                      <li
-                        key={`${s.setIndex}-${s.weight}-${s.reps}`}
-                        className="flex items-center gap-1.5 border-b border-border px-2 py-2 last:border-b-0"
-                      >
-                        <span className="w-10 shrink-0 text-[10px] text-muted-foreground">
-                          Série {s.setIndex + 1}
-                        </span>
-                        {/* Editar usa updateSet: corrige a série existente, não
-                            cria outra nem redispara avanço/descanso. */}
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          defaultValue={s.weight}
-                          aria-label={`Peso da série ${s.setIndex + 1}`}
-                          onBlur={(e) =>
-                            void updateSet(session.id, current.exerciseId, s.setIndex, {
-                              weight: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                          className="w-14 rounded-md border border-border bg-surface px-1.5 py-1 text-right text-xs tabular-nums outline-none focus:border-primary"
-                        />
-                        <span className="text-[10px] text-muted-foreground">kg</span>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          defaultValue={s.reps}
-                          aria-label={`Repetições da série ${s.setIndex + 1}`}
-                          onBlur={(e) =>
-                            void updateSet(session.id, current.exerciseId, s.setIndex, {
-                              reps: parseInt(e.target.value, 10) || 0,
-                            })
-                          }
-                          className="w-12 rounded-md border border-border bg-surface px-1.5 py-1 text-right text-xs tabular-nums outline-none focus:border-primary"
-                        />
-                        <span className="text-[10px] text-muted-foreground">reps</span>
-                        <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-success" />
-                      </li>
-                    ))}
+                    {(() => {
+                      let regular = 0;
+                      return doneSets.map((s) => {
+                        const label = s.isDrop ? "Drop" : `Série ${++regular}`;
+                        return (
+                          <li
+                            key={`${s.setIndex}-${s.weight}-${s.reps}`}
+                            className="flex items-center gap-1.5 border-b border-border px-2 py-2 last:border-b-0"
+                          >
+                            <span
+                              className={`w-10 shrink-0 text-[10px] ${s.isDrop ? "font-semibold text-warning" : "text-muted-foreground"}`}
+                            >
+                              {label}
+                            </span>
+                            {/* Editar usa updateSet: corrige a série existente,
+                                não cria outra nem redispara avanço/descanso. */}
+                            <NumberField
+                              value={s.weight}
+                              aria-label={`Peso de ${label}`}
+                              onValue={(v) =>
+                                void updateSet(session.id, current.exerciseId, s.setIndex, {
+                                  weight: v,
+                                })
+                              }
+                              className="w-14 rounded-md border border-border bg-surface px-1.5 py-1 text-right text-xs tabular-nums outline-none focus:border-primary"
+                            />
+                            <span className="text-[10px] text-muted-foreground">kg</span>
+                            <NumberField
+                              integer
+                              value={s.reps}
+                              aria-label={`Repetições de ${label}`}
+                              onValue={(v) =>
+                                void updateSet(session.id, current.exerciseId, s.setIndex, {
+                                  reps: v,
+                                })
+                              }
+                              className="w-12 rounded-md border border-border bg-surface px-1.5 py-1 text-right text-xs tabular-nums outline-none focus:border-primary"
+                            />
+                            <span className="text-[10px] text-muted-foreground">reps</span>
+                            <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-success" />
+                          </li>
+                        );
+                      });
+                    })()}
                   </ul>
                 )}
               </div>
@@ -300,13 +364,11 @@ export function QuickSetPanel({
               <div className="py-2 text-center">
                 <Check className="check-enter mx-auto h-7 w-7 text-success" strokeWidth={2.5} />
                 <p className="mt-1.5 text-sm font-semibold">Exercício concluído</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {doneSets.length} séries registradas
-                </p>
+                <p className="text-[11px] text-muted-foreground">{setIndex} séries registradas</p>
                 <button
-                  onClick={addExtraSet}
+                  onClick={addSet}
                   disabled={setAction.pending}
-                  className="interactive-press mt-3 inline-flex items-center gap-1 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground disabled:opacity-40"
+                  className="academia-add-set interactive-press mt-3 inline-flex items-center gap-1 rounded-xl px-4 py-2.5 text-xs font-semibold"
                 >
                   <Plus className="h-3.5 w-3.5" /> Adicionar série
                 </button>
@@ -315,20 +377,20 @@ export function QuickSetPanel({
               current && (
                 <>
                   <p className="text-center text-base font-semibold tracking-[-0.02em] text-foreground">
-                    Série {setIndex + 1} de {Math.max(current.setsTarget, setIndex + 1)}
+                    Série <span className="academia-current-set">{setIndex + 1}</span> de{" "}
+                    {Math.max(totalSets, setIndex + 1)}
                   </p>
                   <div className="mt-5 flex items-end justify-center gap-2.5">
                     <label className="flex-1">
                       <span className="mb-1.5 block text-center text-xs text-muted-foreground">
                         Peso (kg)
                       </span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        value={values.weight}
-                        onChange={(e) =>
-                          setDraft({ key: draftKey, weight: e.target.value, reps: values.reps })
+                      <NumberField
+                        value={parseFloat(values.weight) || 0}
+                        onValue={(v) =>
+                          setDraft({ key: draftKey, weight: String(v), reps: values.reps })
                         }
+                        onEmpty={() => setDraft({ key: draftKey, weight: "0", reps: values.reps })}
                         className="academia-quick-number w-full min-w-0 rounded-[22px] border border-border bg-background/55 px-2 py-3.5 text-center font-mono text-2xl font-bold tabular-nums outline-none focus:border-primary"
                       />
                     </label>
@@ -336,12 +398,14 @@ export function QuickSetPanel({
                       <span className="mb-1.5 block text-center text-xs text-muted-foreground">
                         Repetições
                       </span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        value={values.reps}
-                        onChange={(e) =>
-                          setDraft({ key: draftKey, weight: values.weight, reps: e.target.value })
+                      <NumberField
+                        integer
+                        value={parseInt(values.reps, 10) || 0}
+                        onValue={(v) =>
+                          setDraft({ key: draftKey, weight: values.weight, reps: String(v) })
+                        }
+                        onEmpty={() =>
+                          setDraft({ key: draftKey, weight: values.weight, reps: "0" })
                         }
                         className="academia-quick-number w-full min-w-0 rounded-[22px] border border-border bg-background/55 px-2 py-3.5 text-center font-mono text-2xl font-bold tabular-nums outline-none focus:border-primary"
                       />
@@ -355,8 +419,76 @@ export function QuickSetPanel({
                       <Check className="h-6 w-6" strokeWidth={3} />
                     </button>
                   </div>
+                  {/* Mesma ideia do modal do exercício: dá pra pedir mais uma
+                      série desde o começo, sem esperar terminar as planejadas. */}
+                  {completion !== "concluido" && (
+                    <button
+                      onClick={addSet}
+                      className="academia-add-set interactive-press mt-3 flex w-full items-center justify-center gap-1 rounded-xl py-2 text-xs font-semibold"
+                      title="Soma uma série além da meta"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Adicionar série
+                    </button>
+                  )}
                 </>
               )
+            )}
+
+            {current && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  onClick={dropOpen ? () => setDropOpen(false) : openDrop}
+                  disabled={doneSets.length === 0 && !dropOpen}
+                  title={doneSets.length === 0 ? "Registre uma série antes do drop" : undefined}
+                  className="interactive-press flex min-h-10 items-center justify-center gap-1 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:border-warning/60 hover:text-warning disabled:opacity-40"
+                >
+                  <ArrowDownToLine className="h-3.5 w-3.5" /> {dropOpen ? "Cancelar drop" : "Drop"}
+                </button>
+                <button
+                  onClick={skipCurrent}
+                  disabled={setAction.pending || doneSets.length > 0}
+                  title={doneSets.length > 0 ? "Já tem séries registradas" : "Pular este exercício"}
+                  className="interactive-press flex min-h-10 items-center justify-center gap-1 rounded-xl border border-border text-xs font-semibold text-muted-foreground disabled:opacity-40"
+                >
+                  <SkipForward className="h-3.5 w-3.5" /> Pular exercício
+                </button>
+              </div>
+            )}
+
+            {dropOpen && current && (
+              <div className="mt-2 flex items-end justify-center gap-2.5 rounded-2xl border border-warning/40 bg-warning/5 p-3">
+                <label className="flex-1">
+                  <span className="mb-1 block text-center text-[11px] font-semibold text-warning">
+                    Drop · peso (kg)
+                  </span>
+                  <NumberField
+                    value={parseFloat(dropDraft.weight) || 0}
+                    onValue={(v) => setDropDraft((d) => ({ ...d, weight: String(v) }))}
+                    onEmpty={() => setDropDraft((d) => ({ ...d, weight: "0" }))}
+                    className="w-full min-w-0 rounded-xl border border-border bg-background/55 px-2 py-2.5 text-center font-mono text-lg font-bold tabular-nums outline-none focus:border-warning"
+                  />
+                </label>
+                <label className="flex-1">
+                  <span className="mb-1 block text-center text-[11px] text-muted-foreground">
+                    Repetições
+                  </span>
+                  <NumberField
+                    integer
+                    value={parseInt(dropDraft.reps, 10) || 0}
+                    onValue={(v) => setDropDraft((d) => ({ ...d, reps: String(v) }))}
+                    onEmpty={() => setDropDraft((d) => ({ ...d, reps: "0" }))}
+                    className="w-full min-w-0 rounded-xl border border-border bg-background/55 px-2 py-2.5 text-center font-mono text-lg font-bold tabular-nums outline-none focus:border-warning"
+                  />
+                </label>
+                <button
+                  onClick={confirmDrop}
+                  disabled={setAction.pending}
+                  aria-label="Registrar drop"
+                  className="interactive-press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-warning text-background disabled:opacity-40"
+                >
+                  <Check className="h-5 w-5" strokeWidth={3} />
+                </button>
+              </div>
             )}
 
             {setAction.error && (

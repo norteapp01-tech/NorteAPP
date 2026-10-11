@@ -78,3 +78,20 @@
     width: 52px !important;
   }
 }
+
+/* "Adicionar série": contorno verde contínuo, para ninguém deixar passar que
+   dá pra fazer mais uma. */
+.academia-add-set {
+  border: 1.5px solid var(--color-success);
+  color: var(--color-success);
+  background: color-mix(in oklab, var(--color-success) 8%, transparent);
+}
+
+.academia-add-set:disabled {
+  opacity: 0.4;
+}
+
+/* Série em que a pessoa está: o número em verde, o total em branco. */
+.academia-current-set {
+  color: var(--color-success);
+}

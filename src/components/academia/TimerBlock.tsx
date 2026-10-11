@@ -4,6 +4,7 @@ import { formatDurationClock } from "@/lib/sport-store";
 import {
   DEFAULT_REST_SECONDS,
   MAX_REST_SECONDS,
+  adjustRest,
   pauseRest,
   pauseSession,
   resetRest,
@@ -18,6 +19,7 @@ import {
   type WorkoutSession,
 } from "@/lib/workout-store";
 import { TimerPrism, type TimerFace } from "./TimerPrism";
+import { restClockLabel } from "./rest-clock";
 
 // ---------------------------------------------------------------------------
 // As duas faces do cronômetro e seus controles.
@@ -37,6 +39,7 @@ function playLabel(status: RestStatus): string {
   return "Iniciar descanso";
 }
 const QUICK_MINUTES = [1, 2, 3, 5];
+const REST_STEP_SECONDS = 30;
 
 export function TimerBlock({
   session,
@@ -83,16 +86,27 @@ export function TimerBlock({
         descanso={
           <FaceShell tone={rest.status === "fim" ? "done" : "normal"}>
             <div className="min-w-0">
-              <p className="text-[11px] text-muted-foreground">Descanso</p>
+              <p className="text-[11px] text-muted-foreground">
+                {rest.status === "fim" ? "Descansado além da meta" : "Descanso"}
+              </p>
               <button
-                onClick={() => setEditing(true)}
-                aria-label={`Ajustar o tempo de descanso, agora ${formatDurationClock(rest.remaining)}`}
+                onClick={() => setEditing((open) => !open)}
+                aria-label={`Ajustar o tempo de descanso, agora ${restClockLabel(rest)}`}
+                aria-expanded={editing}
                 className={`interactive-press -ml-1 rounded px-1 font-mono text-2xl font-bold tabular-nums ${rest.status === "fim" ? "text-success" : ""}`}
               >
-                {formatDurationClock(rest.remaining)}
+                {restClockLabel(rest)}
               </button>
             </div>
             <div className="ml-auto flex shrink-0 items-center gap-1">
+              <button
+                onClick={() => void adjustRest(session, REST_STEP_SECONDS, base)}
+                aria-label="Somar 30 segundos ao descanso"
+                title="+30 segundos"
+                className="interactive-press h-7 rounded-full border border-border bg-background/20 px-2 text-[11px] font-semibold tabular-nums text-foreground hover:border-primary/40"
+              >
+                +30s
+              </button>
               <IconButton onClick={playRest} label={playLabel(rest.status)}>
                 {rest.status === "correndo" ? (
                   <Pause className="h-4 w-4" />
@@ -141,7 +155,7 @@ export function TimerBlock({
 
       {editing && (
         <RestDurationEditor
-          current={base}
+          current={rest.status === "correndo" || rest.status === "pausado" ? rest.remaining : base}
           onCancel={() => setEditing(false)}
           onStart={async (seconds) => {
             if (exerciseId) await setRestOverride(session, exerciseId, seconds);
@@ -232,6 +246,12 @@ export function RestDurationEditor({
   );
   const valid = total > 0;
 
+  const nudge = (delta: number) => {
+    const next = Math.max(1, Math.min(MAX_REST_SECONDS, total + delta));
+    setMinutes(String(Math.floor(next / 60)));
+    setSeconds(String(next % 60).padStart(2, "0"));
+  };
+
   const pick = (m: number) => {
     setMinutes(String(m));
     setSeconds("00");
@@ -243,9 +263,23 @@ export function RestDurationEditor({
       aria-label="Tempo de descanso"
       className="mt-1.5 rounded-xl border border-border bg-surface p-2.5 shadow-lg"
     >
-      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-        Tempo de descanso
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+          Tempo de descanso
+        </p>
+        <div className="flex gap-1">
+          {[-REST_STEP_SECONDS, REST_STEP_SECONDS].map((delta) => (
+            <button
+              key={delta}
+              onClick={() => nudge(delta)}
+              aria-label={`${delta > 0 ? "Somar" : "Tirar"} 30 segundos`}
+              className="interactive-press rounded-md border border-border px-2 py-0.5 text-[11px] font-semibold tabular-nums"
+            >
+              {delta > 0 ? "+30s" : "−30s"}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="mt-2 flex gap-1.5">
         {QUICK_MINUTES.map((m) => (
           <button

@@ -33,8 +33,41 @@ async function clearLocalContent(userId: string) {
   }
 }
 
+const USER_BUCKETS = ["avatars", "sport-photos", "book-covers", "financial-goal-images"];
+
+/** Apaga os arquivos da própria pessoa pelo cliente. Melhor esforço: o que não
+ * puder ser listado ou removido não impede o reset do conteúdo. */
+async function removeOwnFiles(userId: string) {
+  for (const bucket of USER_BUCKETS) {
+    const { data } = await supabase.storage.from(bucket).list(userId, { limit: 100 });
+    const files = (data ?? []).filter((item) => item.id).map((item) => `${userId}/${item.name}`);
+    if (files.length) await supabase.storage.from(bucket).remove(files);
+  }
+}
+
+/** Reset direto pelo banco, sem a função de servidor. A função SQL só apaga as
+ * linhas da PRÓPRIA pessoa (usa o auth.uid() da sessão). Usado quando a função
+ * `reset-account` não está publicada ou não responde. */
+async function resetViaDatabase(userId: string) {
+  try {
+    await removeOwnFiles(userId);
+  } catch {
+    /* Arquivos são melhor esforço; o conteúdo é o que importa. */
+  }
+  const { error } = await supabase.rpc("reset_my_account_content");
+  if (error) throw error;
+}
+
 export async function resetAccountContent(userId: string) {
-  await invokeAccountAction("reset-account");
+  try {
+    await invokeAccountAction("reset-account");
+  } catch (cause) {
+    try {
+      await resetViaDatabase(userId);
+    } catch {
+      throw cause;
+    }
+  }
   await clearLocalContent(userId);
 }
 

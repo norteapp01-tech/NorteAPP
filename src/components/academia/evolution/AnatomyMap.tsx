@@ -1,9 +1,33 @@
 import { useId, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import type { MuscleGroup } from "@/lib/workout-store";
-import { muscleGroupLabel, type MuscleStimulus } from "@/lib/workout-evolution";
+import { muscleGroupLabel, regionSetCount, type MuscleStimulus } from "@/lib/workout-evolution";
 import { progressLabel, type muscleProgress } from "@/lib/workout-map";
 type Region = { group: MuscleGroup; label: string; d: string };
+
+/** Subgrupo que cada região representa. Região que não aparece aqui responde
+ * pelo grupo inteiro. */
+const REGION_DETAIL: Record<string, MuscleGroup> = {
+  "Peitoral · região superior": "peito_superior",
+  "Peitoral · região média": "peito_medio",
+  "Peitoral · região inferior": "peito_inferior",
+  "Deltoide anterior": "ombro_anterior",
+  "Deltoide lateral": "ombro_lateral",
+  "Deltoide posterior": "ombro_posterior",
+  "Trapézio · região superior": "trapezio",
+  "Trapézio · região média e inferior": "costas_meio",
+  "Costas · região escapular": "costas_meio",
+  Dorsal: "dorsais",
+  "Lombar · eretores da coluna": "lombar",
+  "Tríceps · cabeça longa": "triceps_longa",
+  "Tríceps · cabeça lateral": "triceps_lateral",
+  "Tríceps · região medial visível": "triceps_medial",
+};
+
+/** Séries de uma região que valem "totalmente aceso". Escala ABSOLUTA: antes
+ * a cor era relativa ao grupo mais treinado, então quem treinou só um
+ * exercício de ombro via o ombro "no máximo". */
+const FULL_SETS = 12;
 // Atlas fascia traced as separate bilateral shapes. Visible paths ARE hit targets.
 // Regional outlines are anatomical, not invented regional measurements.
 const FRONT: Region[] = [
@@ -170,11 +194,13 @@ const COLORS = {
 };
 export function BodyMap({
   stimulus,
+  detailCounts,
   selected,
   onSelect,
   progress,
 }: {
   stimulus: MuscleStimulus[];
+  detailCounts: Map<MuscleGroup, number>;
   selected: MuscleGroup | null;
   onSelect: (g: MuscleGroup | null) => void;
   progress: ReturnType<typeof muscleProgress>;
@@ -183,7 +209,6 @@ export function BodyMap({
   const [mode, setMode] = useState<"volume" | "progressao">("volume");
   const [expanded, setExpanded] = useState(false);
   const id = useId().replace(/:/g, "");
-  const max = Math.max(1, ...stimulus.map((s) => s.directSets));
 
   const controls = (full = false) => (
     <div className={`evo-map-controls ${full ? "is-full" : ""}`}>
@@ -229,7 +254,8 @@ export function BodyMap({
         />
         {(view === "frente" ? FRONT : BACK).flatMap((region, index) =>
           [false, true].map((mirror) => {
-            const count = stimulus.find((item) => item.group === region.group)?.directSets ?? 0;
+            const count = regionSetCount(detailCounts, region.group, REGION_DETAIL[region.label]);
+            const ratio = Math.min(1, count / FULL_SETS);
             const state = progress.get(region.group)?.state ?? "insuficiente";
             const known = mode === "volume" ? count > 0 : state !== "insuficiente";
             const color =
@@ -237,9 +263,9 @@ export function BodyMap({
                 ? COLORS[state]
                 : !count
                   ? COLORS.insuficiente
-                  : count / max > 0.72
+                  : ratio > 0.72
                     ? "#efba5b"
-                    : count / max > 0.35
+                    : ratio > 0.35
                       ? "#80e780"
                       : "#63b4dd";
             const active = selected === region.group;
@@ -251,7 +277,9 @@ export function BodyMap({
                   mirror ? `translate(${view === "frente" ? 660 : 590} 0) scale(-1 1)` : undefined
                 }
                 fill={color}
-                fillOpacity={known ? 0.48 : 0.05}
+                fillOpacity={
+                  mode === "volume" ? (count > 0 ? 0.22 + ratio * 0.4 : 0.05) : known ? 0.48 : 0.05
+                }
                 stroke={active ? "#fff" : color}
                 strokeOpacity={active ? 1 : 0.65}
                 strokeWidth={active ? 2.5 : 1.2}
@@ -260,7 +288,7 @@ export function BodyMap({
                 aria-pressed={interactive ? active : undefined}
                 aria-label={
                   interactive
-                    ? `${region.label}, ${mirror ? "direita" : "esquerda"}: ${mode === "volume" ? `${count} séries do grupo ${muscleGroupLabel[region.group]}` : progressLabel[state]}`
+                    ? `${region.label}, ${mirror ? "direita" : "esquerda"}: ${mode === "volume" ? `${count} séries` : progressLabel[state]}`
                     : undefined
                 }
                 onClick={interactive ? () => onSelect(active ? null : region.group) : undefined}
@@ -291,9 +319,9 @@ export function BodyMap({
     <div className="evo-map-legend" aria-label="Legenda do mapa">
       {(mode === "volume"
         ? [
-            ["#63b4dd", "Menos"],
+            ["#63b4dd", "Poucas séries"],
             ["#80e780", "Intermediário"],
-            ["#efba5b", "Mais"],
+            ["#efba5b", "Bastante (9+ séries)"],
             ["#63717d", "Sem registro"],
           ]
         : Object.entries(COLORS).map(([key, color]) => [

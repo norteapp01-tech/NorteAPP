@@ -29,6 +29,10 @@ import {
   exerciseTrends,
   attentionPoints,
   UNCLASSIFIED,
+  detailSetCounts,
+  regionSetCount,
+  muscleSelectGroups,
+  muscleGroupLabel,
 } from "./workout-evolution";
 import type { Exercise, SetLog, WorkoutPlan, WorkoutSession } from "./workout-store";
 
@@ -638,5 +642,68 @@ describe("attentionPoints — no máximo três, todas verificáveis", () => {
       "2026-09-30",
     );
     expect(points.length).toBeLessThanOrEqual(3);
+  });
+});
+
+describe("subgrupos musculares", () => {
+  const four = [
+    { weight: 20, reps: 10 },
+    { weight: 20, reps: 10 },
+    { weight: 20, reps: 10 },
+    { weight: 20, reps: 10 },
+  ];
+
+  it("subgrupo agrega no grupo pai, mas o mapa enxerga o detalhe", () => {
+    const sets = resolveSets(
+      [session("s1", "2026-09-01", four)],
+      [ex({ muscleGroup: "peito_superior" })],
+      [plan()],
+    );
+    expect(sets[0].muscleGroup).toBe("peito");
+    expect(sets[0].muscleDetail).toBe("peito_superior");
+    const counts = detailSetCounts(sets);
+    expect(counts.get("peito_superior")).toBe(4);
+    // Só a região treinada acende — as outras partes do peito ficam apagadas.
+    expect(regionSetCount(counts, "peito", "peito_superior")).toBe(4);
+    expect(regionSetCount(counts, "peito", "peito_inferior")).toBe(0);
+  });
+
+  it("exercício só 'Peito' (geral) acende todas as partes do peito", () => {
+    const sets = resolveSets(
+      [session("s1", "2026-09-01", four)],
+      [ex({ muscleGroup: "peito" })],
+      [plan()],
+    );
+    const counts = detailSetCounts(sets);
+    expect(regionSetCount(counts, "peito", "peito_inferior")).toBe(4);
+  });
+
+  it("quatro séries de peito pesam mais que uma de ombro", () => {
+    const sets = resolveSets(
+      [
+        session("s1", "2026-09-01", four),
+        session("s2", "2026-09-02", [four[0]], {
+          exerciseLogs: [
+            { exerciseId: "ex-2", done: true, sets: [{ setIndex: 0, weight: 20, reps: 10 }] },
+          ],
+        }),
+      ],
+      [
+        ex({ id: "ex-1", muscleGroup: "peito" }),
+        ex({ id: "ex-2", lineageId: "lin-lat", muscleGroup: "ombro_lateral" }),
+      ],
+      [plan()],
+    );
+    const counts = detailSetCounts(sets);
+    expect(regionSetCount(counts, "peito")).toBe(4);
+    expect(regionSetCount(counts, "ombros", "ombro_lateral")).toBe(1);
+  });
+
+  it("o seletor de grupo principal vem em ordem alfabética", () => {
+    const labels = muscleSelectGroups().map((g) => muscleGroupLabel[g.parent]);
+    expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b, "pt-BR")));
+    const chest = muscleSelectGroups().find((g) => g.parent === "peito")!;
+    expect(chest.options[0]).toBe("peito");
+    expect(chest.options).toContain("peito_superior");
   });
 });

@@ -23,6 +23,7 @@ import {
   sessionPlanned,
   restBaseSeconds,
   restState,
+  regularSetCount,
   DEFAULT_REST_SECONDS,
   type WorkoutSession,
   type Exercise,
@@ -561,5 +562,69 @@ describe("reiniciar o descanso — volta ao cheio e fica PARADO", () => {
       status: "pausado",
       remaining: 180,
     });
+  });
+});
+
+describe("descanso estourado continua contando", () => {
+  const started = restSession({
+    restStartedAt: "2026-09-16T10:00:00.000Z",
+    restTotalSeconds: 120,
+  });
+
+  it("depois do zero mostra quantos segundos passaram além da meta", () => {
+    expect(restState(started, 120, REST_T0 + 120_000)).toMatchObject({
+      status: "fim",
+      remaining: 0,
+      overtime: 0,
+    });
+    expect(restState(started, 120, REST_T0 + 125_000).overtime).toBe(5);
+    expect(restState(started, 120, REST_T0 + 195_000).overtime).toBe(75);
+  });
+
+  it("antes do fim não tem tempo extra", () => {
+    expect(restState(started, 120, REST_T0 + 30_000).overtime).toBe(0);
+  });
+});
+
+describe("drop set não conta como série planejada", () => {
+  const planned = {
+    exerciseId: "ex-1",
+    name: "Supino",
+    order: 0,
+    setsTarget: 2,
+    repsTarget: 10,
+    loadTarget: 20,
+    restSeconds: 60,
+    setTargets: [],
+  } as PlannedExercise;
+
+  it("regularSetCount ignora drops", () => {
+    const log = {
+      exerciseId: "ex-1",
+      done: false,
+      sets: [
+        { setIndex: 0, weight: 20, reps: 8 },
+        { setIndex: 1, weight: 15, reps: 5, isDrop: true },
+      ],
+    };
+    expect(regularSetCount(log)).toBe(1);
+  });
+
+  it("uma série + um drop continua parcial (2 séries na meta)", () => {
+    const log = {
+      exerciseId: "ex-1",
+      done: false,
+      sets: [
+        { setIndex: 0, weight: 20, reps: 8 },
+        { setIndex: 1, weight: 15, reps: 5, isDrop: true },
+      ],
+    };
+    expect(exerciseCompletionState(log, planned)).toBe("parcial");
+  });
+
+  it("exercício pulado sai da fila de pendentes", () => {
+    const second = { ...planned, exerciseId: "ex-2", order: 1 };
+    const logs = [{ exerciseId: "ex-2", done: false, skipped: true, sets: [] }];
+    expect(nextPendingExerciseId([planned, second], logs, "ex-1")).toBe("ex-1");
   });
 });

@@ -13,6 +13,7 @@ import {
   frequency,
   muscleGroupLabel,
   muscleStimulus,
+  detailSetCounts,
   rangeOfLastDays,
   resolveSets,
   type DateRange,
@@ -113,6 +114,7 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
   );
 
   const stimulus = useMemo(() => muscleStimulus(data.sets), [data.sets]);
+  const detailCounts = useMemo(() => detailSetCounts(data.sets), [data.sets]);
   const progress = useMemo(() => muscleProgress(data.sets), [data.sets]);
   const allSets = useMemo(
     () => resolveSets(sessions, exercises, plans),
@@ -277,7 +279,13 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
             </b>
           </div>
         </div>
-        <BodyMap stimulus={stimulus} selected={muscle} onSelect={setMuscle} progress={progress} />
+        <BodyMap
+          stimulus={stimulus}
+          detailCounts={detailCounts}
+          selected={muscle}
+          onSelect={setMuscle}
+          progress={progress}
+        />
       </section>
       {muscle && (
         <MuscleDetail stimulus={stimulus} muscle={muscle} progress={progress.get(muscle)} />
