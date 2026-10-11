@@ -111,6 +111,7 @@ export function regularSetCount(log: ExerciseLog | undefined): number {
   return log?.sets.filter((s) => !s.isDrop).length ?? 0;
 }
 export type WorkoutSessionStatus = "em_andamento" | "concluido";
+export type WorkoutPerceivedEffort = "leve" | "na_medida" | "pesado";
 
 /** O que o treino planejava no instante em que a sessão começou. Sem isso, um
  * treino de três meses atrás passa a exibir a meta de hoje — a sessão lia o
@@ -157,6 +158,9 @@ export type WorkoutSession = {
   /** Descanso escolhido na hora para um exercício, valendo só nesta sessão.
    * Não toca na ficha do treino. */
   restOverrides: Record<string, number>;
+  /** Leitura subjetiva de quem treinou. Carga e repetições não dizem se uma
+   * sessão pareceu fácil, adequada ou pesada — este toque fecha essa lacuna. */
+  perceivedEffort?: WorkoutPerceivedEffort;
 };
 
 export type BodyWeightEntry = { id: string; date: string; weight: number };
@@ -578,11 +582,95 @@ export type ExerciseSummary = {
   deltaWeightVsPrevious?: number;
   previousVolume?: number;
   isPersonalRecord: boolean;
+  comparison: ExerciseComparison;
+};
+
+export type ExerciseComparisonKind = "evoluiu" | "manteve" | "ajustou" | "sem_comparacao";
+
+export type ExerciseComparison = {
+  kind: ExerciseComparisonKind;
+  /** Comparação curta e verificável, sempre entre condições equivalentes. */
+  detail?: string;
+  change?: string;
 };
 
 /** Soma peso×reps de todas as séries do log — volume real do exercício na sessão. */
 function logVolume(log: ExerciseLog): number {
   return log.sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
+}
+
+function comparableLogVolume(log: ExerciseLog): number {
+  return log.sets.reduce((sum, set) => sum + (set.isDrop ? 0 : set.weight * set.reps), 0);
+}
+
+function formatLoad(value: number): string {
+  return Number.isInteger(value) ? String(value) : String(Math.round(value * 100) / 100);
+}
+
+/** Compara somente condições equivalentes. Primeiro tenta a mesma carga e
+ * compara repetições; quando não existe carga em comum, tenta o mesmo número
+ * de repetições e compara carga. Sem uma dessas âncoras, não inventa score. */
+export function compareExerciseSets(
+  current: SetLog[],
+  previous: SetLog[] | undefined,
+): ExerciseComparison {
+  const currentRegular = current.filter((set) => !set.isDrop);
+  const previousRegular = previous?.filter((set) => !set.isDrop);
+  if (!previousRegular?.length || currentRegular.length === 0) {
+    return { kind: "sem_comparacao" };
+  }
+
+  const repsAtWeight = (sets: SetLog[]) => {
+    const map = new Map<number, number>();
+    for (const set of sets) map.set(set.weight, Math.max(map.get(set.weight) ?? 0, set.reps));
+    return map;
+  };
+  const weightAtReps = (sets: SetLog[]) => {
+    const map = new Map<number, number>();
+    for (const set of sets) map.set(set.reps, Math.max(map.get(set.reps) ?? 0, set.weight));
+    return map;
+  };
+  const kindFor = (delta: number): ExerciseComparisonKind =>
+    delta > 0 ? "evoluiu" : delta < 0 ? "ajustou" : "manteve";
+
+  const nowByWeight = repsAtWeight(currentRegular);
+  const beforeByWeight = repsAtWeight(previousRegular);
+  const commonWeights = [...nowByWeight.keys()]
+    .filter((weight) => beforeByWeight.has(weight))
+    .sort((a, b) => b - a);
+  if (commonWeights.length > 0) {
+    const weight = commonWeights[0];
+    const before = beforeByWeight.get(weight) ?? 0;
+    const now = nowByWeight.get(weight) ?? 0;
+    const delta = now - before;
+    return {
+      kind: kindFor(delta),
+      detail: `${formatLoad(weight)} kg × ${before} → ${formatLoad(weight)} kg × ${now}`,
+      change:
+        delta === 0
+          ? "mesmas repetições"
+          : `${delta > 0 ? "+" : ""}${delta} ${Math.abs(delta) === 1 ? "repetição" : "repetições"}`,
+    };
+  }
+
+  const nowByReps = weightAtReps(currentRegular);
+  const beforeByReps = weightAtReps(previousRegular);
+  const commonReps = [...nowByReps.keys()]
+    .filter((reps) => beforeByReps.has(reps))
+    .sort((a, b) => b - a);
+  if (commonReps.length > 0) {
+    const reps = commonReps[0];
+    const before = beforeByReps.get(reps) ?? 0;
+    const now = nowByReps.get(reps) ?? 0;
+    const delta = Math.round((now - before) * 100) / 100;
+    return {
+      kind: kindFor(delta),
+      detail: `${formatLoad(before)} kg × ${reps} → ${formatLoad(now)} kg × ${reps}`,
+      change: delta === 0 ? "mesma carga" : `${delta > 0 ? "+" : ""}${formatLoad(delta)} kg`,
+    };
+  }
+
+  return { kind: "sem_comparacao" };
 }
 
 /** Carga máxima já registrada pra esse exercício em QUALQUER sessão concluída
@@ -615,17 +703,24 @@ export function sessionSummary(
   completedExercises: number;
   totalVolume: number;
   previousTotalVolume?: number;
+  comparableVolume?: number;
+  previousComparableVolume?: number;
   durationMinutes?: number;
+  plannedExercises: number;
+  comparisonCounts: Record<ExerciseComparisonKind, number>;
 } {
   const rows: ExerciseSummary[] = [];
   let totalSets = 0;
   let completedExercises = 0;
   let totalVolume = 0;
   let previousTotalVolume: number | undefined = previous ? 0 : undefined;
+  let comparableVolume = 0;
+  let previousComparableVolume = 0;
   // O resumo descreve o treino COMO ELE FOI: nome e metas vêm do retrato
   // gravado no início da sessão, não do exercício de hoje. É também o que
   // mantém no histórico um exercício já excluído do treino.
   const planned = sessionPlanned(session, exercises);
+  const previousPlanned = previous ? sessionPlanned(previous, exercises) : [];
   for (const log of session.exerciseLogs) {
     if (log.sets.length === 0) continue;
     const ex = planned.find((p) => p.exerciseId === log.exerciseId);
@@ -635,13 +730,22 @@ export function sessionSummary(
     const best = log.sets.reduce((a, b) => (b.weight > a.weight ? b : a), log.sets[0]);
     const volume = logVolume(log);
     totalVolume += volume;
-    const prevLog = previous?.exerciseLogs.find((l) => l.exerciseId === log.exerciseId);
+    const previousExercise = previousPlanned.find((candidate) =>
+      ex.lineageId && candidate.lineageId
+        ? candidate.lineageId === ex.lineageId
+        : candidate.exerciseId === ex.exerciseId,
+    );
+    const prevLog = previous?.exerciseLogs.find(
+      (candidate) => candidate.exerciseId === previousExercise?.exerciseId,
+    );
     const prevBest = prevLog?.sets.length
       ? Math.max(...prevLog.sets.map((s) => s.weight))
       : undefined;
     const previousVolume = prevLog ? logVolume(prevLog) : undefined;
-    if (previousVolume !== undefined && previousTotalVolume !== undefined) {
+    if (prevLog && previousVolume !== undefined && previousTotalVolume !== undefined) {
       previousTotalVolume += previousVolume;
+      comparableVolume += comparableLogVolume(log);
+      previousComparableVolume += comparableLogVolume(prevLog);
     }
     const priorMax = allSessions.length
       ? ex.lineageId
@@ -666,21 +770,39 @@ export function sessionSummary(
       volume,
       deltaWeightVsPrevious: prevBest !== undefined ? best.weight - prevBest : undefined,
       previousVolume,
-      isPersonalRecord: best.weight > 0 && best.weight >= priorMax && priorMax > 0,
+      isPersonalRecord: best.weight > 0 && best.weight > priorMax && priorMax > 0,
+      comparison: compareExerciseSets(log.sets, prevLog?.sets),
     });
   }
   const durationMinutes = session.finishedAt
-    ? Math.round(
-        (new Date(session.finishedAt).getTime() - new Date(session.startedAt).getTime()) / 60000,
+    ? Math.max(
+        0,
+        Math.round(
+          (new Date(session.finishedAt).getTime() -
+            new Date(session.startedAt).getTime() -
+            session.pausedSeconds * 1000) /
+            60000,
+        ),
       )
     : undefined;
+  const comparisonCounts: Record<ExerciseComparisonKind, number> = {
+    evoluiu: 0,
+    manteve: 0,
+    ajustou: 0,
+    sem_comparacao: 0,
+  };
+  for (const row of rows) comparisonCounts[row.comparison.kind] += 1;
   return {
     exercises: rows,
     totalSets,
     completedExercises,
     totalVolume,
     previousTotalVolume,
+    comparableVolume: previousComparableVolume > 0 ? comparableVolume : undefined,
+    previousComparableVolume: previousComparableVolume > 0 ? previousComparableVolume : undefined,
     durationMinutes,
+    plannedExercises: planned.length,
+    comparisonCounts,
   };
 }
 
@@ -702,18 +824,22 @@ export function workoutInsights(
       86400000,
   );
 
-  if (summary.previousTotalVolume !== undefined && summary.previousTotalVolume > 0) {
+  if (summary.previousComparableVolume !== undefined && summary.previousComparableVolume > 0) {
     const pct = Math.round(
-      ((summary.totalVolume - summary.previousTotalVolume) / summary.previousTotalVolume) * 100,
+      (((summary.comparableVolume ?? 0) - summary.previousComparableVolume) /
+        summary.previousComparableVolume) *
+        100,
     );
     if (pct <= -5 && daysSince > 7) {
       insights.push(
-        `O volume caiu ${Math.abs(pct)}% após ${daysSince} dias sem esse treino. O intervalo maior pode ter contribuído.`,
+        `Nos exercícios comparáveis, o volume ficou ${Math.abs(pct)}% abaixo após ${daysSince} dias sem esse treino. O intervalo maior pode ter contribuído.`,
       );
     } else if (pct <= -5) {
-      insights.push(`O volume caiu ${Math.abs(pct)}% em relação ao treino anterior.`);
+      insights.push(
+        `Nos exercícios comparáveis, o volume ficou ${Math.abs(pct)}% abaixo do último treino.`,
+      );
     } else if (pct >= 5) {
-      insights.push(`Você aumentou o volume em ${pct}% em relação ao treino anterior.`);
+      insights.push(`Nos exercícios comparáveis, o volume ficou ${pct}% acima do último treino.`);
     }
   }
 
@@ -821,6 +947,7 @@ function mapSession(r: Row, exerciseLogs: ExerciseLog[]): WorkoutSession {
     planLineageId: (r.plan_lineage_id as string) ?? undefined,
     planLabel: (r.plan_label as string) ?? undefined,
     restOverrides: (r.rest_overrides as Record<string, number>) ?? {},
+    perceivedEffort: (r.perceived_effort as WorkoutPerceivedEffort) ?? undefined,
   };
 }
 
@@ -1141,6 +1268,10 @@ export async function resumeSession(session: WorkoutSession) {
     paused_at: null,
     paused_seconds: session.pausedSeconds + pausedSince(session.pausedAt),
   });
+}
+
+export async function setSessionPerceivedEffort(sessionId: string, effort: WorkoutPerceivedEffort) {
+  await patchSession(sessionId, { perceived_effort: effort });
 }
 
 /** Sem `invalidate()` de propósito: qual exercício o painel mostra é estado de

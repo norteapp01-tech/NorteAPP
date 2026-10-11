@@ -13,6 +13,7 @@ vi.mock("./supabase/client", () => ({
 
 import {
   sessionSummary,
+  compareExerciseSets,
   allTimeMaxWeight,
   workoutInsights,
   sessionElapsedSeconds,
@@ -107,6 +108,73 @@ describe("sessionSummary — sem histórico não inventa percentual/delta", () =
     expect(sessionSummary(finished, undefined, exercises).durationMinutes).toBe(60);
     expect(sessionSummary(ongoing, undefined, exercises).durationMinutes).toBeUndefined();
   });
+
+  it("duração desconta o tempo em que o treino ficou pausado", () => {
+    const exercises = [makeExercise()];
+    const session = makeSession({ pausedSeconds: 15 * 60 });
+    expect(sessionSummary(session, undefined, exercises).durationMinutes).toBe(45);
+  });
+});
+
+describe("compareExerciseSets — só compara condições equivalentes", () => {
+  it("reconhece evolução de repetições na mesma carga", () => {
+    expect(
+      compareExerciseSets(
+        [{ setIndex: 0, weight: 20, reps: 16 }],
+        [{ setIndex: 0, weight: 20, reps: 15 }],
+      ),
+    ).toEqual({
+      kind: "evoluiu",
+      detail: "20 kg × 15 → 20 kg × 16",
+      change: "+1 repetição",
+    });
+  });
+
+  it("reconhece evolução de carga no mesmo número de repetições", () => {
+    expect(
+      compareExerciseSets(
+        [{ setIndex: 0, weight: 42, reps: 10 }],
+        [{ setIndex: 0, weight: 40, reps: 10 }],
+      ),
+    ).toEqual({
+      kind: "evoluiu",
+      detail: "40 kg × 10 → 42 kg × 10",
+      change: "+2 kg",
+    });
+  });
+
+  it("não inventa uma conclusão quando carga e repetições mudaram juntas", () => {
+    expect(
+      compareExerciseSets(
+        [{ setIndex: 0, weight: 30, reps: 8 }],
+        [{ setIndex: 0, weight: 20, reps: 12 }],
+      ),
+    ).toEqual({ kind: "sem_comparacao" });
+  });
+
+  it("trata redução comparável como ajuste, não como fracasso", () => {
+    expect(
+      compareExerciseSets(
+        [{ setIndex: 0, weight: 20, reps: 10 }],
+        [{ setIndex: 0, weight: 20, reps: 12 }],
+      ).kind,
+    ).toBe("ajustou");
+  });
+
+  it("não deixa uma série drop distorcer a comparação principal", () => {
+    expect(
+      compareExerciseSets(
+        [
+          { setIndex: 0, weight: 40, reps: 10 },
+          { setIndex: 1, weight: 20, reps: 20, isDrop: true },
+        ],
+        [
+          { setIndex: 0, weight: 40, reps: 10 },
+          { setIndex: 1, weight: 20, reps: 10, isDrop: true },
+        ],
+      ).kind,
+    ).toBe("manteve");
+  });
 });
 
 describe("sessionSummary — comparação com sessão anterior", () => {
@@ -147,6 +215,58 @@ describe("sessionSummary — comparação com sessão anterior", () => {
     });
     const summary = sessionSummary(current, previous, exercises, [biggerPast, previous, current]);
     expect(summary.exercises[0].isPersonalRecord).toBe(false); // 40 < 50 histórico
+  });
+
+  it("repetir o recorde anterior é manutenção, não um novo recorde", () => {
+    const tiedPrevious = makeSession({
+      id: "s-tied",
+      date: "2026-08-28",
+      exerciseLogs: [
+        { exerciseId: "ex-1", done: true, sets: [{ setIndex: 0, weight: 40, reps: 10 }] },
+      ],
+    });
+    const summary = sessionSummary(current, tiedPrevious, exercises, [tiedPrevious, current]);
+    expect(summary.exercises[0].isPersonalRecord).toBe(false);
+    expect(summary.exercises[0].comparison.kind).toBe("manteve");
+  });
+
+  it("acompanha o mesmo exercício pela linhagem quando o ciclo cria uma nova cópia", () => {
+    const previousCopy = makePlanned({
+      exerciseId: "ex-old",
+      lineageId: "lin-supino",
+      name: "Supino reto",
+    });
+    const currentCopy = makePlanned({
+      exerciseId: "ex-new",
+      lineageId: "lin-supino",
+      name: "Supino reto",
+    });
+    const previousSession = makeSession({
+      id: "previous-copy",
+      plannedSnapshot: [previousCopy],
+      exerciseLogs: [
+        { exerciseId: "ex-old", done: true, sets: [{ setIndex: 0, weight: 40, reps: 10 }] },
+      ],
+    });
+    const currentSession = makeSession({
+      id: "current-copy",
+      date: "2026-09-11",
+      plannedSnapshot: [currentCopy],
+      exerciseLogs: [
+        { exerciseId: "ex-new", done: true, sets: [{ setIndex: 0, weight: 40, reps: 11 }] },
+      ],
+    });
+
+    const summary = sessionSummary(
+      currentSession,
+      previousSession,
+      [],
+      [previousSession, currentSession],
+    );
+    expect(summary.exercises[0].comparison.kind).toBe("evoluiu");
+    expect(summary.exercises[0].comparison.change).toBe("+1 repetição");
+    expect(summary.comparableVolume).toBe(440);
+    expect(summary.previousComparableVolume).toBe(400);
   });
 });
 

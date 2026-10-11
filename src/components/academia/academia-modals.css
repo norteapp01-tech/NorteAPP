@@ -95,3 +95,266 @@
 .academia-current-set {
   color: var(--color-success);
 }
+
+/* Fechamento do treino: menos painel estatístico, mais resposta. A hierarquia
+   é conclusão -> comparação -> detalhe, com volume apenas como contexto. */
+.academia-summary-modal {
+  border-radius: 28px;
+  background: var(--surface);
+}
+
+.academia-summary-intro {
+  padding: 4px 2px 2px;
+}
+
+.academia-summary-kicker,
+.academia-summary-label {
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.academia-summary-intro h3 {
+  margin-top: 6px;
+  font-size: clamp(1.35rem, 6vw, 1.72rem);
+  font-weight: 750;
+  letter-spacing: -0.04em;
+  line-height: 1.08;
+}
+
+.academia-summary-intro > p:last-child {
+  margin-top: 8px;
+  color: var(--muted-foreground);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.academia-summary-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 18px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface-quiet);
+}
+
+.academia-summary-kpis > div {
+  display: flex;
+  min-width: 0;
+  min-height: 82px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 6px;
+  text-align: center;
+}
+
+.academia-summary-kpis > div + div {
+  border-left: 1px solid var(--border);
+}
+
+.academia-summary-kpis strong {
+  color: var(--foreground);
+  font-size: clamp(1rem, 4.5vw, 1.22rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.academia-summary-kpis span {
+  margin-top: 7px;
+  color: var(--muted-foreground);
+  font-size: 0.62rem;
+  letter-spacing: 0.07em;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.academia-summary-section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.academia-summary-comparison-copy {
+  margin-top: 8px;
+  font-size: 0.98rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.academia-summary-comparison-bar {
+  display: flex;
+  height: 5px;
+  gap: 3px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.academia-summary-comparison-bar span {
+  min-width: 5px;
+  border-radius: inherit;
+}
+
+.academia-summary-comparison-bar .is-progress {
+  background: var(--color-success);
+}
+
+.academia-summary-comparison-bar .is-steady {
+  background: color-mix(in srgb, var(--foreground) 44%, transparent);
+}
+
+.academia-summary-comparison-bar .is-adjusted {
+  background: color-mix(in srgb, var(--color-warning) 76%, var(--surface));
+}
+
+.academia-summary-empty-comparison,
+.academia-summary-effort-help {
+  margin-top: 8px;
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.academia-summary-insights {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.academia-summary-insights p {
+  padding-left: 11px;
+  border-left: 2px solid color-mix(in srgb, var(--color-primary) 65%, transparent);
+  color: var(--muted-foreground);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.academia-summary-exercises {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.academia-summary-exercises > li {
+  --summary-cut: 13px;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--summary-cut)) 0,
+    100% var(--summary-cut),
+    100% 100%,
+    0 100%
+  );
+  background:
+    radial-gradient(circle at 100% 0%, rgb(176 119 62 / 0.1), transparent 30%), var(--surface-quiet);
+}
+
+.academia-summary-exercise-heading,
+.academia-summary-exercise-detail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.academia-summary-exercise-heading p {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.academia-summary-record {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 3px 6px;
+  background: color-mix(in srgb, var(--color-warning) 13%, transparent);
+  color: var(--color-warning);
+  font-size: 0.55rem;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.academia-summary-status {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: var(--surface-2);
+  color: var(--muted-foreground);
+  font-size: 0.61rem;
+  font-weight: 700;
+}
+
+.academia-summary-status.is-progress {
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  color: var(--color-success);
+}
+
+.academia-summary-status.is-adjusted {
+  color: color-mix(in srgb, var(--color-warning) 80%, var(--foreground));
+}
+
+.academia-summary-exercise-detail {
+  margin-top: 7px;
+  color: var(--muted-foreground);
+  font-size: 0.69rem;
+  line-height: 1.35;
+}
+
+.academia-summary-exercise-detail strong {
+  flex-shrink: 0;
+  color: var(--foreground);
+  font-size: 0.68rem;
+}
+
+.academia-summary-effort > div {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.academia-summary-effort button {
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  font-weight: 650;
+  transition:
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+
+.academia-summary-effort button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--color-primary) 70%, var(--border));
+  background: color-mix(in srgb, var(--color-primary) 11%, transparent);
+  color: var(--color-primary);
+}
+
+@media (max-width: 370px) {
+  .academia-summary-kpis > div {
+    min-height: 76px;
+    padding-inline: 4px;
+  }
+
+  .academia-summary-kpis span {
+    font-size: 0.56rem;
+  }
+
+  .academia-summary-exercise-heading {
+    align-items: flex-start;
+  }
+}

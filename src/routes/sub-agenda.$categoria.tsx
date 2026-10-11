@@ -34,6 +34,8 @@ import {
   toggleRoutineActive,
   removeRoutine,
   todayISO,
+  toISODate,
+  addDays,
   relevantDate,
   formatDateBR,
 } from "@/lib/goals-store";
@@ -46,6 +48,7 @@ import {
   previousFinishedSession,
   sessionSummary,
   workoutInsights,
+  finishedSessionsInRange,
   createPlan,
   removePlan,
   addExercise,
@@ -62,6 +65,7 @@ import {
   removeLastSet,
   completeExerciseLog,
   skipExercise,
+  setSessionPerceivedEffort,
   regularSetCount,
   addBodyWeight,
   currentBodyWeight,
@@ -71,6 +75,8 @@ import {
   type Exercise,
   type SetTarget,
   type PlannedExercise,
+  type ExerciseComparisonKind,
+  type WorkoutPerceivedEffort,
 } from "@/lib/workout-store";
 import { formatDurationClock } from "@/lib/sport-store";
 import { useGymSession } from "@/lib/gym-session-context";
@@ -78,7 +84,14 @@ import { recordsForSession, resolveSets } from "@/lib/workout-evolution";
 import { PlanExerciseEditor } from "@/components/academia/PlanExerciseEditor";
 import { CycleTab } from "@/components/academia/cycle/CycleTab";
 import { EvolutionTab } from "@/components/academia/evolution/EvolutionTab";
-import { todayProgramming, useCycleStore, type TodayProgramming } from "@/lib/workout-cycle-store";
+import {
+  activeCycle,
+  blocksForCycle,
+  plannedSessionsInRange,
+  todayProgramming,
+  useCycleStore,
+  type TodayProgramming,
+} from "@/lib/workout-cycle-store";
 import { EsportesModule } from "@/components/esportes/EsportesModule";
 import { LeituraModule } from "@/components/reading/LeituraModule";
 import { AlimentacaoModule } from "@/components/nutrition/AlimentacaoModule";
@@ -1215,151 +1228,235 @@ function ExerciseModal({
   );
 }
 
+function weekRange(iso: string): { from: string; to: string } {
+  const date = new Date(`${iso}T12:00:00`);
+  const daysSinceMonday = (date.getDay() + 6) % 7;
+  const monday = addDays(date, -daysSinceMonday);
+  return { from: toISODate(monday), to: toISODate(addDays(monday, 6)) };
+}
+
+function durationLabel(minutes: number | undefined): string {
+  if (minutes === undefined) return "—";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest > 0 ? `${hours}h ${rest}min` : `${hours}h`;
+}
+
+const comparisonMeta: Record<ExerciseComparisonKind, { label: string; className: string }> = {
+  evoluiu: { label: "Evoluiu", className: "is-progress" },
+  manteve: { label: "Manteve", className: "is-steady" },
+  ajustou: { label: "Ajustou", className: "is-adjusted" },
+  sem_comparacao: { label: "Sem comparação", className: "is-new" },
+};
+
 function FinishSummaryModal({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
   const sessions = useWorkoutStore((s) => s.sessions);
   const exercises = useWorkoutStore((s) => s.exercises);
   const plans = useWorkoutStore((s) => s.plans);
+  const weeklyAssignment = useWorkoutStore((s) => s.weeklyAssignment);
+  const cycles = useCycleStore((s) => s.cycles);
+  const blocks = useCycleStore((s) => s.blocks);
+  const blockDays = useCycleStore((s) => s.blockDays);
+  const effortAction = useAsyncAction();
   const session = sessions.find((s) => s.id === sessionId);
   if (!session) return null;
+
   const plan = plans.find((p) => p.id === session.planId);
   const previous = previousFinishedSession(sessions, session.planId, session.id);
   const summary = sessionSummary(session, previous, exercises, sessions);
   const insights = workoutInsights(session, previous, sessions, summary);
-  const volumeDeltaPct =
-    summary.previousTotalVolume && summary.previousTotalVolume > 0
-      ? Math.round(
-          ((summary.totalVolume - summary.previousTotalVolume) / summary.previousTotalVolume) * 100,
-        )
-      : undefined;
-
-  // Evidência do que MUDOU, quando existe uma comparação verificável. Sem
-  // conquista, o treino é só confirmado — o app não inventa elogio.
   const records = recordsForSession(resolveSets(sessions, exercises, plans), sessionId);
+  const recordNames = new Set(records.map((record) => record.name));
+  const range = weekRange(session.date);
+  const cycle = activeCycle(cycles);
+  const cyclePlannedThisWeek = cycle
+    ? plannedSessionsInRange(blocksForCycle(blocks, cycle.id), blockDays, range.from, range.to)
+    : 0;
+  const plannedThisWeek = cycle
+    ? cyclePlannedThisWeek || undefined
+    : Object.values(weeklyAssignment).filter(Boolean).length || undefined;
+  const doneThisWeek = finishedSessionsInRange(sessions, range.from, range.to).length;
+  const recentFrom = toISODate(addDays(new Date(`${session.date}T12:00:00`), -6));
+  const recentDone = finishedSessionsInRange(sessions, recentFrom, session.date).length;
+  const compared =
+    summary.comparisonCounts.evoluiu +
+    summary.comparisonCounts.manteve +
+    summary.comparisonCounts.ajustou;
+  const completionValue = summary.plannedExercises
+    ? `${summary.completedExercises} de ${summary.plannedExercises}`
+    : String(summary.completedExercises);
+  const completedAll =
+    summary.plannedExercises > 0 && summary.completedExercises >= summary.plannedExercises;
+  const comparisonParts = [
+    summary.comparisonCounts.evoluiu > 0 &&
+      `${summary.comparisonCounts.evoluiu} ${summary.comparisonCounts.evoluiu === 1 ? "evoluiu" : "evoluíram"}`,
+    summary.comparisonCounts.manteve > 0 &&
+      `${summary.comparisonCounts.manteve} ${summary.comparisonCounts.manteve === 1 ? "manteve" : "mantiveram"}`,
+    summary.comparisonCounts.ajustou > 0 &&
+      `${summary.comparisonCounts.ajustou} ${summary.comparisonCounts.ajustou === 1 ? "foi ajustado" : "foram ajustados"}`,
+  ].filter(Boolean);
+  const headline = completedAll
+    ? `Você concluiu todo o treino em ${durationLabel(summary.durationMinutes)}.`
+    : summary.plannedExercises > 0
+      ? `Você concluiu ${summary.completedExercises} de ${summary.plannedExercises} exercícios em ${durationLabel(summary.durationMinutes)}.`
+      : `Treino registrado em ${durationLabel(summary.durationMinutes)}.`;
 
-  return (
-    <Modal onClose={onClose} title="Treino concluído">
-      <h3 className="text-xl font-bold">
-        {plan ? `Treino ${plan.letter} — ${plan.name}` : "Treino"}
-      </h3>
-
-      {records.length > 0 && (
-        <div className="mt-3 rounded-xl border border-primary/40 bg-primary/5 p-3">
-          <ul className="space-y-1">
-            {records.map((r) => (
-              <li key={`${r.lineageId}-${r.kind}`} className="text-sm font-semibold">
-                {r.name}:{" "}
-                {r.kind === "repeticoes"
-                  ? `${r.reps - (r.previousReps ?? 0)} ${r.reps - (r.previousReps ?? 0) === 1 ? "repetição" : "repetições"} a mais com ${r.weight} kg`
-                  : `${Math.round((r.weight - (r.previousWeight ?? 0)) * 100) / 100} kg a mais em ${r.reps} repetições`}
-              </li>
-            ))}
-          </ul>
-          <Link
-            to="/sub-agenda/$categoria"
-            params={{ categoria: "academia" }}
-            search={{ aba: "evolucao" }}
-            onClick={onClose}
-            className="interactive-press mt-2 inline-block text-[11px] font-bold text-primary underline"
-          >
-            Ver evolução
-          </Link>
-        </div>
-      )}
-
-      <div className="mt-4 grid grid-cols-2 gap-2 text-center">
-        <div className="rounded-xl bg-success/10 p-3">
-          <p className="text-xl font-bold text-success">{summary.completedExercises}</p>
-          <p className="text-[10px] uppercase text-muted-foreground">exercícios concluídos</p>
-        </div>
-        <div className="rounded-xl bg-primary/10 p-3">
-          <p className="text-xl font-bold text-primary">{summary.totalSets}</p>
-          <p className="text-[10px] uppercase text-muted-foreground">séries realizadas</p>
-        </div>
-        {summary.durationMinutes !== undefined && (
-          <div className="rounded-xl bg-surface-2 p-3">
-            <p className="text-xl font-bold">{summary.durationMinutes}min</p>
-            <p className="text-[10px] uppercase text-muted-foreground">duração</p>
-          </div>
-        )}
-        <div className="rounded-xl bg-surface-2 p-3">
-          <p className="text-xl font-bold">{Math.round(summary.totalVolume)}kg</p>
-          <p className="text-[10px] uppercase text-muted-foreground">
-            volume total
-            {volumeDeltaPct !== undefined && (
-              <span className={volumeDeltaPct >= 0 ? " text-success" : " text-danger"}>
-                {" "}
-                ({volumeDeltaPct > 0 ? "+" : ""}
-                {volumeDeltaPct}%)
-              </span>
-            )}
-          </p>
-        </div>
-      </div>
-
-      {insights.length > 0 && (
-        <div className="mt-4 space-y-1.5">
-          {insights.map((text, i) => (
-            <p
-              key={i}
-              className="rounded-lg border border-primary/25 bg-primary/5 p-2.5 text-[11px] text-foreground"
-            >
-              {text}
-            </p>
-          ))}
-        </div>
-      )}
-
-      <ul className="mt-4 space-y-2">
-        {summary.exercises.map((e) => (
-          <li key={e.exerciseId} className="rounded-lg border border-border bg-surface-2 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
-                  {e.name}
-                  {e.isPersonalRecord && (
-                    <span className="shrink-0 rounded-full bg-warning/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-warning">
-                      recorde
-                    </span>
-                  )}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {e.maxWeight}kg × {e.repsAtMaxWeight} reps · meta {e.targetWeight}kg ×{" "}
-                  {e.targetReps}
-                </p>
-              </div>
-              {e.deltaWeightVsPrevious !== undefined ? (
-                <span
-                  className={`flex shrink-0 items-center gap-0.5 text-xs font-bold ${e.deltaWeightVsPrevious > 0 ? "text-success" : e.deltaWeightVsPrevious < 0 ? "text-danger" : "text-muted-foreground"}`}
-                >
-                  {e.deltaWeightVsPrevious > 0 ? (
-                    <ChevronUp className="h-3.5 w-3.5" />
-                  ) : e.deltaWeightVsPrevious < 0 ? (
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  ) : null}
-                  {e.deltaWeightVsPrevious > 0 ? "+" : ""}
-                  {e.deltaWeightVsPrevious}kg
-                </span>
-              ) : (
-                <span className="shrink-0 text-[10px] text-muted-foreground">sem histórico</span>
-              )}
-            </div>
-            {e.previousVolume !== undefined && (
-              <p className="mt-1.5 text-[10px] text-muted-foreground">
-                Volume: {Math.round(e.volume)}kg vs. {Math.round(e.previousVolume)}kg anterior
-              </p>
-            )}
-          </li>
-        ))}
-        {summary.exercises.length === 0 && (
-          <p className="text-sm text-muted-foreground">Nenhuma série registrada nesse treino.</p>
-        )}
-      </ul>
+  const footer = (
+    <div className="grid grid-cols-2 gap-2">
       <button
+        type="button"
         onClick={onClose}
-        className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
+        className="interactive-press min-h-12 rounded-[18px] border border-border text-sm font-semibold text-muted-foreground"
       >
         Fechar
       </button>
+      <Link
+        to="/sub-agenda/$categoria"
+        params={{ categoria: "academia" }}
+        search={{ aba: "evolucao" }}
+        onClick={onClose}
+        className="interactive-press flex min-h-12 items-center justify-center rounded-[18px] bg-primary px-3 text-center text-sm font-semibold text-primary-foreground"
+      >
+        Ver evolução completa
+      </Link>
+    </div>
+  );
+
+  return (
+    <Modal
+      onClose={onClose}
+      title="Treino concluído"
+      maxWidthClassName="max-w-lg"
+      panelClassName="academia-summary-modal"
+      footer={footer}
+    >
+      <div className="academia-summary-intro">
+        <p className="academia-summary-kicker">Sessão finalizada</p>
+        <h3>{plan ? `Treino ${plan.letter} — ${plan.name}` : (session.planLabel ?? "Treino")}</h3>
+        <p>{headline}</p>
+      </div>
+
+      <div className="academia-summary-kpis" aria-label="Resumo do treino">
+        <div>
+          <strong>{completionValue}</strong>
+          <span>exercícios</span>
+        </div>
+        <div>
+          <strong>{durationLabel(summary.durationMinutes)}</strong>
+          <span>duração ativa</span>
+        </div>
+        <div>
+          <strong>
+            {plannedThisWeek !== undefined
+              ? `${Math.min(doneThisWeek, plannedThisWeek)} de ${plannedThisWeek}`
+              : recentDone}
+          </strong>
+          <span>{plannedThisWeek !== undefined ? "esta semana" : "últimos 7 dias"}</span>
+        </div>
+      </div>
+
+      <section className="academia-summary-section">
+        <p className="academia-summary-label">Em relação ao último treino</p>
+        {previous && compared > 0 ? (
+          <>
+            <p className="academia-summary-comparison-copy">{comparisonParts.join(" · ")}</p>
+            <div
+              className="academia-summary-comparison-bar"
+              aria-label={comparisonParts.join(", ")}
+            >
+              {summary.comparisonCounts.evoluiu > 0 && (
+                <span className="is-progress" style={{ flex: summary.comparisonCounts.evoluiu }} />
+              )}
+              {summary.comparisonCounts.manteve > 0 && (
+                <span className="is-steady" style={{ flex: summary.comparisonCounts.manteve }} />
+              )}
+              {summary.comparisonCounts.ajustou > 0 && (
+                <span className="is-adjusted" style={{ flex: summary.comparisonCounts.ajustou }} />
+              )}
+            </div>
+          </>
+        ) : (
+          <p className="academia-summary-empty-comparison">
+            {previous
+              ? "Não houve séries em condições equivalentes para uma comparação honesta."
+              : "Este é o primeiro registro deste treino. A próxima sessão terá comparação."}
+          </p>
+        )}
+        {insights.length > 0 && (
+          <div className="academia-summary-insights">
+            {insights.map((text) => (
+              <p key={text}>{text}</p>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="academia-summary-section">
+        <p className="academia-summary-label">Por exercício</p>
+        <ul className="academia-summary-exercises">
+          {summary.exercises.map((exercise) => {
+            const meta = comparisonMeta[exercise.comparison.kind];
+            const hasRecord = exercise.isPersonalRecord || recordNames.has(exercise.name);
+            return (
+              <li key={exercise.exerciseId}>
+                <div className="academia-summary-exercise-heading">
+                  <p>
+                    {exercise.name}
+                    {hasRecord && <span className="academia-summary-record">Recorde</span>}
+                  </p>
+                  <span className={`academia-summary-status ${meta.className}`}>{meta.label}</span>
+                </div>
+                <div className="academia-summary-exercise-detail">
+                  <span>
+                    {exercise.comparison.detail ??
+                      `${exercise.maxWeight} kg × ${exercise.repsAtMaxWeight} repetições`}
+                  </span>
+                  {exercise.comparison.change && <strong>{exercise.comparison.change}</strong>}
+                </div>
+              </li>
+            );
+          })}
+          {summary.exercises.length === 0 && (
+            <li className="academia-summary-empty-comparison">
+              Nenhuma série foi registrada neste treino.
+            </li>
+          )}
+        </ul>
+      </section>
+
+      <section className="academia-summary-section academia-summary-effort">
+        <p className="academia-summary-label">Como foi hoje?</p>
+        <p className="academia-summary-effort-help">
+          Sua percepção ajuda o Norte a interpretar manutenção, evolução e recuperação.
+        </p>
+        <div role="group" aria-label="Percepção do treino">
+          {(
+            [
+              ["leve", "Leve"],
+              ["na_medida", "Na medida"],
+              ["pesado", "Pesado"],
+            ] as const satisfies ReadonlyArray<readonly [WorkoutPerceivedEffort, string]>
+          ).map(([value, label]) => (
+            <button
+              type="button"
+              key={value}
+              aria-pressed={session.perceivedEffort === value}
+              disabled={effortAction.pending}
+              onClick={() => effortAction.run(() => setSessionPerceivedEffort(session.id, value))}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {effortAction.error && (
+          <InlineError
+            message={effortAction.error}
+            onRetry={effortAction.clearError}
+            className="mt-2"
+          />
+        )}
+      </section>
     </Modal>
   );
 }
