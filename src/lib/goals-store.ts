@@ -3,7 +3,12 @@ import { categoryMeta } from "./mock-data";
 import { supabase } from "./supabase/client";
 import { queryClient } from "./query-client";
 import { useSupabaseUserId, ensureSession } from "./supabase/client";
-import { removeExecutionAlerts, shiftExecutionAlerts } from "./agenda-alerts";
+import {
+  fetchAgendaAlerts,
+  removeExecutionAlerts,
+  setExecutionAlerts,
+  shiftExecutionAlerts,
+} from "./agenda-alerts";
 import { nowDate, nowMs } from "./test-clock";
 import { dateAndTimeInZone, getAppTimeZone, isValidTimeZone } from "./app-time-zone";
 
@@ -151,9 +156,17 @@ export type Routine = {
   title: string;
   weekday: number; // 0=domingo .. 6=sábado
   time: string;
+  endTime?: string;
   weight: TaskWeight;
   active: boolean;
   how?: string;
+  location?: string;
+  rigid?: boolean;
+  labelId?: string;
+  notes?: string;
+  link?: string;
+  allDay?: boolean;
+  alerts?: number[];
   sportModality?: SportModality;
   sportTargetDistanceM?: number;
   sportTargetDurationS?: number;
@@ -1115,9 +1128,17 @@ function mapRoutine(r: Row): Routine {
     title: r.title as string,
     weekday: r.weekday as number,
     time: r.time as string,
+    endTime: (r.end_time as string | null) ?? undefined,
     weight: r.weight as TaskWeight,
     active: r.active as boolean,
     how: (r.how as string) ?? undefined,
+    location: (r.location as string | null) ?? undefined,
+    rigid: Boolean(r.rigid),
+    labelId: (r.label_id as string | null) ?? undefined,
+    notes: (r.notes as string | null) ?? undefined,
+    link: (r.link as string | null) ?? undefined,
+    allDay: Boolean(r.all_day),
+    alerts: Array.isArray(r.alerts) ? (r.alerts as number[]) : [],
     sportModality: (r.sport_modality as SportModality) ?? undefined,
     sportTargetDistanceM: (r.sport_target_distance_m as number) ?? undefined,
     sportTargetDurationS: (r.sport_target_duration_s as number) ?? undefined,
@@ -1496,7 +1517,7 @@ export async function scheduleExecution(
   agendaDate: string,
   startTime: string,
   endTime?: string,
-): Promise<void> {
+): Promise<string> {
   const row = await fetchExecutionRow(id);
   const existing = Array.isArray(row.agenda_sessions)
     ? (row.agenda_sessions as AgendaSession[])
@@ -1539,6 +1560,7 @@ export async function scheduleExecution(
     to: { date: agendaDate, start: startTime, end: endTime },
   });
   await invalidate();
+  return session.id;
 }
 
 /** Edita uma ocorrência específica na Agenda sem alterar prazo ou intervalo do
@@ -1728,8 +1750,9 @@ export type AgendaChangeKind =
 type AgendaSlot = { date?: string | null; start?: string | null; end?: string | null };
 
 export async function logAgendaChange(input: {
-  executionId: string;
+  executionId?: string | null;
   seriesId?: string | null;
+  subjectTitle?: string;
   sessionId?: string;
   kind: AgendaChangeKind;
   from?: AgendaSlot;
@@ -1738,9 +1761,9 @@ export async function logAgendaChange(input: {
 }): Promise<void> {
   try {
     const userId = await ensureSession();
-    await supabase.from("agenda_changes").insert({
+    const row: Row = {
       user_id: userId,
-      execution_id: input.executionId,
+      execution_id: input.executionId ?? null,
       series_id: input.seriesId ?? null,
       session_id: input.sessionId ?? null,
       kind: input.kind,
@@ -1751,7 +1774,19 @@ export async function logAgendaChange(input: {
       to_start: input.to?.start ?? null,
       to_end: input.to?.end ?? null,
       note: input.note ?? null,
-    });
+    };
+    if (input.subjectTitle) row.subject_title = input.subjectTitle;
+    const first = await supabase.from("agenda_changes").insert(row);
+    // Compatibilidade durante o intervalo entre publicar o front e aplicar a
+    // migração 0055: as demais mudanças continuam sendo auditadas.
+    if (first.error && input.subjectTitle) {
+      const { subject_title: _title, ...legacyRow } = row;
+      void _title;
+      const fallback = await supabase.from("agenda_changes").insert(legacyRow);
+      if (fallback.error) throw new Error(fallback.error.message);
+    } else if (first.error) {
+      throw new Error(first.error.message);
+    }
   } catch {
     // O histórico é auditoria: falhar em gravá-lo nunca pode impedir a pessoa
     // de agendar, mover ou concluir.
@@ -1895,29 +1930,100 @@ export async function patchExecution(
 export async function updateRoutineAndFutureExecutions(
   routineId: string,
   patch: Partial<{
+    title: string;
+    category: string;
     time: string;
+    endTime: string | null;
     how: string;
+    location: string | null;
+    rigid: boolean;
+    labelId: string | null;
+    notes: string | null;
+    link: string | null;
+    allDay: boolean;
+    alerts: number[];
     sportTargetDistanceM: number;
     sportTargetDurationS: number;
   }>,
   fromDate: string,
-) {
+): Promise<{ undo: () => Promise<void> }> {
+  const routineBefore = unwrap<Row>(
+    await supabase.from("routines").select("*").eq("id", routineId).single(),
+  );
+  const { data: futureData } = await supabase
+    .from("executions")
+    .select("*")
+    .eq("routine_id", routineId)
+    .eq("status", "planejada")
+    .gte("agenda_date", fromDate);
+  const futureBefore = (futureData ?? []) as Row[];
+  const alertOffsets =
+    patch.alerts === undefined
+      ? new Map<string, number[]>()
+      : (await fetchAgendaAlerts()).reduce((map, alert) => {
+          if (!alert.executionId || !futureBefore.some((row) => row.id === alert.executionId))
+            return map;
+          const values = map.get(alert.executionId) ?? [];
+          values.push(alert.offsetMinutes);
+          map.set(alert.executionId, values);
+          return map;
+        }, new Map<string, number[]>());
+
   const routineDbPatch: Row = {};
+  if (patch.title !== undefined) routineDbPatch.title = patch.title;
+  if (patch.category !== undefined) routineDbPatch.category = patch.category;
   if (patch.time !== undefined) routineDbPatch.time = patch.time;
+  if (patch.endTime !== undefined) routineDbPatch.end_time = patch.endTime;
   if (patch.how !== undefined) routineDbPatch.how = patch.how;
+  if (patch.location !== undefined) routineDbPatch.location = patch.location;
+  if (patch.rigid !== undefined) routineDbPatch.rigid = patch.rigid;
+  if (patch.labelId !== undefined) routineDbPatch.label_id = patch.labelId;
+  if (patch.notes !== undefined) routineDbPatch.notes = patch.notes;
+  if (patch.link !== undefined) routineDbPatch.link = patch.link;
+  if (patch.allDay !== undefined) routineDbPatch.all_day = patch.allDay;
+  if (patch.alerts !== undefined) routineDbPatch.alerts = patch.alerts;
   if (patch.sportTargetDistanceM !== undefined)
     routineDbPatch.sport_target_distance_m = patch.sportTargetDistanceM;
   if (patch.sportTargetDurationS !== undefined)
     routineDbPatch.sport_target_duration_s = patch.sportTargetDurationS;
   if (Object.keys(routineDbPatch).length > 0) {
-    unwrap(
-      await supabase.from("routines").update(routineDbPatch).eq("id", routineId).select().single(),
-    );
+    const updated = await supabase
+      .from("routines")
+      .update(routineDbPatch)
+      .eq("id", routineId)
+      .select()
+      .single();
+    if (updated.error) {
+      // Compatibilidade durante a publicação da migração 0055. Título,
+      // horário e campos esportivos já existiam e continuam seguros.
+      const legacyPatch: Row = {};
+      for (const key of [
+        "title",
+        "category",
+        "time",
+        "how",
+        "sport_target_distance_m",
+        "sport_target_duration_s",
+      ])
+        if (key in routineDbPatch) legacyPatch[key] = routineDbPatch[key];
+      unwrap(
+        await supabase.from("routines").update(legacyPatch).eq("id", routineId).select().single(),
+      );
+    }
   }
 
   const executionDbPatch: Row = {};
+  if (patch.title !== undefined) executionDbPatch.title = patch.title;
+  if (patch.category !== undefined) executionDbPatch.category = patch.category;
   if (patch.time !== undefined) executionDbPatch.start_time = patch.time;
+  if (patch.endTime !== undefined) executionDbPatch.end_time = patch.endTime;
   if (patch.how !== undefined) executionDbPatch.how = patch.how;
+  if (patch.location !== undefined) executionDbPatch.location = patch.location;
+  if (patch.rigid !== undefined) executionDbPatch.rigid = patch.rigid;
+  if (patch.labelId !== undefined) executionDbPatch.label_id = patch.labelId;
+  if (patch.notes !== undefined) executionDbPatch.notes = patch.notes;
+  if (patch.link !== undefined) executionDbPatch.link = patch.link;
+  if (patch.allDay !== undefined) executionDbPatch.all_day = patch.allDay;
   if (patch.sportTargetDistanceM !== undefined)
     executionDbPatch.sport_target_distance_m = patch.sportTargetDistanceM;
   if (patch.sportTargetDurationS !== undefined)
@@ -1933,7 +2039,55 @@ export async function updateRoutineAndFutureExecutions(
         .select(),
     );
   }
+  if (patch.alerts !== undefined) {
+    for (const row of futureBefore)
+      await setExecutionAlerts(
+        {
+          id: row.id as string,
+          title: (patch.title ?? row.title) as string,
+          date: row.agenda_date as string,
+          startTime: patch.allDay
+            ? undefined
+            : ((patch.time ?? row.start_time) as string | undefined),
+        },
+        patch.alerts,
+      );
+  }
   await invalidate();
+  return {
+    undo: async () => {
+      const {
+        id: _routineId,
+        user_id: _routineUserId,
+        created_at: _routineCreatedAt,
+        ...routineRestore
+      } = routineBefore;
+      void _routineId;
+      void _routineUserId;
+      void _routineCreatedAt;
+      await supabase.from("routines").update(routineRestore).eq("id", routineId);
+      for (const row of futureBefore) {
+        const { id, user_id: _userId, created_at: _createdAt, ...restore } = row;
+        void _userId;
+        void _createdAt;
+        await supabase
+          .from("executions")
+          .update(restore)
+          .eq("id", id as string);
+        if (patch.alerts !== undefined)
+          await setExecutionAlerts(
+            {
+              id: id as string,
+              title: row.title as string,
+              date: row.agenda_date as string,
+              startTime: row.all_day ? undefined : ((row.start_time as string | null) ?? undefined),
+            },
+            alertOffsets.get(id as string) ?? [],
+          );
+      }
+      await invalidate();
+    },
+  };
 }
 
 /** Exclusão real (não soft-delete) — diferente de `cancelExecution` (que preserva
@@ -1989,6 +2143,7 @@ export async function updateExecutionDetails(
 }
 
 export async function removeExecution(id: string) {
+  await removeExecutionAlerts(id);
   await supabase.from("executions").delete().eq("id", id);
   await invalidate();
 }
@@ -2169,8 +2324,16 @@ async function materializeRoutineExecutions(routine: {
   title: string;
   weekday: number;
   time: string;
+  endTime?: string;
   weight: TaskWeight;
   how?: string;
+  location?: string;
+  rigid?: boolean;
+  labelId?: string;
+  notes?: string;
+  link?: string;
+  allDay?: boolean;
+  alerts?: number[];
   sportModality?: SportModality;
   sportTargetDistanceM?: number;
   sportTargetDurationS?: number;
@@ -2194,18 +2357,37 @@ async function materializeRoutineExecutions(routine: {
       due_date: date,
       agenda_date: date,
       start_time: routine.time,
+      end_time: routine.endTime,
       category: routine.category,
-      rigid: false,
+      location: routine.location,
+      rigid: routine.rigid ?? false,
       weight: routine.weight,
       status: "planejada",
       routine_id: routine.id,
       how: routine.how,
+      label_id: routine.labelId,
+      notes: routine.notes,
+      link: routine.link,
+      all_day: routine.allDay ?? false,
       sport_modality: routine.sportModality,
       sport_target_distance_m: routine.sportTargetDistanceM,
       sport_target_duration_s: routine.sportTargetDurationS,
     });
   }
-  if (toInsert.length > 0) unwrap(await supabase.from("executions").insert(toInsert));
+  if (toInsert.length > 0) {
+    const inserted = unwrap<Row[]>(await supabase.from("executions").insert(toInsert).select());
+    if (routine.alerts?.length)
+      for (const row of inserted)
+        await setExecutionAlerts(
+          {
+            id: row.id as string,
+            title: row.title as string,
+            date: row.agenda_date as string,
+            startTime: routine.allDay ? undefined : routine.time,
+          },
+          routine.alerts,
+        );
+  }
 }
 
 export async function createRoutine(input: {
@@ -2226,6 +2408,7 @@ export async function createRoutine(input: {
     title: string;
     weekday: number;
     time: string;
+    end_time: string | null;
     weight: TaskWeight;
     active: boolean;
   }>(
@@ -2270,9 +2453,17 @@ export async function toggleRoutineActive(routineId: string, currentlyActive: bo
     title: string;
     weekday: number;
     time: string;
+    end_time: string | null;
     weight: TaskWeight;
     active: boolean;
     how: string | null;
+    location: string | null;
+    rigid: boolean | null;
+    label_id: string | null;
+    notes: string | null;
+    link: string | null;
+    all_day: boolean | null;
+    alerts: number[] | null;
     sport_modality: SportModality | null;
     sport_target_distance_m: number | null;
     sport_target_duration_s: number | null;
@@ -2291,8 +2482,16 @@ export async function toggleRoutineActive(routineId: string, currentlyActive: bo
       title: routine.title as string,
       weekday: routine.weekday as number,
       time: routine.time as string,
+      endTime: (routine.end_time as string) ?? undefined,
       weight: routine.weight as TaskWeight,
       how: (routine.how as string) ?? undefined,
+      location: (routine.location as string) ?? undefined,
+      rigid: (routine.rigid as boolean) ?? false,
+      labelId: (routine.label_id as string) ?? undefined,
+      notes: (routine.notes as string) ?? undefined,
+      link: (routine.link as string) ?? undefined,
+      allDay: (routine.all_day as boolean) ?? false,
+      alerts: Array.isArray(routine.alerts) ? (routine.alerts as number[]) : [],
       sportModality: (routine.sport_modality as SportModality) ?? undefined,
       sportTargetDistanceM: (routine.sport_target_distance_m as number) ?? undefined,
       sportTargetDurationS: (routine.sport_target_duration_s as number) ?? undefined,

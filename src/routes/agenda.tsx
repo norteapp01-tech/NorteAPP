@@ -39,7 +39,7 @@ import {
   weekDates,
   WEEKDAY_LETTERS,
 } from "@/lib/agenda-navigation";
-import { minutesToTime } from "@/lib/agenda-time";
+import { minutesToTime, timeToMinutes } from "@/lib/agenda-time";
 import type { AgendaOccurrence } from "@/lib/agenda-occurrences";
 import { weekdayOf } from "@/lib/agenda-recurrence";
 import {
@@ -166,7 +166,10 @@ function AgendaScreen() {
         startTime: occ.startTime ?? clock(defaultStartFor(occ.date)),
         endTime:
           occ.endTime ??
-          clock((occ.startTime ? 0 : defaultStartFor(occ.date)) + settings.defaultDurationMin),
+          clock(
+            (occ.startTime ? timeToMinutes(occ.startTime) : defaultStartFor(occ.date)) +
+              settings.defaultDurationMin,
+          ),
       }),
     [defaultStartFor, settings.defaultDurationMin],
   );
@@ -197,13 +200,13 @@ function AgendaScreen() {
   const dropFit = useCallback(
     async (executionId: string, date: string, minute: number) => {
       await feedback.run("Ação encaixada na Agenda.", async () => {
-        await scheduleExecution(
+        const sessionId = await scheduleExecution(
           executionId,
           date,
           clock(minute),
           clock(minute + settings.defaultDurationMin),
         );
-        return { undo: async () => void (await removeAgendaSession(executionId)) };
+        return { undo: async () => void (await removeAgendaSession(executionId, sessionId)) };
       });
     },
     [feedback, settings.defaultDurationMin],

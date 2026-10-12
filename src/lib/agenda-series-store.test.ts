@@ -18,6 +18,7 @@ import {
   cancelOccurrence,
   completeOccurrence,
   createSeries,
+  discardSeries,
   editOccurrence,
   fetchSeriesState,
   materializeUpcoming,
@@ -35,10 +36,14 @@ import {
 } from "./agenda-labels-store";
 import { fetchAgendaAlerts, setExecutionAlerts } from "./agenda-alerts";
 import {
+  createRoutine,
   createExecution,
   fetchState as fetchGoalsState,
+  removeAgendaSession,
+  scheduleExecution,
   updateAgendaSession,
   updateExecutionDetails,
+  updateRoutineAndFutureExecutions,
 } from "./goals-store";
 import { buildOccurrences, type AgendaOccurrence } from "./agenda-occurrences";
 import { setTestClockOverride } from "./test-clock";
@@ -111,6 +116,34 @@ describe("criação e materialização", () => {
     await createSeries({ ...academia, rule: { freq: "weekly", interval: 1, count: 3 } });
     const list = await occurrences(TODAY, "2027-12-31");
     expect(list).toHaveLength(3);
+  });
+
+  it("desfazer uma série recém-criada não deixa ocorrências materializadas", async () => {
+    const id = await createSeries({ ...academia, rule: { freq: "daily", interval: 1 } });
+    expect(fake.rows("executions").length).toBeGreaterThan(0);
+    await discardSeries(id);
+    expect(fake.rows("agenda_series")).toHaveLength(0);
+    expect(fake.rows("executions")).toHaveLength(0);
+    expect(fake.rows("reminders")).toHaveLength(0);
+  });
+});
+
+describe("agendamento de ações existentes", () => {
+  it("o desfazer remove exatamente a sessão que acabou de ser criada", async () => {
+    const id = await createExecution({
+      title: "Preparar relatório",
+      dueDate: "2026-10-20",
+      category: "carreira",
+    });
+    const sessionId = await scheduleExecution(id, "2026-10-13", "14:00", "15:00");
+    expect(fake.rows("executions")[0].agenda_sessions).toHaveLength(1);
+    await removeAgendaSession(id, sessionId);
+    expect(fake.rows("executions")[0]).toMatchObject({
+      agenda_sessions: [],
+      agenda_date: null,
+      start_time: null,
+      end_time: null,
+    });
   });
 });
 
@@ -229,6 +262,33 @@ describe("editar com escopo", () => {
     expect(fake.rows("agenda_series")).toHaveLength(1);
     const list = await occurrences("2026-10-19", "2026-10-28");
     expect(list.every((o) => o.title === "Academia")).toBe(true);
+  });
+
+  it("desfazer uma edição individual preserva outras ocorrências removidas", async () => {
+    await createSeries(academia);
+    const removed = (await occurrences("2026-10-14", "2026-10-14"))[0];
+    await removeOccurrence(ref(removed), "this");
+    const edited = (await occurrences("2026-10-19", "2026-10-19"))[0];
+    const { undo } = await editOccurrence(ref(edited), "this", { title: "Só hoje" });
+    await undo();
+    expect(await occurrences("2026-10-14", "2026-10-14")).toHaveLength(0);
+    expect((await occurrences("2026-10-19", "2026-10-19"))[0].title).toBe("Academia");
+  });
+
+  it("desfazer a edição da série restaura ocorrências reais e seus alertas", async () => {
+    await createSeries({ ...academia, alerts: [30] });
+    const target = (await occurrences(TODAY, TODAY))[0];
+    const { undo } = await editOccurrence(ref(target), "all", {
+      title: "Treino novo",
+      startTime: "20:00",
+      endTime: "21:00",
+      alerts: [10],
+    });
+    expect(fake.rows("executions")[0]).toMatchObject({ title: "Treino novo", start_time: "20:00" });
+    expect((await fetchAgendaAlerts()).map((alert) => alert.offsetMinutes)).toContain(10);
+    await undo();
+    expect(fake.rows("executions")[0]).toMatchObject({ title: "Academia", start_time: "18:00" });
+    expect((await fetchAgendaAlerts()).map((alert) => alert.offsetMinutes)).toContain(30);
   });
 });
 
@@ -454,5 +514,34 @@ describe("dados antigos", () => {
     const [item] = await occurrences("2026-10-13", "2026-10-13");
     expect(item.recurring).toBe(true);
     expect(item.routineId).toBe("routine-1");
+  });
+
+  it("rotina pode alterar esta e as próximas pela Agenda e desfazer por inteiro", async () => {
+    const routineId = await createRoutine({
+      category: "academia",
+      title: "Treino A",
+      weekday: 1,
+      time: "18:00",
+    });
+    const { undo } = await updateRoutineAndFutureExecutions(
+      routineId,
+      { title: "Treino B", time: "19:00", endTime: "20:00", alerts: [30] },
+      TODAY,
+    );
+    expect(fake.rows("routines")[0]).toMatchObject({ title: "Treino B", time: "19:00" });
+    expect(
+      fake
+        .rows("executions")
+        .every((row) => row.title === "Treino B" && row.start_time === "19:00"),
+    ).toBe(true);
+    expect(fake.rows("reminders").length).toBeGreaterThan(0);
+    await undo();
+    expect(fake.rows("routines")[0]).toMatchObject({ title: "Treino A", time: "18:00" });
+    expect(
+      fake
+        .rows("executions")
+        .every((row) => row.title === "Treino A" && row.start_time === "18:00"),
+    ).toBe(true);
+    expect(fake.rows("reminders")).toHaveLength(0);
   });
 });

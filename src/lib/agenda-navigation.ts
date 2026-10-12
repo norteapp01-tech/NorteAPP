@@ -79,15 +79,22 @@ export function rangeForView(
     return { from: addDaysISO(start, -1), to: addDaysISO(start, 6) };
   }
   if (view === "mes") {
-    const { y, m } = parts(iso);
-    const first = `${y}-${pad(m)}-01`;
-    const last = `${y}-${pad(m)}-${pad(new Date(Date.UTC(y, m, 0)).getUTCDate())}`;
-    return {
-      from: startOfWeekISO(first, weekStart),
-      to: addDaysISO(startOfWeekISO(last, weekStart), 6),
-    };
+    const { from, to } = monthBounds(iso, weekStart);
+    // A véspera é necessária para mostrar, no primeiro quadrinho da grade,
+    // compromissos que começaram no dia anterior e atravessaram a meia-noite.
+    return { from: addDaysISO(from, -1), to };
   }
   return { from: addDaysISO(iso, -1), to: addDaysISO(iso, 90) };
+}
+
+function monthBounds(iso: string, weekStart: WeekStart): { from: string; to: string } {
+  const { y, m } = parts(iso);
+  const first = `${y}-${pad(m)}-01`;
+  const last = `${y}-${pad(m)}-${pad(new Date(Date.UTC(y, m, 0)).getUTCDate())}`;
+  return {
+    from: startOfWeekISO(first, weekStart),
+    to: addDaysISO(startOfWeekISO(last, weekStart), 6),
+  };
 }
 
 /** Grade do mês: linhas de 7 dias começando no primeiro dia da semana. */
@@ -96,7 +103,7 @@ export function monthGrid(
   weekStart: WeekStart,
 ): { date: string; inMonth: boolean }[][] {
   const { y, m } = parts(iso);
-  const { from, to } = rangeForView(iso, "mes", weekStart);
+  const { from, to } = monthBounds(iso, weekStart);
   const rows: { date: string; inMonth: boolean }[][] = [];
   const total = dayIndex(to) - dayIndex(from) + 1;
   for (let i = 0; i < total; i += 7) {

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Link2, Lock, Target } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { DateField } from "@/components/ui/date-wheel-picker";
@@ -21,8 +21,8 @@ import { relativeDayLabel } from "@/lib/agenda-navigation";
 import type { AgendaOccurrence } from "@/lib/agenda-occurrences";
 import { setExecutionAlerts } from "@/lib/agenda-alerts";
 import {
-  archiveSeries,
   createSeries,
+  discardSeries,
   editOccurrence,
   removeOccurrence,
   type OccurrenceChanges,
@@ -33,6 +33,7 @@ import {
   removeExecution,
   scheduleExecution,
   scheduleStepAsExecution,
+  updateRoutineAndFutureExecutions,
   updateExecutionDetails,
   formatDateBR,
 } from "@/lib/goals-store";
@@ -156,6 +157,9 @@ export function EventComposer({
       alerts: settings.defaultAlertMin !== null ? [settings.defaultAlertMin] : [],
     };
   });
+  const [seriesRuleHydrated, setSeriesRuleHydrated] = useState(
+    () => !editing || !source?.seriesId || Boolean(sourceSeries),
+  );
   const [selection, setSelection] = useState<PlanItemSelection | null>(seed.selection ?? null);
   const [showPicker, setShowPicker] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
@@ -167,6 +171,12 @@ export function EventComposer({
   const [endTouched, setEndTouched] = useState(editing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (seriesRuleHydrated || !sourceSeries) return;
+    setForm((current) => ({ ...current, recurrence: sourceSeries.rule }));
+    setSeriesRuleHydrated(true);
+  }, [seriesRuleHydrated, sourceSeries]);
 
   const set = (patch: Partial<Form>) => setForm((f) => ({ ...f, ...patch }));
   const setStart = (startTime: string) => {
@@ -205,7 +215,7 @@ export function EventComposer({
     const dates = [own, goalDeadline].filter((d): d is string => !!d && d >= now.date);
     return dates.length ? dates.sort()[0] : undefined;
   }, [selection, now.date]);
-  const valid = !!title.trim() && !!form.date && timesOk;
+  const valid = !!title.trim() && !!form.date && timesOk && seriesRuleHydrated;
   const duration =
     form.startTime && form.endTime
       ? durationMinutes(form.startTime, form.endTime)
@@ -308,7 +318,7 @@ export function EventComposer({
         alerts: form.alerts,
       });
       void feedback.run("Compromisso recorrente criado.", async () => ({
-        undo: async () => archiveSeries(id),
+        undo: async () => discardSeries(id),
       }));
       return;
     }
@@ -317,8 +327,8 @@ export function EventComposer({
     let undo: () => Promise<void>;
     if (selection?.kind === "execution") {
       executionId = selection.execution.id;
-      await scheduleExecution(executionId, form.date, startForStore, endForStore);
-      undo = async () => removeAgendaSession(executionId);
+      const sessionId = await scheduleExecution(executionId, form.date, startForStore, endForStore);
+      undo = async () => removeAgendaSession(executionId, sessionId);
     } else if (selection?.kind === "step") {
       executionId = await scheduleStepAsExecution(
         selection.step,
@@ -386,33 +396,88 @@ export function EventComposer({
     if (!form.allDay && form.endTime !== (original.endTime ?? "")) changes.endTime = form.endTime;
     if (form.date !== original.date) changes.date = form.date;
     if (!sameAlerts(form.alerts, initialAlerts)) changes.alerts = form.alerts;
+    const recurrenceRemoved = Boolean(sourceSeries && !form.recurrence);
     const ruleChanged =
       !!sourceSeries &&
       !!form.recurrence &&
       JSON.stringify(normalizeRule(form.recurrence)) !== JSON.stringify(sourceSeries.rule);
     if (ruleChanged) changes.rule = normalizeRule(form.recurrence!);
 
+    // Parar a repetição preserva a ocorrência escolhida como compromisso
+    // avulso e encerra a série no escopo decidido pela pessoa.
+    if (original.seriesId && sourceSeries && recurrenceRemoved) {
+      const answer = await feedback.askScope("parar de repetir", { allowThis: false });
+      if (!answer) throw new CancelledEdit();
+      const standaloneId = await createExecution({
+        title: form.title.trim(),
+        dueDate: form.date,
+        agendaDate: form.date,
+        startTime: startForStore,
+        endTime: endForStore,
+        category: form.category,
+        location: form.location.trim() || undefined,
+        rigid: form.rigid,
+        weight: original.weight,
+        goalId: original.goalId,
+        stepId: original.stepId,
+        labelId: form.labelId ?? undefined,
+        notes: form.notes.trim() || undefined,
+        link: form.link.trim() || undefined,
+        allDay: form.allDay,
+      });
+      if (form.alerts.length > 0)
+        await setExecutionAlerts(
+          {
+            id: standaloneId,
+            title: form.title.trim(),
+            date: form.date,
+            startTime: form.allDay ? undefined : form.startTime,
+          },
+          form.alerts,
+        );
+      let removal: Awaited<ReturnType<typeof removeOccurrence>>;
+      try {
+        removal = await removeOccurrence(original, answer);
+      } catch (error) {
+        await removeExecution(standaloneId);
+        throw error;
+      }
+      void feedback.run("A repetição foi encerrada.", async () => ({
+        undo: async () => {
+          await removal.undo();
+          await removeExecution(standaloneId);
+        },
+      }));
+      return;
+    }
+
     // Repetir um compromisso avulso: vira uma série e o avulso sai de cena.
     if (!original.seriesId && !original.routineId && !original.goalId && form.recurrence) {
       const removal = await removeOccurrence(original, "this");
-      const id = await createSeries({
-        title: form.title.trim(),
-        category: form.category,
-        labelId: form.labelId ?? undefined,
-        location: form.location.trim() || undefined,
-        notes: form.notes.trim() || undefined,
-        link: form.link.trim() || undefined,
-        rigid: form.rigid,
-        startDate: form.date,
-        startTime: form.allDay ? undefined : form.startTime,
-        endTime: form.allDay ? undefined : form.endTime,
-        allDay: form.allDay,
-        rule: normalizeRule(form.recurrence),
-        alerts: form.alerts,
-      });
+      let id: string;
+      try {
+        id = await createSeries({
+          title: form.title.trim(),
+          category: form.category,
+          labelId: form.labelId ?? undefined,
+          location: form.location.trim() || undefined,
+          notes: form.notes.trim() || undefined,
+          link: form.link.trim() || undefined,
+          rigid: form.rigid,
+          startDate: form.date,
+          startTime: form.allDay ? undefined : form.startTime,
+          endTime: form.allDay ? undefined : form.endTime,
+          allDay: form.allDay,
+          rule: normalizeRule(form.recurrence),
+          alerts: form.alerts,
+        });
+      } catch (error) {
+        await removal.undo();
+        throw error;
+      }
       void feedback.run("Agora este compromisso se repete.", async () => ({
         undo: async () => {
-          await archiveSeries(id);
+          await discardSeries(id);
           await removal.undo();
         },
       }));
@@ -420,6 +485,32 @@ export function EventComposer({
     }
 
     if (Object.keys(changes).length === 0) return;
+
+    if (original.routineId && changes.date === undefined) {
+      const answer = await feedback.askScope("alterar");
+      if (!answer) throw new CancelledEdit();
+      if (answer !== "this") {
+        const result = await updateRoutineAndFutureExecutions(
+          original.routineId,
+          {
+            title: changes.title,
+            category: changes.category,
+            time: changes.startTime,
+            endTime: changes.endTime,
+            location: changes.location,
+            rigid: changes.rigid,
+            labelId: changes.labelId,
+            notes: changes.notes,
+            link: changes.link,
+            allDay: changes.allDay,
+            alerts: changes.alerts,
+          },
+          answer === "all" ? now.date : original.date,
+        );
+        void feedback.run("Rotina e próximos compromissos atualizados.", async () => result);
+        return;
+      }
+    }
 
     let scope: "this" | "following" | "all" = "this";
     if (original.seriesId) {
@@ -505,6 +596,7 @@ export function EventComposer({
               </span>
               <input
                 type="time"
+                lang={profile.timeFormat === "12h" ? "en-US" : "pt-BR"}
                 value={form.startTime}
                 onChange={(e) => setStart(e.target.value)}
                 className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-primary"
@@ -516,6 +608,7 @@ export function EventComposer({
               </span>
               <input
                 type="time"
+                lang={profile.timeFormat === "12h" ? "en-US" : "pt-BR"}
                 value={form.endTime}
                 onChange={(e) => {
                   setEndTouched(true);
@@ -622,17 +715,22 @@ export function EventComposer({
         <div className="space-y-5">
           {canRepeat && (editing ? !source?.routineId && !source?.goalId : true) && (
             <Section title="Repetir">
-              <RecurrenceEditor
-                startDate={form.date}
-                value={form.recurrence}
-                onChange={(recurrence) => set({ recurrence })}
-              />
+              {seriesRuleHydrated ? (
+                <RecurrenceEditor
+                  startDate={form.date}
+                  value={form.recurrence}
+                  onChange={(recurrence) => set({ recurrence })}
+                />
+              ) : (
+                <p className="text-xs text-muted-foreground">Carregando repetição…</p>
+              )}
             </Section>
           )}
           {editing && source?.routineId && (
             <p className="rounded-xl border border-border p-3 text-xs text-muted-foreground">
-              Este compromisso faz parte de uma rotina. As mudanças valem só para esta ocorrência; a
-              rotina se ajusta na área da própria rotina.
+              Este compromisso faz parte de uma rotina. Ao salvar, você escolhe entre alterar só
+              esta ocorrência ou também as próximas. Os dias da semana continuam na área da própria
+              rotina.
             </p>
           )}
           <Section title="Alertas">

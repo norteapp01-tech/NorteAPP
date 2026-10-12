@@ -36,6 +36,7 @@ import {
   weekDates,
 } from "./agenda-navigation";
 import { fitCandidates, suggestSlotsFor } from "./agenda-fit";
+import { addDaysISO } from "./agenda-intervals";
 import { summarizeHistory } from "./agenda-history";
 import { DEFAULT_AGENDA_SETTINGS, parseAgendaSettings } from "./agenda-settings";
 import type { Execution, Goal, Step } from "./goals-store";
@@ -378,6 +379,13 @@ describe("navegação", () => {
     const rows = monthGrid("2026-10-14", "monday");
     expect(rows.every((r) => r.length === 7)).toBe(true);
     expect(rows.flat().filter((c) => c.inMonth)).toHaveLength(31);
+  });
+
+  it("o mês carrega também a véspera do primeiro quadrinho para eventos noturnos", () => {
+    const rows = monthGrid("2026-10-14", "monday");
+    const range = rangeForView("2026-10-14", "mes", "monday");
+    expect(range.from).toBe(addDaysISO(rows[0][0].date, -1));
+    expect(range.to).toBe(rows.at(-1)!.at(-1)!.date);
   });
 
   it("próximos: hoje, amanhã, esta semana e próximas semanas", () => {

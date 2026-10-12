@@ -25,6 +25,7 @@ import { EventComposer, type ComposerSeed } from "./EventComposer";
 import { AgendaFeedbackProvider } from "./agenda-feedback";
 import { queryClient } from "@/lib/query-client";
 import { setTestClockOverride } from "@/lib/test-clock";
+import type { AgendaOccurrence } from "@/lib/agenda-occurrences";
 
 const fake = (globalThis as unknown as { __fake: Fake }).__fake;
 
@@ -211,5 +212,74 @@ describe("recorrência", () => {
     expect(screen.getAllByText("Todos os dias").length).toBeGreaterThan(1);
     fireEvent.click(screen.getByRole("radio", { name: "Não repete" }));
     expect(screen.getByRole("button", { name: /Salvar na agenda/ })).toBeInTheDocument();
+  });
+
+  it("permite encerrar uma série existente sem perder a ocorrência escolhida", async () => {
+    const series = fake.seed("agenda_series", {
+      user_id: "user-a",
+      title: "Academia",
+      category: "academia",
+      start_date: "2026-10-12",
+      start_time: "18:00",
+      end_time: "19:00",
+      rule: { freq: "weekly", interval: 1, byWeekday: [1] },
+      alerts: [],
+      rigid: false,
+      all_day: false,
+      source: "norte",
+    });
+    const execution = fake.seed("executions", {
+      user_id: "user-a",
+      title: "Academia",
+      due_date: "2026-10-12",
+      agenda_date: "2026-10-12",
+      start_time: "18:00",
+      end_time: "19:00",
+      category: "academia",
+      status: "planejada",
+      series_id: series.id,
+      series_occurrence_date: "2026-10-12",
+      series_overridden: false,
+      rigid: false,
+      all_day: false,
+    });
+    const source: AgendaOccurrence = {
+      key: `execution:${execution.id}`,
+      kind: "execution",
+      executionId: execution.id as string,
+      sessionId: `legacy-${execution.id}`,
+      seriesId: series.id as string,
+      occurrenceDate: "2026-10-12",
+      title: "Academia",
+      date: "2026-10-12",
+      startTime: "18:00",
+      endTime: "19:00",
+      allDay: false,
+      category: "academia",
+      rigid: false,
+      weight: "leve",
+      status: "planejada",
+      recurring: true,
+      source: "norte",
+    };
+    const { onClose } = renderComposer({
+      mode: "edit",
+      source,
+      startTime: "18:00",
+      endTime: "19:00",
+    });
+    fireEvent.click(screen.getByRole("button", { name: /mais opções/i }));
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Toda segunda" })).toBeChecked());
+    fireEvent.click(screen.getByRole("radio", { name: "Não repete" }));
+    fireEvent.click(saveButton());
+    fireEvent.click(await screen.findByRole("button", { name: "Esta e as próximas" }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(fake.rows("agenda_series")[0].archived_at).toBeTruthy();
+    expect(fake.rows("executions")).toHaveLength(1);
+    expect(fake.rows("executions")[0]).toMatchObject({
+      title: "Academia",
+      agenda_date: "2026-10-12",
+      series_id: undefined,
+    });
   });
 });

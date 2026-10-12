@@ -20,7 +20,7 @@ import "./agenda-ui.css";
 
 const PAGE = 60;
 /** Quanto passado e futuro a busca alcança. */
-const REACH_DAYS = 365;
+const REACH_DAYS = 3650;
 
 /** Busca visual: título, local, nota, rótulo, categoria, plano, data e estado —
  * passado e futuro numa lista cronológica. Coexiste com a consulta conversacional

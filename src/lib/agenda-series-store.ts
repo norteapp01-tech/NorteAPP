@@ -4,6 +4,7 @@ import { queryClient } from "./query-client";
 import { nowDate } from "./test-clock";
 import {
   adoptSeriesAlerts,
+  fetchAgendaAlerts,
   removeExecutionAlerts,
   setExecutionAlerts,
   syncSeriesAlerts,
@@ -275,6 +276,18 @@ export async function archiveSeries(id: string, archived = true): Promise<void> 
   await invalidate();
 }
 
+/** Apaga uma série que acabou de ser criada e todas as ocorrências reais que
+ * nasceram com ela. É deliberadamente diferente de arquivar: no Desfazer de
+ * uma criação nada daquela criação pode continuar aparecendo em Hoje. */
+export async function discardSeries(id: string): Promise<void> {
+  const { data } = await supabase.from("executions").select("id").eq("series_id", id);
+  const executionIds = ((data ?? []) as Row[]).map((row) => row.id as string);
+  for (const executionId of executionIds) await removeExecutionAlerts(executionId);
+  if (executionIds.length > 0) await supabase.from("executions").delete().eq("series_id", id);
+  await supabase.from("agenda_series").delete().eq("id", id);
+  await invalidate();
+}
+
 // ---------------------------------------------------------------------------
 // Materialização
 // ---------------------------------------------------------------------------
@@ -519,6 +532,13 @@ export async function removeOccurrence(occ: OccurrenceRef, scope: EditScope): Pr
   if (!occ.seriesId || scope === "this") {
     if (occ.seriesId && occ.occurrenceDate) {
       const userId = await ensureSession();
+      await logAgendaChange({
+        executionId: occ.executionId,
+        seriesId: occ.seriesId,
+        subjectTitle: occ.title,
+        kind: "removed",
+        from: { date: occ.date, start: occ.startTime, end: occ.endTime },
+      });
       // A ocorrência vira exceção da regra: ela não reaparece.
       const exception = await supabase
         .from("agenda_series_exceptions")
@@ -535,10 +555,14 @@ export async function removeOccurrence(occ: OccurrenceRef, scope: EditScope): Pr
         .single();
       unwrap(exception);
       let snapshot: Row | null = null;
+      let snapshotAlerts: number[] = [];
       if (occ.executionId) {
         snapshot = unwrap<Row>(
           await supabase.from("executions").select("*").eq("id", occ.executionId).single(),
         );
+        snapshotAlerts = (await fetchAgendaAlerts())
+          .filter((alert) => alert.executionId === occ.executionId)
+          .map((alert) => alert.offsetMinutes);
         await removeExecutionAlerts(occ.executionId);
         await supabase.from("executions").delete().eq("id", occ.executionId);
       }
@@ -557,6 +581,18 @@ export async function removeOccurrence(occ: OccurrenceRef, scope: EditScope): Pr
             void _id;
             void _created;
             await supabase.from("executions").insert({ ...rest, id: snapshot.id });
+            await setExecutionAlerts(
+              {
+                id: snapshot.id as string,
+                title: snapshot.title as string,
+                date: snapshot.agenda_date as string,
+                startTime: snapshot.all_day
+                  ? undefined
+                  : ((snapshot.start_time as string | null) ?? undefined),
+                seriesId,
+              },
+              snapshotAlerts,
+            );
           }
           await refreshSeriesAlerts(seriesId);
           await invalidate();
@@ -567,12 +603,32 @@ export async function removeOccurrence(occ: OccurrenceRef, scope: EditScope): Pr
     const snapshot = unwrap<Row>(
       await supabase.from("executions").select("*").eq("id", occ.executionId).single(),
     );
+    const snapshotAlerts = (await fetchAgendaAlerts())
+      .filter((alert) => alert.executionId === occ.executionId)
+      .map((alert) => alert.offsetMinutes);
+    await logAgendaChange({
+      executionId: occ.executionId,
+      subjectTitle: occ.title,
+      kind: "removed",
+      from: { date: occ.date, start: occ.startTime, end: occ.endTime },
+    });
     await removeExecutionAlerts(occ.executionId);
     await supabase.from("executions").delete().eq("id", occ.executionId);
     await invalidate();
     return {
       undo: async () => {
         await supabase.from("executions").insert(snapshot);
+        await setExecutionAlerts(
+          {
+            id: snapshot.id as string,
+            title: snapshot.title as string,
+            date: snapshot.agenda_date as string,
+            startTime: snapshot.all_day
+              ? undefined
+              : ((snapshot.start_time as string | null) ?? undefined),
+          },
+          snapshotAlerts,
+        );
         await invalidate();
       },
     };
@@ -593,6 +649,15 @@ async function endSeries(
   const from = scope === "all" ? series.startDate : (occ.occurrenceDate ?? occ.date);
   const previousRule = series.rule;
   const previousArchived = series.archivedAt;
+
+  await logAgendaChange({
+    executionId: occ.executionId,
+    seriesId,
+    subjectTitle: occ.title,
+    kind: mode === "cancel" ? "cancelled" : "removed",
+    from: { date: occ.date, start: occ.startTime, end: occ.endTime },
+    note: scope === "all" ? "toda a série" : "esta e as próximas",
+  });
 
   if (from <= series.startDate) {
     // Nada sobra antes dela: a série inteira sai de cena.
@@ -617,11 +682,17 @@ async function endSeries(
       (r.series_occurrence_date as string) >= (scope === "all" ? today : from),
   );
   const snapshots: Row[] = [];
+  const snapshotAlerts = new Map<string, number[]>();
+  const allAlerts = mode === "remove" ? await fetchAgendaAlerts() : [];
   for (const r of open) {
     const id = r.id as string;
     if (mode === "remove") {
       snapshots.push(
         unwrap<Row>(await supabase.from("executions").select("*").eq("id", id).single()),
+      );
+      snapshotAlerts.set(
+        id,
+        allAlerts.filter((alert) => alert.executionId === id).map((alert) => alert.offsetMinutes),
       );
       await removeExecutionAlerts(id);
       await supabase.from("executions").delete().eq("id", id);
@@ -639,7 +710,21 @@ async function endSeries(
         .update({ rule: previousRule, archived_at: previousArchived ?? null })
         .eq("id", seriesId);
       if (mode === "remove") {
-        for (const snapshot of snapshots) await supabase.from("executions").insert(snapshot);
+        for (const snapshot of snapshots) {
+          await supabase.from("executions").insert(snapshot);
+          await setExecutionAlerts(
+            {
+              id: snapshot.id as string,
+              title: snapshot.title as string,
+              date: snapshot.agenda_date as string,
+              startTime: snapshot.all_day
+                ? undefined
+                : ((snapshot.start_time as string | null) ?? undefined),
+              seriesId,
+            },
+            snapshotAlerts.get(snapshot.id as string) ?? [],
+          );
+        }
       } else {
         for (const r of open) await setExecutionStatus(r.id as string, "planejada", "desfeito");
       }
@@ -667,6 +752,12 @@ async function editStandalone(occ: OccurrenceRef, changes: OccurrenceChanges): P
   if (!occ.executionId) return { undo: noopUndo };
   const id = occ.executionId;
   const row = unwrap<Row>(await supabase.from("executions").select("*").eq("id", id).single());
+  const previousAlerts =
+    changes.alerts === undefined
+      ? null
+      : (await fetchAgendaAlerts())
+          .filter((alert) => alert.executionId === id)
+          .map((alert) => alert.offsetMinutes);
   await applyExecutionChanges(id, occ, changes);
   return {
     undo: async () => {
@@ -682,6 +773,17 @@ async function editStandalone(occ: OccurrenceRef, changes: OccurrenceChanges): P
       });
       if (occ.startTime !== undefined)
         await updateAgendaSession(id, occ.sessionId, occ.date, occ.startTime, occ.endTime);
+      if (previousAlerts)
+        await setExecutionAlerts(
+          {
+            id,
+            title: row.title as string,
+            date: occ.date,
+            startTime: row.all_day ? undefined : occ.startTime,
+            seriesId: (row.series_id as string | null) ?? undefined,
+          },
+          previousAlerts,
+        );
     },
   };
 }
@@ -755,7 +857,6 @@ async function editThis(occ: OccurrenceRef, changes: OccurrenceChanges): Promise
     await invalidate();
     return {
       undo: async () => {
-        await supabase.from("agenda_series_exceptions").delete().eq("series_id", seriesId);
         await removeExecutionAlerts(id);
         await supabase.from("executions").delete().eq("id", id);
         await refreshSeriesAlerts(seriesId);
@@ -775,6 +876,31 @@ async function editSeries(
   const series = await fetchSeriesRow(seriesId);
   const occurrenceDate = occ.occurrenceDate!;
   const splitHere = scope === "following" && occurrenceDate > series.startDate;
+  const today = toISODate(nowDate());
+  const fromDate = scope === "all" ? today : occurrenceDate;
+  const { data: executionsBeforeData } = await supabase
+    .from("executions")
+    .select("*")
+    .eq("series_id", seriesId);
+  const executionsBefore = (executionsBeforeData ?? []) as Row[];
+  const executionIdsBefore = new Set(executionsBefore.map((row) => row.id as string));
+  const pristineBefore = executionsBefore.filter(
+    (row) =>
+      row.series_overridden === false &&
+      row.status === "planejada" &&
+      (row.series_occurrence_date as string) >= fromDate,
+  );
+  const previousAlerts =
+    changes.alerts === undefined
+      ? new Map<string, number[]>()
+      : (await fetchAgendaAlerts()).reduce((map, alert) => {
+          if (!alert.executionId || !pristineBefore.some((row) => row.id === alert.executionId))
+            return map;
+          const list = map.get(alert.executionId) ?? [];
+          list.push(alert.offsetMinutes);
+          map.set(alert.executionId, list);
+          return map;
+        }, new Map<string, number[]>());
   const template: Partial<SeriesRecord> = {};
   if (changes.title !== undefined) template.title = changes.title;
   if (changes.category !== undefined) template.category = changes.category;
@@ -867,8 +993,6 @@ async function editSeries(
   }
 
   // As ocorrências já materializadas que a pessoa NÃO tocou acompanham a série.
-  const today = toISODate(nowDate());
-  const fromDate = scope === "all" ? today : occurrenceDate;
   const execPatch: Row = {};
   if (changes.title !== undefined) execPatch.title = changes.title;
   if (changes.category !== undefined) execPatch.category = changes.category;
@@ -943,7 +1067,42 @@ async function editSeries(
             .update({ series_id: seriesId })
             .eq("series_id", createdSeriesId)
             .eq("occurrence_date", d);
-        await supabase.from("agenda_series").delete().eq("id", createdSeriesId);
+        await discardSeries(createdSeriesId);
+      }
+      for (const snapshot of pristineBefore) {
+        const { id, user_id: _userId, created_at: _createdAt, ...rest } = snapshot;
+        void _userId;
+        void _createdAt;
+        await supabase
+          .from("executions")
+          .update(rest)
+          .eq("id", id as string);
+        if (changes.alerts !== undefined)
+          await setExecutionAlerts(
+            {
+              id: id as string,
+              title: snapshot.title as string,
+              date: snapshot.agenda_date as string,
+              startTime: snapshot.all_day
+                ? undefined
+                : ((snapshot.start_time as string | null) ?? undefined),
+              seriesId,
+            },
+            previousAlerts.get(id as string) ?? [],
+          );
+      }
+      // A nova regra pode ter materializado hoje/amanhã durante a edição. Se
+      // essas linhas não existiam antes, o Desfazer também precisa removê-las.
+      const { data: currentRows } = await supabase
+        .from("executions")
+        .select("id, series_overridden")
+        .eq("series_id", seriesId);
+      for (const row of (currentRows ?? []) as Row[]) {
+        const id = row.id as string;
+        if (!executionIdsBefore.has(id) && row.series_overridden === false) {
+          await removeExecutionAlerts(id);
+          await supabase.from("executions").delete().eq("id", id);
+        }
       }
       await refreshSeriesAlerts(seriesId);
       await invalidate();

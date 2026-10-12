@@ -28,7 +28,7 @@ export function AgendaSettingsSheet({
   onClose: () => void;
   onManageLabels: () => void;
 }) {
-  const { agendaSettings: settings } = useProfile();
+  const { agendaSettings: settings, timeFormat } = useProfile();
   const labels = useAgendaLabels();
   const [error, setError] = useState<string | null>(null);
 
@@ -68,6 +68,7 @@ export function AgendaSettingsSheet({
               <span className="mb-1 block text-[11px] text-muted-foreground">Começa</span>
               <input
                 type="time"
+                lang={timeFormat === "12h" ? "en-US" : "pt-BR"}
                 value={settings.dayStart}
                 onChange={(e) => e.target.value && void save({ dayStart: e.target.value })}
                 className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-primary"
@@ -77,6 +78,7 @@ export function AgendaSettingsSheet({
               <span className="mb-1 block text-[11px] text-muted-foreground">Termina</span>
               <input
                 type="time"
+                lang={timeFormat === "12h" ? "en-US" : "pt-BR"}
                 value={settings.dayEnd}
                 onChange={(e) => e.target.value && void save({ dayEnd: e.target.value })}
                 className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-primary"

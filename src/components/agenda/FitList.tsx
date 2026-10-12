@@ -61,10 +61,10 @@ export function FitList({
   const schedule = async (item: FitItem, slot: FreeSlot) => {
     const id = item.execution.id;
     await feedback.run("Ação encaixada na Agenda.", async () => {
-      await scheduleExecution(id, slot.date, slot.start, slot.end);
+      const sessionId = await scheduleExecution(id, slot.date, slot.start, slot.end);
       return {
         undo: async () => {
-          await removeAgendaSession(id);
+          await removeAgendaSession(id, sessionId);
         },
       };
     });

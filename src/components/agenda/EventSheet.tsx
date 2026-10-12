@@ -376,6 +376,7 @@ export function EventSheet({
               </span>
               <input
                 type="time"
+                lang={profile.timeFormat === "12h" ? "en-US" : "pt-BR"}
                 value={rescheduleStart}
                 onChange={(e) => setRescheduleStart(e.target.value)}
                 className="w-full rounded-xl border border-border bg-surface px-2 py-3 text-sm outline-none focus:border-primary"
@@ -387,6 +388,7 @@ export function EventSheet({
               </span>
               <input
                 type="time"
+                lang={profile.timeFormat === "12h" ? "en-US" : "pt-BR"}
                 value={rescheduleEnd}
                 onChange={(e) => setRescheduleEnd(e.target.value)}
                 className="w-full rounded-xl border border-border bg-surface px-2 py-3 text-sm outline-none focus:border-primary"

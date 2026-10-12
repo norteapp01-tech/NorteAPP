@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { AlertTriangle } from "lucide-react";
 import { monthGrid, WEEKDAY_LETTERS, formatLongDate } from "@/lib/agenda-navigation";
 import { weekdayOf } from "@/lib/agenda-recurrence";
-import { loadForDate } from "@/lib/agenda-occurrences";
+import { loadForDate, occurrencesForDay } from "@/lib/agenda-occurrences";
 import { OccurrenceCard } from "./OccurrenceCard";
 import type { ViewProps } from "./view-types";
 import "./agenda-ui.css";
@@ -25,19 +25,27 @@ export function MonthView(props: ViewProps & { onOpenDay: (date: string) => void
     onOpenDay,
     onOpen,
   } = props;
-  const rows = useMemo(() => monthGrid(selectedDate, weekStart), [selectedDate, weekStart]);
+  const rows = useMemo(() => {
+    const grid = monthGrid(selectedDate, weekStart);
+    return settings.showWeekends
+      ? grid
+      : grid.map((row) => row.filter((cell) => ![0, 6].includes(weekdayOf(cell.date))));
+  }, [selectedDate, weekStart, settings.showWeekends]);
   const header = rows[0].map((cell) => WEEKDAY_LETTERS[weekdayOf(cell.date)]);
 
   const byDate = useMemo(() => {
     const map = new Map<string, typeof occurrences>();
-    for (const o of occurrences) {
-      if (o.status === "cancelada") continue;
-      const list = map.get(o.date) ?? [];
-      list.push(o);
-      map.set(o.date, list);
+    for (const row of rows) {
+      for (const { date } of row) {
+        const { today: startedToday, overnight } = occurrencesForDay(occurrences, date);
+        map.set(
+          date,
+          [...startedToday, ...overnight].filter((o) => o.status !== "cancelada"),
+        );
+      }
     }
     return map;
-  }, [occurrences]);
+  }, [occurrences, rows]);
 
   const windowMinutes =
     Number(settings.dayEnd.slice(0, 2)) * 60 +
@@ -48,7 +56,10 @@ export function MonthView(props: ViewProps & { onOpenDay: (date: string) => void
   return (
     <div>
       <div className="card-surface-quiet mt-3 p-3" role="grid" aria-label="Calendário do mês">
-        <div className="grid grid-cols-7 text-center text-[10px] uppercase text-muted-foreground">
+        <div
+          className="grid text-center text-[10px] uppercase text-muted-foreground"
+          style={{ gridTemplateColumns: `repeat(${header.length}, minmax(0, 1fr))` }}
+        >
           {header.map((letter, i) => (
             <div key={i} className="py-1">
               {letter}
@@ -56,7 +67,12 @@ export function MonthView(props: ViewProps & { onOpenDay: (date: string) => void
           ))}
         </div>
         {rows.map((row, r) => (
-          <div key={r} className="grid grid-cols-7 gap-0.5" role="row">
+          <div
+            key={r}
+            className="grid gap-0.5"
+            role="row"
+            style={{ gridTemplateColumns: `repeat(${row.length}, minmax(0, 1fr))` }}
+          >
             {row.map(({ date, inMonth }) => {
               const events = byDate.get(date) ?? [];
               const colors = [
