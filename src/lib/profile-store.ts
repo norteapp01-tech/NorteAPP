@@ -3,6 +3,11 @@ import { supabase, useSupabaseUserId, ensureSession } from "./supabase/client";
 import { queryClient } from "./query-client";
 import { nowDate } from "./test-clock";
 import { isValidTimeZone, setAppTimeZone } from "./app-time-zone";
+import {
+  DEFAULT_AGENDA_SETTINGS,
+  parseAgendaSettings,
+  type AgendaSettings,
+} from "./agenda-settings";
 
 // ---------------------------------------------------------------------------
 // Perfil — uma linha por usuário (Perfil + Preferências + Notificações, tudo
@@ -20,6 +25,7 @@ export type Profile = {
   timeFormat: TimeFormat;
   weekStart: WeekStart;
   timeZone: string | null;
+  agendaSettings: AgendaSettings;
   notifyAgenda: boolean;
   notifyPlans: boolean;
   notifyRoutines: boolean;
@@ -40,6 +46,7 @@ const DEFAULT_PROFILE: Profile = {
   timeFormat: "24h",
   weekStart: "monday",
   timeZone: null,
+  agendaSettings: DEFAULT_AGENDA_SETTINGS,
   notifyAgenda: true,
   notifyPlans: true,
   notifyRoutines: true,
@@ -60,6 +67,7 @@ function mapProfile(r: Row): Profile {
     timeFormat: (r.time_format as TimeFormat) ?? "24h",
     weekStart: (r.week_start as WeekStart) ?? "monday",
     timeZone: (r.time_zone as string) ?? null,
+    agendaSettings: parseAgendaSettings(r.agenda_settings),
     notifyAgenda: (r.notify_agenda as boolean) ?? true,
     notifyPlans: (r.notify_plans as boolean) ?? true,
     notifyRoutines: (r.notify_routines as boolean) ?? true,
@@ -118,6 +126,7 @@ export async function updateProfile(patch: {
   timeFormat?: TimeFormat;
   weekStart?: WeekStart;
   timeZone?: string | null;
+  agendaSettings?: Partial<AgendaSettings>;
   notifyAgenda?: boolean;
   notifyPlans?: boolean;
   notifyRoutines?: boolean;
@@ -138,6 +147,13 @@ export async function updateProfile(patch: {
     if (patch.timeZone && !isValidTimeZone(patch.timeZone))
       throw new Error("Fuso horário inválido.");
     dbPatch.time_zone = patch.timeZone;
+  }
+  if (patch.agendaSettings !== undefined) {
+    const current = queryClient.getQueryData<Profile>([...QUERY_KEY, userId])?.agendaSettings;
+    dbPatch.agenda_settings = parseAgendaSettings({
+      ...(current ?? DEFAULT_AGENDA_SETTINGS),
+      ...patch.agendaSettings,
+    });
   }
   if (patch.notifyAgenda !== undefined) dbPatch.notify_agenda = patch.notifyAgenda;
   if (patch.notifyPlans !== undefined) dbPatch.notify_plans = patch.notifyPlans;

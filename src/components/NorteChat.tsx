@@ -35,6 +35,7 @@ const labels: Record<string, [string, string]> = {
   criar_execucao: ["Novo compromisso", "/agenda"],
   reagendar_execucao: ["Reagendar compromisso", "/agenda"],
   consultar_dia: ["Seu dia", "/agenda"],
+  verificar_disponibilidade: ["Disponibilidade", "/agenda"],
   registrar_transacao: ["Movimentação", "/sub-agenda/financas"],
   consultar_financas: ["Finanças", "/sub-agenda/financas"],
   registrar_refeicao: ["Confirmar refeição", "/sub-agenda/alimentacao"],

@@ -3,6 +3,7 @@ import { categoryMeta } from "./mock-data";
 import { supabase } from "./supabase/client";
 import { queryClient } from "./query-client";
 import { useSupabaseUserId, ensureSession } from "./supabase/client";
+import { removeExecutionAlerts, shiftExecutionAlerts } from "./agenda-alerts";
 import { nowDate, nowMs } from "./test-clock";
 import { dateAndTimeInZone, getAppTimeZone, isValidTimeZone } from "./app-time-zone";
 
@@ -120,6 +121,20 @@ export type Execution = {
   routineId?: string;
   history: ExecutionHistoryEntry[];
   createdAt: string;
+  /** Rótulo visual da Agenda (Trabalho, Família…). Independe da categoria. */
+  labelId?: string;
+  notes?: string;
+  link?: string;
+  /** Compromisso de dia inteiro: aparece na data, mas não ocupa horário. */
+  allDay?: boolean;
+  /** Série recorrente de origem e a data ORIGINAL da ocorrência pela regra
+   * (mesmo que ela tenha sido movida depois). */
+  seriesId?: string;
+  seriesOccurrenceDate?: string;
+  /** A pessoa mexeu nesta ocorrência: edições da série não a sobrescrevem. */
+  seriesOverridden?: boolean;
+  /** "norte" ou "external" — preparado para a sincronização futura. */
+  source?: "norte" | "external";
 };
 
 /** Uma execução "existe" sempre (tem prazo); só passa a valer pra Agenda/Hoje quando agendada. */
@@ -1073,6 +1088,14 @@ function mapExecution(r: Row, history: ExecutionHistoryEntry[]): Execution {
     routineId: (r.routine_id as string) ?? undefined,
     history,
     createdAt: r.created_at as string,
+    labelId: (r.label_id as string) ?? undefined,
+    notes: (r.notes as string) ?? undefined,
+    link: (r.link as string) ?? undefined,
+    allDay: (r.all_day as boolean) ?? false,
+    seriesId: (r.series_id as string) ?? undefined,
+    seriesOccurrenceDate: (r.series_occurrence_date as string) ?? undefined,
+    seriesOverridden: (r.series_overridden as boolean) ?? false,
+    source: (r.source as "norte" | "external") ?? "norte",
   };
 }
 
@@ -1383,12 +1406,29 @@ export async function createExecution(input: {
   goalId?: string;
   stepId?: string;
   status?: ExecutionStatus;
+  labelId?: string;
+  notes?: string;
+  link?: string;
+  allDay?: boolean;
+  seriesId?: string;
+  seriesOccurrenceDate?: string;
+  seriesOverridden?: boolean;
+  /** Não grava "agendado" no histórico — usado ao materializar ocorrências de
+   * série, que não são uma decisão da pessoa. */
+  silent?: boolean;
 }): Promise<string> {
   const userId = await ensureSession();
   const row = unwrap<{ id: string }>(
     await supabase
       .from("executions")
       .insert({
+        label_id: input.labelId,
+        notes: input.notes,
+        link: input.link,
+        all_day: input.allDay ?? false,
+        series_id: input.seriesId,
+        series_occurrence_date: input.seriesOccurrenceDate,
+        series_overridden: input.seriesOverridden ?? false,
         user_id: userId,
         title: input.title,
         due_date: input.dueDate,
@@ -1413,6 +1453,14 @@ export async function createExecution(input: {
       .select()
       .single(),
   );
+  if (!input.silent && input.agendaDate && input.startTime !== undefined) {
+    await logAgendaChange({
+      executionId: row.id,
+      seriesId: input.seriesId,
+      kind: "scheduled",
+      to: { date: input.agendaDate, start: input.startTime, end: input.endTime },
+    });
+  }
   await invalidate();
   return row.id as string;
 }
@@ -1483,6 +1531,13 @@ export async function scheduleExecution(
       .select()
       .single(),
   );
+  await logAgendaChange({
+    executionId: id,
+    seriesId: (row.series_id as string | null) ?? null,
+    sessionId: session.id,
+    kind: "scheduled",
+    to: { date: agendaDate, start: startTime, end: endTime },
+  });
   await invalidate();
 }
 
@@ -1500,6 +1555,15 @@ export async function updateAgendaSession(
   const sessions = Array.isArray(row.agenda_sessions)
     ? (row.agenda_sessions as AgendaSession[])
     : [];
+  const oldSession =
+    sessions.find((session) => session.id === sessionId) ??
+    (row.agenda_date
+      ? {
+          date: row.agenda_date as string,
+          startTime: (row.start_time as string) ?? "",
+          endTime: (row.end_time as string | null) ?? undefined,
+        }
+      : undefined);
 
   if (sessions.length > 0 && sessionId && !sessionId.startsWith("legacy-")) {
     const updated = sessions.map((session) =>
@@ -1513,6 +1577,7 @@ export async function updateAgendaSession(
           agenda_date: agendaDate,
           start_time: startTime,
           end_time: endTime,
+          ...(row.series_id ? { series_overridden: true } : {}),
         })
         .eq("id", id)
         .select()
@@ -1522,11 +1587,35 @@ export async function updateAgendaSession(
     unwrap(
       await supabase
         .from("executions")
-        .update({ agenda_date: agendaDate, start_time: startTime, end_time: endTime })
+        .update({
+          agenda_date: agendaDate,
+          start_time: startTime,
+          end_time: endTime,
+          // Mexer numa ocorrência de série a torna uma exceção da regra.
+          ...(row.series_id ? { series_overridden: true } : {}),
+        })
         .eq("id", id)
         .select()
         .single(),
     );
+  }
+  // O alerta acompanha o compromisso quando ele muda de dia ou de horário.
+  if (!oldSession || oldSession.date !== agendaDate || oldSession.startTime !== startTime) {
+    await shiftExecutionAlerts(id, row.title as string, agendaDate, startTime);
+  }
+  if (oldSession) {
+    const slotMoved = oldSession.date !== agendaDate || oldSession.startTime !== startTime;
+    const resized = !slotMoved && (oldSession.endTime ?? null) !== (endTime ?? null);
+    if (slotMoved || resized) {
+      await logAgendaChange({
+        executionId: id,
+        seriesId: (row.series_id as string | null) ?? null,
+        sessionId,
+        kind: slotMoved ? "moved" : "resized",
+        from: { date: oldSession.date, start: oldSession.startTime, end: oldSession.endTime },
+        to: { date: agendaDate, start: startTime, end: endTime },
+      });
+    }
   }
   await invalidate();
 }
@@ -1538,6 +1627,18 @@ export async function removeAgendaSession(id: string, sessionId?: string): Promi
   const sessions = Array.isArray(row.agenda_sessions)
     ? (row.agenda_sessions as AgendaSession[])
     : [];
+  await logAgendaChange({
+    executionId: id,
+    seriesId: (row.series_id as string | null) ?? null,
+    sessionId,
+    kind: "removed",
+    from: {
+      date: (sessions.find((x) => x.id === sessionId)?.date ?? row.agenda_date) as string | null,
+      start: (sessions.find((x) => x.id === sessionId)?.startTime ?? row.start_time) as
+        string | null,
+      end: (sessions.find((x) => x.id === sessionId)?.endTime ?? row.end_time) as string | null,
+    },
+  });
 
   if (sessions.length > 0 && sessionId && !sessionId.startsWith("legacy-")) {
     const remaining = sessions.filter((session) => session.id !== sessionId);
@@ -1565,6 +1666,11 @@ export async function removeAgendaSession(id: string, sessionId?: string): Promi
         .single(),
     );
   }
+  const stillScheduled =
+    sessions.length > 0 && sessionId && !sessionId.startsWith("legacy-")
+      ? sessions.some((session) => session.id !== sessionId)
+      : false;
+  if (!stillScheduled) await removeExecutionAlerts(id);
   await invalidate();
 }
 
@@ -1604,6 +1710,54 @@ export async function updateGoalDeadline(goalId: string, deadlineISO: string): P
   await invalidate();
 }
 
+// ---------------------------------------------------------------------------
+// Histórico da Agenda: horário ANTES e DEPOIS de cada mudança. É o que permite
+// saber, depois, quantas vezes algo foi reagendado e qual era o horário
+// original — sem inventar duração real (só existe o que foi planejado).
+// ---------------------------------------------------------------------------
+export type AgendaChangeKind =
+  | "scheduled"
+  | "moved"
+  | "resized"
+  | "completed"
+  | "reopened"
+  | "cancelled"
+  | "removed"
+  | "label_changed";
+
+type AgendaSlot = { date?: string | null; start?: string | null; end?: string | null };
+
+export async function logAgendaChange(input: {
+  executionId: string;
+  seriesId?: string | null;
+  sessionId?: string;
+  kind: AgendaChangeKind;
+  from?: AgendaSlot;
+  to?: AgendaSlot;
+  note?: string;
+}): Promise<void> {
+  try {
+    const userId = await ensureSession();
+    await supabase.from("agenda_changes").insert({
+      user_id: userId,
+      execution_id: input.executionId,
+      series_id: input.seriesId ?? null,
+      session_id: input.sessionId ?? null,
+      kind: input.kind,
+      from_date: input.from?.date ?? null,
+      from_start: input.from?.start ?? null,
+      from_end: input.from?.end ?? null,
+      to_date: input.to?.date ?? null,
+      to_start: input.to?.start ?? null,
+      to_end: input.to?.end ?? null,
+      note: input.note ?? null,
+    });
+  } catch {
+    // O histórico é auditoria: falhar em gravá-lo nunca pode impedir a pessoa
+    // de agendar, mover ou concluir.
+  }
+}
+
 async function fetchExecutionRow(id: string): Promise<Row> {
   return unwrap(await supabase.from("executions").select("*").eq("id", id).single());
 }
@@ -1618,7 +1772,7 @@ async function pushHistory(
   await supabase
     .from("execution_history")
     .insert({ user_id: userId, execution_id: executionId, from_status: from, to_status: to, note });
-  unwrap(
+  const updated = unwrap<Row>(
     await supabase
       .from("executions")
       .update({ status: to })
@@ -1626,6 +1780,29 @@ async function pushHistory(
       .select()
       .single(),
   );
+  const kind: AgendaChangeKind | null =
+    to === "concluida"
+      ? "completed"
+      : to === "cancelada"
+        ? "cancelled"
+        : from === "concluida" && to === "planejada"
+          ? "reopened"
+          : null;
+  // Concluído ou cancelado: não há mais o que avisar.
+  if (to === "concluida" || to === "cancelada") await removeExecutionAlerts(executionId);
+  if (kind) {
+    await logAgendaChange({
+      executionId,
+      seriesId: (updated.series_id as string | null) ?? null,
+      kind,
+      to: {
+        date: (updated.agenda_date as string | null) ?? null,
+        start: (updated.start_time as string | null) ?? null,
+        end: (updated.end_time as string | null) ?? null,
+      },
+      note,
+    });
+  }
 }
 
 /** Escreve o novo status no cache antes de falar com o servidor, e devolve
@@ -1763,6 +1940,54 @@ export async function updateRoutineAndFutureExecutions(
  * histórico como "cancelada"). Usada só quando o usuário confirma explicitamente
  * que quer apagar o registro, não só descartá-lo. `execution_history` cai junto
  * (FK on delete cascade), sem deixar rastro órfão. */
+/** Troca o status registrando o histórico — usado por cancelar/reabrir/desfazer. */
+export async function setExecutionStatus(id: string, to: ExecutionStatus, note?: string) {
+  const row = await fetchExecutionRow(id);
+  if (row.status === to) return;
+  await pushHistory(id, row.status as ExecutionStatus, to, note);
+  await invalidate();
+}
+
+/** Edita os detalhes de um compromisso (título, local, nota, link, rótulo…).
+ * Em ocorrência de série, marca como exceção para que editar a série depois
+ * não desfaça a escolha da pessoa. */
+export async function updateExecutionDetails(
+  id: string,
+  patch: {
+    title?: string;
+    location?: string | null;
+    notes?: string | null;
+    link?: string | null;
+    labelId?: string | null;
+    rigid?: boolean;
+    allDay?: boolean;
+    category?: string;
+  },
+) {
+  const row = await fetchExecutionRow(id);
+  const dbPatch: Row = {};
+  if (patch.title !== undefined) dbPatch.title = patch.title;
+  if (patch.location !== undefined) dbPatch.location = patch.location;
+  if (patch.notes !== undefined) dbPatch.notes = patch.notes;
+  if (patch.link !== undefined) dbPatch.link = patch.link;
+  if (patch.labelId !== undefined) dbPatch.label_id = patch.labelId;
+  if (patch.rigid !== undefined) dbPatch.rigid = patch.rigid;
+  if (patch.allDay !== undefined) dbPatch.all_day = patch.allDay;
+  if (patch.category !== undefined) dbPatch.category = patch.category;
+  if (Object.keys(dbPatch).length === 0) return;
+  if (row.series_id) dbPatch.series_overridden = true;
+  unwrap(await supabase.from("executions").update(dbPatch).eq("id", id).select().single());
+  if (patch.labelId !== undefined && (row.label_id ?? null) !== patch.labelId) {
+    await logAgendaChange({
+      executionId: id,
+      seriesId: (row.series_id as string | null) ?? null,
+      kind: "label_changed",
+      note: patch.labelId ?? "sem rótulo",
+    });
+  }
+  await invalidate();
+}
+
 export async function removeExecution(id: string) {
   await supabase.from("executions").delete().eq("id", id);
   await invalidate();
@@ -1814,6 +2039,10 @@ export async function rescheduleExecution(
         step_id: originalRow.step_id,
         rescheduled_from_id: id,
         routine_id: originalRow.routine_id,
+        label_id: originalRow.label_id,
+        notes: originalRow.notes,
+        link: originalRow.link,
+        all_day: originalRow.all_day,
       })
       .select()
       .single(),
@@ -1865,6 +2094,10 @@ export async function redistributeExecution(
         step_id: originalRow.step_id,
         rescheduled_from_id: id,
         routine_id: originalRow.routine_id,
+        label_id: originalRow.label_id,
+        notes: originalRow.notes,
+        link: originalRow.link,
+        all_day: originalRow.all_day,
       })
       .select()
       .single(),

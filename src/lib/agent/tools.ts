@@ -24,6 +24,12 @@ import {
   formatBRL,
   FINANCE_CATEGORIES,
 } from "../finance-store";
+import { ensureSession, supabase } from "../supabase/client";
+import { fetchSeriesState, moveOccurrence } from "../agenda-series-store";
+import { buildOccurrences, type AgendaOccurrence } from "../agenda-occurrences";
+import { durationMinutes, findConflicts, suggestFreeSlots, addDaysISO } from "../agenda-intervals";
+import { toConflictable } from "../agenda-search";
+import { parseAgendaSettings } from "../agenda-settings";
 import {
   fetchState as fetchGoalsState,
   todayExecutions,
@@ -98,6 +104,46 @@ function effectiveTimeZone(): string {
 
 const CATEGORY_IDS = FINANCE_CATEGORIES.map((c) => c.id).join(", ");
 
+/** Janela habitual do dia da pessoa — o agente só sugere dentro dela. */
+async function loadAgendaSettings() {
+  try {
+    const userId = await ensureSession();
+    const { data } = await supabase
+      .from("profiles")
+      .select("agenda_settings")
+      .eq("user_id", userId)
+      .maybeSingle();
+    return parseAgendaSettings(data?.agenda_settings);
+  } catch {
+    return parseAgendaSettings(undefined);
+  }
+}
+
+/** Ocorrências de compromissos recorrentes que ainda são só regra. */
+async function recurringOccurrences(
+  executions: Awaited<ReturnType<typeof fetchGoalsState>>["executions"],
+  days: number,
+): Promise<AgendaOccurrence[]> {
+  const seriesState = await fetchSeriesState();
+  if (seriesState.series.length === 0) return [];
+  const today = todayISO();
+  return buildOccurrences({
+    executions,
+    series: seriesState.series,
+    exceptions: seriesState.exceptions,
+    from: today,
+    to: addDaysISO(today, days),
+    now: { date: today, hm: new Date().toTimeString().slice(0, 5) },
+  }).filter((o) => o.kind === "virtual" && o.status === "planejada");
+}
+
+/** Preserva a duração ao trocar só o início (aceita atravessar a meia-noite). */
+function shiftedEnd(oldStart: string, oldEnd: string | undefined, newStart: string): string {
+  const minutes = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const total = (minutes(newStart) + durationMinutes(oldStart, oldEnd)) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
 /** Formato OpenAI de tool (function calling). */
 export const AGENT_TOOLS = [
   {
@@ -105,7 +151,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "consultar_agenda",
       description:
-        "Consulta compromissos de todas as datas para encontrar um compromisso a reagendar. Use para dentista dia 23, por exemplo. Desambigue apenas se houver vários candidatos.",
+        "Consulta compromissos de todas as datas para encontrar um compromisso a reagendar. Use para dentista dia 23, por exemplo. Desambigue apenas se houver vários candidatos. Compromissos que se repetem vêm em `recorrentes` (com seriesId e occurrenceDate) — reagendar um deles muda só aquela ocorrência.",
       parameters: { type: "object", properties: {} },
     },
   },
@@ -132,16 +178,36 @@ export const AGENT_TOOLS = [
     function: {
       name: "reagendar_execucao",
       description:
-        "Reagenda imediatamente um compromisso identificado a pedido explícito. Consulte consultar_agenda para obter ID. Fim opcional: preserve duração. Não peça confirmação extra.",
+        "Reagenda imediatamente um compromisso identificado a pedido explícito. Consulte consultar_agenda para obter ID (executionId; ou seriesId + occurrenceDate para uma ocorrência de compromisso recorrente). Fim opcional: preserve duração. Não peça confirmação extra. Antes de propor um horário novo, use verificar_disponibilidade; nunca invente horário livre.",
       parameters: {
         type: "object",
         properties: {
           executionId: { type: "string" },
+          seriesId: { type: "string" },
+          occurrenceDate: { type: "string", description: "YYYY-MM-DD original da ocorrência" },
           date: { type: "string" },
           startTime: { type: "string" },
           endTime: { type: "string" },
         },
-        required: ["executionId", "date", "startTime"],
+        required: ["date", "startTime"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "verificar_disponibilidade",
+      description:
+        "Confere se um horário está livre e, se não estiver, devolve os conflitos reais (com a informação de rígido ou flexível) e horários livres próximos calculados pelo app. Use SEMPRE antes de sugerir um horário para encaixar algo. Apresente só o que a ferramenta devolver; nunca mova nada rígido por conta própria.",
+      parameters: {
+        type: "object",
+        properties: {
+          date: { type: "string", description: "YYYY-MM-DD" },
+          startTime: { type: "string", description: "HH:MM" },
+          endTime: { type: "string", description: "HH:MM, opcional" },
+          durationMinutes: { type: "number", description: "se não houver endTime" },
+        },
+        required: ["date", "startTime"],
       },
     },
   },
@@ -742,10 +808,64 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
   switch (name) {
     case "consultar_agenda": {
       const state = await fetchGoalsState();
+      const recorrentes = (await recurringOccurrences(state.executions, 90)).map((o) => ({
+        seriesId: o.seriesId,
+        occurrenceDate: o.occurrenceDate,
+        title: o.title,
+        date: o.date,
+        startTime: o.startTime,
+        endTime: o.endTime,
+        rigid: o.rigid,
+      }));
       return JSON.stringify({
         card: "agenda",
         title: "Sua agenda",
         items: state.executions.filter((e) => e.status === "planejada"),
+        recorrentes,
+      });
+    }
+    case "verificar_disponibilidade": {
+      const date = String(args.date);
+      const startTime = String(args.startTime);
+      const profileSettings = await loadAgendaSettings();
+      const goalsState = await fetchGoalsState();
+      const seriesState = await fetchSeriesState();
+      const now = { date: todayISO(), hm: new Date().toTimeString().slice(0, 5) };
+      const occurrences = buildOccurrences({
+        executions: goalsState.executions,
+        series: seriesState.series,
+        exceptions: seriesState.exceptions,
+        from: addDaysISO(date, -1),
+        to: addDaysISO(date, 14),
+        now,
+      });
+      const timed = occurrences.filter((o) => !o.allDay && o.startTime).map(toConflictable);
+      const minutes =
+        (args.durationMinutes as number | undefined) ??
+        durationMinutes(startTime, args.endTime as string | undefined);
+      const endTime =
+        (args.endTime as string | undefined) ??
+        `${String(Math.floor(((Number(startTime.slice(0, 2)) * 60 + Number(startTime.slice(3)) + minutes) % 1440) / 60)).padStart(2, "0")}:${String(((Number(startTime.slice(0, 2)) * 60 + Number(startTime.slice(3)) + minutes) % 1440) % 60).padStart(2, "0")}`;
+      const conflitos = findConflicts({ date, startTime, endTime }, timed).map((c) => ({
+        titulo: c.title,
+        rigido: Boolean(c.rigid),
+        inicio: c.startTime,
+        fim: c.endTime,
+      }));
+      const horariosLivres = suggestFreeSlots({
+        date,
+        duration: minutes,
+        items: timed,
+        windowStart: profileSettings.dayStart,
+        windowEnd: profileSettings.dayEnd,
+        limit: 3,
+      });
+      return JSON.stringify({
+        livre: conflitos.length === 0,
+        conflitos,
+        horariosLivres,
+        observacao:
+          "Horários calculados pelo app dentro do dia habitual. Nada foi movido; compromissos rígidos só mudam com autorização explícita.",
       });
     }
     case "consultar_rotina": {
@@ -800,11 +920,34 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
     }
     case "reagendar_execucao": {
       const state = await fetchGoalsState();
+      if (!args.executionId && args.seriesId && args.occurrenceDate) {
+        const virtual = (await recurringOccurrences(state.executions, 120)).find(
+          (o) => o.seriesId === args.seriesId && o.occurrenceDate === args.occurrenceDate,
+        );
+        if (!virtual || !virtual.startTime)
+          throw new Error("Ocorrência indisponível para reagendar. Consulte a agenda de novo.");
+        if (args.endTime && String(args.endTime) === String(args.startTime))
+          throw new Error("O fim precisa ser diferente do início.");
+        const endTime =
+          (args.endTime as string | undefined) ??
+          shiftedEnd(virtual.startTime, virtual.endTime, String(args.startTime));
+        await moveOccurrence(virtual, String(args.date), String(args.startTime), endTime);
+        return JSON.stringify({
+          card: "appointment",
+          id: virtual.seriesId,
+          title: virtual.title,
+          date: args.date,
+          startTime: args.startTime,
+          endTime,
+          summary: "Esta ocorrência foi reagendada; o resto da série continua igual.",
+        });
+      }
       const item = state.executions.find((e) => e.id === args.executionId);
       if (!item || item.status !== "planejada")
         throw new Error("Compromisso indisponível para reagendar. Consulte o dia novamente.");
-      if (args.endTime && String(args.endTime) <= String(args.startTime))
-        throw new Error("O fim precisa ser depois do início.");
+      // Fim antes do início é um compromisso que vira o dia (23:00–01:00).
+      if (args.endTime && String(args.endTime) === String(args.startTime))
+        throw new Error("O fim precisa ser diferente do início.");
       if (item.goalId && item.dueDate && String(args.date) > item.dueDate)
         throw new Error(
           "A nova data ultrapassa o prazo. Revise o planejamento antes de reagendar.",
@@ -817,14 +960,8 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
           "Há várias sessões desta tarefa. Abra a agenda para escolher a ocorrência.",
         );
       let endTime = args.endTime as string | undefined;
-      if (!endTime && item.startTime && item.endTime) {
-        const minutes = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
-        const end =
-          minutes(String(args.startTime)) + minutes(item.endTime) - minutes(item.startTime);
-        if (end >= 1440)
-          throw new Error("O novo horário atravessa a meia-noite. Informe o fim na agenda.");
-        endTime = `${String(Math.floor(end / 60)).padStart(2, "0")}:${String(end % 60).padStart(2, "0")}`;
-      }
+      if (!endTime && item.startTime && item.endTime)
+        endTime = shiftedEnd(item.startTime, item.endTime, String(args.startTime));
       await updateAgendaSession(
         item.id,
         item.agendaSessions?.[0]?.id,

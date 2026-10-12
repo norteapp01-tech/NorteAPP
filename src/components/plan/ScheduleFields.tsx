@@ -1,4 +1,5 @@
 import { DateField } from "@/components/ui/date-wheel-picker";
+import { isValidTimeRange } from "@/lib/agenda-intervals";
 
 export type ScheduleValue = { date: string; startTime: string; endTime: string };
 
@@ -61,5 +62,6 @@ export function ScheduleFields({
 }
 
 export function scheduleTimesValid(value: ScheduleValue): boolean {
-  return !!value.startTime && !!value.endTime && value.endTime > value.startTime;
+  // Fim menor que o início é um compromisso que vira o dia (23:00–01:00).
+  return isValidTimeRange(value.startTime, value.endTime);
 }

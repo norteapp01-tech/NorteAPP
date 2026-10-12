@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   Check,
@@ -13,10 +13,8 @@ import {
 import {
   createGoal,
   createExecution,
-  scheduleExecution,
-  scheduleStepAsExecution,
-  isScheduled,
   formatDateBR,
+  todayISO,
   useGoalsStore,
   type Goal,
   type Step,
@@ -25,7 +23,10 @@ import {
 import { categoryMeta, catByArea, lifeAreas } from "@/lib/mock-data";
 import { nowDate } from "@/lib/test-clock";
 import { DateField } from "@/components/ui/date-wheel-picker";
-import { PlanItemPicker, type PlanItemSelection } from "@/components/plan/PlanItemPicker";
+import { type PlanItemSelection } from "@/components/plan/PlanItemPicker";
+import { AgendaFeedbackProvider } from "@/components/agenda/agenda-feedback";
+import { EventComposer } from "@/components/agenda/EventComposer";
+import { minutesToTime } from "@/lib/agenda-time";
 import { useProfile } from "@/lib/profile-store";
 import { useFinanceStore, updateFinancialGoal, type FinancialGoal } from "@/lib/finance-store";
 import { formatTime } from "@/lib/format-utils";
@@ -193,220 +194,48 @@ function AgendaFlow({ onDone, deepLink }: { onDone: () => void; deepLink?: DeepL
   const goals = useGoalsStore((s) => s.goals);
   const steps = useGoalsStore((s) => s.steps);
   const executions = useGoalsStore((s) => s.executions);
-  const profile = useProfile();
+  const settings = useProfile().agendaSettings;
 
-  const [selection, setSelection] = useState<PlanItemSelection | null>(() =>
-    resolveDeepLink(deepLink, goals, steps, executions),
+  // Atalhos que chegam já com plano, etapa ou execução escolhidos.
+  const selection = useMemo(
+    () => resolveDeepLink(deepLink, goals, steps, executions),
+    // Resolvido uma vez: o formulário não deve trocar de seleção sozinho depois.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   );
-  const [showPicker, setShowPicker] = useState(false);
-  const [avulsoTitle, setAvulsoTitle] = useState("");
-  const [form, setForm] = useState({
-    date: "",
-    startTime: "",
-    endTime: "",
-    location: "",
-    rigid: true,
-  });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  // Sem plano vinculado é um compromisso comum — o caso mais frequente.
-  const creatingNew = !selection || selection.kind === "goal" || selection.kind === "step";
-  const timesValid = !!form.startTime && !!form.endTime && form.endTime > form.startTime;
-  const title =
-    selection?.kind === "step"
-      ? selection.step.title
-      : selection?.kind === "execution"
-        ? selection.execution.title
-        : avulsoTitle;
-  const valid = !!title.trim() && !!form.date && timesValid;
-
-  const save = async () => {
-    if (!valid || saving) return;
-    setSaving(true);
-    setError("");
-    try {
-      if (selection?.kind === "execution") {
-        await scheduleExecution(selection.execution.id, form.date, form.startTime, form.endTime);
-      } else if (selection?.kind === "step") {
-        await scheduleStepAsExecution(
-          selection.step,
-          selection.goal,
-          form.date,
-          form.startTime,
-          form.endTime,
-        );
-      } else {
-        await createExecution({
-          title: title.trim(),
-          dueDate: form.date,
-          agendaDate: form.date,
-          startTime: form.startTime,
-          endTime: form.endTime,
-          category: selection?.kind === "goal" ? selection.goal.category : "generico",
-          location: form.location || undefined,
-          rigid: form.rigid,
-          weight: "leve",
-          goalId: selection?.kind === "goal" ? selection.goal.id : undefined,
-        });
-      }
-      onDone();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Não foi possível salvar. Tente de novo.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const breadcrumb =
-    selection &&
-    [
-      selection.goal.title,
-      selection.kind !== "goal" && selection.kind === "step" ? selection.step.title : null,
-      selection.kind === "execution" ? (selection.step?.title ?? null) : null,
-      selection.kind === "execution" ? selection.execution.title : null,
-    ].filter(Boolean);
+  const start = useMemo(() => {
+    const now = nowDate();
+    const rounded = Math.min(
+      Math.ceil((now.getHours() * 60 + now.getMinutes() + 1) / 30) * 30,
+      23 * 60,
+    );
+    return rounded;
+  }, []);
+  const clock = (m: number) => minutesToTime(((m % 1440) + 1440) % 1440);
 
   return (
-    <div className="mt-8 space-y-5">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Novo compromisso</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Só o essencial. Você edita depois se precisar.
-        </p>
-      </div>
-
-      <div>
-        <span className="mb-1 block text-[11px] uppercase tracking-wider text-muted-foreground">
-          O quê
-        </span>
-        {/* Primeiro o nome: a maioria só quer anotar um compromisso. Vincular a
-            um plano é opcional e vem depois. */}
-        {(!selection || selection.kind === "goal") && (
-          <input
-            value={avulsoTitle}
-            onChange={(e) => setAvulsoTitle(e.target.value)}
-            placeholder='Ex: "Dentista"'
-            aria-label="Nome do compromisso"
-            autoFocus
-            className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-primary"
-          />
-        )}
-        {selection && (selection.kind === "step" || selection.kind === "execution") && (
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm">
-            <Target className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate">{breadcrumb!.join(" › ")}</span>
-          </div>
-        )}
-        {selection?.kind === "goal" && (
-          <p className="mt-2 flex items-center gap-1.5 text-[11px] text-primary">
-            <Link2 className="h-3 w-3 shrink-0" /> Plano: {selection.goal.title}
+    <AgendaFeedbackProvider>
+      <div className="mt-8 space-y-5">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Novo compromisso</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Só o essencial. Você edita depois se precisar.
           </p>
-        )}
-        {selection?.kind === "execution" && (
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Prazo: {formatDateBR(selection.execution.dueDate)}
-            {isScheduled(selection.execution)
-              ? ` — já agendada para ${formatDateBR(selection.execution.agendaDate!)} às ${formatTime(selection.execution.startTime, profile.timeFormat)}. Confirmar aqui só troca o horário, não duplica.`
-              : " — agendar aqui não muda o prazo nem duplica a execução, só marca dia e horário."}
-          </p>
-        )}
-        {selection?.kind === "step" && (
-          <p className="mt-2 flex items-center gap-1.5 text-[11px] text-primary">
-            <Link2 className="h-3 w-3" /> essa etapa ainda não tem execução — vamos criar uma ao
-            agendar.
-          </p>
-        )}
-        <div className="mt-2.5 flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => setShowPicker(true)}
-            className="text-[11px] font-semibold text-success underline decoration-dotted underline-offset-4"
-          >
-            {selection
-              ? "trocar de plano, etapa ou execução"
-              : "ou selecionar um plano, etapa ou execução"}
-          </button>
-          {selection && (
-            <button
-              type="button"
-              onClick={() => setSelection(null)}
-              className="text-[11px] font-semibold text-muted-foreground underline decoration-dotted underline-offset-4"
-            >
-              desvincular
-            </button>
-          )}
         </div>
-      </div>
-
-      <DateField label="Dia" value={form.date} onChange={(v) => setForm({ ...form, date: v })} />
-      <div className="grid grid-cols-2 gap-3">
-        <Field
-          label="Início"
-          placeholder="14:00"
-          value={form.startTime}
-          onChange={(v) => setForm({ ...form, startTime: v })}
-          type="time"
-        />
-        <Field
-          label="Fim"
-          placeholder="15:00"
-          value={form.endTime}
-          onChange={(v) => setForm({ ...form, endTime: v })}
-          type="time"
-        />
-      </div>
-      {form.startTime && form.endTime && !timesValid && (
-        <p className="text-[11px] text-danger">O horário de fim precisa ser depois do início.</p>
-      )}
-      {creatingNew && (
-        <>
-          <Field
-            label="Onde (opcional)"
-            placeholder="Ex: Clínica Norte"
-            value={form.location}
-            onChange={(v) => setForm({ ...form, location: v })}
-          />
-          <label className="flex items-center gap-3 rounded-xl border border-border bg-surface p-4">
-            <input
-              type="checkbox"
-              checked={form.rigid}
-              onChange={(e) => setForm({ ...form, rigid: e.target.checked })}
-              className="h-4 w-4 accent-primary"
-            />
-            <div>
-              <p className="text-sm font-medium">Rígido</p>
-              <p className="text-[11px] text-muted-foreground">
-                Não pode ser renegociado sem confronto.
-              </p>
-            </div>
-          </label>
-        </>
-      )}
-      {error && <p className="text-[11px] text-danger">{error}</p>}
-      <button
-        disabled={!valid || saving}
-        onClick={save}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-semibold text-primary-foreground disabled:opacity-40"
-      >
-        <Check className="h-4 w-4" />
-        {saving
-          ? "Salvando…"
-          : selection?.kind === "execution"
-            ? "Agendar execução"
-            : "Salvar na agenda"}
-      </button>
-
-      {showPicker && (
-        <PlanItemPicker
-          onClose={() => setShowPicker(false)}
-          onSelect={(sel) => {
-            setSelection(sel);
-            setShowPicker(false);
+        <EventComposer
+          variant="page"
+          seed={{
+            mode: "create",
+            date: todayISO(),
+            startTime: clock(start),
+            endTime: clock(start + settings.defaultDurationMin),
+            selection,
           }}
+          onClose={() => {}}
+          onDone={onDone}
         />
-      )}
-    </div>
+      </div>
+    </AgendaFeedbackProvider>
   );
 }
 

@@ -78,11 +78,24 @@ const schemas: Record<string, z.ZodType<Record<string, unknown>>> = {
   consultar_rotina: z.object({
     area: z.enum(["alimentacao", "leitura", "fe", "planos", "academia"]),
   }),
-  reagendar_execucao: z.object({
-    executionId: z.string().uuid(),
+  reagendar_execucao: z
+    .object({
+      executionId: z.string().uuid().optional(),
+      // Ocorrência de um compromisso recorrente que ainda é só regra.
+      seriesId: z.string().uuid().optional(),
+      occurrenceDate: isoDate.optional(),
+      date: isoDate,
+      startTime: hhmm,
+      endTime: hhmm.optional(),
+    })
+    .refine((v) => v.executionId || (v.seriesId && v.occurrenceDate), {
+      message: "informe o compromisso (executionId ou seriesId com occurrenceDate)",
+    }),
+  verificar_disponibilidade: z.object({
     date: isoDate,
     startTime: hhmm,
     endTime: hhmm.optional(),
+    durationMinutes: z.number().int().min(5).max(720).optional(),
   }),
   registrar_refeicao: z.object({ mealId: z.string().uuid(), optionId: z.string().uuid() }),
   registrar_refeicao_estimada: z

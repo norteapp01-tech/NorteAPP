@@ -462,8 +462,15 @@ describe("scheduleStepAsExecution — agenda etapa sem execução, sem duplicar"
 
     await scheduleStepAsExecution(step, goal, "2026-09-15", "09:00", "10:00");
 
-    expect(insertSpy).toHaveBeenCalledTimes(1);
-    const [table, payload] = insertSpy.mock.calls[0] as [string, Row];
+    // Uma única execução criada (o histórico da Agenda é gravado à parte).
+    const executionInserts = insertSpy.mock.calls.filter(([table]) => table === "executions");
+    expect(executionInserts).toHaveLength(1);
+    expect(
+      insertSpy.mock.calls.some(
+        ([table, row]) => table === "agenda_changes" && (row as Row).kind === "scheduled",
+      ),
+    ).toBe(true);
+    const [table, payload] = executionInserts[0] as [string, Row];
     expect(table).toBe("executions");
     expect(payload).toMatchObject({
       title: step.title,
@@ -482,7 +489,10 @@ describe("scheduleStepAsExecution — agenda etapa sem execução, sem duplicar"
 
     await scheduleStepAsExecution(step, goal, "2026-09-15", "09:00");
 
-    const [, payload] = insertSpy.mock.calls[0] as [string, Row];
+    const [, payload] = insertSpy.mock.calls.find(([table]) => table === "executions") as [
+      string,
+      Row,
+    ];
     expect(payload).toMatchObject({ due_date: "2026-09-15" });
   });
 });

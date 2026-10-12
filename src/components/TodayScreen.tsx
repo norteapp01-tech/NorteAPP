@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
+import { isValidTimeRange } from "@/lib/agenda-intervals";
+import { useSeriesMaterialization } from "@/components/agenda/use-agenda-data";
 import { nowDate } from "@/lib/test-clock";
 import {
   Check,
@@ -68,6 +70,8 @@ const moodOptions = [
 ] as const;
 
 export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
+  // Compromissos recorrentes de hoje viram compromissos reais aqui também.
+  useSeriesMaterialization();
   const state = useGoalsStore((s) => s);
   const { executions } = state;
   const profile = useProfile();
@@ -814,7 +818,7 @@ function ConfrontModal({ task, onClose }: { task: Execution; onClose: () => void
   const linkedGoal = useGoalsStore((s) => s.goals.find((g) => g.id === task.goalId));
   const executions = useGoalsStore((s) => s.executions);
   const profile = useProfile();
-  const timesValid = !!startTime && !!endTime && endTime > startTime;
+  const timesValid = isValidTimeRange(startTime, endTime);
 
   const chooseReason = async (reason: string) => {
     if (busy) return;
