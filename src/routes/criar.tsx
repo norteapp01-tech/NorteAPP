@@ -157,7 +157,7 @@ function CreateScreen() {
   );
 }
 
-// -------- Agenda: seleção estruturada Plano→Etapa→Execução, ou compromisso avulso --------
+// -------- Agenda: nome do compromisso primeiro; vincular a Plano→Etapa→Execução é opcional --------
 type DeepLink = { goalId?: string; stepId?: string; executionId?: string };
 
 function resolveDeepLink(
@@ -195,7 +195,6 @@ function AgendaFlow({ onDone, deepLink }: { onDone: () => void; deepLink?: DeepL
   const executions = useGoalsStore((s) => s.executions);
   const profile = useProfile();
 
-  const [avulso, setAvulso] = useState(false);
   const [selection, setSelection] = useState<PlanItemSelection | null>(() =>
     resolveDeepLink(deepLink, goals, steps, executions),
   );
@@ -211,7 +210,8 @@ function AgendaFlow({ onDone, deepLink }: { onDone: () => void; deepLink?: DeepL
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const creatingNew = avulso || selection?.kind === "goal" || selection?.kind === "step";
+  // Sem plano vinculado é um compromisso comum — o caso mais frequente.
+  const creatingNew = !selection || selection.kind === "goal" || selection.kind === "step";
   const timesValid = !!form.startTime && !!form.endTime && form.endTime > form.startTime;
   const title =
     selection?.kind === "step"
@@ -219,7 +219,7 @@ function AgendaFlow({ onDone, deepLink }: { onDone: () => void; deepLink?: DeepL
       : selection?.kind === "execution"
         ? selection.execution.title
         : avulsoTitle;
-  const valid = !!title.trim() && !!form.date && timesValid && (avulso || selection !== null);
+  const valid = !!title.trim() && !!form.date && timesValid;
 
   const save = async () => {
     if (!valid || saving) return;
@@ -280,74 +280,63 @@ function AgendaFlow({ onDone, deepLink }: { onDone: () => void; deepLink?: DeepL
         <span className="mb-1 block text-[11px] uppercase tracking-wider text-muted-foreground">
           O quê
         </span>
-        {!avulso ? (
-          <>
-            <button
-              type="button"
-              onClick={() => setShowPicker(true)}
-              className="flex w-full items-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-left text-sm outline-none focus:border-primary"
-            >
-              <Target className="h-4 w-4 shrink-0 text-muted-foreground" />
-              {selection ? (
-                <span className="min-w-0 flex-1 truncate">{breadcrumb!.join(" › ")}</span>
-              ) : (
-                <span className="flex-1 text-muted-foreground">
-                  Selecionar plano, etapa ou execução
-                </span>
-              )}
-            </button>
-            {selection && (
-              <button
-                type="button"
-                onClick={() => setShowPicker(true)}
-                className="mt-1.5 text-[11px] font-semibold text-primary"
-              >
-                trocar
-              </button>
-            )}
-            {selection?.kind === "execution" && (
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                Prazo: {formatDateBR(selection.execution.dueDate)}
-                {isScheduled(selection.execution)
-                  ? ` — já agendada para ${formatDateBR(selection.execution.agendaDate!)} às ${formatTime(selection.execution.startTime, profile.timeFormat)}. Confirmar aqui só troca o horário, não duplica.`
-                  : " — agendar aqui não muda o prazo nem duplica a execução, só marca dia e horário."}
-              </p>
-            )}
-            {selection?.kind === "step" && (
-              <p className="mt-2 flex items-center gap-1.5 text-[11px] text-primary">
-                <Link2 className="h-3 w-3" /> essa etapa ainda não tem execução — vamos criar uma ao
-                agendar.
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                setAvulso(true);
-                setSelection(null);
-              }}
-              className="mt-2.5 text-[11px] font-semibold text-muted-foreground underline decoration-dotted"
-            >
-              ou criar um compromisso avulso (sem plano)
-            </button>
-          </>
-        ) : (
-          <>
-            <input
-              value={avulsoTitle}
-              onChange={(e) => setAvulsoTitle(e.target.value)}
-              placeholder='Ex: "Dentista"'
-              autoFocus
-              className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-primary"
-            />
-            <button
-              type="button"
-              onClick={() => setAvulso(false)}
-              className="mt-1.5 text-[11px] font-semibold text-primary"
-            >
-              vincular a um plano em vez disso
-            </button>
-          </>
+        {/* Primeiro o nome: a maioria só quer anotar um compromisso. Vincular a
+            um plano é opcional e vem depois. */}
+        {(!selection || selection.kind === "goal") && (
+          <input
+            value={avulsoTitle}
+            onChange={(e) => setAvulsoTitle(e.target.value)}
+            placeholder='Ex: "Dentista"'
+            aria-label="Nome do compromisso"
+            autoFocus
+            className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-primary"
+          />
         )}
+        {selection && (selection.kind === "step" || selection.kind === "execution") && (
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm">
+            <Target className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate">{breadcrumb!.join(" › ")}</span>
+          </div>
+        )}
+        {selection?.kind === "goal" && (
+          <p className="mt-2 flex items-center gap-1.5 text-[11px] text-primary">
+            <Link2 className="h-3 w-3 shrink-0" /> Plano: {selection.goal.title}
+          </p>
+        )}
+        {selection?.kind === "execution" && (
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Prazo: {formatDateBR(selection.execution.dueDate)}
+            {isScheduled(selection.execution)
+              ? ` — já agendada para ${formatDateBR(selection.execution.agendaDate!)} às ${formatTime(selection.execution.startTime, profile.timeFormat)}. Confirmar aqui só troca o horário, não duplica.`
+              : " — agendar aqui não muda o prazo nem duplica a execução, só marca dia e horário."}
+          </p>
+        )}
+        {selection?.kind === "step" && (
+          <p className="mt-2 flex items-center gap-1.5 text-[11px] text-primary">
+            <Link2 className="h-3 w-3" /> essa etapa ainda não tem execução — vamos criar uma ao
+            agendar.
+          </p>
+        )}
+        <div className="mt-2.5 flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => setShowPicker(true)}
+            className="text-[11px] font-semibold text-success underline decoration-dotted underline-offset-4"
+          >
+            {selection
+              ? "trocar de plano, etapa ou execução"
+              : "ou selecionar um plano, etapa ou execução"}
+          </button>
+          {selection && (
+            <button
+              type="button"
+              onClick={() => setSelection(null)}
+              className="text-[11px] font-semibold text-muted-foreground underline decoration-dotted underline-offset-4"
+            >
+              desvincular
+            </button>
+          )}
+        </div>
       </div>
 
       <DateField label="Dia" value={form.date} onChange={(v) => setForm({ ...form, date: v })} />
