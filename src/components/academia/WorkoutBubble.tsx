@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Dumbbell } from "lucide-react";
 import { useGymSession } from "@/lib/gym-session-context";
-import { sessionElapsedSeconds, restRemainingSeconds } from "@/lib/workout-store";
+import { restState, sessionElapsedSeconds } from "@/lib/workout-store";
 import { formatDurationClock } from "@/lib/sport-store";
+import { restClockLabel } from "./rest-clock";
 import { QuickSetPanel } from "./QuickSetPanel";
 import { FullscreenTimer } from "./FullscreenTimer";
 
@@ -164,8 +165,11 @@ export function WorkoutBubble() {
   if (!session) return null;
 
   const elapsed = sessionElapsedSeconds(session);
-  const rest = restRemainingSeconds(session);
-  const restOver = rest !== null && rest <= 0;
+  // Descanso e relógio da bolha: contagem regressiva e, passando do zero, o
+  // tempo a mais com "+" (+0:01, +0:02…) — nunca congela em 0:00.
+  const rest = restState(session, 0);
+  const restActive = rest.status !== "pronto";
+  const restOver = rest.status === "fim";
 
   return (
     <>
@@ -207,7 +211,7 @@ export function WorkoutBubble() {
             >
               <Dumbbell className="h-5 w-5" strokeWidth={2} />
               <span className="mt-0.5 font-mono text-[9px] font-bold tabular-nums">
-                {rest !== null ? formatDurationClock(rest) : bubbleLabel(elapsed)}
+                {restActive ? restClockLabel(rest) : bubbleLabel(elapsed)}
               </span>
             </button>
 

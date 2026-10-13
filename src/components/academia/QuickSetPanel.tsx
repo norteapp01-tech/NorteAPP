@@ -1,15 +1,6 @@
 import { useLayoutEffect, useState, type CSSProperties, type RefObject } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import {
-  ArrowDownToLine,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  Plus,
-  SkipForward,
-  X,
-} from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ChevronUp, Plus, SkipForward, X } from "lucide-react";
 import { NumberField } from "@/components/ui/number-field";
 import { InlineError } from "@/components/ui/inline-error";
 import { useAsyncAction } from "@/hooks/use-async-action";
@@ -19,14 +10,16 @@ import {
   exerciseCompletionState,
   finishSession,
   logSet,
-  regularSetCount,
+  seriesPosition,
   restBaseSeconds,
   skipExercise,
+  skipSet,
   startRest,
   updateSet,
   type PlannedExercise,
 } from "@/lib/workout-store";
 import { TimerBlock } from "./TimerBlock";
+import { DropInputs, DropToggle, suggestDrop, type DropDraft } from "./DropFields";
 
 // ---------------------------------------------------------------------------
 // Painel rápido — UMA série por vez. A série atual dá lugar à próxima no mesmo
@@ -62,8 +55,9 @@ export function QuickSetPanel({
   // Séries somadas à meta com "Adicionar série", por exercício. A série nova
   // aparece como as outras, com kg e repetições para preencher.
   const [extraByExercise, setExtraByExercise] = useState<Record<string, number>>({});
-  const [dropOpen, setDropOpen] = useState(false);
-  const [dropDraft, setDropDraft] = useState({ weight: "0", reps: "0" });
+  // Drop da série atual: ligado, é gravado junto com a série pelo mesmo check.
+  const [dropOn, setDropOn] = useState(false);
+  const [dropDraft, setDropDraft] = useState<DropDraft | null>(null);
   const [confirmFinish, setConfirmFinish] = useState(false);
   const setAction = useAsyncAction();
   const finishAction = useAsyncAction();
@@ -94,13 +88,14 @@ export function QuickSetPanel({
   const log = session.exerciseLogs.find((l) => l.exerciseId === current?.exerciseId);
   const doneSets = log?.sets ?? [];
   const extra = current ? (extraByExercise[current.exerciseId] ?? 0) : 0;
-  // Drops não contam como série planejada.
-  const setIndex = regularSetCount(log);
+  // Posição na sequência: séries feitas + puladas (pular a 2 leva à 3).
+  const setIndex = seriesPosition(log);
   const totalSets = (current?.setsTarget ?? 0) + extra;
   // Com séries somadas ainda por fazer, o exercício não está concluído.
   const completion =
     extra > 0 && setIndex < totalSets ? "parcial" : exerciseCompletionState(log, current);
   const lastRegular = [...doneSets].reverse().find((s) => !s.isDrop);
+  const regularDone = doneSets.filter((s) => !s.isDrop).length;
   const target = current?.setTargets[setIndex] ??
     current?.setTargets.at(-1) ?? {
       reps: current?.repsTarget ?? 0,
@@ -115,6 +110,8 @@ export function QuickSetPanel({
       ? { weight: String(lastRegular.weight), reps: String(lastRegular.reps) }
       : { weight: String(target.weight), reps: String(target.reps) };
   const values = draft?.key === draftKey ? draft : defaults;
+  const dropValues =
+    dropDraft ?? suggestDrop(parseFloat(values.weight) || 0, parseInt(values.reps, 10) || 0);
 
   const pending = planned.filter(
     (p) =>
@@ -160,7 +157,8 @@ export function QuickSetPanel({
     const next = planned[(index + delta + planned.length) % planned.length];
     select(next.exerciseId);
     setShowDone(false);
-    setDropOpen(false);
+    setDropOn(false);
+    setDropDraft(null);
     setDraft(null);
   };
 
@@ -170,7 +168,20 @@ export function QuickSetPanel({
       const weight = parseFloat(values.weight) || 0;
       const reps = parseInt(values.reps, 10) || 0;
       const wasDone = Boolean(log?.done);
-      await logSet(session.id, current.exerciseId, weight, reps);
+      await logSet(
+        session.id,
+        current.exerciseId,
+        weight,
+        reps,
+        dropOn
+          ? {
+              drop: {
+                weight: parseFloat(dropValues.weight) || 0,
+                reps: parseInt(dropValues.reps, 10) || 0,
+              },
+            }
+          : {},
+      );
       const isLastPlanned = setIndex + 1 >= totalSets;
       if (isLastPlanned) await completeExerciseLog(session.id, current.exerciseId);
       // Duração da série que acabou de ser concluída — com a escolha temporária
@@ -184,43 +195,58 @@ export function QuickSetPanel({
       // Só depois de tudo gravado: uma falha acima interrompe aqui e mantém os
       // valores digitados na tela, sem avançar.
       setDraft(null);
-      // Série extra num exercício que já estava concluído não puxa a pessoa
-      // para o próximo: ela escolheu ficar nele.
-      if (isLastPlanned && !wasDone) advance(current.exerciseId);
+      setDropOn(false);
+      setDropDraft(null);
+      // Ao terminar a última série a pessoa fica no exercício: é ali que
+      // aparece "Adicionar série" e o botão para seguir. Nada avança sozinho.
+      void wasDone;
     });
 
   const addSet = () => {
     if (!current) return;
     setDraft(null);
+    setDropOn(false);
+    setDropDraft(null);
     setExtraByExercise((m) => ({ ...m, [current.exerciseId]: (m[current.exerciseId] ?? 0) + 1 }));
   };
 
-  const openDrop = () => {
-    setDropDraft({
-      weight: String(Math.max(0, Math.round((lastRegular?.weight ?? target.weight) * 0.75))),
-      reps: String(Math.max(1, Math.round((lastRegular?.reps ?? target.reps) / 2))),
-    });
-    setDropOpen(true);
+  const toggleDrop = () => {
+    if (dropOn) {
+      setDropOn(false);
+      setDropDraft(null);
+    } else {
+      setDropDraft(suggestDrop(parseFloat(values.weight) || 0, parseInt(values.reps, 10) || 0));
+      setDropOn(true);
+    }
   };
 
-  const confirmDrop = () =>
+  // Pula só ESTA série: ela fica zerada e a próxima passa a ser a atual.
+  const skipCurrentSet = () =>
     setAction.run(async () => {
       if (!current) return;
-      await logSet(
-        session.id,
-        current.exerciseId,
-        parseFloat(dropDraft.weight) || 0,
-        parseInt(dropDraft.reps, 10) || 0,
-        { isDrop: true },
-      );
-      setDropOpen(false);
+      await skipSet(session.id, current.exerciseId);
+      const lastOne = setIndex + 1 >= totalSets;
+      if (lastOne) {
+        // Última série: com alguma feita o exercício termina; sem nenhuma, foi pulado.
+        if (regularDone > 0) await completeExerciseLog(session.id, current.exerciseId);
+        else {
+          await skipExercise(session.id, current.exerciseId, true);
+          advance(current.exerciseId);
+        }
+      }
+      setDraft(null);
+      setDropOn(false);
+      setDropDraft(null);
     });
 
-  const skipCurrent = () =>
+  // Pula o exercício inteiro, a qualquer momento — o que já foi feito fica.
+  const skipCurrentExercise = () =>
     setAction.run(async () => {
       if (!current) return;
       await skipExercise(session.id, current.exerciseId, true);
       setDraft(null);
+      setDropOn(false);
+      setDropDraft(null);
       advance(current.exerciseId);
     });
 
@@ -301,50 +327,105 @@ export function QuickSetPanel({
                   <ChevronUp
                     className={`h-3.5 w-3.5 transition-transform ${showDone ? "" : "rotate-180"}`}
                   />
-                  {showDone ? "ocultar" : `${doneSets.length} séries registradas`}
+                  {showDone
+                    ? "ocultar"
+                    : `${doneSets.length} ${doneSets.length === 1 ? "série registrada" : "séries registradas"}`}
                 </button>
                 {showDone && current && (
                   <ul className="mt-1 space-y-1">
                     {(() => {
+                      type Row =
+                        | { kind: "set"; index: number; set: (typeof doneSets)[number] }
+                        | { kind: "skipped"; index: number };
+                      const rows: Row[] = [
+                        ...doneSets.map((set): Row => ({ kind: "set", index: set.setIndex, set })),
+                        ...(log?.skippedSets ?? []).map((index): Row => ({
+                          kind: "skipped",
+                          index,
+                        })),
+                      ].sort((x, y) => x.index - y.index);
                       let regular = 0;
-                      return doneSets.map((s) => {
+                      return rows.map((row) => {
+                        if (row.kind === "skipped") {
+                          regular += 1;
+                          return (
+                            <li
+                              key={`skip-${row.index}`}
+                              className="flex items-center gap-1.5 border-b border-border px-2 py-2 text-[11px] text-muted-foreground last:border-b-0"
+                            >
+                              <span className="w-10 shrink-0">Série {regular}</span>
+                              <span>pulada</span>
+                            </li>
+                          );
+                        }
+                        const s = row.set;
                         const label = s.isDrop ? "Drop" : `Série ${++regular}`;
                         return (
                           <li
                             key={`${s.setIndex}-${s.weight}-${s.reps}`}
-                            className="flex items-center gap-1.5 border-b border-border px-2 py-2 last:border-b-0"
+                            className="border-b border-border px-2 py-2 last:border-b-0"
                           >
-                            <span
-                              className={`w-10 shrink-0 text-[10px] ${s.isDrop ? "font-semibold text-warning" : "text-muted-foreground"}`}
-                            >
-                              {label}
-                            </span>
-                            {/* Editar usa updateSet: corrige a série existente,
-                                não cria outra nem redispara avanço/descanso. */}
-                            <NumberField
-                              value={s.weight}
-                              aria-label={`Peso de ${label}`}
-                              onValue={(v) =>
-                                void updateSet(session.id, current.exerciseId, s.setIndex, {
-                                  weight: v,
-                                })
-                              }
-                              className="w-14 rounded-md border border-border bg-surface px-1.5 py-1 text-right text-xs tabular-nums outline-none focus:border-primary"
-                            />
-                            <span className="text-[10px] text-muted-foreground">kg</span>
-                            <NumberField
-                              integer
-                              value={s.reps}
-                              aria-label={`Repetições de ${label}`}
-                              onValue={(v) =>
-                                void updateSet(session.id, current.exerciseId, s.setIndex, {
-                                  reps: v,
-                                })
-                              }
-                              className="w-12 rounded-md border border-border bg-surface px-1.5 py-1 text-right text-xs tabular-nums outline-none focus:border-primary"
-                            />
-                            <span className="text-[10px] text-muted-foreground">reps</span>
-                            <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-success" />
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-10 shrink-0 text-[10px] text-muted-foreground">
+                                {label}
+                              </span>
+                              {/* Editar usa updateSet: corrige a série existente,
+                                  não cria outra nem redispara avanço/descanso. */}
+                              <NumberField
+                                value={s.weight}
+                                aria-label={`Peso de ${label}`}
+                                onValue={(v) =>
+                                  void updateSet(session.id, current.exerciseId, s.setIndex, {
+                                    weight: v,
+                                  })
+                                }
+                                className="w-14 rounded-md border border-border bg-surface px-1.5 py-1 text-right text-xs tabular-nums outline-none focus:border-primary"
+                              />
+                              <span className="text-[10px] text-muted-foreground">kg</span>
+                              <NumberField
+                                integer
+                                value={s.reps}
+                                aria-label={`Repetições de ${label}`}
+                                onValue={(v) =>
+                                  void updateSet(session.id, current.exerciseId, s.setIndex, {
+                                    reps: v,
+                                  })
+                                }
+                                className="w-12 rounded-md border border-border bg-surface px-1.5 py-1 text-right text-xs tabular-nums outline-none focus:border-primary"
+                              />
+                              <span className="text-[10px] text-muted-foreground">reps</span>
+                              <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-success" />
+                            </div>
+                            {s.drop && (
+                              <div className="mt-1.5 flex items-center gap-1.5 pl-3">
+                                <span className="w-10 shrink-0 text-[10px] font-semibold text-primary">
+                                  ↳ Drop
+                                </span>
+                                <NumberField
+                                  value={s.drop.weight}
+                                  aria-label={`Peso do drop de ${label}`}
+                                  onValue={(v) =>
+                                    void updateSet(session.id, current.exerciseId, s.setIndex, {
+                                      drop: { weight: v, reps: s.drop!.reps },
+                                    })
+                                  }
+                                  className="w-14 rounded-md border border-border bg-surface px-1.5 py-1 text-right text-xs tabular-nums outline-none focus:border-primary"
+                                />
+                                <span className="text-[10px] text-muted-foreground">kg</span>
+                                <NumberField
+                                  integer
+                                  value={s.drop.reps}
+                                  aria-label={`Repetições do drop de ${label}`}
+                                  onValue={(v) =>
+                                    void updateSet(session.id, current.exerciseId, s.setIndex, {
+                                      drop: { weight: s.drop!.weight, reps: v },
+                                    })
+                                  }
+                                  className="w-12 rounded-md border border-border bg-surface px-1.5 py-1 text-right text-xs tabular-nums outline-none focus:border-primary"
+                                />
+                                <span className="text-[10px] text-muted-foreground">reps</span>
+                              </div>
+                            )}
                           </li>
                         );
                       });
@@ -365,13 +446,23 @@ export function QuickSetPanel({
                 <Check className="check-enter mx-auto h-7 w-7 text-success" strokeWidth={2.5} />
                 <p className="mt-1.5 text-sm font-semibold">Exercício concluído</p>
                 <p className="text-[11px] text-muted-foreground">{setIndex} séries registradas</p>
-                <button
-                  onClick={addSet}
-                  disabled={setAction.pending}
-                  className="academia-add-set interactive-press mt-3 inline-flex items-center gap-1 rounded-xl px-4 py-2.5 text-xs font-semibold"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Adicionar série
-                </button>
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    onClick={addSet}
+                    disabled={setAction.pending}
+                    className="academia-add-set interactive-press inline-flex items-center gap-1 rounded-xl px-4 py-2.5 text-xs font-semibold"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Adicionar série
+                  </button>
+                  {pending.some((p) => p.exerciseId !== current.exerciseId) && (
+                    <button
+                      onClick={() => advance(current.exerciseId)}
+                      className="interactive-press inline-flex items-center gap-1 rounded-xl border border-border px-4 py-2.5 text-xs font-semibold"
+                    >
+                      Próximo exercício <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               current && (
@@ -419,74 +510,29 @@ export function QuickSetPanel({
                       <Check className="h-6 w-6" strokeWidth={3} />
                     </button>
                   </div>
-                  {/* Mesma ideia do modal do exercício: dá pra pedir mais uma
-                      série desde o começo, sem esperar terminar as planejadas. */}
-                  {completion !== "concluido" && (
-                    <button
-                      onClick={addSet}
-                      className="academia-add-set interactive-press mt-3 flex w-full items-center justify-center gap-1 rounded-xl py-2 text-xs font-semibold"
-                      title="Soma uma série além da meta"
-                    >
-                      <Plus className="h-3.5 w-3.5" /> Adicionar série
-                    </button>
-                  )}
+                  {dropOn && <DropInputs value={dropValues} onChange={setDropDraft} />}
                 </>
               )
             )}
 
-            {current && (
-              <div className="mt-3 grid grid-cols-2 gap-2">
+            {current && completion !== "concluido" && (
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <DropToggle on={dropOn} onToggle={toggleDrop} />
                 <button
-                  onClick={dropOpen ? () => setDropOpen(false) : openDrop}
-                  disabled={doneSets.length === 0 && !dropOpen}
-                  title={doneSets.length === 0 ? "Registre uma série antes do drop" : undefined}
-                  className="interactive-press flex min-h-10 items-center justify-center gap-1 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:border-warning/60 hover:text-warning disabled:opacity-40"
-                >
-                  <ArrowDownToLine className="h-3.5 w-3.5" /> {dropOpen ? "Cancelar drop" : "Drop"}
-                </button>
-                <button
-                  onClick={skipCurrent}
-                  disabled={setAction.pending || doneSets.length > 0}
-                  title={doneSets.length > 0 ? "Já tem séries registradas" : "Pular este exercício"}
-                  className="interactive-press flex min-h-10 items-center justify-center gap-1 rounded-xl border border-border text-xs font-semibold text-muted-foreground disabled:opacity-40"
-                >
-                  <SkipForward className="h-3.5 w-3.5" /> Pular exercício
-                </button>
-              </div>
-            )}
-
-            {dropOpen && current && (
-              <div className="mt-2 flex items-end justify-center gap-2.5 rounded-2xl border border-warning/40 bg-warning/5 p-3">
-                <label className="flex-1">
-                  <span className="mb-1 block text-center text-[11px] font-semibold text-warning">
-                    Drop · peso (kg)
-                  </span>
-                  <NumberField
-                    value={parseFloat(dropDraft.weight) || 0}
-                    onValue={(v) => setDropDraft((d) => ({ ...d, weight: String(v) }))}
-                    onEmpty={() => setDropDraft((d) => ({ ...d, weight: "0" }))}
-                    className="w-full min-w-0 rounded-xl border border-border bg-background/55 px-2 py-2.5 text-center font-mono text-lg font-bold tabular-nums outline-none focus:border-warning"
-                  />
-                </label>
-                <label className="flex-1">
-                  <span className="mb-1 block text-center text-[11px] text-muted-foreground">
-                    Repetições
-                  </span>
-                  <NumberField
-                    integer
-                    value={parseInt(dropDraft.reps, 10) || 0}
-                    onValue={(v) => setDropDraft((d) => ({ ...d, reps: String(v) }))}
-                    onEmpty={() => setDropDraft((d) => ({ ...d, reps: "0" }))}
-                    className="w-full min-w-0 rounded-xl border border-border bg-background/55 px-2 py-2.5 text-center font-mono text-lg font-bold tabular-nums outline-none focus:border-warning"
-                  />
-                </label>
-                <button
-                  onClick={confirmDrop}
+                  onClick={skipCurrentSet}
                   disabled={setAction.pending}
-                  aria-label="Registrar drop"
-                  className="interactive-press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-warning text-background disabled:opacity-40"
+                  title="Pula só esta série e vai para a próxima"
+                  className="interactive-press flex min-h-10 items-center justify-center gap-1 rounded-xl border border-border px-1 text-[11px] font-semibold text-muted-foreground disabled:opacity-40"
                 >
-                  <Check className="h-5 w-5" strokeWidth={3} />
+                  <SkipForward className="h-3.5 w-3.5 shrink-0" /> Pular série
+                </button>
+                <button
+                  onClick={skipCurrentExercise}
+                  disabled={setAction.pending}
+                  title="Pula o exercício inteiro"
+                  className="interactive-press flex min-h-10 items-center justify-center gap-1 rounded-xl border border-border px-1 text-[11px] font-semibold text-muted-foreground disabled:opacity-40"
+                >
+                  <SkipForward className="h-3.5 w-3.5 shrink-0" /> Pular exercício
                 </button>
               </div>
             )}

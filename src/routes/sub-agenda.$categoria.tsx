@@ -65,6 +65,8 @@ import {
   removeLastSet,
   completeExerciseLog,
   skipExercise,
+  skipSet,
+  seriesPosition,
   setSessionPerceivedEffort,
   regularSetCount,
   addBodyWeight,
@@ -81,6 +83,9 @@ import {
 import { formatDurationClock } from "@/lib/sport-store";
 import { useGymSession } from "@/lib/gym-session-context";
 import { recordsForSession, resolveSets } from "@/lib/workout-evolution";
+import { DropInputs, suggestDrop, type DropDraft } from "@/components/academia/DropFields";
+import { SwipeToSkip } from "@/components/academia/SwipeToSkip";
+import { TimerBlock } from "@/components/academia/TimerBlock";
 import { PlanExerciseEditor } from "@/components/academia/PlanExerciseEditor";
 import { CycleTab } from "@/components/academia/cycle/CycleTab";
 import { EvolutionTab } from "@/components/academia/evolution/EvolutionTab";
@@ -953,11 +958,13 @@ function ExerciseModal({
   const liveSession = sessions.find((s) => s.id === session.id) ?? session;
   const log = liveSession.exerciseLogs.find((l) => l.exerciseId === exercise.id);
   const allSets = log?.sets ?? [];
-  const registeredCount = regularSetCount(log);
-  // Séries extras pedidas com "Adicionar série" — somam às planejadas. Não
-  // exige terminar as quatro: dá pra decidir fazer mais uma logo no começo.
+  const skippedIdx = log?.skippedSets ?? [];
+  // Feitas + puladas: pular a série 2 leva direto à 3.
+  const position = seriesPosition(log);
+  // Séries somadas com "Adicionar série" — só existe depois de terminar a última.
   const [extraRows, setExtraRows] = useState(0);
-  const pendingRows = Math.max(0, planned.setsTarget + extraRows - registeredCount);
+  const pendingRows = Math.max(0, planned.setsTarget + extraRows - position);
+  const finishedAll = pendingRows === 0 && regularSetCount(log) > 0;
   const [draftValues, setDraftValues] = useState<Record<number, { weight: string; reps: string }>>(
     {},
   );
@@ -969,6 +976,14 @@ function ExerciseModal({
     };
   const setDraftFor = (idx: number, patch: Partial<{ weight: string; reps: string }>) =>
     setDraftValues((d) => ({ ...d, [idx]: { ...draftFor(idx), ...patch } }));
+  // Drop da série em andamento: vai junto com a série, pelo mesmo check.
+  const [dropFor, setDropFor] = useState<Record<number, DropDraft | undefined>>({});
+  const toggleDrop = (idx: number) =>
+    setDropFor((m) => {
+      if (m[idx]) return { ...m, [idx]: undefined };
+      const d = draftFor(idx);
+      return { ...m, [idx]: suggestDrop(parseFloat(d.weight) || 0, parseInt(d.reps, 10) || 0) };
+    });
   // Registrar série é o toque mais repetido do app e escrevia sem trava
   // nenhuma: dois toques rápidos gravavam a série duas vezes.
   const setAction = useAsyncAction();
@@ -977,34 +992,30 @@ function ExerciseModal({
       const d = draftFor(idx);
       const w = parseFloat(d.weight) || 0;
       const r = parseInt(d.reps, 10) || 0;
-      await logSet(liveSession.id, exercise.id, w, r);
+      const drop = dropFor[idx];
+      await logSet(
+        liveSession.id,
+        exercise.id,
+        w,
+        r,
+        drop
+          ? { drop: { weight: parseFloat(drop.weight) || 0, reps: parseInt(drop.reps, 10) || 0 } }
+          : {},
+      );
+      setDropFor((m) => ({ ...m, [idx]: undefined }));
       onLogged(planned.setTargets[idx]?.restSeconds ?? planned.restSeconds);
     });
-
-  // Drop: peso mais leve logo depois da série, sem descanso entre os dois.
-  const [dropOpen, setDropOpen] = useState(false);
-  const [dropWeight, setDropWeight] = useState("");
-  const [dropReps, setDropReps] = useState("");
-  const openDrop = () => {
-    setDropWeight(
-      String(Math.max(0, Math.round((lastRegular?.weight ?? planned.loadTarget) * 0.75))),
-    );
-    setDropReps(String(Math.max(1, Math.round((lastRegular?.reps ?? planned.repsTarget) / 2))));
-    setDropOpen(true);
-  };
-  const registerDrop = () =>
+  const skipNextSet = () =>
     setAction.run(async () => {
-      const w = parseFloat(dropWeight) || 0;
-      const r = parseInt(dropReps, 10) || 0;
-      await logSet(liveSession.id, exercise.id, w, r, { isDrop: true });
-      setDropOpen(false);
+      await skipSet(liveSession.id, exercise.id);
+      // Pulou a última que faltava: com alguma série feita o exercício termina.
+      if (pendingRows <= 1 && regularSetCount(log) > 0)
+        await completeExerciseLog(liveSession.id, exercise.id);
     });
 
   const [showHistory, setShowHistory] = useState(false);
   const series = exerciseWeightSeries(sessions, exercise.planId, exercise.id);
   const skipAction = useAsyncAction();
-
-  let regularLabel = 0;
 
   return (
     <Modal onClose={onClose} title={exercise.name} panelClassName="academia-exercise-modal">
@@ -1013,148 +1024,225 @@ function ExerciseModal({
       </p>
 
       <div className="academia-series-list mt-5 overflow-hidden rounded-[22px] border border-border bg-surface-quiet">
-        {allSets.map((s, i, arr) => {
-          const isLast = i === arr.length - 1;
-          const label = s.isDrop ? "Drop" : `Série ${++regularLabel}`;
-          return (
-            <div
-              key={s.setIndex}
-              className={`academia-series-row flex min-h-14 items-center gap-2 border-b border-border px-3 py-2.5 last:border-b-0 ${s.isDrop ? "bg-warning/5" : ""}`}
-            >
-              <span
-                className={`w-12 shrink-0 text-[11px] ${s.isDrop ? "font-semibold text-warning" : "text-muted-foreground"}`}
+        {(() => {
+          type Row =
+            | { kind: "set"; index: number; set: (typeof allSets)[number] }
+            | { kind: "skipped"; index: number };
+          const rows: Row[] = [
+            ...allSets.map((set): Row => ({ kind: "set", index: set.setIndex, set })),
+            ...skippedIdx.map((index): Row => ({ kind: "skipped", index })),
+          ].sort((x, y) => x.index - y.index);
+          let regularLabel = 0;
+          return rows.map((row, i, arr) => {
+            const isLast = i === arr.length - 1;
+            if (row.kind === "skipped") {
+              regularLabel += 1;
+              return (
+                <div
+                  key={`skip-${row.index}`}
+                  className="academia-series-row flex min-h-14 items-center gap-2 border-b border-border px-3 py-2.5 text-muted-foreground last:border-b-0"
+                >
+                  <span className="w-12 shrink-0 text-[11px]">Série {regularLabel}</span>
+                  <span className="text-xs">pulada · zerada</span>
+                  {isLast && (
+                    <button
+                      onClick={() => void removeLastSet(liveSession.id, exercise.id)}
+                      aria-label={`Desfazer pulo da série ${regularLabel}`}
+                      className="interactive-press ml-auto text-[11px] font-semibold text-primary"
+                    >
+                      Desfazer
+                    </button>
+                  )}
+                </div>
+              );
+            }
+            const s = row.set;
+            const label = s.isDrop ? "Drop" : `Série ${++regularLabel}`;
+            return (
+              <div
+                key={s.setIndex}
+                className="academia-series-row border-b border-border px-3 py-2.5 last:border-b-0"
               >
-                {label}
-              </span>
-              <NumberField
-                value={s.weight}
-                onValue={(v) =>
-                  void updateSet(liveSession.id, exercise.id, s.setIndex, { weight: v })
-                }
-                aria-label={`Peso de ${label}`}
-                className="academia-series-input w-16 rounded-xl border border-border bg-background/45 px-2 py-2 text-center text-sm tabular-nums outline-none focus:border-primary"
-              />
-              <span className="text-[10px] text-muted-foreground">kg</span>
-              <NumberField
-                integer
-                value={s.reps}
-                onValue={(v) =>
-                  void updateSet(liveSession.id, exercise.id, s.setIndex, { reps: v })
-                }
-                aria-label={`Repetições de ${label}`}
-                className="academia-series-input w-14 rounded-xl border border-border bg-background/45 px-2 py-2 text-center text-sm tabular-nums outline-none focus:border-primary"
-              />
-              <span className="text-[10px] text-muted-foreground">reps</span>
-              {isLast ? (
-                <button
-                  onClick={() => void removeLastSet(liveSession.id, exercise.id)}
-                  aria-label="Desfazer última série"
-                  title="Desfazer última série"
-                  className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground"
-                >
-                  <Check className="check-enter h-3 w-3" strokeWidth={3} />
-                </button>
-              ) : (
-                <span
-                  aria-label="Série concluída"
-                  className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground"
-                >
-                  <Check className="check-enter h-3 w-3" strokeWidth={3} />
+                <div className="flex min-h-10 items-center gap-2">
+                  <span className="w-12 shrink-0 text-[11px] text-muted-foreground">{label}</span>
+                  <NumberField
+                    value={s.weight}
+                    onValue={(v) =>
+                      void updateSet(liveSession.id, exercise.id, s.setIndex, { weight: v })
+                    }
+                    aria-label={`Peso de ${label}`}
+                    className="academia-series-input w-16 rounded-xl border border-border bg-background/45 px-2 py-2 text-center text-sm tabular-nums outline-none focus:border-primary"
+                  />
+                  <span className="text-[10px] text-muted-foreground">kg</span>
+                  <NumberField
+                    integer
+                    value={s.reps}
+                    onValue={(v) =>
+                      void updateSet(liveSession.id, exercise.id, s.setIndex, { reps: v })
+                    }
+                    aria-label={`Repetições de ${label}`}
+                    className="academia-series-input w-14 rounded-xl border border-border bg-background/45 px-2 py-2 text-center text-sm tabular-nums outline-none focus:border-primary"
+                  />
+                  <span className="text-[10px] text-muted-foreground">reps</span>
+                  {isLast ? (
+                    <button
+                      onClick={() => void removeLastSet(liveSession.id, exercise.id)}
+                      aria-label="Desfazer última série"
+                      title="Desfazer última série"
+                      className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground"
+                    >
+                      <Check className="check-enter h-3 w-3" strokeWidth={3} />
+                    </button>
+                  ) : (
+                    <span
+                      aria-label="Série concluída"
+                      className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground"
+                    >
+                      <Check className="check-enter h-3 w-3" strokeWidth={3} />
+                    </span>
+                  )}
+                </div>
+                {s.drop && (
+                  <div className="mt-1.5 flex items-center gap-2 pl-3">
+                    <span className="w-12 shrink-0 text-[11px] font-semibold text-primary">
+                      ↳ Drop
+                    </span>
+                    <NumberField
+                      value={s.drop.weight}
+                      onValue={(v) =>
+                        void updateSet(liveSession.id, exercise.id, s.setIndex, {
+                          drop: { weight: v, reps: s.drop!.reps },
+                        })
+                      }
+                      aria-label={`Peso do drop de ${label}`}
+                      className="academia-series-input w-16 rounded-xl border border-border bg-background/45 px-2 py-2 text-center text-sm tabular-nums outline-none focus:border-primary"
+                    />
+                    <span className="text-[10px] text-muted-foreground">kg</span>
+                    <NumberField
+                      integer
+                      value={s.drop.reps}
+                      onValue={(v) =>
+                        void updateSet(liveSession.id, exercise.id, s.setIndex, {
+                          drop: { weight: s.drop!.weight, reps: v },
+                        })
+                      }
+                      aria-label={`Repetições do drop de ${label}`}
+                      className="academia-series-input w-14 rounded-xl border border-border bg-background/45 px-2 py-2 text-center text-sm tabular-nums outline-none focus:border-primary"
+                    />
+                    <span className="text-[10px] text-muted-foreground">reps</span>
+                  </div>
+                )}
+              </div>
+            );
+          });
+        })()}
+        {Array.from({ length: pendingRows }, (_, i) => position + i).map((idx, order) => {
+          const d = draftFor(idx);
+          const next = order === 0; // só a próxima série dá para pular, na ordem
+          const drop = dropFor[idx];
+          const row = (
+            <div className="academia-series-row border-b border-border px-3 py-2.5 last:border-b-0">
+              <div className="flex min-h-10 items-center gap-2">
+                <span className="w-12 shrink-0 text-[11px] text-muted-foreground">
+                  Série {idx + 1}
                 </span>
+                <NumberField
+                  value={parseFloat(d.weight) || 0}
+                  onValue={(v) => setDraftFor(idx, { weight: String(v) })}
+                  onEmpty={() => setDraftFor(idx, { weight: "0" })}
+                  aria-label={`Peso da série ${idx + 1}`}
+                  className="academia-series-input w-16 rounded-xl border border-border bg-background/45 px-2 py-2 text-center text-sm tabular-nums outline-none focus:border-primary"
+                />
+                <span className="text-[10px] text-muted-foreground">kg</span>
+                <NumberField
+                  integer
+                  value={parseInt(d.reps, 10) || 0}
+                  onValue={(v) => setDraftFor(idx, { reps: String(v) })}
+                  onEmpty={() => setDraftFor(idx, { reps: "0" })}
+                  aria-label={`Repetições da série ${idx + 1}`}
+                  className="academia-series-input w-14 rounded-xl border border-border bg-background/45 px-2 py-2 text-center text-sm tabular-nums outline-none focus:border-primary"
+                />
+                <span className="text-[10px] text-muted-foreground">reps</span>
+                <button
+                  onClick={() => registerPlanned(idx)}
+                  disabled={setAction.pending}
+                  aria-label={`Concluir série ${idx + 1}`}
+                  title="Concluir série"
+                  className="interactive-press ml-auto h-6 w-6 shrink-0 rounded-full border-2 border-muted-foreground/50 hover:border-primary disabled:opacity-40"
+                />
+              </div>
+              <div className="mt-1.5 flex items-center gap-2 pl-14">
+                <button
+                  type="button"
+                  onClick={() => toggleDrop(idx)}
+                  aria-pressed={Boolean(drop)}
+                  className={`interactive-press inline-flex min-h-8 items-center gap-1 rounded-lg border px-2.5 text-[11px] font-semibold ${
+                    drop
+                      ? "border-primary/60 bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground"
+                  }`}
+                >
+                  <ArrowDownToLine className="h-3 w-3" /> {drop ? "Com drop" : "Drop"}
+                </button>
+                {next && (
+                  <button
+                    type="button"
+                    onClick={skipNextSet}
+                    disabled={setAction.pending}
+                    className="interactive-press inline-flex min-h-8 items-center gap-1 rounded-lg border border-border px-2.5 text-[11px] font-semibold text-muted-foreground disabled:opacity-40"
+                  >
+                    <SkipForward className="h-3 w-3" /> Pular série
+                  </button>
+                )}
+              </div>
+              {drop && (
+                <DropInputs
+                  compact
+                  value={drop}
+                  onChange={(next2) => setDropFor((m) => ({ ...m, [idx]: next2 }))}
+                />
               )}
             </div>
           );
-        })}
-        {Array.from({ length: pendingRows }, (_, i) => registeredCount + i).map((idx) => {
-          const d = draftFor(idx);
-          return (
-            <div
-              key={idx}
-              className="academia-series-row flex min-h-14 items-center gap-2 border-b border-border px-3 py-2.5 last:border-b-0"
-            >
-              <span className="w-12 shrink-0 text-[11px] text-muted-foreground">
-                Série {idx + 1}
-              </span>
-              <NumberField
-                value={parseFloat(d.weight) || 0}
-                onValue={(v) => setDraftFor(idx, { weight: String(v) })}
-                onEmpty={() => setDraftFor(idx, { weight: "0" })}
-                aria-label={`Peso da série ${idx + 1}`}
-                className="academia-series-input w-16 rounded-xl border border-border bg-background/45 px-2 py-2 text-center text-sm tabular-nums outline-none focus:border-primary"
-              />
-              <span className="text-[10px] text-muted-foreground">kg</span>
-              <NumberField
-                integer
-                value={parseInt(d.reps, 10) || 0}
-                onValue={(v) => setDraftFor(idx, { reps: String(v) })}
-                onEmpty={() => setDraftFor(idx, { reps: "0" })}
-                aria-label={`Repetições da série ${idx + 1}`}
-                className="academia-series-input w-14 rounded-xl border border-border bg-background/45 px-2 py-2 text-center text-sm tabular-nums outline-none focus:border-primary"
-              />
-              <span className="text-[10px] text-muted-foreground">reps</span>
-              <button
-                onClick={() => registerPlanned(idx)}
-                disabled={setAction.pending}
-                aria-label="Concluir série"
-                title="Concluir série"
-                className="interactive-press ml-auto h-6 w-6 shrink-0 rounded-full border-2 border-muted-foreground/50 hover:border-primary disabled:opacity-40"
-              />
-            </div>
+          return next ? (
+            <SwipeToSkip key={idx} onSkip={skipNextSet} disabled={setAction.pending}>
+              {row}
+            </SwipeToSkip>
+          ) : (
+            <div key={idx}>{row}</div>
           );
         })}
-        {dropOpen && (
-          <div className="academia-series-row flex min-h-14 items-center gap-2 border-b border-border bg-warning/5 px-3 py-2.5 last:border-b-0">
-            <span className="w-12 shrink-0 text-[11px] font-semibold text-warning">Drop</span>
-            <NumberField
-              value={parseFloat(dropWeight) || 0}
-              onValue={(v) => setDropWeight(String(v))}
-              onEmpty={() => setDropWeight("0")}
-              aria-label="Peso do drop"
-              className="academia-series-input w-16 rounded-xl border border-border bg-background/45 px-2 py-2 text-center text-sm tabular-nums outline-none focus:border-primary"
-            />
-            <span className="text-[10px] text-muted-foreground">kg</span>
-            <NumberField
-              integer
-              value={parseInt(dropReps, 10) || 0}
-              onValue={(v) => setDropReps(String(v))}
-              onEmpty={() => setDropReps("0")}
-              aria-label="Repetições do drop"
-              className="academia-series-input w-14 rounded-xl border border-border bg-background/45 px-2 py-2 text-center text-sm tabular-nums outline-none focus:border-primary"
-            />
-            <span className="text-[10px] text-muted-foreground">reps</span>
-            <button
-              onClick={registerDrop}
-              disabled={setAction.pending}
-              aria-label="Concluir drop"
-              title="Concluir drop"
-              className="interactive-press ml-auto h-6 w-6 shrink-0 rounded-full border-2 border-warning/70 disabled:opacity-40"
-            />
-          </div>
-        )}
       </div>
 
       {setAction.error && (
         <InlineError message={setAction.error} onRetry={setAction.clearError} className="mt-2" />
       )}
 
-      {/* Sempre à mostra, com contorno verde: é fácil não perceber que dá pra
-          fazer mais uma série. */}
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      {pendingRows > 0 && (
+        <p className="mt-2 text-center text-[10px] text-muted-foreground">
+          Arraste a próxima série para a esquerda para pular.
+        </p>
+      )}
+
+      {/* "Adicionar série" só aparece quando a última série foi concluída. */}
+      {finishedAll && (
         <button
           onClick={() => setExtraRows((n) => n + 1)}
-          className="academia-add-set interactive-press flex items-center justify-center gap-1 rounded-xl py-2.5 text-xs font-semibold"
+          className="academia-add-set interactive-press mt-3 flex w-full items-center justify-center gap-1 rounded-xl py-2.5 text-xs font-semibold"
         >
           <Plus className="h-3.5 w-3.5" /> Adicionar série
         </button>
-        <button
-          onClick={dropOpen ? () => setDropOpen(false) : openDrop}
-          disabled={allSets.length === 0 && !dropOpen}
-          title={allSets.length === 0 ? "Registre uma série antes de fazer o drop" : undefined}
-          className="interactive-press flex items-center justify-center gap-1 rounded-xl border border-border py-2.5 text-xs font-semibold text-muted-foreground hover:border-warning/60 hover:text-warning disabled:opacity-40"
-        >
-          <ArrowDownToLine className="h-3.5 w-3.5" /> {dropOpen ? "Cancelar drop" : "Drop"}
-        </button>
-      </div>
+      )}
+
+      {/* Mesmo cronômetro do atalho do Alter: descanso, tempo a mais e treino. */}
+      <TimerBlock
+        session={liveSession}
+        face={gym.timerFace}
+        onChangeFace={gym.setTimerFace}
+        exerciseId={exercise.id}
+        configuredRest={planned.setTargets[position]?.restSeconds ?? planned.restSeconds}
+        onExpand={() => gym.setFullscreen(true)}
+      />
 
       <div className="academia-evolution-card mt-5 border border-border bg-surface-quiet p-4">
         <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -1200,29 +1288,21 @@ function ExerciseModal({
       >
         <Check className="h-4 w-4" /> Concluir exercício
       </button>
-      {allSets.length === 0 && (
-        <>
-          <button
-            onClick={() =>
-              skipAction.run(async () => {
-                await skipExercise(liveSession.id, exercise.id, true);
-                gym.advance(exercise.id);
-                onClose();
-              })
-            }
-            disabled={skipAction.pending}
-            className="interactive-press mt-2 flex min-h-12 w-full items-center justify-center gap-2 rounded-[20px] border border-border py-2.5 text-sm font-semibold text-muted-foreground disabled:opacity-40"
-          >
-            <SkipForward className="h-4 w-4" /> Pular exercício
-          </button>
-          {skipAction.error && (
-            <InlineError
-              message={skipAction.error}
-              onRetry={skipAction.clearError}
-              className="mt-2"
-            />
-          )}
-        </>
+      <button
+        onClick={() =>
+          skipAction.run(async () => {
+            await skipExercise(liveSession.id, exercise.id, true);
+            gym.advance(exercise.id);
+            onClose();
+          })
+        }
+        disabled={skipAction.pending}
+        className="interactive-press mt-2 flex min-h-12 w-full items-center justify-center gap-2 rounded-[20px] border border-border py-2.5 text-sm font-semibold text-muted-foreground disabled:opacity-40"
+      >
+        <SkipForward className="h-4 w-4" /> Pular exercício
+      </button>
+      {skipAction.error && (
+        <InlineError message={skipAction.error} onRetry={skipAction.clearError} className="mt-2" />
       )}
     </Modal>
   );

@@ -10,6 +10,7 @@ import {
   resetRest,
   restBaseSeconds,
   restState,
+  seriesPosition,
   resumeRest,
   resumeSession,
   sessionElapsedSeconds,
@@ -37,7 +38,7 @@ export function FullscreenTimer() {
   const current = planned.find((p) => p.exerciseId === selectedExerciseId);
   const log = session.exerciseLogs.find((l) => l.exerciseId === current?.exerciseId);
   const completion = exerciseCompletionState(log, current);
-  const setIndex = log?.sets.length ?? 0;
+  const setIndex = seriesPosition(log);
   const configured = current?.setTargets[setIndex]?.restSeconds ?? current?.restSeconds;
   const base = restBaseSeconds(session, current?.exerciseId, configured);
   const rest = restState(session, base);
@@ -58,7 +59,7 @@ export function FullscreenTimer() {
           </p>
           {current && (
             <p className="mt-0.5 truncate text-sm font-semibold">
-              {current.name} · {log?.sets.length ?? 0}/{current.setsTarget} séries
+              {current.name} · {seriesPosition(log)}/{current.setsTarget} séries
               {completion === "concluido" && " · concluído"}
             </p>
           )}

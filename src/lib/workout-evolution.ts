@@ -87,23 +87,51 @@ export const muscleParent: Record<MuscleGroup, MuscleGroup> = {
   cardio: "cardio",
 };
 
-/** Opções do seletor "Grupo principal": grupos em ordem alfabética, cada um
- * com o "geral" primeiro e os subgrupos também em ordem alfabética. */
-export function muscleSelectGroups(): { parent: MuscleGroup; options: MuscleGroup[] }[] {
+/** Seções do seletor de músculo. É só APRESENTAÇÃO: o que agrega (radar,
+ * totais, filtros) continua usando `muscleParent`. A perna junta os músculos
+ * que a pessoa pensa como "perna", cada um continuando classificável. */
+const MUSCLE_SECTIONS: { key: string; label: string; members: MuscleGroup[] }[] = [
+  {
+    key: "peito",
+    label: "Peito",
+    members: ["peito", "peito_superior", "peito_medio", "peito_inferior"],
+  },
+  {
+    key: "costas",
+    label: "Costas",
+    members: ["costas", "dorsais", "costas_meio", "trapezio", "lombar"],
+  },
+  {
+    key: "ombros",
+    label: "Ombros",
+    members: ["ombros", "ombro_anterior", "ombro_lateral", "ombro_posterior"],
+  },
+  { key: "biceps", label: "Bíceps", members: ["biceps"] },
+  {
+    key: "triceps",
+    label: "Tríceps",
+    members: ["triceps", "triceps_longa", "triceps_lateral", "triceps_medial"],
+  },
+  { key: "antebraco", label: "Antebraço", members: ["antebraco"] },
+  {
+    key: "perna",
+    label: "Perna",
+    members: ["quadriceps", "posteriores", "adutores", "gluteos", "panturrilhas"],
+  },
+  { key: "abdomen", label: "Abdômen", members: ["abdomen"] },
+  { key: "corpo_inteiro", label: "Corpo inteiro", members: ["corpo_inteiro"] },
+  { key: "cardio", label: "Cardio", members: ["cardio"] },
+];
+
+export type MuscleSelectSection = { parent: string; label: string; options: MuscleGroup[] };
+
+/** Opções do seletor de músculo: seções em ordem alfabética, e dentro de cada
+ * uma o "geral" primeiro seguido dos músculos numa ordem fixa e lógica. */
+export function muscleSelectGroups(): MuscleSelectSection[] {
   const collator = new Intl.Collator("pt-BR");
-  const all = Object.keys(muscleGroupLabel) as MuscleGroup[];
-  const parents = [...new Set(all.map((g) => muscleParent[g]))].sort((a, b) =>
-    collator.compare(muscleGroupLabel[a], muscleGroupLabel[b]),
-  );
-  return parents.map((parent) => ({
-    parent,
-    options: [
-      ...all.filter((g) => muscleParent[g] === parent && g === parent),
-      ...all
-        .filter((g) => muscleParent[g] === parent && g !== parent)
-        .sort((a, b) => collator.compare(muscleGroupLabel[a], muscleGroupLabel[b])),
-    ],
-  }));
+  return [...MUSCLE_SECTIONS]
+    .sort((a, b) => collator.compare(a.label, b.label))
+    .map((s) => ({ parent: s.key, label: s.label, options: [...s.members] }));
 }
 
 export const equipmentLabel: Record<ExerciseEquipment, string> = {

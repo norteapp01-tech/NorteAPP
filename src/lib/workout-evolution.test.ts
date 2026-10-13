@@ -700,10 +700,31 @@ describe("subgrupos musculares", () => {
   });
 
   it("o seletor de grupo principal vem em ordem alfabética", () => {
-    const labels = muscleSelectGroups().map((g) => muscleGroupLabel[g.parent]);
+    const labels = muscleSelectGroups().map((g) => g.label);
     expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b, "pt-BR")));
     const chest = muscleSelectGroups().find((g) => g.parent === "peito")!;
     expect(chest.options[0]).toBe("peito");
     expect(chest.options).toContain("peito_superior");
+  });
+
+  it("a perna reúne quadríceps, posterior, adutores, glúteos e panturrilhas", () => {
+    const leg = muscleSelectGroups().find((g) => g.label === "Perna")!;
+    expect(leg.options).toEqual([
+      "quadriceps",
+      "posteriores",
+      "adutores",
+      "gluteos",
+      "panturrilhas",
+    ]);
+    // nenhum desses aparece solto como seção própria
+    const labels = muscleSelectGroups().map((g) => g.label);
+    for (const solto of ["Quadríceps (coxa)", "Glúteos", "Panturrilhas", "Posterior de coxa"])
+      expect(labels).not.toContain(solto);
+  });
+
+  it("todo músculo classificável aparece em exatamente uma seção", () => {
+    const all = muscleSelectGroups().flatMap((g) => g.options);
+    expect(new Set(all).size).toBe(all.length);
+    expect([...all].sort()).toEqual((Object.keys(muscleGroupLabel) as string[]).sort());
   });
 });

@@ -6,7 +6,7 @@ import {
   ChevronRight,
   Plus,
   Search,
-  Settings,
+  CalendarSync,
   SlidersHorizontal,
   Tag,
 } from "lucide-react";
@@ -441,10 +441,20 @@ function AgendaScreen() {
           <button
             type="button"
             onClick={() => setPanel("settings")}
-            aria-label="Configurações da Agenda"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground"
+            aria-label={googleState.connection ? "Google Agenda" : "Conectar Google Agenda"}
+            title="Google Agenda"
+            className="agenda-google-button relative flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-primary/60 bg-primary/10 px-3 text-primary"
           >
-            <Settings className="h-4 w-4" />
+            <CalendarSync className="h-4 w-4" aria-hidden="true" />
+            <span className="text-xs font-semibold">
+              {googleState.connection ? "Google" : "Conectar"}
+            </span>
+            {!googleState.connection && (
+              <span
+                aria-hidden="true"
+                className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-primary"
+              />
+            )}
           </button>
         </div>
       </div>
@@ -575,11 +585,7 @@ function AgendaScreen() {
       )}
       {panel === "labels" && <LabelManager onClose={() => setPanel(null)} />}
       {panel === "settings" && (
-        <AgendaSettingsSheet
-          onClose={() => setPanel(null)}
-          onManageLabels={() => setPanel("labels")}
-          connectingGoogle={connectingGoogle}
-        />
+        <AgendaSettingsSheet onClose={() => setPanel(null)} connectingGoogle={connectingGoogle} />
       )}
       {panel === "calendar" && (
         <CalendarPicker

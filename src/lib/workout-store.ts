@@ -95,20 +95,37 @@ export type ExerciseEquipment =
 export type SetTarget = { reps: number; weight: number; restSeconds: number };
 /** `isDrop`: série extra feita logo depois de soltar o peso. Não conta como
  * série planejada nem avança o exercício. */
-export type SetLog = { setIndex: number; weight: number; reps: number; isDrop?: boolean };
+export type SetLog = {
+  setIndex: number;
+  weight: number;
+  reps: number;
+  /** Legado: drop gravado como linha própria. Novos drops ficam em `drop`. */
+  isDrop?: boolean;
+  /** Drop feito logo depois desta série — um registro só, confirmado junto. */
+  drop?: { weight: number; reps: number };
+};
 /** `exerciseId` é nulo quando o exercício foi excluído do treino depois deste
  * registro — as séries continuam valendo e o nome vem do retrato da sessão. */
 export type ExerciseLog = {
   exerciseId: string | null;
   sets: SetLog[];
   done: boolean;
-  /** Pulado de propósito, sem nenhuma série — é diferente de "não chegou lá". */
+  /** Pulado de propósito — é diferente de "não chegou lá". */
   skipped?: boolean;
+  /** Posições (set_index) das séries puladas. Não entram em `sets`: não são
+   * séries feitas, então volume, carga e contagens continuam intactos. */
+  skippedSets?: number[];
 };
 
 /** Séries planejadas feitas — drops ficam de fora. */
 export function regularSetCount(log: ExerciseLog | undefined): number {
   return log?.sets.filter((s) => !s.isDrop).length ?? 0;
+}
+
+/** Quantas posições da sequência já foram resolvidas: feitas + puladas. É daqui
+ * que sai o "Série N" atual — pular a 2 leva direto para a 3. */
+export function seriesPosition(log: ExerciseLog | undefined): number {
+  return regularSetCount(log) + (log?.skippedSets?.length ?? 0);
 }
 export type WorkoutSessionStatus = "em_andamento" | "concluido";
 export type WorkoutPerceivedEffort = "leve" | "na_medida" | "pesado";
@@ -367,11 +384,12 @@ export function exerciseCompletionState(
   planned: PlannedExercise | undefined,
 ): ExerciseCompletion {
   const done = regularSetCount(log);
+  const skipped = log?.skippedSets?.length ?? 0;
   if (log?.done) return "concluido";
   if (done === 0 && (log?.sets.length ?? 0) === 0) return "nao_realizado";
   if (done === 0) return "parcial";
   const target = planned?.setsTarget ?? 0;
-  return target > 0 && done >= target ? "concluido" : "parcial";
+  return target > 0 && done + skipped >= target ? "concluido" : "parcial";
 }
 
 /** Próximo exercício que ainda tem série pendente, dando a volta na lista.
@@ -389,7 +407,8 @@ export function nextPendingExerciseId(
   for (let step = 1; step <= planned.length; step += 1) {
     const candidate = planned[(start + step) % planned.length];
     const log = logs.find((l) => l.exerciseId === candidate.exerciseId);
-    if (log?.skipped && log.sets.length === 0) continue;
+    // Pulado de propósito (inteiro ou o que restava): não volta a ser pendente.
+    if (log?.skipped) continue;
     if (exerciseCompletionState(log, candidate) !== "concluido") return candidate.exerciseId;
   }
   return null;
@@ -596,7 +615,10 @@ export type ExerciseComparison = {
 
 /** Soma peso×reps de todas as séries do log — volume real do exercício na sessão. */
 function logVolume(log: ExerciseLog): number {
-  return log.sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
+  return log.sets.reduce(
+    (sum, s) => sum + s.weight * s.reps + (s.drop ? s.drop.weight * s.drop.reps : 0),
+    0,
+  );
 }
 
 function comparableLogVolume(log: ExerciseLog): number {
@@ -979,17 +1001,31 @@ export async function fetchState(): Promise<State> {
 
   const sessions = (sessionRows as Row[]).map((r) => {
     const exLogs = exLogsBySession[r.id as string] ?? [];
-    const exerciseLogs: ExerciseLog[] = exLogs.map((el) => ({
-      exerciseId: (el.exercise_id as string) ?? null,
-      sets: (setLogsByExLog[el.id as string] ?? []).map((s) => ({
-        setIndex: s.set_index as number,
-        weight: s.weight as number,
-        reps: s.reps as number,
-        isDrop: (s.is_drop as boolean) ?? false,
-      })),
-      done: el.done as boolean,
-      skipped: (el.skipped as boolean) ?? false,
-    }));
+    const exerciseLogs: ExerciseLog[] = exLogs.map((el) => {
+      const rows = setLogsByExLog[el.id as string] ?? [];
+      return {
+        exerciseId: (el.exercise_id as string) ?? null,
+        sets: rows
+          .filter((s) => !(s.skipped as boolean))
+          .map((s) => ({
+            setIndex: s.set_index as number,
+            weight: s.weight as number,
+            reps: s.reps as number,
+            isDrop: (s.is_drop as boolean) ?? false,
+            ...(s.drop_weight != null || s.drop_reps != null
+              ? {
+                  drop: {
+                    weight: (s.drop_weight as number) ?? 0,
+                    reps: (s.drop_reps as number) ?? 0,
+                  },
+                }
+              : {}),
+          })),
+        skippedSets: rows.filter((s) => s.skipped as boolean).map((s) => s.set_index as number),
+        done: el.done as boolean,
+        skipped: (el.skipped as boolean) ?? false,
+      };
+    });
     return mapSession(r, exerciseLogs);
   });
 
@@ -1374,31 +1410,71 @@ async function findExerciseLogId(sessionId: string, exerciseId: string): Promise
   return row.id;
 }
 
+/** Próxima posição da sequência: depois da maior já usada, pulada ou não — com
+ * buracos (série desfeita no meio) uma contagem simples repetiria um índice. */
+async function nextSetIndex(exerciseLogId: string): Promise<number> {
+  const { data } = await supabase
+    .from("workout_set_logs")
+    .select("set_index")
+    .eq("exercise_log_id", exerciseLogId)
+    .order("set_index", { ascending: false })
+    .limit(1);
+  const last = data?.[0]?.set_index as number | undefined;
+  return last === undefined ? 0 : last + 1;
+}
+
 export async function logSet(
   sessionId: string,
   exerciseId: string,
   weight: number,
   reps: number,
-  options: { isDrop?: boolean } = {},
+  options: { isDrop?: boolean; drop?: { weight: number; reps: number } } = {},
 ) {
   const userId = await ensureSession();
   const exerciseLogId = await findExerciseLogId(sessionId, exerciseId);
-  const { count } = await supabase
-    .from("workout_set_logs")
-    .select("id", { count: "exact", head: true })
-    .eq("exercise_log_id", exerciseLogId);
+  const setIndex = await nextSetIndex(exerciseLogId);
   unwrap(
     await supabase
       .from("workout_set_logs")
       .insert({
         user_id: userId,
         exercise_log_id: exerciseLogId,
-        set_index: count ?? 0,
+        set_index: setIndex,
         weight,
         reps,
         // Só manda a coluna quando é drop: série normal continua gravando
         // mesmo antes da migração 0051 ser aplicada.
         ...(options.isDrop ? { is_drop: true } : {}),
+        ...(options.drop ? { drop_weight: options.drop.weight, drop_reps: options.drop.reps } : {}),
+      })
+      .select()
+      .single(),
+  );
+  // Registrar uma série desfaz o "pulado": a pessoa voltou para o exercício.
+  await supabase
+    .from("workout_exercise_logs")
+    .update({ skipped: false })
+    .eq("id", exerciseLogId)
+    .eq("skipped", true);
+  await invalidate();
+}
+
+/** Pula uma série: ela ocupa o lugar na sequência (a próxima é a seguinte),
+ * fica sem peso nem repetições e não conta como feita. */
+export async function skipSet(sessionId: string, exerciseId: string) {
+  const userId = await ensureSession();
+  const exerciseLogId = await findExerciseLogId(sessionId, exerciseId);
+  const setIndex = await nextSetIndex(exerciseLogId);
+  unwrap(
+    await supabase
+      .from("workout_set_logs")
+      .insert({
+        user_id: userId,
+        exercise_log_id: exerciseLogId,
+        set_index: setIndex,
+        weight: 0,
+        reps: 0,
+        skipped: true,
       })
       .select()
       .single(),
@@ -1410,12 +1486,21 @@ export async function updateSet(
   sessionId: string,
   exerciseId: string,
   setIndex: number,
-  patch: { weight?: number; reps?: number },
+  patch: {
+    weight?: number;
+    reps?: number;
+    /** `null` remove o drop da série. */
+    drop?: { weight: number; reps: number } | null;
+  },
 ) {
   const exerciseLogId = await findExerciseLogId(sessionId, exerciseId);
   const dbPatch: Row = {};
   if (patch.weight !== undefined) dbPatch.weight = patch.weight;
   if (patch.reps !== undefined) dbPatch.reps = patch.reps;
+  if (patch.drop !== undefined) {
+    dbPatch.drop_weight = patch.drop ? patch.drop.weight : null;
+    dbPatch.drop_reps = patch.drop ? patch.drop.reps : null;
+  }
   unwrap(
     await supabase
       .from("workout_set_logs")

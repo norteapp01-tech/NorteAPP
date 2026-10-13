@@ -4,6 +4,7 @@ import { ProfileEditor } from "@/components/settings/ProfileEditor";
 import { SubscriptionSection } from "@/components/settings/SubscriptionSection";
 import { TimeZonePicker } from "@/components/settings/TimeZonePicker";
 import { PrivacyPolicy, TermsOfUse } from "@/components/settings/LegalDocuments";
+import { AgendaPreferences } from "@/components/agenda/AgendaPreferences";
 import { IdeasSection } from "@/components/settings/IdeasSection";
 import { deleteAccountPermanently, resetAccountContent } from "@/lib/account-management";
 import {
@@ -453,6 +454,7 @@ function PreferencesSection() {
         </div>
       </div>
       <TimeZonePicker />
+      <AgendaPreferences />
     </section>
   );
 }

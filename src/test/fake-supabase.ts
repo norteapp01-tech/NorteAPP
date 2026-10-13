@@ -80,6 +80,7 @@ const UPDATED_AT_TABLES = new Set([
 
 const UNIQUE: Record<string, string[][]> = {
   executions: [["series_id", "series_occurrence_date"]],
+  workout_exercise_logs: [["session_id", "exercise_id"]],
   agenda_sync_outbox: [["entity_type", "entity_id", "op"]],
   agenda_series_exceptions: [["series_id", "occurrence_date"]],
 };

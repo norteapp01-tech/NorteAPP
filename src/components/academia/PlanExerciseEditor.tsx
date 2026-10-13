@@ -272,16 +272,16 @@ function ExerciseForm({
           className="min-w-0 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-xs outline-none focus:border-primary"
         >
           <option value="">Grupo principal…</option>
-          {groups.map(({ parent, options }) =>
+          {groups.map(({ parent, label, options }) =>
             options.length === 1 ? (
-              <option key={parent} value={parent}>
-                {muscleGroupLabel[parent]}
+              <option key={parent} value={options[0]}>
+                {muscleGroupLabel[options[0]]}
               </option>
             ) : (
-              <optgroup key={parent} label={muscleGroupLabel[parent]}>
+              <optgroup key={parent} label={label}>
                 {options.map((key) => (
                   <option key={key} value={key}>
-                    {key === parent ? `${muscleGroupLabel[parent]} (geral)` : muscleGroupLabel[key]}
+                    {key === parent ? `${label} (geral)` : muscleGroupLabel[key]}
                   </option>
                 ))}
               </optgroup>
@@ -309,32 +309,42 @@ function ExerciseForm({
           <summary className="cursor-pointer list-none text-[10px] text-muted-foreground">
             Músculos secundários ({form.secondaryMuscles.length}) — participam, não somam
           </summary>
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {(Object.keys(muscleGroupLabel) as MuscleGroup[])
-              .filter((key) => key !== form.muscleGroup)
-              .sort((a, b) => muscleGroupLabel[a].localeCompare(muscleGroupLabel[b], "pt-BR"))
-              .map((key) => {
-                const on = form.secondaryMuscles.includes(key);
-                return (
-                  <button
-                    key={key}
-                    onClick={() =>
-                      setForm({
-                        ...form,
-                        secondaryMuscles: on
-                          ? form.secondaryMuscles.filter((m) => m !== key)
-                          : [...form.secondaryMuscles, key],
-                      })
-                    }
-                    aria-pressed={on}
-                    className={`interactive-press rounded-md border px-1.5 py-1 text-[10px] ${
-                      on ? "border-primary bg-primary/15 text-primary" : "border-border"
-                    }`}
-                  >
-                    {muscleGroupLabel[key]}
-                  </button>
-                );
-              })}
+          <div className="mt-1.5 space-y-2">
+            {groups.map(({ parent, label, options }) => {
+              const list = options.filter((key) => key !== form.muscleGroup);
+              if (!list.length) return null;
+              return (
+                <div key={parent}>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {label}
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {list.map((key) => {
+                      const on = form.secondaryMuscles.includes(key);
+                      return (
+                        <button
+                          key={key}
+                          onClick={() =>
+                            setForm({
+                              ...form,
+                              secondaryMuscles: on
+                                ? form.secondaryMuscles.filter((m) => m !== key)
+                                : [...form.secondaryMuscles, key],
+                            })
+                          }
+                          aria-pressed={on}
+                          className={`interactive-press rounded-md border px-1.5 py-1 text-[10px] ${
+                            on ? "border-primary bg-primary/15 text-primary" : "border-border"
+                          }`}
+                        >
+                          {muscleGroupLabel[key]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </details>
       )}
