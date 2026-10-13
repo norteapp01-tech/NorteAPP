@@ -32,6 +32,8 @@ type FeedbackApi = {
   run: (message: string, action: () => Promise<Result | void>) => Promise<boolean>;
   askScope: (verb: string, options?: { allowThis?: boolean }) => Promise<EditScope | null>;
   notify: (message: string) => void;
+  /** Aviso de erro (borda vermelha), sem ação de desfazer. */
+  notifyError: (message: string) => void;
 };
 
 const FeedbackContext = createContext<FeedbackApi | null>(null);
@@ -81,8 +83,12 @@ export function AgendaFeedbackProvider({ children }: { children: ReactNode }) {
   );
 
   const notify = useCallback((message: string) => show({ message }), [show]);
+  const notifyError = useCallback((message: string) => show({ message, error: true }), [show]);
 
-  const api = useMemo(() => ({ run, askScope, notify }), [run, askScope, notify]);
+  const api = useMemo(
+    () => ({ run, askScope, notify, notifyError }),
+    [run, askScope, notify, notifyError],
+  );
 
   return (
     <FeedbackContext.Provider value={api}>

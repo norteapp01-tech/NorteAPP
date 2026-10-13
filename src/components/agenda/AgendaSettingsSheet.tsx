@@ -10,6 +10,7 @@ import { formatDuration } from "@/lib/agenda-intervals";
 import { useAgendaLabels } from "@/lib/agenda-labels-store";
 import { useState } from "react";
 import { InlineError } from "@/components/ui/inline-error";
+import { GoogleCalendarSection } from "./GoogleCalendarSection";
 import "./agenda-ui.css";
 
 const VIEW_OPTIONS: { id: AgendaView; label: string }[] = [
@@ -24,9 +25,12 @@ const VIEW_OPTIONS: { id: AgendaView; label: string }[] = [
 export function AgendaSettingsSheet({
   onClose,
   onManageLabels,
+  connectingGoogle = false,
 }: {
   onClose: () => void;
   onManageLabels: () => void;
+  /** O app está concluindo a conexão com o Google (voltou do consentimento). */
+  connectingGoogle?: boolean;
 }) {
   const { agendaSettings: settings, timeFormat } = useProfile();
   const labels = useAgendaLabels();
@@ -44,6 +48,8 @@ export function AgendaSettingsSheet({
   return (
     <Modal onClose={onClose} title="Configurações da Agenda">
       <div className="space-y-6">
+        <GoogleCalendarSection connectingExternally={connectingGoogle} />
+
         <Field label="Duração padrão de um compromisso novo">
           <div className="agenda-chips" role="radiogroup" aria-label="Duração padrão">
             {DURATION_OPTIONS.map((m) => (

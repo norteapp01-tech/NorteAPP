@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { AlertTriangle, Check, Link2, Lock, MapPin, Repeat, X } from "lucide-react";
+import { AlertTriangle, CalendarSync, Check, Link2, Lock, MapPin, Repeat, X } from "lucide-react";
 import { formatTime } from "@/lib/format-utils";
 import type { AgendaOccurrence } from "@/lib/agenda-occurrences";
 import type { AgendaLabel } from "@/lib/agenda-labels-store";
@@ -36,7 +36,7 @@ export function OccurrenceCard({
   dateText?: string;
   onOpen: (occ: AgendaOccurrence) => void;
 }) {
-  const style = { ["--lbl" as string]: label?.color } as CSSProperties;
+  const style = { ["--lbl" as string]: label?.color ?? occ.externalColor } as CSSProperties;
   return (
     <button
       type="button"
@@ -77,6 +77,17 @@ export function OccurrenceCard({
           {occ.goalId && (
             <span className="inline-flex items-center gap-1 text-primary">
               <Link2 className="h-3 w-3" /> plano
+            </span>
+          )}
+          {occ.source === "external" && (
+            <span className="inline-flex items-center gap-1">
+              <CalendarSync className="h-3 w-3" /> {occ.externalCalendar ?? "Google"}
+              {occ.readOnly ? " · leitura" : ""}
+            </span>
+          )}
+          {occ.syncState === "conflict" && (
+            <span className="inline-flex items-center gap-1 text-danger">
+              <AlertTriangle className="h-3 w-3" /> decidir
             </span>
           )}
           {occ.rigid && (

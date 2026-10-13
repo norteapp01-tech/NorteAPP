@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Bell,
   CalendarClock,
+  CalendarSync,
   Check,
   Copy,
   ExternalLink,
@@ -35,6 +36,7 @@ import {
   removeFromAgenda,
 } from "@/lib/agenda-series-store";
 import { setExecutionStatus } from "@/lib/goals-store";
+import { resolveGoogleConflict } from "@/lib/google-calendar-store";
 import { formatTime } from "@/lib/format-utils";
 import type { AgendaOccurrence } from "@/lib/agenda-occurrences";
 import { useAgendaFeedback } from "./agenda-feedback";
@@ -244,7 +246,12 @@ export function EventSheet({
           </Row>
         )}
         <p className="text-[11px] text-muted-foreground">
-          Origem: {occ.source === "external" ? "calendário externo" : "criado no Norte"}
+          Origem:{" "}
+          {occ.source === "external"
+            ? `Google Agenda${occ.externalCalendar ? ` · ${occ.externalCalendar}` : ""}`
+            : occ.externalCalendar
+              ? `criado no Norte · sincronizado com ${occ.externalCalendar}`
+              : "criado no Norte"}
         </p>
         {(summary.rescheduleCount > 0 || summary.completedAt || summary.cancelledAt) && (
           <Row icon={<History className="h-4 w-4" />}>
@@ -263,9 +270,57 @@ export function EventSheet({
         )}
       </div>
 
+      {occ.syncState === "conflict" && occ.linkId && (
+        <div
+          role="alert"
+          className="mt-4 rounded-xl border border-danger/50 bg-danger/5 p-3 text-sm"
+        >
+          <p className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
+            <span>
+              Este compromisso mudou no Norte <strong>e</strong> no Google Agenda. Nada foi
+              sobrescrito — escolha qual versão vale.
+            </span>
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <ActionButton
+              icon={<CalendarClock className="h-4 w-4" />}
+              label="Manter o Norte"
+              onClick={() =>
+                void feedback.run("Google atualizado com a versão do Norte.", async () => {
+                  await resolveGoogleConflict(occ.linkId!, "norte");
+                  onClose();
+                })
+              }
+            />
+            <ActionButton
+              icon={<CalendarSync className="h-4 w-4" />}
+              label="Usar o do Google"
+              onClick={() =>
+                void feedback.run("Norte atualizado com a versão do Google.", async () => {
+                  await resolveGoogleConflict(occ.linkId!, "google");
+                  onClose();
+                })
+              }
+            />
+          </div>
+        </div>
+      )}
+
+      {occ.readOnly && (
+        <p className="mt-4 flex items-start gap-2 rounded-xl border border-border p-3 text-xs text-muted-foreground">
+          <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            Evento de uma agenda do Google somente leitura
+            {occ.externalCalendar ? ` (${occ.externalCalendar})` : ""}. Para mudar, edite no Google
+            Agenda — aqui você pode duplicá-lo como um compromisso seu.
+          </span>
+        </p>
+      )}
+
       {/* Ações frequentes, à vista */}
       <div className="mt-5 grid grid-cols-2 gap-2">
-        {open && (
+        {open && !occ.readOnly && (
           <ActionButton
             primary
             icon={<Check className="h-4 w-4" />}
@@ -273,7 +328,7 @@ export function EventSheet({
             onClick={() => void act("Marcado como concluído.", () => completeOccurrence(occ))}
           />
         )}
-        {(done || cancelled) && (
+        {(done || cancelled) && !occ.readOnly && (
           <ActionButton
             primary
             icon={<RotateCcw className="h-4 w-4" />}
@@ -291,7 +346,7 @@ export function EventSheet({
             }}
           />
         )}
-        {!cancelled && timed && (
+        {!cancelled && timed && !occ.readOnly && (
           <ActionButton
             icon={<CalendarClock className="h-4 w-4" />}
             label="Reagendar"
@@ -299,14 +354,16 @@ export function EventSheet({
             onClick={() => setPanel(panel === "reschedule" ? null : "reschedule")}
           />
         )}
-        <ActionButton
-          icon={<Pencil className="h-4 w-4" />}
-          label="Editar"
-          onClick={() => {
-            onClose();
-            onEdit(occ);
-          }}
-        />
+        {!occ.readOnly && (
+          <ActionButton
+            icon={<Pencil className="h-4 w-4" />}
+            label="Editar"
+            onClick={() => {
+              onClose();
+              onEdit(occ);
+            }}
+          />
+        )}
         <ActionButton
           icon={<Copy className="h-4 w-4" />}
           label="Duplicar"
@@ -317,7 +374,7 @@ export function EventSheet({
         />
       </div>
 
-      {panel === "reschedule" && timed && (
+      {panel === "reschedule" && timed && !occ.readOnly && (
         <div className="card-surface-quiet mt-3 space-y-3 p-3">
           <div className="agenda-chips" role="group" aria-label="Ajustes rápidos">
             {[
@@ -418,7 +475,7 @@ export function EventSheet({
       )}
 
       {/* Cancelar mantém o registro; excluir apaga */}
-      {!cancelled && (
+      {!cancelled && !occ.readOnly && (
         <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border pt-4">
           <ActionButton
             icon={<X className="h-4 w-4" />}
@@ -445,6 +502,11 @@ export function EventSheet({
             />
           )}
         </div>
+      )}
+      {!occ.readOnly && occ.externalCalendar && (
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Mudanças aqui também são enviadas ao Google Agenda ({occ.externalCalendar}).
+        </p>
       )}
       {occ.goalId && !occ.seriesId && (
         <p className="mt-2 flex items-start gap-1.5 text-[11px] text-muted-foreground">

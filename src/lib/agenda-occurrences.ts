@@ -74,12 +74,47 @@ export type AgendaOccurrence = {
   stepId?: string;
   recurring: boolean;
   source: "norte" | "external";
+  /** Vem de uma agenda do Google somente leitura (ou o Norte não representa por
+   * inteiro): aparece, mas não se edita aqui. */
+  readOnly?: boolean;
+  /** Cor da agenda do Google, quando o compromisso não tem rótulo próprio. */
+  externalColor?: string;
+  externalCalendar?: string;
+  /** "conflict" quando mudou nos dois lugares e espera decisão. */
+  syncState?: string;
+  /** id do vínculo (para resolver conflito). */
+  linkId?: string;
   /** Alertas em minutos — só conhecidos de antemão nas ocorrências virtuais;
    * nas reais vêm dos lembretes ligados ao compromisso. */
   alerts?: number[];
 };
 
 export type Clock = { date: string; hm: string };
+
+/** O que a Agenda sabe sobre a ligação de um compromisso com o Google. */
+export type ExternalInfo = {
+  id: string;
+  readOnly: boolean;
+  color?: string;
+  calendarName?: string;
+  syncState?: string;
+};
+export type Externals = {
+  byExecution: Map<string, ExternalInfo>;
+  bySeries: Map<string, ExternalInfo>;
+};
+
+function externalFields(info: ExternalInfo | undefined) {
+  return info
+    ? {
+        readOnly: info.readOnly || undefined,
+        externalColor: info.color,
+        externalCalendar: info.calendarName,
+        syncState: info.syncState,
+        linkId: info.id,
+      }
+    : {};
+}
 
 export function resolveStatus(
   status: ExecutionStatus,
@@ -115,9 +150,13 @@ export function executionOccurrences(
   from: string,
   to: string,
   now: Clock,
+  externals?: Externals,
 ): AgendaOccurrence[] {
   const out: AgendaOccurrence[] = [];
   for (const e of executions) {
+    const external =
+      externals?.byExecution.get(e.id) ??
+      (e.seriesId ? externals?.bySeries.get(e.seriesId) : undefined);
     // "reagendada": substituída pela execução nova que a sucedeu.
     if (e.status === "reagendada") continue;
     for (const session of sessionsOf(e)) {
@@ -148,6 +187,7 @@ export function executionOccurrences(
         stepId: e.stepId,
         recurring: Boolean(e.seriesId || e.routineId),
         source: e.source ?? "norte",
+        ...externalFields(external),
       });
     }
   }
@@ -163,6 +203,7 @@ export function virtualOccurrences(
   from: string,
   to: string,
   now: Clock,
+  externals?: Externals,
 ): AgendaOccurrence[] {
   const touched = new Set(
     executions
@@ -199,6 +240,7 @@ export function virtualOccurrences(
         recurring: true,
         source: s.source,
         alerts: s.alerts,
+        ...externalFields(externals?.bySeries.get(s.id)),
       });
     }
   }
@@ -212,11 +254,12 @@ export function buildOccurrences(input: {
   from: string;
   to: string;
   now: Clock;
+  externals?: Externals;
 }): AgendaOccurrence[] {
-  const { executions, series, exceptions, from, to, now } = input;
+  const { executions, series, exceptions, from, to, now, externals } = input;
   const all = [
-    ...executionOccurrences(executions, from, to, now),
-    ...virtualOccurrences(series, executions, exceptions, from, to, now),
+    ...executionOccurrences(executions, from, to, now, externals),
+    ...virtualOccurrences(series, executions, exceptions, from, to, now, externals),
   ];
   return sortOccurrences(all);
 }

@@ -545,3 +545,72 @@ describe("histórico essencial", () => {
     });
   });
 });
+
+describe("ligação com o Google nas ocorrências", () => {
+  it("evento de agenda somente leitura chega marcado, com a cor da agenda", () => {
+    const list = buildOccurrences({
+      executions: [exec({ id: "g1", source: "external", title: "Natal" })],
+      series: [],
+      exceptions: [],
+      from: "2026-10-12",
+      to: "2026-10-12",
+      now: NOW,
+      externals: {
+        byExecution: new Map([
+          [
+            "g1",
+            {
+              id: "link1",
+              readOnly: true,
+              color: "#8fd694",
+              calendarName: "Feriados",
+              syncState: "synced",
+            },
+          ],
+        ]),
+        bySeries: new Map(),
+      },
+    });
+    expect(list[0]).toMatchObject({
+      readOnly: true,
+      externalColor: "#8fd694",
+      externalCalendar: "Feriados",
+      linkId: "link1",
+      source: "external",
+    });
+  });
+
+  it("série do Google: as ocorrências calculadas herdam a ligação", () => {
+    const list = buildOccurrences({
+      executions: [],
+      series: [series({ source: "external" })],
+      exceptions: [],
+      from: "2026-10-12",
+      to: "2026-10-14",
+      now: NOW,
+      externals: {
+        byExecution: new Map(),
+        bySeries: new Map([
+          ["s1", { id: "link-s", readOnly: false, color: "#7cb8ff", syncState: "conflict" }],
+        ]),
+      },
+    });
+    expect(list.every((o) => o.syncState === "conflict" && o.externalColor === "#7cb8ff")).toBe(
+      true,
+    );
+    expect(list.every((o) => !o.readOnly)).toBe(true);
+  });
+
+  it("sem ligação nada muda (compromissos do Norte continuam como antes)", () => {
+    const [o] = buildOccurrences({
+      executions: [exec()],
+      series: [],
+      exceptions: [],
+      from: "2026-10-12",
+      to: "2026-10-12",
+      now: NOW,
+    });
+    expect(o.readOnly).toBeUndefined();
+    expect(o.linkId).toBeUndefined();
+  });
+});

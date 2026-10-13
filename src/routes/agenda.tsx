@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   ChevronLeft,
@@ -53,11 +53,25 @@ import type { AgendaView } from "@/lib/agenda-settings";
 import { moveOccurrence } from "@/lib/agenda-series-store";
 import { removeAgendaSession, scheduleExecution, todayISO } from "@/lib/goals-store";
 import { nowDate } from "@/lib/test-clock";
+import {
+  RETURN_MESSAGES,
+  completeGoogleConnect,
+  useGoogleAutoSync,
+  useGoogleCalendar,
+} from "@/lib/google-calendar-store";
 import "@/components/agenda.css";
 import "@/components/agenda/agenda-ui.css";
 
 export const Route = createFileRoute("/agenda")({
   head: () => ({ meta: [{ title: "Agenda — Norte" }] }),
+  // O Google devolve a pessoa para cá depois do consentimento.
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { google_ticket?: string; google?: string; reason?: string } => ({
+    google_ticket: typeof search.google_ticket === "string" ? search.google_ticket : undefined,
+    google: typeof search.google === "string" ? search.google : undefined,
+    reason: typeof search.reason === "string" ? search.reason : undefined,
+  }),
   component: AgendaRoute,
 });
 
@@ -81,6 +95,11 @@ const clock = (minutes: number) => minutesToTime(((minutes % 1440) + 1440) % 144
 function AgendaScreen() {
   useSeriesMaterialization();
   const feedback = useAgendaFeedback();
+  const search = Route.useSearch();
+  const navigate = useNavigate();
+  const googleState = useGoogleCalendar();
+  // Sincronização automática com o Google (ao abrir, ao voltar e depois de mudanças).
+  useGoogleAutoSync(googleState.connection?.status === "active");
 
   // UM estado manda: o dia selecionado. Semana, título e conteúdo derivam dele.
   const [selectedDate, setSelectedDate] = useState(() => todayISO());
@@ -93,6 +112,33 @@ function AgendaScreen() {
     "search" | "filters" | "labels" | "settings" | "calendar" | "app" | null
   >(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [connectingGoogle, setConnectingGoogle] = useState(Boolean(search.google_ticket));
+
+  // Voltou do Google: confirma o bilhete com a sessão atual (só a pessoa que
+  // iniciou consegue) ou explica o que aconteceu.
+  const handledReturn = useRef(false);
+  useEffect(() => {
+    if (handledReturn.current) return;
+    if (!search.google_ticket && !search.google) return;
+    handledReturn.current = true;
+    const clean = () => void navigate({ to: "/agenda", search: {}, replace: true });
+    if (search.google_ticket) {
+      setPanel("settings");
+      completeGoogleConnect(search.google_ticket)
+        .then((r) => feedback.notify(`Google Agenda conectado: ${r.email}.`))
+        .catch((e) =>
+          feedback.notifyError(e instanceof Error ? e.message : RETURN_MESSAGES.unexpected),
+        )
+        .finally(() => {
+          setConnectingGoogle(false);
+          clean();
+        });
+      return;
+    }
+    setPanel("settings");
+    feedback.notifyError(RETURN_MESSAGES[search.reason ?? ""] ?? RETURN_MESSAGES.unexpected);
+    clean();
+  }, [search.google_ticket, search.google, search.reason, navigate, feedback]);
 
   const { settings, profile } = useAgendaData({ from: selectedDate, to: selectedDate });
   const view = pickedView ?? settings.defaultView;
@@ -527,6 +573,7 @@ function AgendaScreen() {
         <AgendaSettingsSheet
           onClose={() => setPanel(null)}
           onManageLabels={() => setPanel("labels")}
+          connectingGoogle={connectingGoogle}
         />
       )}
       {panel === "calendar" && (

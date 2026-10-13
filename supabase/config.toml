@@ -418,3 +418,15 @@ enabled = true
 # declarative_schema_path = "./schemas"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# Google Agenda (Fase 2). O retorno do OAuth, o webhook e o cron não trazem a
+# sessão de uma pessoa: cada um se autentica por conta própria (state assinado,
+# token do canal, segredo do cron). A função `google-calendar` mantém verify_jwt.
+[functions.google-calendar-oauth]
+verify_jwt = false
+
+[functions.google-calendar-webhook]
+verify_jwt = false
+
+[functions.google-calendar-cron]
+verify_jwt = false

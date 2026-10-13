@@ -36,10 +36,44 @@ const TABLE_DEFAULTS: Record<string, () => Row> = {
   }),
   agenda_labels: () => ({ color: "#91f5da", order_index: 0, archived_at: null }),
   reminders: () => ({ done: false, origin: "user", notified_at: null }),
+  agenda_external_links: () => ({
+    provider: "google",
+    kind: "event",
+    sync_state: "pending",
+    origin: "norte",
+    access_role: "write",
+    remote_deleted: false,
+    synced_hash: null,
+    read_only_reason: null,
+  }),
+  agenda_sync_outbox: () => ({ attempts: 0, last_error: null }),
+  google_calendars: () => ({
+    selected: false,
+    push_new_events: false,
+    sync_status: "idle",
+    webhook_status: "off",
+    is_primary: false,
+  }),
+  google_calendar_connections: () => ({
+    status: "active",
+    sync_state: "idle",
+    time_zone: "America/Sao_Paulo",
+    push_routines: false,
+  }),
 };
+
+/** Tabelas com o gatilho `set_updated_at` (coluna updated_at preenchida pelo banco). */
+const UPDATED_AT_TABLES = new Set([
+  "google_calendar_connections",
+  "google_calendars",
+  "google_calendar_tokens",
+  "agenda_series",
+  "agenda_labels",
+]);
 
 const UNIQUE: Record<string, string[][]> = {
   executions: [["series_id", "series_occurrence_date"]],
+  agenda_sync_outbox: [["entity_type", "entity_id", "op"]],
   agenda_series_exceptions: [["series_id", "occurrence_date"]],
 };
 
@@ -48,7 +82,7 @@ const newId = () => `id-${++counter}`;
 
 export function createFakeSupabase(initialUser = "user-a") {
   const db: Record<string, Row[]> = {};
-  const state = { userId: initialUser };
+  const state = { userId: initialUser, service: false, now: () => new Date() };
   const table = (name: string) => (db[name] ??= []);
 
   class Query {
@@ -143,7 +177,8 @@ export function createFakeSupabase(initialUser = "user-a") {
     }
 
     private visible(): Row[] {
-      // RLS: só as linhas da pessoa logada.
+      // RLS: só as linhas da pessoa logada (a service role as vê todas).
+      if (state.service) return table(this.name);
       return table(this.name).filter((r) => !("user_id" in r) || r.user_id === state.userId);
     }
 
@@ -164,9 +199,11 @@ export function createFakeSupabase(initialUser = "user-a") {
     }
 
     private build(row: Row): Row {
+      const stamp = state.now().toISOString();
       return {
         id: newId(),
-        created_at: new Date().toISOString(),
+        created_at: stamp,
+        ...(UPDATED_AT_TABLES.has(this.name) ? { updated_at: stamp } : {}),
         ...(TABLE_DEFAULTS[this.name]?.() ?? {}),
         ...row,
       };
@@ -181,8 +218,8 @@ export function createFakeSupabase(initialUser = "user-a") {
             ...(this.name === "profiles" ? {} : { user_id: state.userId }),
             ...raw,
           });
-          // WITH CHECK: ninguém grava em nome de outra pessoa.
-          if ("user_id" in row && row.user_id !== state.userId)
+          // WITH CHECK: ninguém grava em nome de outra pessoa (a service role pode).
+          if (!state.service && "user_id" in row && row.user_id !== state.userId)
             return {
               data: null,
               error: { message: `new row violates row-level security policy for "${this.name}"` },
@@ -210,6 +247,8 @@ export function createFakeSupabase(initialUser = "user-a") {
           const problem = this.violatesUnique(next, row);
           if (problem) return { data: null, error: { message: problem } };
           Object.assign(row, this.payload);
+          // O gatilho set_updated_at do banco.
+          if ("updated_at" in row) row.updated_at = state.now().toISOString();
         }
         return this.finish(rows);
       }
@@ -218,10 +257,35 @@ export function createFakeSupabase(initialUser = "user-a") {
         db[this.name] = table(this.name).filter((r) => !rows.includes(r));
         // ON DELETE CASCADE / SET NULL das relações que o app usa.
         if (this.name === "executions")
-          for (const r of rows)
+          for (const r of rows) {
             db.reminders = (db.reminders ?? []).filter((rem) => rem.related_execution_id !== r.id);
+            db.agenda_external_links = (db.agenda_external_links ?? []).filter(
+              (l) => l.execution_id !== r.id,
+            );
+          }
+        if (this.name === "google_calendars")
+          for (const r of rows) {
+            for (const t of ["google_calendar_sync_state", "google_calendar_channels"])
+              db[t] = (db[t] ?? []).filter((x) => x.calendar_id !== r.id);
+            db.agenda_external_links = (db.agenda_external_links ?? []).filter(
+              (l) => l.calendar_id !== r.id,
+            );
+          }
+        if (this.name === "google_calendar_connections")
+          for (const r of rows) {
+            for (const t of [
+              "google_calendar_tokens",
+              "google_calendars",
+              "google_calendar_sync_runs",
+              "agenda_external_links",
+            ])
+              db[t] = (db[t] ?? []).filter((x) => x.connection_id !== r.id);
+          }
         if (this.name === "agenda_series")
           for (const r of rows) {
+            db.agenda_external_links = (db.agenda_external_links ?? []).filter(
+              (l) => l.series_id !== r.id,
+            );
             db.agenda_series_exceptions = (db.agenda_series_exceptions ?? []).filter(
               (x) => x.series_id !== r.id,
             );
@@ -277,6 +341,14 @@ export function createFakeSupabase(initialUser = "user-a") {
     },
     setUser(id: string) {
       state.userId = id;
+    },
+    /** Relógio do banco (created_at / updated_at). */
+    setNow(fn: () => Date) {
+      state.now = fn;
+    },
+    /** Simula a service role (ignora o isolamento por usuário), como as Edge Functions. */
+    setServiceRole(on: boolean) {
+      state.service = on;
     },
     /** Insere direto, sem passar pelo usuário atual (para montar cenários). */
     seed(name: string, row: Row) {

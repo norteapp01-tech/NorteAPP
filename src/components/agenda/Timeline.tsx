@@ -1,5 +1,5 @@
 import { useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
-import { AlertTriangle, Check, Lock, Repeat } from "lucide-react";
+import { AlertTriangle, CalendarSync, Check, Lock, Repeat } from "lucide-react";
 import { DAY_MIN, crossesMidnight, durationMinutes, layoutColumns } from "@/lib/agenda-intervals";
 import { minutesToTime, timeToMinutes } from "@/lib/agenda-time";
 import { HOUR_HEIGHT, TIMELINE_HEIGHT } from "@/lib/agenda-timeline";
@@ -238,7 +238,8 @@ function OccurrenceBlock({
 
   const realDuration = occ.startTime ? durationMinutes(occ.startTime, occ.endTime) : 60;
   const crosses = occ.startTime ? crossesMidnight(occ.startTime, occ.endTime) : false;
-  const canEdit = !ghost && occ.status !== "cancelada";
+  // Evento de agenda do Google somente leitura aparece, mas não se mexe aqui.
+  const canEdit = !ghost && occ.status !== "cancelada" && !occ.readOnly;
   const canResize = canEdit && !crosses;
 
   // Pré-visualização durante o arraste.
@@ -269,7 +270,7 @@ function OccurrenceBlock({
     height,
     left: `calc(${(column / columns) * 100}% + 1px)`,
     width: `calc(${100 / columns}% - 3px)`,
-    ["--lbl" as string]: label?.color,
+    ["--lbl" as string]: label?.color ?? occ.externalColor,
     transform: drag?.mode === "move" && drag.dx ? `translateX(${drag.dx}px)` : undefined,
   };
 
@@ -385,6 +386,12 @@ function OccurrenceBlock({
           ? "cancelado"
           : "",
     occ.rigid ? "rígido" : "",
+    occ.readOnly
+      ? "somente leitura, do Google Agenda"
+      : occ.source === "external"
+        ? "do Google Agenda"
+        : "",
+    occ.syncState === "conflict" ? "mudou no Norte e no Google, aguardando decisão" : "",
     conflict ? "em conflito com outro compromisso" : "",
   ]
     .filter(Boolean)
@@ -421,6 +428,12 @@ function OccurrenceBlock({
           <Repeat className="h-2.5 w-2.5 shrink-0 text-muted-foreground" />
         )}
         {conflict && !squeezed && <AlertTriangle className="h-2.5 w-2.5 shrink-0 text-warning" />}
+        {!squeezed && occ.syncState === "conflict" && (
+          <AlertTriangle className="h-2.5 w-2.5 shrink-0 text-danger" />
+        )}
+        {!squeezed && occ.source === "external" && (
+          <CalendarSync className="h-2.5 w-2.5 shrink-0 text-muted-foreground" />
+        )}
         <span className="truncate">{occ.title}</span>
       </p>
       {!squeezed && (tall || !compact) && height >= 38 && (
