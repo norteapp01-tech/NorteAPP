@@ -16,6 +16,7 @@ import {
   Pencil,
   Repeat,
   RotateCcw,
+  Smile,
   Target,
   Trash2,
   X,
@@ -37,6 +38,7 @@ import {
 } from "@/lib/agenda-series-store";
 import { setExecutionStatus } from "@/lib/goals-store";
 import { resolveGoogleConflict } from "@/lib/google-calendar-store";
+import { FeelingCheckin } from "@/components/mirror/FeelingCheckin";
 import { formatTime } from "@/lib/format-utils";
 import type { AgendaOccurrence } from "@/lib/agenda-occurrences";
 import { useAgendaFeedback } from "./agenda-feedback";
@@ -266,6 +268,11 @@ export function EventSheet({
               {summary.cancelledAt &&
                 `${summary.rescheduleCount ? " · " : ""}cancelado em ${new Date(summary.cancelledAt).toLocaleDateString("pt-BR")}`}
             </p>
+          </Row>
+        )}
+        {done && occ.executionId && !occ.readOnly && (
+          <Row icon={<Smile className="h-4 w-4" />}>
+            <FeelingCheckin executionId={occ.executionId} value={occ.feeling} />
           </Row>
         )}
       </div>

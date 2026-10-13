@@ -140,6 +140,7 @@ function RootComponent() {
   const [voiceLaunching, setVoiceLaunching] = useState(false);
   const [startChatWithVoice, setStartChatWithVoice] = useState(false);
   const [startChatWithPhoto, setStartChatWithPhoto] = useState(false);
+  const [chatDraft, setChatDraft] = useState("");
   const [functionsOpen, setFunctionsOpen] = useState(false);
   const [globalSettingsOpen, setGlobalSettingsOpen] = useState(false);
 
@@ -341,6 +342,14 @@ function RootComponent() {
                       setVoiceChatOpen(true);
                     });
                   },
+                  openChatWithDraft: (text) => {
+                    flushSync(() => {
+                      setChatDraft(text);
+                      setStartChatWithVoice(false);
+                      setStartChatWithPhoto(false);
+                      setVoiceChatOpen(true);
+                    });
+                  },
                 }}
               >
                 <div key={pathname} className="page-enter" inert={voiceChatOpen}>
@@ -384,7 +393,9 @@ function RootComponent() {
                     onMenu={() => setFunctionsOpen(true)}
                     autoStartAudio={startChatWithVoice}
                     autoOpenPhotoPicker={startChatWithPhoto}
+                    initialDraft={chatDraft}
                     onBack={() => {
+                      setChatDraft("");
                       setVoiceChatOpen(false);
                       setStartChatWithVoice(false);
                       setStartChatWithPhoto(false);

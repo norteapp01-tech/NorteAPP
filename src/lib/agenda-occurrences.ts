@@ -6,7 +6,7 @@ import {
   type TimedLike,
 } from "./agenda-intervals";
 import { expandRule, type RecurrenceRule } from "./agenda-recurrence";
-import type { Execution, ExecutionStatus, TaskWeight } from "./goals-store";
+import type { Execution, ExecutionStatus, Feeling, TaskWeight } from "./goals-store";
 
 // ---------------------------------------------------------------------------
 // Ocorrências da Agenda.
@@ -87,6 +87,8 @@ export type AgendaOccurrence = {
   /** Alertas em minutos — só conhecidos de antemão nas ocorrências virtuais;
    * nas reais vêm dos lembretes ligados ao compromisso. */
   alerts?: number[];
+  /** Check-in opcional "Como foi?" — só nas ocorrências reais. */
+  feeling?: Feeling;
 };
 
 export type Clock = { date: string; hm: string };
@@ -187,6 +189,7 @@ export function executionOccurrences(
         stepId: e.stepId,
         recurring: Boolean(e.seriesId || e.routineId),
         source: e.source ?? "norte",
+        feeling: e.feeling,
         ...externalFields(external),
       });
     }

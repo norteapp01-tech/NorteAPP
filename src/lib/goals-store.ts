@@ -140,7 +140,12 @@ export type Execution = {
   seriesOverridden?: boolean;
   /** "norte" ou "external" — preparado para a sincronização futura. */
   source?: "norte" | "external";
+  /** Check-in opcional "Como foi?". Só existe se a pessoa respondeu. */
+  feeling?: Feeling;
+  feelingAt?: string;
 };
+
+export type Feeling = "leve" | "neutro" | "pesado";
 
 /** Uma execução "existe" sempre (tem prazo); só passa a valer pra Agenda/Hoje quando agendada. */
 export function isScheduled(e: Execution): boolean {
@@ -1109,6 +1114,8 @@ function mapExecution(r: Row, history: ExecutionHistoryEntry[]): Execution {
     seriesOccurrenceDate: (r.series_occurrence_date as string) ?? undefined,
     seriesOverridden: (r.series_overridden as boolean) ?? false,
     source: (r.source as "norte" | "external") ?? "norte",
+    feeling: (r.feeling as Feeling | null) ?? undefined,
+    feelingAt: (r.feeling_at as string | null) ?? undefined,
   };
 }
 
@@ -1229,6 +1236,17 @@ export function useGoalsLoading(): boolean {
     enabled: !!userId,
   });
   return !userId || isLoading || isFetching;
+}
+
+/** O carregamento falhou (e não há dado antigo para mostrar no lugar). */
+export function useGoalsError(): { error: boolean; retry: () => void } {
+  const userId = useSupabaseUserId();
+  const { isError, data, refetch } = useQuery({
+    queryKey: QUERY_KEY,
+    queryFn: fetchState,
+    enabled: !!userId,
+  });
+  return { error: isError && !data, retry: () => void refetch() };
 }
 
 // ---------------------------------------------------------------------------
@@ -2095,6 +2113,19 @@ export async function updateRoutineAndFutureExecutions(
  * que quer apagar o registro, não só descartá-lo. `execution_history` cai junto
  * (FK on delete cascade), sem deixar rastro órfão. */
 /** Troca o status registrando o histórico — usado por cancelar/reabrir/desfazer. */
+/** Check-in "Como foi?". `null` apaga a resposta. Opcional por natureza. */
+export async function setExecutionFeeling(id: string, feeling: Feeling | null): Promise<void> {
+  unwrap(
+    await supabase
+      .from("executions")
+      .update({ feeling, feeling_at: feeling ? new Date().toISOString() : null })
+      .eq("id", id)
+      .select()
+      .single(),
+  );
+  await invalidate();
+}
+
 export async function setExecutionStatus(id: string, to: ExecutionStatus, note?: string) {
   const row = await fetchExecutionRow(id);
   if (row.status === to) return;

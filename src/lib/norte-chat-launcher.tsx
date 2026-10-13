@@ -7,7 +7,11 @@ import { createContext, useContext, type ReactNode } from "react";
  * manualmente em cada tela nova que precisar disso. Mesma arquitetura de
  * `GymSessionProvider`/`SportRecorderProvider`: montado uma vez na raiz.
  */
-type NorteChatLauncher = { openChatWithPhoto: () => void };
+type NorteChatLauncher = {
+  openChatWithPhoto: () => void;
+  /** Abre a conversa com o texto já escrito (a pessoa revisa e envia). */
+  openChatWithDraft: (text: string) => void;
+};
 
 const NorteChatLauncherContext = createContext<NorteChatLauncher | null>(null);
 
@@ -26,5 +30,10 @@ export function NorteChatLauncherProvider({
 /** Fora do provider (ex.: uma tela testada isolada) vira no-op — nunca quebra
  * a tela por causa disso. */
 export function useNorteChatLauncher(): NorteChatLauncher {
-  return useContext(NorteChatLauncherContext) ?? { openChatWithPhoto: () => {} };
+  return (
+    useContext(NorteChatLauncherContext) ?? {
+      openChatWithPhoto: () => {},
+      openChatWithDraft: () => {},
+    }
+  );
 }

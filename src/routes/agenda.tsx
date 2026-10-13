@@ -67,7 +67,12 @@ export const Route = createFileRoute("/agenda")({
   // O Google devolve a pessoa para cá depois do consentimento.
   validateSearch: (
     search: Record<string, unknown>,
-  ): { google_ticket?: string; google?: string; reason?: string } => ({
+  ): { google_ticket?: string; google?: string; reason?: string; date?: string } => ({
+    // Abre a Agenda em um dia (vindo do Espelho).
+    date:
+      typeof search.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(search.date)
+        ? search.date
+        : undefined,
     google_ticket: typeof search.google_ticket === "string" ? search.google_ticket : undefined,
     google: typeof search.google === "string" ? search.google : undefined,
     reason: typeof search.reason === "string" ? search.reason : undefined,
@@ -102,7 +107,7 @@ function AgendaScreen() {
   useGoogleAutoSync(googleState.connection?.status === "active");
 
   // UM estado manda: o dia selecionado. Semana, título e conteúdo derivam dele.
-  const [selectedDate, setSelectedDate] = useState(() => todayISO());
+  const [selectedDate, setSelectedDate] = useState(() => search.date ?? todayISO());
   const [pickedView, setPickedView] = useState<AgendaView | null>(null);
   const [filters, setFilters] = useState<AgendaFilters>(EMPTY_FILTERS);
 

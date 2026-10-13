@@ -104,8 +104,11 @@ export function NorteChat({
   autoOpenPhotoPicker = false,
   fullscreen = false,
   onMenu,
+  initialDraft = "",
 }: {
   onBack: () => void;
+  /** Texto já escrito no campo ao abrir (ex.: pedido vindo do Espelho). */
+  initialDraft?: string;
   demo?: boolean;
   onDemoComplete?: () => void;
   autoStartAudio?: boolean;
@@ -118,7 +121,7 @@ export function NorteChat({
   const userId = useSupabaseUserId();
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [ready, setReady] = useState(false);
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(initialDraft);
   const [keyboardOpen, setKeyboardOpen] = useState(!autoStartAudio);
   const [voiceEntry, setVoiceEntry] = useState(autoStartAudio);
   const [menuOpen, setMenuOpen] = useState(false);
