@@ -785,6 +785,19 @@ describe("robustez da sincronização", () => {
     await t.pull();
     expect(execs().map((e) => e.title)).toEqual(["Fica"]);
   });
+
+  it("falha que exige ação não some: fica visível e continua na fila para nova tentativa", async () => {
+    const e = exec();
+    t.cal.push_new_events = false;
+    await t.enqueue("execution", e.id);
+    await t.push();
+    const queued = t.fake.rows("agenda_sync_outbox")[0];
+    expect(queued).toMatchObject({ attempts: 1 });
+    expect(queued.failed_at).toBeTruthy();
+    expect(queued.next_attempt_at).toBeTruthy();
+    expect(t.conn).toMatchObject({ pending_sync_errors: 1 });
+    expect(String(t.conn.last_push_error)).toMatch(/Escolha uma agenda/);
+  });
 });
 
 describe("conflitos: ninguém sobrescreve ninguém em silêncio", () => {

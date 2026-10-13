@@ -24,6 +24,8 @@ export type GoogleConnection = {
   timeZone: string;
   lastSyncAt?: string;
   lastError?: string;
+  pendingSyncErrors: number;
+  lastPushError?: string;
 };
 
 export type GoogleCalendarRow = {
@@ -93,6 +95,8 @@ function mapConnection(r: Row): GoogleConnection {
     timeZone: r.time_zone as string,
     lastSyncAt: text(r.last_sync_at),
     lastError: text(r.last_error),
+    pendingSyncErrors: Number(r.pending_sync_errors ?? 0),
+    lastPushError: text(r.last_push_error),
   };
 }
 

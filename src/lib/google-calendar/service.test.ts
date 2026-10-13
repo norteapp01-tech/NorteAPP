@@ -333,6 +333,22 @@ describe("OAuth: concluir a conexão (anti-CSRF)", () => {
     });
     expect(connections()[0].last_sync_at).toBeTruthy();
   });
+
+  it("pode concluir o OAuth antes da carga inicial e sincronizar em segundo plano", async () => {
+    h.google.put(MAIN, {
+      id: "evento-de-conta-grande",
+      summary: "Chega depois",
+      status: "confirmed",
+      start: { dateTime: "2026-10-14T10:00:00-03:00", timeZone: SP },
+      end: { dateTime: "2026-10-14T11:00:00-03:00", timeZone: SP },
+    });
+    const { ticket } = await authorize();
+    await completeConnection(h.deps, "user-a", ticket!, SP, { syncInitial: false });
+    expect(h.fake.rows("executions")).toHaveLength(0);
+    expect(h.fake.rows("google_calendar_sync_runs")).toHaveLength(0);
+    await syncConnection(h.deps, "user-a", { trigger: "initial" });
+    expect(h.fake.rows("executions").map((e) => e.title)).toContain("Chega depois");
+  });
 });
 
 async function connect(userId = "user-a") {
@@ -553,6 +569,16 @@ describe("sincronização manual e travas", () => {
     expect(result.skipped).toBe(true);
   });
 
+  it("retoma uma trava realmente vencida com a condição conferida no banco", async () => {
+    await connect();
+    const conn = h.fake.rows("google_calendar_connections")[0];
+    conn.sync_state = "syncing";
+    conn.updated_at = new Date(NOW.getTime() - 20 * 60_000).toISOString();
+    const result = await syncConnection(h.deps, "user-a", { trigger: "manual" });
+    expect(result.skipped).not.toBe(true);
+    expect(conn.sync_state).toBe("idle");
+  });
+
   it("registra a execução e atualiza a última sincronização", async () => {
     await connect();
     h.clock.now = new Date(NOW.getTime() + 60_000);
@@ -763,6 +789,29 @@ describe("verificação periódica (cron)", () => {
     expect(r.processed).toBe(1);
     const newRuns = h.fake.rows("google_calendar_sync_runs").slice(runsBefore);
     expect(newRuns.every((x) => x.user_id === "user-b" && x.trigger === "cron")).toBe(true);
+  });
+
+  it("continua do cursor e dá vez a quem ficou depois do orçamento", async () => {
+    await connect("user-a");
+    h.oauth.account = { sub: "google-sub-b", email: "b@example.com" };
+    const { ticket } = await authorize("user-b");
+    await completeConnection(h.deps, "user-b", ticket!, SP);
+    const before = h.fake.rows("google_calendar_sync_runs").length;
+    const onePerRun = () => {
+      let calls = 0;
+      return () => (calls++ < 2 ? 0 : 100);
+    };
+    expect((await runCron(h.deps, "segredo-do-cron", 50, onePerRun())).processed).toBe(1);
+    expect((await runCron(h.deps, "segredo-do-cron", 50, onePerRun())).processed).toBe(1);
+    const users = new Set(
+      h.fake
+        .rows("google_calendar_sync_runs")
+        .slice(before)
+        .filter((r) => r.trigger === "cron")
+        .map((r) => r.user_id),
+    );
+    expect(users).toEqual(new Set(["user-a", "user-b"]));
+    expect(h.fake.rows("google_sync_internal")[0].cron_cursor).toBeTruthy();
   });
 });
 

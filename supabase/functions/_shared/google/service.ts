@@ -237,6 +237,7 @@ export async function completeConnection(
   userId: string,
   ticket: string,
   timeZone?: string,
+  options: { syncInitial?: boolean } = {},
 ): Promise<{ email: string }> {
   const pending = await q<Row | null>(
     deps.db.from("google_oauth_pending").select("*").eq("ticket", ticket).maybeSingle(),
@@ -323,7 +324,7 @@ export async function completeConnection(
 
   // Agendas: a principal já vem marcada (e recebe o que for criado no Norte).
   await listCalendars(deps, userId, { firstConnection: !current });
-  await syncConnection(deps, userId, { trigger: "initial" });
+  if (options.syncInitial !== false) await syncConnection(deps, userId, { trigger: "initial" });
   return { email: String(pending.google_email) };
 }
 
@@ -685,12 +686,20 @@ export async function syncConnection(
       .select(),
   );
   let acquired = Boolean(locked && locked.length > 0);
-  if (!acquired && String(conn.updated_at ?? "") < staleBefore) {
-    await deps.db
-      .from("google_calendar_connections")
-      .update({ sync_state: "syncing" })
-      .eq("id", conn.id);
-    acquired = true;
+  if (!acquired) {
+    // A retomada também precisa ser atômica. Usar o `updated_at` carregado antes
+    // permitiria que duas chamadas vissem a mesma fotografia antiga e ambas
+    // roubassem a trava que a outra acabou de adquirir.
+    const reclaimed = await q<Row[]>(
+      deps.db
+        .from("google_calendar_connections")
+        .update({ sync_state: "syncing" })
+        .eq("id", conn.id)
+        .eq("sync_state", "syncing")
+        .lt("updated_at", staleBefore)
+        .select(),
+    );
+    acquired = Boolean(reclaimed && reclaimed.length > 0);
   }
   if (!acquired) return { skipped: true, stats: {} };
 
@@ -782,6 +791,13 @@ export async function syncConnection(
         }
       }
       if (opts.backfill || opts.trigger === "initial") await enqueueBackfill(ctx);
+      // "Sincronizar agora" também é a ação de recuperação: ignora o backoff
+      // automático e tenta imediatamente tudo o que ainda está pendente.
+      if (opts.trigger === "manual")
+        await deps.db
+          .from("agenda_sync_outbox")
+          .update({ next_attempt_at: null })
+          .eq("user_id", userId);
       await pushOutbox(ctx);
     });
   } catch (error) {
@@ -928,22 +944,36 @@ export async function runCron(
   deps: Deps,
   secret: string | null,
   budgetMs = 50_000,
+  wallNow: () => number = Date.now,
 ): Promise<{ status: number; processed: number }> {
   const internal = await q<Row | null>(
-    deps.db.from("google_sync_internal").select("cron_secret").maybeSingle(),
+    deps.db.from("google_sync_internal").select("cron_secret, cron_cursor").maybeSingle(),
   );
   if (!secret || !internal || !timingSafeEqual(String(internal.cron_secret), secret))
     return { status: 401, processed: 0 };
 
   // O orçamento de tempo é de relógio real, não do relógio injetado.
-  const started = Date.now();
-  const connections =
-    (await q<Row[]>(
-      deps.db.from("google_calendar_connections").select("*").eq("status", "active"),
-    )) ?? [];
+  const started = wallNow();
+  const loadBatch = async (after?: string): Promise<Row[]> => {
+    let query = deps.db
+      .from("google_calendar_connections")
+      .select("*")
+      .eq("status", "active")
+      .order("id", { ascending: true })
+      .limit(100);
+    if (after) query = query.gt("id", after);
+    return (await q<Row[]>(query)) ?? [];
+  };
+  const cursor = internal.cron_cursor ? String(internal.cron_cursor) : undefined;
+  let connections = await loadBatch(cursor);
+  // Chegou ao fim: a rodada seguinte recomeça do início, sem manter as mesmas
+  // pessoas eternamente na frente da fila.
+  if (connections.length === 0 && cursor) connections = await loadBatch();
   let processed = 0;
+  let lastAttempted: string | null = null;
   for (const conn of connections) {
-    if (Date.now() - started > budgetMs) break;
+    if (wallNow() - started >= budgetMs) break;
+    lastAttempted = String(conn.id);
     try {
       await syncConnection(deps, String(conn.user_id), { trigger: "cron" });
       processed += 1;
@@ -951,6 +981,11 @@ export async function runCron(
       /* uma pessoa com problema não pode parar as demais */
     }
   }
+  if (lastAttempted)
+    await deps.db
+      .from("google_sync_internal")
+      .update({ cron_cursor: lastAttempted })
+      .eq("singleton", true);
   return { status: 200, processed };
 }
 

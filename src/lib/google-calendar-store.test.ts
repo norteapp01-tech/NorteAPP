@@ -158,6 +158,7 @@ describe("estados da interface", () => {
       syncState: "idle" as const,
       pushRoutines: false,
       timeZone: "America/Sao_Paulo",
+      pendingSyncErrors: 0,
       ...over,
     },
   });

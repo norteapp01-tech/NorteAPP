@@ -18,7 +18,9 @@ Google ──(redirect OAuth)──► google-calendar-oauth/callback
   `google-calendar`. Tokens e segredos nunca chegam a ele.
 - **Fila de saída:** gatilhos do banco registram em `agenda_sync_outbox` o que mudou
   (criar/editar/apagar compromissos e séries) — só para quem tem o Google conectado.
-  A Edge Function envia ao Google.
+  A Edge Function envia ao Google. Falhas usam espera progressiva e continuam sendo
+  tentadas; depois de repetirem, ficam visíveis nas configurações com a ação
+  **Tentar novamente agora** — nunca desaparecem silenciosamente.
 - **Sem ciclos nem duplicação:** cada evento tem um vínculo em `agenda_external_links`
   com o id do Google, o `etag` e o `synced_hash` (hash do último conteúdo em que os dois
   lados concordaram). Conteúdo igual ao hash = não mudou (inclusive o "eco" do que o
@@ -72,9 +74,21 @@ supabase functions deploy google-calendar google-calendar-oauth google-calendar-
 node scripts/check-google-calendar-deploy.mjs   # confere que tudo está no ar
 ```
 
-As migrações `0056` (tabelas, gatilhos, RLS) e `0057` (cron de 5 minutos) já fazem parte de
-`supabase/migrations`. `verify_jwt = false` está em `supabase/config.toml` para as três funções
+As migrações `0056` (tabelas, gatilhos, RLS), `0057` (cron de 5 minutos) e `0058`
+(fila resiliente, trava e rodízio do cron) já fazem parte de `supabase/migrations`.
+`verify_jwt = false` está em `supabase/config.toml` para as três funções
 que não recebem a sessão de uma pessoa (callback, webhook e cron).
+
+## Checklist antes de abrir para o público
+
+- Publicar as migrações, as quatro Edge Functions e o frontend a partir do mesmo commit.
+- Rodar `node scripts/check-google-calendar-deploy.mjs` depois da publicação.
+- No Google Auth Platform, confirmar o app como **In production**, os domínios autorizados,
+  a política de privacidade, os termos e a verificação dos escopos sensíveis. Em modo Testing,
+  o refresh token de um app externo com escopos de Agenda pode expirar em sete dias.
+- Usar uma conta Google exclusiva de homologação para validar o ciclo completo: conectar,
+  criar/editar/mover/excluir nos dois lados, recorrência, conflito, desconexão e reconexão.
+- Conferir no Supabase que o job `google-calendar-sync` está ativo e executando a cada 5 minutos.
 
 ## Limites conhecidos
 

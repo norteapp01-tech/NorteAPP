@@ -46,7 +46,12 @@ const TABLE_DEFAULTS: Record<string, () => Row> = {
     synced_hash: null,
     read_only_reason: null,
   }),
-  agenda_sync_outbox: () => ({ attempts: 0, last_error: null }),
+  agenda_sync_outbox: () => ({
+    attempts: 0,
+    last_error: null,
+    next_attempt_at: null,
+    failed_at: null,
+  }),
   google_calendars: () => ({
     selected: false,
     push_new_events: false,
@@ -59,6 +64,8 @@ const TABLE_DEFAULTS: Record<string, () => Row> = {
     sync_state: "idle",
     time_zone: "America/Sao_Paulo",
     push_routines: false,
+    pending_sync_errors: 0,
+    last_push_error: null,
   }),
 };
 
