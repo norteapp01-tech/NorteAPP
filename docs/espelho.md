@@ -27,7 +27,7 @@ hora a partir de dados que o app já guarda; **não há tabela de métricas**.
 
 * Compromissos, séries, exceções e rótulos: o mesmo cálculo da Agenda (`buildOccurrences`).
 * Reagendamentos: `agenda_changes` (sobrevive à exclusão do compromisso via `subject_title`).
-* "Como foi?": `executions.feeling` (migration 0058) — opcional, nunca inferido.
+* "Como foi?": `executions.feeling` (migration 0059) — opcional, nunca inferido.
 * Isolamento: RLS das tabelas de origem; nada de novo a proteger.
 
 ## Arquivos
