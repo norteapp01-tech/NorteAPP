@@ -1213,21 +1213,39 @@ async function pushSeries(ctx: Ctx, cals: Cal[], seriesId: string): Promise<void
   await pushPatch(ctx, cals, link, normal, meta);
 }
 
-const MAX_ATTEMPTS = 5;
+const REPORT_AFTER_ATTEMPTS = 5;
+const RETRY_BASE_MS = 30_000;
+const RETRY_MAX_MS = 6 * 60 * 60 * 1000;
 
 /** Esvazia a fila de saída: manda ao Google o que mudou no Norte. */
 export async function pushOutbox(ctx: Ctx): Promise<void> {
   const cals = await pushCalendars(ctx);
-  const rows =
-    (await q<Row[]>(
+  const now = ctx.now();
+  // Duas consultas evitam que itens em backoff ocupem o começo da fila e
+  // escondam mudanças novas que já podem ser enviadas.
+  const [fresh, retryable] = await Promise.all([
+    q<Row[]>(
       ctx.db
         .from("agenda_sync_outbox")
         .select("*")
         .eq("user_id", ctx.conn.user_id)
-        .lt("attempts", MAX_ATTEMPTS)
+        .is("next_attempt_at", null)
         .order("created_at", { ascending: true })
         .limit(300),
-    )) ?? [];
+    ),
+    q<Row[]>(
+      ctx.db
+        .from("agenda_sync_outbox")
+        .select("*")
+        .eq("user_id", ctx.conn.user_id)
+        .lte("next_attempt_at", now.toISOString())
+        .order("next_attempt_at", { ascending: true })
+        .limit(300),
+    ),
+  ]);
+  const rows = [...new Map([...(fresh ?? []), ...(retryable ?? [])].map((r) => [r.id, r])).values()]
+    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+    .slice(0, 300);
   // Séries antes das exceções que dependem delas.
   rows.sort((a, b) => (a.entity_type === b.entity_type ? 0 : a.entity_type === "series" ? -1 : 1));
 
@@ -1249,17 +1267,44 @@ export async function pushOutbox(ctx: Ctx): Promise<void> {
         .eq("created_at", row.created_at);
     } catch (error) {
       const userError = error instanceof SyncUserError;
+      const attempts = Number(row.attempts ?? 0) + 1;
+      const delay = userError
+        ? 24 * 60 * 60 * 1000
+        : Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** Math.min(attempts - 1, 10));
       bump(ctx, "erros_envio");
       await ctx.db
         .from("agenda_sync_outbox")
         .update({
-          attempts: userError ? MAX_ATTEMPTS : Number(row.attempts ?? 0) + 1,
+          attempts,
           last_error: error instanceof Error ? error.message.slice(0, 300) : "erro",
+          next_attempt_at: new Date(now.getTime() + delay).toISOString(),
+          failed_at:
+            userError || attempts >= REPORT_AFTER_ATTEMPTS
+              ? (row.failed_at ?? now.toISOString())
+              : null,
         })
         .eq("id", row.id);
       if (userError) ctx.stats.precisa_escolher_agenda = 1;
     }
   }
+
+  // A fila é privada ao servidor; este resumo sem conteúdo de eventos permite
+  // que a pessoa saiba que algo ficou pendente e tente novamente.
+  const pending =
+    (await q<Row[]>(
+      ctx.db
+        .from("agenda_sync_outbox")
+        .select("attempts,last_error,failed_at")
+        .eq("user_id", ctx.conn.user_id),
+    )) ?? [];
+  const failed = pending.filter((r) => Boolean(r.failed_at));
+  await ctx.db
+    .from("google_calendar_connections")
+    .update({
+      pending_sync_errors: failed.length,
+      last_push_error: failed.at(-1)?.last_error ?? null,
+    })
+    .eq("id", ctx.conn.id);
 }
 
 /** Primeira conexão: coloca na fila o que o Norte já tem e ainda não foi ao Google. */

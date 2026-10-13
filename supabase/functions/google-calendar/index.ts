@@ -2,7 +2,13 @@
 //
 // Nunca devolve tokens nem segredos. Erros inesperados saem como mensagem
 // genérica; o detalhe fica só no log do servidor (sem dados sensíveis).
-import { adminClient, corsHeaders, loadEnv, makeDeps } from "../_shared/google/runtime.ts";
+import {
+  adminClient,
+  corsHeaders,
+  loadEnv,
+  makeDeps,
+  runInBackground,
+} from "../_shared/google/runtime.ts";
 import {
   ServiceError,
   completeConnection,
@@ -75,7 +81,17 @@ Deno.serve(async (req) => {
         if (typeof body.ticket !== "string" || body.ticket.length > 200)
           return json(400, { error: "Bilhete inválido.", code: "ticket_invalid" }, cors);
         const timeZone = typeof body.timeZone === "string" ? body.timeZone : undefined;
-        return json(200, await completeConnection(deps, userId, body.ticket, timeZone), cors);
+        const completed = await completeConnection(deps, userId, body.ticket, timeZone, {
+          syncInitial: false,
+        });
+        // Contas antigas podem ter milhares de eventos. A autorização não deve
+        // ficar presa esperando toda a primeira importação terminar.
+        runInBackground(
+          syncConnection(deps, userId, { trigger: "initial", timeZone }).catch((error) => {
+            console.error("google-calendar-initial:", error instanceof Error ? error.name : "erro");
+          }),
+        );
+        return json(200, completed, cors);
       }
       case "list-calendars":
         return json(

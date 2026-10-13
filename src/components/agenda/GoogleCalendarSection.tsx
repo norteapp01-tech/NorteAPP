@@ -188,6 +188,44 @@ export function GoogleCalendarSection({
             </button>
           )}
 
+          {conn.pendingSyncErrors > 0 && (
+            <div
+              role="alert"
+              className="rounded-xl border border-warning/40 bg-warning/5 p-3 text-xs"
+            >
+              <p className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                <span>
+                  <strong className="block text-foreground">
+                    {conn.pendingSyncErrors}{" "}
+                    {conn.pendingSyncErrors === 1
+                      ? "alteração ainda não foi enviada"
+                      : "alterações ainda não foram enviadas"}
+                  </strong>
+                  {conn.lastPushError ?? "O Norte tentará novamente automaticamente."}
+                </span>
+              </p>
+              <button
+                type="button"
+                disabled={busy !== null || ui === "syncing"}
+                onClick={() =>
+                  void run("retry-pending", async () => {
+                    const result = await syncGoogleNow("manual");
+                    if (result.error) throw new Error(result.error);
+                    if ((result.stats.erros_envio ?? 0) > 0)
+                      throw new Error(
+                        "Algumas alterações continuam pendentes. Tentaremos novamente.",
+                      );
+                    feedback.notify("Alterações pendentes sincronizadas.");
+                  })
+                }
+                className="interactive-press mt-3 min-h-10 w-full rounded-xl border border-warning/40 font-semibold text-foreground disabled:opacity-50"
+              >
+                Tentar novamente agora
+              </button>
+            </div>
+          )}
+
           <div>
             <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
               Agendas
@@ -303,6 +341,8 @@ export function GoogleCalendarSection({
                   if (result.skipped)
                     feedback.notify("Já está sincronizando. Aguarde um instante.");
                   else if (result.error) throw new Error(result.error);
+                  else if ((result.stats.erros_envio ?? 0) > 0)
+                    throw new Error("Algumas alterações não foram enviadas. Tente novamente.");
                   else {
                     const created =
                       (result.stats.criados_no_norte ?? 0) + (result.stats.criados_no_google ?? 0);

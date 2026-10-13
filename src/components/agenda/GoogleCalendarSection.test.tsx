@@ -37,6 +37,7 @@ const connection = {
   pushRoutines: false,
   timeZone: "America/Sao_Paulo",
   lastSyncAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+  pendingSyncErrors: 0,
 };
 const main = {
   id: "cal1",
@@ -177,6 +178,36 @@ describe("Google Agenda nas configurações", () => {
     fireEvent.click(screen.getByRole("button", { name: /Sincronizar agora/ }));
     await waitFor(() => expect(store.syncGoogleNow).toHaveBeenCalledWith("manual"));
     expect(await screen.findByText(/Sincronizado: 2 novo\(s\) evento\(s\)/)).toBeInTheDocument();
+  });
+
+  it("não diz que está tudo certo quando algum envio ficou pendente", async () => {
+    store.syncGoogleNow.mockResolvedValue({
+      stats: { erros_envio: 1 },
+      skipped: false,
+      error: null,
+    });
+    setState({ connection, calendars: [main] });
+    renderSection();
+    fireEvent.click(screen.getByRole("button", { name: /Sincronizar agora/ }));
+    expect(await screen.findByText(/Algumas alterações não foram enviadas/)).toBeInTheDocument();
+    expect(screen.queryByText("Tudo sincronizado.")).toBeNull();
+  });
+
+  it("mostra falhas persistentes e permite tentar novamente", async () => {
+    store.syncGoogleNow.mockResolvedValue({ stats: {}, skipped: false, error: null });
+    setState({
+      connection: {
+        ...connection,
+        pendingSyncErrors: 2,
+        lastPushError: "O Google demorou para responder.",
+      },
+      calendars: [main],
+    });
+    renderSection();
+    expect(screen.getByText(/2 alterações ainda não foram enviadas/)).toBeInTheDocument();
+    expect(screen.getByText("O Google demorou para responder.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Tentar novamente agora/ }));
+    await waitFor(() => expect(store.syncGoogleNow).toHaveBeenCalledWith("manual"));
   });
 
   it("erro de sincronização aparece com opção de tentar de novo", async () => {
