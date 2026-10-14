@@ -18,3 +18,22 @@ describe("datas das etapas do plano criado pelo agente", () => {
     expect(ends[1] >= ends[0]).toBe(true);
   });
 });
+
+import { parseAndValidateToolCall } from "./policy";
+describe("proposta de plano com etapa além do prazo", () => {
+  it("ajusta a etapa ao prazo em vez de recusar a proposta", () => {
+    const action = parseAndValidateToolCall({
+      id: "c1",
+      type: "function",
+      function: {
+        name: "criar_plano",
+        arguments: JSON.stringify({
+          title: "Abrir loja", why: "Independência", lifeArea: "Carreira", deadlineLabel: "em 30 dias", deadlineISO: "2099-01-31",
+          steps: [{ title: "Pesquisa", targetDate: "2099-01-20" }, { title: "Inauguração", targetDate: "2099-03-10" }],
+        }),
+      },
+    });
+    const steps = action.args.steps as { targetDate: string }[];
+    expect(steps.map((s) => s.targetDate)).toEqual(["2099-01-20", "2099-01-31"]);
+  });
+});

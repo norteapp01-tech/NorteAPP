@@ -313,8 +313,11 @@ export function parseAndValidateToolCall(call: AgentToolCall): PendingAgentActio
           )
             .toISOString()
             .slice(0, 10);
-        if (step.targetDate > String(plan.deadlineISO))
-          throw new Error("Etapa ultrapassa o prazo do plano. Ajuste a proposta.");
+        // O prazo do plano é o pedido da pessoa: uma etapa proposta além dele é ajustada
+        // para o prazo (antes a proposta inteira era recusada e o agente se perdia).
+        if (step.targetDate > String(plan.deadlineISO)) step.targetDate = String(plan.deadlineISO);
+        const prev = i > 0 ? steps[i - 1].targetDate : undefined;
+        if (prev && step.targetDate < prev) step.targetDate = prev;
       });
   }
   return { name: call.function.name, args: result.data };
