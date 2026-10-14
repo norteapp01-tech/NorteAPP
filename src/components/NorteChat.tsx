@@ -43,6 +43,12 @@ const labels: Record<string, [string, string]> = {
   criar_lembrete: ["Lembrete", "/agenda"],
   gerenciar_lembrete: ["Lembrete", "/agenda"],
 };
+/** Consultas e dados estruturados (ex.: disponibilidade em JSON) servem ao modelo, não à pessoa. */
+function isInternalResult(t: { name: string; result: string }): boolean {
+  if (t.name.startsWith("consultar") || t.name.startsWith("verificar")) return true;
+  const r = t.result.trim();
+  return r.startsWith("{") || r.startsWith("[");
+}
 function domain(name: string, area?: unknown): [string, string] {
   if (labels[name]) return labels[name];
   const category = String(
@@ -546,7 +552,7 @@ export function NorteChat({
                     parseCard(t.result)?.card === "agenda" &&
                     turn.toolTrace?.some((other) => parseCard(other.result)?.card === "appointment")
                   ) &&
-                  (parseCard(t.result) || !t.name.startsWith("consultar")) &&
+                  (parseCard(t.result) || !isInternalResult(t)) &&
                   !/^Erro|^Não /i.test(t.result),
               )
               .map((t, i) =>
@@ -649,7 +655,7 @@ export function NorteChat({
                 {[
                   ...new Map(
                     turn.toolTrace
-                      .filter((t) => !parseCard(t.result))
+                      .filter((t) => !parseCard(t.result) && !isInternalResult(t))
                       .map((t) => {
                         const d = domain(t.name, t.args.area);
                         return [d[1], d];

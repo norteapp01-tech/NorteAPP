@@ -333,7 +333,7 @@ async function createLocal(
               startTime: s.start,
               endTime: s.end ?? undefined,
             }))
-          : null,
+          : [], // a coluna é NOT NULL (default '[]'); null fazia toda importação de evento simples falhar
       })
       .select()
       .single(),

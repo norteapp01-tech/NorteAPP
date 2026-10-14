@@ -38,8 +38,8 @@ import {
   rescheduleExecution,
   updateAgendaSession,
   createGoal,
-  addSubtask,
   todayISO,
+  toISODate,
 } from "../goals-store";
 import {
   fetchState as fetchRemindersState,
@@ -428,7 +428,7 @@ export const AGENT_TOOLS = [
             type: "string",
             enum: ["Corpo", "Mente", "Carreira", "Relações", "Arte", "Finanças", "Fé"],
           },
-          deadlineISO: { type: "string", description: "YYYY-MM-DD, opcional" },
+          deadlineISO: { type: "string", description: "YYYY-MM-DD. Defina quando houver prazo ou quando a pessoa pedir prazos." },
           deadlineLabel: { type: "string", description: "ex.: 'em 90 dias', 'sem prazo'" },
           steps: {
             type: "array",
@@ -436,7 +436,11 @@ export const AGENT_TOOLS = [
               type: "object",
               properties: {
                 title: { type: "string" },
-                targetDate: { type: "string", description: "YYYY-MM-DD, apenas se prazo definido" },
+                targetDate: {
+                  type: "string",
+                  description:
+                    "YYYY-MM-DD. Proponha sempre uma data realista para concluir a etapa, distribuindo até o prazo do plano (ou a partir de hoje se não houver prazo).",
+                },
                 actions: {
                   type: "array",
                   items: { type: "string" },
@@ -1146,7 +1150,9 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
       const id = await createExecution({
         title: args.title as string,
         dueDate: args.dueDate as string,
-        agendaDate: args.agendaDate as string | undefined,
+        // Compromisso com horário é agenda: sem agendaDate explícita, vale a data do prazo
+        // (antes ficava só como prazo, fora da Agenda e fora do Google Agenda).
+        agendaDate: (args.agendaDate as string | undefined) ?? (args.startTime ? (args.dueDate as string) : undefined),
         startTime: args.startTime as string | undefined,
         category: (args.category as string) || "generico",
       });
@@ -1186,14 +1192,28 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
         deadlineLabel: (args.deadlineLabel as string) || "sem prazo",
         deadlineISO: args.deadlineISO as string | undefined,
         metric: { target: 1, unit: "etapas" },
-        steps: args.steps as { title: string; targetDate?: string }[] | undefined,
+        steps: withStepDates(args),
       });
       const state = await fetchGoalsState();
       const steps = state.steps.filter((s) => s.goalId === id).sort((a, b) => a.order - b.order);
       try {
+        // Ações são execuções ligadas à etapa — o mesmo que "Nova ação" grava na tela do plano.
         const proposed = args.steps as { actions?: string[] }[] | undefined;
-        for (let i = 0; i < steps.length; i++)
-          for (const action of proposed?.[i]?.actions || []) await addSubtask(steps[i].id, action);
+        const ends = planStepEnds(args, steps.length, toISODate(new Date()));
+        for (let i = 0; i < steps.length; i++) {
+          const start = i === 0 ? toISODate(new Date()) : ends[i - 1];
+          for (const action of proposed?.[i]?.actions || [])
+            await createExecution({
+              title: action,
+              dueDate: ends[i],
+              plannedStartDate: start,
+              plannedEndDate: ends[i],
+              category: catByArea[args.lifeArea as string] ?? "generico",
+              weight: "medio",
+              goalId: id,
+              stepId: steps[i].id,
+            });
+        }
       } catch {
         return JSON.stringify({
           card: "plan",
@@ -1504,4 +1524,26 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
     default:
       return `Ferramenta desconhecida: ${name}.`;
   }
+}
+
+/** Datas de conclusão de cada etapa: as propostas pelo modelo; as que faltarem são
+ * distribuídas até o prazo do plano (ou de 21 em 21 dias a partir de hoje). */
+export function planStepEnds(args: Record<string, unknown>, count: number, today: string): string[] {
+  const steps = (args.steps as { targetDate?: string }[] | undefined) ?? [];
+  const deadline = args.deadlineISO as string | undefined;
+  const span = deadline ? Math.max(count, Math.round((Date.parse(deadline) - Date.parse(today)) / 86_400_000)) : 21 * count;
+  const ends: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const given = steps[i]?.targetDate;
+    const even = addDaysISO(today, Math.round((span * (i + 1)) / count));
+    const prev = ends[i - 1] ?? today;
+    ends.push(given && given >= prev ? given : even >= prev ? even : prev);
+  }
+  return ends;
+}
+function withStepDates(args: Record<string, unknown>) {
+  const steps = args.steps as { title: string; targetDate?: string }[] | undefined;
+  if (!steps) return undefined;
+  const ends = planStepEnds(args, steps.length, toISODate(new Date()));
+  return steps.map((s, i) => ({ title: s.title, targetDate: ends[i] }));
 }

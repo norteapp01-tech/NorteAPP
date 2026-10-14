@@ -109,6 +109,8 @@ describe("Google → Norte: criar, editar e excluir", () => {
       due_date: "2026-10-14",
       status: "planejada",
     });
+    // agenda_sessions é NOT NULL no banco: evento de um dia grava lista vazia, nunca null.
+    expect(execs()[0].agenda_sessions).toEqual([]);
     expect(links()[0]).toMatchObject({
       external_event_id: "g1",
       external_calendar_id: CAL,

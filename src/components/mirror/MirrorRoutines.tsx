@@ -63,6 +63,14 @@ export function MirrorRoutines({
   const areas = current.byCategory.filter((g) => g.rate !== null).slice(0, 6);
   const strongest = [...areas].sort((a, b) => (b.rate ?? 0) - (a.rate ?? 0))[0];
   const attention = current.topTroubled[0];
+  // O detalhe do ponto forte precisa falar da MESMA área do título (antes usava a maior
+  // sequência de qualquer rotina, ex.: "Academia com 100%" + "dias seguidos em Leitura").
+  const strongStreak = strongest
+    ? [...new Set(executions.filter((e) => e.category === strongest.key).map((e) => e.title))]
+        .map((title) => ({ title, streak: streakForTitle(executions, title) }))
+        .filter((x) => x.streak > 0)
+        .sort((a, b) => b.streak - a.streak)[0]
+    : undefined;
 
   return (
     <div className="space-y-4">
@@ -137,9 +145,11 @@ export function MirrorRoutines({
                 : "Seu primeiro padrão aparecerá aqui"
             }
             detail={
-              streaks[0]
-                ? `${streaks[0].streak} dias seguidos em “${streaks[0].title}”`
-                : "Continue registrando suas ações"
+              strongStreak
+                ? `${strongStreak.streak} dias seguidos em “${strongStreak.title}”`
+                : strongest
+                  ? `${strongest.done} de ${strongest.done + strongest.missed} realizadas ${scope}`
+                  : "Continue registrando suas ações"
             }
           />
           <Row

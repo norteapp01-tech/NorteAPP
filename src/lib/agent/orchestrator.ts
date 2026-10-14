@@ -182,9 +182,19 @@ export async function runAgentTurnWith(
       };
     }
   }
+  // Rodadas esgotadas: a mensagem precisa refletir o que de fato foi gravado neste turno
+  // (antes dizia "nada foi executado" mesmo com a refeição/gasto já registrados).
+  const written = toolTrace.filter(
+    (t) =>
+      !t.name.startsWith("consultar") &&
+      !t.name.startsWith("verificar") &&
+      !/^Erro|^Não |^Ação duplicada/i.test(t.result),
+  );
   return {
     role: "assistant",
-    text: "Não consegui concluir com segurança. Nada pendente foi executado.",
+    text: written.length
+      ? "Registrei o que você pediu — confira abaixo."
+      : "Não consegui concluir com segurança. Nada foi alterado.",
     toolTrace,
   };
 }
