@@ -1189,8 +1189,9 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
         kind: "projeto",
         category: catByArea[args.lifeArea as string] ?? "generico",
         lifeArea: args.lifeArea as string,
-        deadlineLabel: (args.deadlineLabel as string) || "sem prazo",
-        deadlineISO: args.deadlineISO as string | undefined,
+        // Sem prazo informado, o prazo do plano é a última etapa (as etapas sempre têm data).
+        deadlineLabel: args.deadlineISO ? (args.deadlineLabel as string) || "sem prazo" : planDeadline(args).label,
+        deadlineISO: (args.deadlineISO as string | undefined) ?? planDeadline(args).iso,
         metric: { target: 1, unit: "etapas" },
         steps: withStepDates(args),
       });
@@ -1227,6 +1228,8 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
         card: "plan",
         id,
         ...args,
+        // o card mostra as datas efetivamente salvas, não só as da proposta
+        steps: savedStepsForCard(args),
         summary: "Plano, etapas e ações criados.",
       });
     }
@@ -1546,4 +1549,18 @@ function withStepDates(args: Record<string, unknown>) {
   if (!steps) return undefined;
   const ends = planStepEnds(args, steps.length, toISODate(new Date()));
   return steps.map((s, i) => ({ title: s.title, targetDate: ends[i] }));
+}
+function savedStepsForCard(args: Record<string, unknown>) {
+  const steps = args.steps as { title: string; actions?: string[] }[] | undefined;
+  if (!steps) return undefined;
+  const ends = planStepEnds(args, steps.length, toISODate(new Date()));
+  return steps.map((s, i) => ({ ...s, targetDate: ends[i] }));
+}
+function planDeadline(args: Record<string, unknown>): { iso?: string; label: string } {
+  const n = (args.steps as unknown[] | undefined)?.length ?? 0;
+  if (!n) return { label: (args.deadlineLabel as string) || "sem prazo" };
+  const today = toISODate(new Date());
+  const iso = planStepEnds(args, n, today)[n - 1];
+  const days = Math.round((Date.parse(iso) - Date.parse(today)) / 86_400_000);
+  return { iso, label: `${days} dias` };
 }
