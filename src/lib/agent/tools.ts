@@ -1230,6 +1230,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
         ...args,
         // o card mostra as datas efetivamente salvas, não só as da proposta
         steps: savedStepsForCard(args),
+        deadlineLabel: args.deadlineISO ? args.deadlineLabel : planDeadline(args).label,
         summary: "Plano, etapas e ações criados.",
       });
     }
