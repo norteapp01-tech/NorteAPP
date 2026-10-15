@@ -14,6 +14,7 @@ vi.mock("./supabase/client", async () => {
     }),
     ensureSession: async () => fake.userId,
     useSupabaseUserId: () => fake.userId,
+    FUNCTIONS_REGION: "us-east-2",
   };
 });
 
@@ -179,6 +180,8 @@ describe("chamadas à função", () => {
     expect(await startGoogleConnect()).toBe("https://accounts.google.com/x");
     expect(invoke).toHaveBeenCalledWith("google-calendar", {
       body: { action: "oauth-start", origin: window.location.origin },
+      // roda na região do banco: cada consulta não atravessa o continente
+      region: "us-east-2",
     });
   });
 

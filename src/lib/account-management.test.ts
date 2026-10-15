@@ -11,6 +11,7 @@ vi.mock("./supabase/client", () => ({
     storage: { from: vi.fn(() => ({ list: vi.fn(async () => ({ data: [] })), remove: vi.fn() })) },
   },
   markIntentionalSignOut: vi.fn(),
+  FUNCTIONS_REGION: "us-east-2",
 }));
 vi.mock("./sport-recording-db", () => ({ clearRecordingState: vi.fn() }));
 vi.mock("./query-client", () => ({ queryClient: { cancelQueries: vi.fn(), clear: vi.fn() } }));
@@ -50,7 +51,9 @@ it("reseta o conteúdo sem encerrar a identidade", async () => {
   } as never);
   localStorage.setItem("norte-chat:user-1", "conteúdo");
   await resetAccountContent("user-1");
-  expect(supabase.functions.invoke).toHaveBeenCalledWith("reset-account");
+  expect(supabase.functions.invoke).toHaveBeenCalledWith("reset-account", {
+    region: "us-east-2",
+  });
   expect(localStorage.getItem("norte-chat:user-1")).toBeNull();
   expect(supabase.auth.signOut).not.toHaveBeenCalled();
 });
@@ -63,6 +66,8 @@ it("só remove a marca da conta depois da exclusão confirmada pelo servidor", a
   vi.mocked(supabase.auth.signOut).mockResolvedValue({ error: null } as never);
   localStorage.setItem("norte_has_account", "1");
   await deleteAccountPermanently("user-1");
-  expect(supabase.functions.invoke).toHaveBeenCalledWith("delete-account");
+  expect(supabase.functions.invoke).toHaveBeenCalledWith("delete-account", {
+    region: "us-east-2",
+  });
   expect(localStorage.getItem("norte_has_account")).toBeNull();
 });

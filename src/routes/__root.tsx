@@ -17,6 +17,7 @@ import { MoreVertical } from "lucide-react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthGate, SignInScreen } from "../components/AuthGate";
+import { useGoogleAutoSync, useGoogleCalendar } from "../lib/google-calendar-store";
 import { hasLinkedAccount, supabase } from "../lib/supabase/client";
 import { SportRecorderProvider } from "../lib/sport-recorder-context";
 import { ActiveRecordingBar } from "../components/esportes/ActiveRecordingBar";
@@ -328,6 +329,7 @@ function RootComponent() {
         className={`norte-app mx-auto min-h-screen max-w-md bg-background ${isFullScreenRoute ? "" : "norte-shell-with-controls pb-28"}`}
       >
         <AuthGate onBack={() => setEntered(false)}>
+          <GoogleAgendaSync />
           <SportRecorderProvider>
             {/* Bolha e painel ficam FORA do `div key={pathname}` de propósito:
                 é isso que os mantém montados ao trocar de tela, em vez de
@@ -426,4 +428,12 @@ function RootComponent() {
       </div>
     </QueryClientProvider>
   );
+}
+
+/** Sincronização com o Google Agenda em todo o app (não só na tela da Agenda):
+ * mudanças feitas pela Home, pelo agente ou em outro aparelho também vão na hora. */
+function GoogleAgendaSync() {
+  const google = useGoogleCalendar();
+  useGoogleAutoSync(google.connection?.status === "active");
+  return null;
 }

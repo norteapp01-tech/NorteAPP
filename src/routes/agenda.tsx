@@ -56,7 +56,6 @@ import { nowDate } from "@/lib/test-clock";
 import {
   RETURN_MESSAGES,
   completeGoogleConnect,
-  useGoogleAutoSync,
   useGoogleCalendar,
 } from "@/lib/google-calendar-store";
 import "@/components/agenda.css";
@@ -103,8 +102,6 @@ function AgendaScreen() {
   const search = Route.useSearch();
   const navigate = useNavigate();
   const googleState = useGoogleCalendar();
-  // Sincronização automática com o Google (ao abrir, ao voltar e depois de mudanças).
-  useGoogleAutoSync(googleState.connection?.status === "active");
 
   // UM estado manda: o dia selecionado. Semana, título e conteúdo derivam dele.
   const [selectedDate, setSelectedDate] = useState(() => search.date ?? todayISO());

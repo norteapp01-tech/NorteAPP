@@ -5,16 +5,22 @@
 // auth.users(id) on delete cascade`, apagar o auth.users já apaga tudo em cascata.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { removeUserFiles } from "../_shared/account-storage.ts";
+import { accountCors } from "../_shared/account-cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 Deno.serve(async (req) => {
-  if (req.method !== "POST") return new Response(null, { status: 405 });
+  const cors = accountCors(req);
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (req.method !== "POST") return new Response(null, { status: 405, headers: cors });
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
-    return new Response(JSON.stringify({ error: "Sem autenticação." }), { status: 401 });
+    return new Response(JSON.stringify({ error: "Sem autenticação." }), {
+      status: 401,
+      headers: cors,
+    });
   }
 
   // Cliente com a anon key + o JWT do chamador — só serve pra descobrir QUEM está pedindo.
@@ -23,7 +29,10 @@ Deno.serve(async (req) => {
   });
   const { data: userData, error: userError } = await callerClient.auth.getUser();
   if (userError || !userData.user) {
-    return new Response(JSON.stringify({ error: "Sessão inválida." }), { status: 401 });
+    return new Response(JSON.stringify({ error: "Sessão inválida." }), {
+      status: 401,
+      headers: cors,
+    });
   }
 
   // Só aqui, no servidor, a service_role é usada — nunca chega no client.
@@ -33,18 +42,18 @@ Deno.serve(async (req) => {
   } catch {
     return new Response(
       JSON.stringify({ error: "Não foi possível remover todos os arquivos. Tente novamente." }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+      { status: 500, headers: { ...cors, "Content-Type": "application/json" } },
     );
   }
   const { error: deleteError } = await adminClient.auth.admin.deleteUser(userData.user.id);
   if (deleteError) {
     return new Response(JSON.stringify({ error: deleteError.message }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   }
 
   return new Response(JSON.stringify({ ok: true }), {
-    headers: { "Content-Type": "application/json" },
+    headers: { ...cors, "Content-Type": "application/json" },
   });
 });

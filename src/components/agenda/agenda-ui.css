@@ -135,7 +135,11 @@
     color-mix(in srgb, var(--lbl) 9%, var(--surface));
   color: var(--foreground);
   text-align: left;
-  touch-action: none;
+  /* rolar a página por cima do compromisso é normal; arrastar exige tocar e segurar */
+  touch-action: pan-x pan-y;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
   user-select: none;
   transition:
     box-shadow 140ms ease,
@@ -163,6 +167,16 @@
   outline-offset: 1px;
 }
 
+.agenda-block[data-armed="true"] {
+  transform: scale(1.03);
+  box-shadow:
+    0 10px 28px rgb(0 0 0 / 0.45),
+    0 0 0 1.5px var(--color-primary);
+  z-index: 6;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
 .agenda-block[data-selected="true"],
 .agenda-block[data-dragging="true"] {
   z-index: 30;
@@ -209,6 +223,7 @@
 }
 
 .agenda-resize {
+  -webkit-touch-callout: none;
   position: absolute;
   right: 0;
   bottom: 0;
@@ -218,7 +233,7 @@
   justify-content: center;
   height: 14px;
   padding-bottom: 2px;
-  touch-action: none;
+  touch-action: pan-x pan-y;
   cursor: ns-resize;
 }
 .agenda-resize span {

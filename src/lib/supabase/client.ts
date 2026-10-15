@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type FunctionRegion } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 import { queryClient } from "../query-client";
 import { setAppTimeZone } from "../app-time-zone";
@@ -21,6 +21,11 @@ if (!url || !anonKey) {
 export const supabase = createClient(url, anonKey, {
   auth: { persistSession: true, autoRefreshToken: true },
 });
+
+/** Região do banco. As Edge Functions rodam aqui (e não na borda mais próxima da
+ * pessoa): cada consulta ao banco deixa de atravessar o continente. Medido: uma
+ * sincronização com o Google caiu de ~8,6 s para ~2,7 s. */
+export const FUNCTIONS_REGION = "us-east-2" as FunctionRegion;
 
 let bootstrapped: Promise<string> | null = null;
 
@@ -113,9 +118,12 @@ const isNetworkError = (e: unknown) => {
 
 /** Tenta recuperar a sessão anterior a partir da cópia guardada. */
 async function recoverFromBackup(backup: SessionBackup): Promise<string> {
-  const { data, error } = await supabase.auth.refreshSession({ refresh_token: backup.refreshToken });
+  const { data, error } = await supabase.auth.refreshSession({
+    refresh_token: backup.refreshToken,
+  });
   if (data.session?.user.id === backup.userId) return backup.userId;
-  if (error && isNetworkError(error)) throw new Error(`Sem conexão para recuperar a sessão: ${error.message}`);
+  if (error && isNetworkError(error))
+    throw new Error(`Sem conexão para recuperar a sessão: ${error.message}`);
   // A sessão recuperada é de outra pessoa (não deveria acontecer) ou o token foi recusado.
   if (data.session) await supabase.auth.signOut({ scope: "local" });
   throw new SessionLostError();
@@ -201,7 +209,8 @@ export function useSupabaseUserId(): string | undefined {
           // acima) — sem este retry, uma falha transitória de rede deixava este hook
           // parado em `undefined` para sempre, mesmo depois da rede voltar.
           // Sessão perdida não se resolve sozinha: o AuthGate pergunta à pessoa.
-          if (!cancelled && !(err instanceof SessionLostError)) retryTimer = setTimeout(attempt, 3000);
+          if (!cancelled && !(err instanceof SessionLostError))
+            retryTimer = setTimeout(attempt, 3000);
         },
       );
     };

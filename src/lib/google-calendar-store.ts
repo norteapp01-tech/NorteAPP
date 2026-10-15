@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase, useSupabaseUserId } from "./supabase/client";
+import { FUNCTIONS_REGION, supabase, useSupabaseUserId } from "./supabase/client";
 import { queryClient } from "./query-client";
 import { QUERY_KEY as GOALS_QUERY_KEY } from "./goals-store";
 import { SERIES_QUERY_KEY } from "./agenda-series-store";
@@ -218,6 +218,7 @@ export class GoogleActionError extends Error {
 async function call<T>(action: string, body: Record<string, unknown> = {}): Promise<T> {
   const { data, error } = await supabase.functions.invoke("google-calendar", {
     body: { action, ...body },
+    region: FUNCTIONS_REGION,
   });
   if (error) {
     let message = "Não foi possível falar com o Google Agenda. Tente de novo.";
@@ -278,7 +279,13 @@ export type SyncResult = { stats: Record<string, number>; skipped: boolean; erro
 
 export async function syncGoogleNow(trigger: "manual" | "push" = "manual"): Promise<SyncResult> {
   const result = await call<SyncResult>("sync", { trigger, timeZone: deviceZone() });
-  await invalidateGoogle();
+  // Envio automático: a Agenda só precisa recarregar se algo veio do Google (o
+  // Realtime também avisa). Recarregar sempre gerava um novo envio em ciclo.
+  const changedHere = Object.entries(result.stats ?? {}).some(
+    ([k, v]) => k.includes("no_norte") && v > 0,
+  );
+  if (trigger === "manual" || changedHere) await invalidateGoogle();
+  else await queryClient.invalidateQueries({ queryKey: GOOGLE_QUERY_KEY, refetchType: "all" });
   return result;
 }
 
@@ -325,65 +332,130 @@ export const RETURN_MESSAGES: Record<string, string> = {
 // ---------------------------------------------------------------------------
 // Sincronização automática do lado do app
 //
-// A fila de saída é preenchida por gatilhos do banco; quem envia é a função.
-// Aqui só pedimos para ela rodar: ao abrir, ao voltar para o app e depois de
-// mudanças — com folga, para que as próprias atualizações da sincronização
-// não disparem outra.
+// A fila de saída é preenchida por gatilhos do banco; quem envia é a função. O app
+// pede o envio assim que percebe uma mudança — pelo Realtime (qualquer tela, o
+// agente, outro aparelho) e pela Agenda em cache — e nunca descarta um pedido:
+// se já houver envio em andamento, roda de novo logo depois. O servidor espera a
+// vez se o Google estiver sincronizando ao mesmo tempo.
+//
+// Do Google para o Norte: o aviso do Google faz o servidor sincronizar; a linha da
+// conexão muda (syncing → idle) e o Realtime avisa o app para recarregar a Agenda.
 // ---------------------------------------------------------------------------
 
-const DEBOUNCE_MS = 3000;
-const COOLDOWN_MS = 5000;
+const PUSH_DEBOUNCE_MS = 450;
+const REFRESH_DEBOUNCE_MS = 250;
 const MIN_GAP_MS = 60_000;
+/** Sem Realtime (rede que bloqueia websocket), confere de tempos em tempos com o app aberto. */
+const FALLBACK_POLL_MS = 45_000;
 
 export function useGoogleAutoSync(enabled: boolean) {
-  const lastRun = useRef(0);
-  const running = useRef(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userId = useSupabaseUserId();
 
   useEffect(() => {
-    if (!enabled) return;
-    const run = async (trigger: "manual" | "push") => {
-      if (running.current) return;
-      running.current = true;
+    if (!enabled || !userId) return;
+    let lastRun = 0;
+    let running = false;
+    let pending = false;
+    let pushTimer: ReturnType<typeof setTimeout> | null = null;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let selfRefresh = 0;
+    let realtimeOk = false;
+
+    const run = async () => {
+      if (running) {
+        pending = true;
+        return;
+      }
+      running = true;
+      pending = false;
       try {
-        await syncGoogleNow(trigger);
+        selfRefresh += 1;
+        await syncGoogleNow("push");
       } catch {
         /* O estado de erro já aparece nas configurações. */
       } finally {
-        running.current = false;
-        lastRun.current = Date.now();
+        selfRefresh -= 1;
+        running = false;
+        lastRun = Date.now();
+        if (pending) schedulePush(150);
       }
     };
-    const schedule = (delay = DEBOUNCE_MS) => {
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => void run("push"), delay);
+    const schedulePush = (delay = PUSH_DEBOUNCE_MS) => {
+      if (pushTimer) clearTimeout(pushTimer);
+      pushTimer = setTimeout(() => void run(), delay);
+    };
+    const refreshAgenda = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(async () => {
+        selfRefresh += 1;
+        try {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: GOALS_QUERY_KEY, refetchType: "all" }),
+            queryClient.invalidateQueries({ queryKey: SERIES_QUERY_KEY, refetchType: "all" }),
+            queryClient.invalidateQueries({ queryKey: GOOGLE_QUERY_KEY, refetchType: "all" }),
+          ]);
+        } finally {
+          selfRefresh -= 1;
+        }
+      }, REFRESH_DEBOUNCE_MS);
     };
 
     // Ao abrir: se faz tempo, sincroniza.
-    if (Date.now() - lastRun.current > MIN_GAP_MS) schedule(800);
-
+    if (Date.now() - lastRun > MIN_GAP_MS) schedulePush(800);
     const onVisible = () => {
-      if (document.visibilityState === "visible" && Date.now() - lastRun.current > MIN_GAP_MS)
-        schedule(500);
+      if (document.visibilityState === "visible") schedulePush(400);
     };
-    const onOnline = () => schedule(500);
+    const onOnline = () => schedulePush(400);
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("online", onOnline);
 
-    // Mudanças da pessoa na Agenda: envia pouco depois.
+    // Realtime: mudanças nos compromissos da pessoa → envia; sincronização terminou → recarrega.
+    const channel = supabase.channel(`agenda-sync-${userId}`);
+    for (const table of ["executions", "agenda_series", "agenda_series_exceptions"]) {
+      channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table, filter: `user_id=eq.${userId}` },
+        () => schedulePush(),
+      );
+    }
+    channel.on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "google_calendar_connections",
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => {
+        const row = payload.new as { sync_state?: string } | undefined;
+        if (row?.sync_state && row.sync_state !== "syncing") refreshAgenda();
+      },
+    );
+    channel.subscribe((status) => {
+      realtimeOk = status === "SUBSCRIBED";
+    });
+
+    // Mudanças feitas na Agenda (inclusive exclusões, que o Realtime não filtra por pessoa).
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       if (event.type !== "updated" || event.action.type !== "success") return;
       const key = event.query.queryKey[0];
       if (key !== GOALS_QUERY_KEY[0] && key !== SERIES_QUERY_KEY[0]) return;
-      if (running.current || Date.now() - lastRun.current < COOLDOWN_MS) return;
-      schedule();
+      if (selfRefresh > 0) return; // recarga causada pela própria sincronização
+      schedulePush();
     });
+
+    const poll = setInterval(() => {
+      if (!realtimeOk && document.visibilityState === "visible") schedulePush(0);
+    }, FALLBACK_POLL_MS);
 
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("online", onOnline);
       unsubscribe();
-      if (timer.current) clearTimeout(timer.current);
+      clearInterval(poll);
+      if (pushTimer) clearTimeout(pushTimer);
+      if (refreshTimer) clearTimeout(refreshTimer);
+      void supabase.removeChannel(channel);
     };
-  }, [enabled]);
+  }, [enabled, userId]);
 }

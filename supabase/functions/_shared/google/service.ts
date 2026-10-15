@@ -59,7 +59,14 @@ export type Deps = {
   /** Para testes: troca o cliente da API. */
   makeApi?: (getAccessToken: () => Promise<string>) => GoogleCalendarApi;
   newId?: () => string;
+  /** Para testes: espera entre tentativas de pegar a trava. */
+  sleep?: (ms: number) => Promise<void>;
 };
+
+/** Quanto um envio/aviso espera a sincronização em andamento terminar, em vez de
+ * ser descartado (antes ficava parado até o cron de 5 min — o "às vezes trava"). */
+export const LOCK_WAIT_MS = 12_000;
+const LOCK_RETRY_MS = 700;
 
 /** Erro com mensagem própria para a pessoa e um código estável para a interface. */
 export class ServiceError extends Error {
@@ -662,6 +669,8 @@ export type SyncOptions = {
   initialCalendars?: string[];
   /** Coloca na fila tudo o que já existe no Norte (primeira conexão). */
   backfill?: boolean;
+  /** Quanto esperar pela trava se outra sincronização estiver rodando (0 = desiste na hora). */
+  lockWaitMs?: number;
 };
 
 export type SyncSummary = { skipped?: boolean; stats: Stats; error?: string };
@@ -676,20 +685,23 @@ export async function syncConnection(
     throw new ServiceError("É preciso reconectar o Google Agenda.", "needs_reauth", 409);
 
   // Trava: uma sincronização por vez por pessoa (a travada há muito tempo é ignorada).
-  const staleBefore = new Date(deps.now().getTime() - LOCK_STALE_MS).toISOString();
-  const locked = await q<Row[]>(
-    deps.db
-      .from("google_calendar_connections")
-      .update({ sync_state: "syncing" })
-      .eq("id", conn.id)
-      .neq("sync_state", "syncing")
-      .select(),
-  );
-  let acquired = Boolean(locked && locked.length > 0);
-  if (!acquired) {
-    // A retomada também precisa ser atômica. Usar o `updated_at` carregado antes
-    // permitiria que duas chamadas vissem a mesma fotografia antiga e ambas
-    // roubassem a trava que a outra acabou de adquirir.
+  // Envio, aviso do Google e "sincronizar agora" esperam a vez em vez de desistir.
+  const waitMs =
+    opts.lockWaitMs ?? (opts.trigger === "cron" || opts.trigger === "initial" ? 0 : LOCK_WAIT_MS);
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const tryLock = async () => {
+    const locked = await q<Row[]>(
+      deps.db
+        .from("google_calendar_connections")
+        .update({ sync_state: "syncing" })
+        .eq("id", conn.id)
+        .neq("sync_state", "syncing")
+        .select(),
+    );
+    if (locked?.length) return true;
+    // Trava vencida (sincronização interrompida): retoma de forma atômica — usar o
+    // `updated_at` carregado antes deixaria duas chamadas roubarem a mesma trava.
+    const staleBefore = new Date(deps.now().getTime() - LOCK_STALE_MS).toISOString();
     const reclaimed = await q<Row[]>(
       deps.db
         .from("google_calendar_connections")
@@ -699,7 +711,12 @@ export async function syncConnection(
         .lt("updated_at", staleBefore)
         .select(),
     );
-    acquired = Boolean(reclaimed && reclaimed.length > 0);
+    return Boolean(reclaimed?.length);
+  };
+  let acquired = await tryLock();
+  for (let waited = 0; !acquired && waited < waitMs; waited += LOCK_RETRY_MS) {
+    await sleep(LOCK_RETRY_MS);
+    acquired = await tryLock();
   }
   if (!acquired) return { skipped: true, stats: {} };
 
@@ -707,7 +724,11 @@ export async function syncConnection(
   // fecha-as para o histórico não mentir e a interface não mostrar sincronização eterna.
   await deps.db
     .from("google_calendar_sync_runs")
-    .update({ status: "error", finished_at: deps.now().toISOString(), error: "Rodada interrompida antes do fim; retomada na seguinte." })
+    .update({
+      status: "error",
+      finished_at: deps.now().toISOString(),
+      error: "Rodada interrompida antes do fim; retomada na seguinte.",
+    })
     .eq("connection_id", conn.id)
     .eq("status", "running");
 
@@ -748,6 +769,13 @@ export async function syncConnection(
       newId: deps.newId ?? (() => crypto.randomUUID()),
     };
     await withTokenRetry(deps, conn, async () => {
+      // Mudança feita no Norte: vai ao Google primeiro (é o que a pessoa está esperando ver);
+      // a leitura das agendas vem em seguida. Conflitos continuam protegidos pelo etag.
+      const t0 = Date.now();
+      if (opts.trigger === "push") {
+        await pushOutbox(ctx);
+        stats.ms_envio = Date.now() - t0;
+      }
       let calendars = ((await q<Cal[]>(
         deps.db
           .from("google_calendars")
@@ -806,7 +834,10 @@ export async function syncConnection(
           .from("agenda_sync_outbox")
           .update({ next_attempt_at: null })
           .eq("user_id", userId);
+      const t1 = Date.now();
       await pushOutbox(ctx);
+      stats.ms_leitura_e_fim = t1 - t0 - (stats.ms_envio ?? 0);
+      stats.ms_total = Date.now() - t0;
     });
   } catch (error) {
     failure = message(error);

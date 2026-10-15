@@ -562,11 +562,38 @@ describe("agendas: escolher e deixar de sincronizar", () => {
 });
 
 describe("sincronização manual e travas", () => {
-  it("duas sincronizações ao mesmo tempo: a segunda espera a primeira", async () => {
+  it("duas sincronizações ao mesmo tempo: a segunda espera a primeira terminar e roda", async () => {
+    await connect();
+    const conn = h.fake.rows("google_calendar_connections")[0];
+    conn.sync_state = "syncing";
+    let waits = 0;
+    const deps = {
+      ...h.deps,
+      sleep: async () => {
+        waits += 1;
+        if (waits === 2) conn.sync_state = "idle"; // a primeira terminou
+      },
+    };
+    const result = await syncConnection(deps, "user-a", { trigger: "push" });
+    expect(waits).toBe(2);
+    expect(result.skipped).not.toBe(true);
+  });
+
+  it("sem tempo de espera (cron), desiste se outra estiver rodando", async () => {
     await connect();
     h.fake.rows("google_calendar_connections")[0].sync_state = "syncing";
-    const result = await syncConnection(h.deps, "user-a", { trigger: "manual" });
+    const result = await syncConnection(h.deps, "user-a", { trigger: "cron" });
     expect(result.skipped).toBe(true);
+  });
+
+  it("espera no máximo o limite e então desiste", async () => {
+    await connect();
+    h.fake.rows("google_calendar_connections")[0].sync_state = "syncing";
+    let waits = 0;
+    const deps = { ...h.deps, sleep: async () => void (waits += 1) };
+    const result = await syncConnection(deps, "user-a", { trigger: "webhook", lockWaitMs: 2100 });
+    expect(result.skipped).toBe(true);
+    expect(waits).toBe(3);
   });
 
   it("retoma uma trava realmente vencida com a condição conferida no banco", async () => {

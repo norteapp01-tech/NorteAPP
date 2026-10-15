@@ -1,4 +1,11 @@
-import { useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+} from "react";
 import { AlertTriangle, CalendarSync, Check, Lock, Repeat } from "lucide-react";
 import { DAY_MIN, crossesMidnight, durationMinutes, layoutColumns } from "@/lib/agenda-intervals";
 import { minutesToTime, timeToMinutes } from "@/lib/agenda-time";
@@ -13,6 +20,11 @@ export { HOUR_HEIGHT, TIMELINE_HEIGHT };
 
 const STEP = 15;
 const DRAG_START_PX = 4;
+/** No toque, só arrasta depois de segurar (padrão de "tocar e segurar" do iOS/Android).
+ * Antes disso, deslizar o dedo é rolagem — esbarrar num compromisso não muda o horário. */
+export const LONG_PRESS_MS = 500;
+/** Quanto o dedo pode tremer enquanto segura sem cancelar o "segurar". */
+const LONG_PRESS_TOLERANCE_PX = 10;
 const MIN_BLOCK_PX = 30;
 
 const snap = (minutes: number) => Math.round(minutes / STEP) * STEP;
@@ -234,7 +246,34 @@ function OccurrenceBlock({
     x: number;
     y: number;
     moved: boolean;
+    /** Pode arrastar: mouse na hora; toque/caneta só depois de segurar. */
+    armed: boolean;
+    pointerId: number;
+    target: HTMLElement;
+    timer?: ReturnType<typeof setTimeout>;
   } | null>(null);
+  const [armed, setArmed] = useState(false);
+  const blockRef = useRef<HTMLDivElement>(null);
+
+  // Com o arraste armado, o dedo não pode rolar a página. touch-action não muda no
+  // meio do gesto, então bloqueamos a rolagem no touchmove (listener não passivo).
+  useEffect(() => {
+    const el = blockRef.current;
+    if (!el) return;
+    const stop = (e: TouchEvent) => {
+      if (gesture.current?.armed) e.preventDefault();
+    };
+    el.addEventListener("touchmove", stop, { passive: false });
+    return () => el.removeEventListener("touchmove", stop);
+  }, []);
+  useEffect(() => () => clearTimeout(gesture.current?.timer), []);
+
+  const reset = () => {
+    clearTimeout(gesture.current?.timer);
+    gesture.current = null;
+    setArmed(false);
+    setDrag(null);
+  };
 
   const realDuration = occ.startTime ? durationMinutes(occ.startTime, occ.endTime) : 60;
   const crosses = occ.startTime ? crossesMidnight(occ.startTime, occ.endTime) : false;
@@ -275,10 +314,37 @@ function OccurrenceBlock({
   };
 
   const begin = (mode: "move" | "resize", event: PointerEvent<HTMLElement>) => {
-    if (!canEdit || saving) return;
     event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    gesture.current = { mode, x: event.clientX, y: event.clientY, moved: false };
+    const touch = event.pointerType !== "mouse";
+    const target = event.currentTarget;
+    // Toque abre o compromisso mesmo quando não dá para editar (lido do Google etc.).
+    gesture.current = {
+      mode,
+      x: event.clientX,
+      y: event.clientY,
+      moved: false,
+      armed: false,
+      pointerId: event.pointerId,
+      target,
+    };
+    if (!canEdit || saving) return;
+    if (!touch) {
+      gesture.current.armed = true;
+      target.setPointerCapture(event.pointerId);
+      return;
+    }
+    gesture.current.timer = setTimeout(() => {
+      const g = gesture.current;
+      if (!g || g.moved) return;
+      g.armed = true;
+      setArmed(true);
+      try {
+        g.target.setPointerCapture(g.pointerId);
+      } catch {
+        /* o ponteiro já saiu */
+      }
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(12);
+    }, LONG_PRESS_MS);
   };
 
   const move = (event: PointerEvent<HTMLElement>) => {
@@ -286,6 +352,14 @@ function OccurrenceBlock({
     if (!g) return;
     const dx = event.clientX - g.x;
     const dy = event.clientY - g.y;
+    if (!g.armed) {
+      // Mexeu antes de segurar o tempo: é rolagem/toque, não arraste.
+      if (Math.hypot(dx, dy) > LONG_PRESS_TOLERANCE_PX) {
+        clearTimeout(g.timer);
+        g.moved = true;
+      }
+      return;
+    }
     if (!g.moved && Math.hypot(dx, dy) < DRAG_START_PX) return;
     g.moved = true;
     setDrag({ mode: g.mode, dy, dx: g.mode === "move" && resolveDropDate ? dx : 0 });
@@ -293,12 +367,21 @@ function OccurrenceBlock({
 
   const finish = async (event: PointerEvent<HTMLElement>) => {
     const g = gesture.current;
+    clearTimeout(g?.timer);
     gesture.current = null;
+    setArmed(false);
     event.stopPropagation();
     if (!g) return;
+    if (!g.armed) {
+      // Soltou antes do tempo: toque simples abre; dedo que deslizou não faz nada.
+      setDrag(null);
+      if (!g.moved) onOpen(occ);
+      return;
+    }
     if (!g.moved) {
       setDrag(null);
-      onOpen(occ);
+      // Segurou e soltou sem arrastar: só "levantou" o bloco, não abre nem muda nada.
+      if (event.pointerType === "mouse") onOpen(occ);
       return;
     }
     const dy = event.clientY - g.y;
@@ -404,19 +487,19 @@ function OccurrenceBlock({
       data-conflict={conflict || undefined}
       data-ghost={ghost || undefined}
       data-selected={selected || undefined}
+      ref={blockRef}
       data-dragging={drag ? "true" : undefined}
+      data-armed={armed && !drag ? "true" : undefined}
       className={`agenda-block ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${saving ? "opacity-60" : ""}`}
       style={style}
       role="button"
       tabIndex={0}
-      aria-label={`${description}. ${canEdit ? "Toque para abrir, arraste para mudar o horário." : "Toque para abrir."}`}
+      aria-label={`${description}. ${canEdit ? "Toque para abrir; toque e segure para arrastar e mudar o horário." : "Toque para abrir."}`}
       onPointerDown={(e) => begin("move", e)}
       onPointerMove={move}
       onPointerUp={finish}
-      onPointerCancel={() => {
-        gesture.current = null;
-        setDrag(null);
-      }}
+      onPointerCancel={reset}
+      onContextMenu={(e) => e.preventDefault()}
       onKeyDown={keyDown}
     >
       <p className="agenda-block-title flex items-center gap-1">
@@ -449,10 +532,7 @@ function OccurrenceBlock({
           onPointerDown={(e) => begin("resize", e)}
           onPointerMove={move}
           onPointerUp={finish}
-          onPointerCancel={() => {
-            gesture.current = null;
-            setDrag(null);
-          }}
+          onPointerCancel={reset}
         >
           <span />
         </div>

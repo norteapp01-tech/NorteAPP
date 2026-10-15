@@ -1,10 +1,12 @@
-import { markIntentionalSignOut, supabase } from "./supabase/client";
+import { FUNCTIONS_REGION, markIntentionalSignOut, supabase } from "./supabase/client";
 import { queryClient } from "./query-client";
 import { clearRecordingState } from "./sport-recording-db";
 import { setAppTimeZone } from "./app-time-zone";
 
 async function invokeAccountAction(name: "reset-account" | "delete-account") {
-  const { data, error } = await supabase.functions.invoke(name);
+  const { data, error } = await supabase.functions.invoke(name, {
+    region: FUNCTIONS_REGION,
+  });
   if (error || data?.ok !== true) {
     throw new Error(data?.error || "Não foi possível concluir. Nenhuma conclusão foi confirmada.");
   }

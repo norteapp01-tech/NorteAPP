@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { TimelineColumn } from "./Timeline";
 import type { AgendaOccurrence } from "@/lib/agenda-occurrences";
 
@@ -140,5 +140,63 @@ describe("linha do tempo", () => {
   it("avisa o conflito para leitores de tela", () => {
     setup([occ({ key: "a" }), occ({ key: "b" })], [], ["a", "b"]);
     expect(screen.getAllByRole("button", { name: /em conflito/i })).toHaveLength(2);
+  });
+});
+
+describe("arrastar exige tocar e segurar (no toque)", () => {
+  // jsdom não tem PointerEvent; um MouseEvent com pointerType/pointerId basta para o componente.
+  const pointer = (el: HTMLElement, type: string, y: number, pointerType = "touch") => {
+    const ev = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: 10, clientY: y });
+    Object.assign(ev, { pointerType, pointerId: 1 });
+    el.setPointerCapture = () => {};
+    fireEvent(el, ev);
+  };
+
+  it("toque rápido abre o compromisso e não muda o horário", () => {
+    const { onOpen, onCommit } = setup([occ({ key: "a" })]);
+    const [a] = blocks();
+    pointer(a, "pointerdown", 100);
+    pointer(a, "pointerup", 100);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("deslizar o dedo sem segurar é rolagem: não move nem abre", () => {
+    vi.useFakeTimers();
+    const { onOpen, onCommit } = setup([occ({ key: "a" })]);
+    const [a] = blocks();
+    pointer(a, "pointerdown", 100);
+    pointer(a, "pointermove", 160);
+    pointer(a, "pointerup", 220);
+    vi.runAllTimers();
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(onOpen).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("segurou o tempo: o bloco levanta e o arraste muda o horário", async () => {
+    vi.useFakeTimers();
+    const { onCommit } = setup([occ({ key: "a" })]);
+    const [a] = blocks();
+    pointer(a, "pointerdown", 100);
+    await act(async () => {
+      vi.advanceTimersByTime(520);
+    });
+    expect(a.dataset.armed).toBe("true");
+    pointer(a, "pointermove", 160);
+    pointer(a, "pointerup", 400);
+    vi.useRealTimers();
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    const patch = (onCommit.mock.calls[0] as unknown[])[1] as { startTime: string };
+    expect(patch.startTime).not.toBe("10:00");
+  });
+
+  it("com mouse o arraste continua imediato", () => {
+    const { onCommit } = setup([occ({ key: "a" })]);
+    const [a] = blocks();
+    pointer(a, "pointerdown", 100, "mouse");
+    pointer(a, "pointermove", 160, "mouse");
+    pointer(a, "pointerup", 400, "mouse");
+    expect(onCommit).toHaveBeenCalledTimes(1);
   });
 });
