@@ -219,7 +219,11 @@ export function BodyMap({
 
   const stage = (
     <div className="evo-body-stage">
-      <svg viewBox="10 0 610 1220" role={interactive ? "group" : "img"} aria-label={`Mapa muscular: ${view}`}>
+      <svg
+        viewBox="10 0 610 1220"
+        role={interactive ? "group" : "img"}
+        aria-label={`Mapa muscular: ${view}`}
+      >
         <defs>
           <clipPath id={`${id}-atlas`}>
             <rect width="627" height="1254" />
@@ -256,9 +260,13 @@ export function BodyMap({
               <path
                 key={`${index}-${mirror}`}
                 d={region.d}
-                transform={mirror ? `translate(${view === "frente" ? 660 : 590} 0) scale(-1 1)` : undefined}
+                transform={
+                  mirror ? `translate(${view === "frente" ? 660 : 590} 0) scale(-1 1)` : undefined
+                }
                 fill={color}
-                fillOpacity={mode === "volume" ? (count > 0 ? 0.22 + ratio * 0.4 : 0.05) : known ? 0.48 : 0.05}
+                fillOpacity={
+                  mode === "volume" ? (count > 0 ? 0.22 + ratio * 0.4 : 0.05) : known ? 0.48 : 0.05
+                }
                 stroke={active ? "#fff" : color}
                 strokeOpacity={active ? 1 : 0.65}
                 strokeWidth={active ? 2.5 : 1.2}
@@ -303,7 +311,10 @@ export function BodyMap({
             ["#efba5b", "Bastante (9+)"],
             ["#63717d", "Sem registro"],
           ]
-        : Object.entries(COLORS).map(([key, color]) => [color, progressLabel[key as keyof typeof COLORS]])
+        : Object.entries(COLORS).map(([key, color]) => [
+            color,
+            progressLabel[key as keyof typeof COLORS],
+          ])
       ).map(([color, label]) => (
         <span key={label}>
           <i style={{ background: color }} />
@@ -347,13 +358,21 @@ export function BodyMap({
         {stage}
       </div>
 
-      <button className="evo-view-toggle" onClick={() => setView(view === "frente" ? "costas" : "frente")}>
+      <button
+        className="evo-view-toggle"
+        onClick={() => setView(view === "frente" ? "costas" : "frente")}
+      >
         {view === "frente" ? "Frente" : "Costas"} <span>⇄</span>
       </button>
 
       {expanded && (
         <>
-          <button type="button" className="evo-map-close interactive-press" onClick={onCollapse} aria-label="Fechar o mapa">
+          <button
+            type="button"
+            className="evo-map-close interactive-press"
+            onClick={onCollapse}
+            aria-label="Fechar o mapa"
+          >
             ✕
           </button>
           <p className="evo-map-hint">

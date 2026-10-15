@@ -874,100 +874,170 @@
 }
 
 /* ---------------------------------------------------------------------------
- * Foco por músculo
+ * Radar por músculo: modos, legenda e detalhamento
  * ------------------------------------------------------------------------- */
-.evolution-dashboard .evo-focus-summary {
-  display: grid;
-  gap: 6px;
-  margin-bottom: 14px;
-  font-size: 13px;
-  line-height: 1.35;
+.evolution-dashboard .evo-radar-modes {
+  display: flex;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
 }
-.evolution-dashboard .evo-focus-summary p {
-  display: grid;
-  grid-template-columns: 96px 1fr;
-  gap: 8px;
-}
-.evolution-dashboard .evo-focus-summary b {
-  font-weight: 650;
-}
-.evolution-dashboard .evo-focus-scale {
-  position: relative;
-  height: 14px;
-  margin: 0 6px 2px;
+.evolution-dashboard .evo-radar-modes button {
+  min-height: 32px;
+  border-radius: 999px;
+  padding: 0 12px;
   color: var(--muted-foreground);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
 }
-.evolution-dashboard .evo-focus-scale span {
-  position: absolute;
-  top: 0;
+.evolution-dashboard .evo-radar-modes button[aria-pressed="true"] {
+  background: var(--surface-2);
+  color: var(--foreground);
+  box-shadow: inset 0 0 0 1px rgb(145 245 218 / 0.45);
 }
-.evolution-dashboard .evo-focus-list {
-  display: grid;
-  gap: 2px;
+.evolution-dashboard .evo-radar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  margin-top: 6px;
+  color: var(--muted-foreground);
+  font-size: 10.5px;
 }
-.evolution-dashboard .evo-focus-row {
-  width: 100%;
-  border-radius: 12px;
-  padding: 9px 6px;
-  text-align: left;
+.evolution-dashboard .evo-radar-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
-.evolution-dashboard .evo-focus-row.is-active {
-  background: rgb(145 245 218 / 0.08);
+.evolution-dashboard .evo-analysis {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  animation: evo-fade-in 0.3s ease both;
 }
-.evolution-dashboard .evo-focus-head,
-.evolution-dashboard .evo-focus-meta {
+.evolution-dashboard .evo-analysis-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  gap: 12px;
+}
+.evolution-dashboard .evo-analysis-head h3 {
+  font-size: 20px;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+}
+.evolution-dashboard .evo-analysis-head strong {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.evolution-dashboard .evo-analysis-lead {
+  margin-top: 4px;
+  font-size: 13px;
+}
+.evolution-dashboard .evo-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.evolution-dashboard .evo-analysis-grid > div {
+  border-radius: 12px;
+  background: var(--surface-2);
+  padding: 10px 12px;
+}
+.evolution-dashboard .evo-analysis-grid dt {
+  color: var(--muted-foreground);
+  font-size: 10.5px;
+}
+.evolution-dashboard .evo-analysis-grid dd {
+  margin-top: 2px;
+  font-size: 15px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.evolution-dashboard .evo-analysis-sub {
+  margin-top: 14px;
+  color: var(--muted-foreground);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.evolution-dashboard .evo-analysis-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.evolution-dashboard .evo-analysis-list li {
+  display: flex;
+  justify-content: space-between;
   gap: 10px;
 }
-.evolution-dashboard .evo-focus-name {
-  font-size: 14px;
-  font-weight: 600;
+.evolution-dashboard .evo-analysis-list li > span:first-child {
+  min-width: 0;
 }
-.evolution-dashboard .evo-focus-trend {
+.evolution-dashboard .evo-analysis-list li > span:last-child {
   flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 600;
+  text-align: right;
 }
-.evolution-dashboard .evo-focus-track {
-  position: relative;
-  height: 8px;
-  margin: 7px 0 6px;
-  overflow: hidden;
-  border-radius: 99px;
-  background: rgb(255 255 255 / 0.06);
-}
-.evolution-dashboard .evo-focus-band {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  background: rgb(145 245 218 / 0.14);
-  border-inline: 1px solid rgb(145 245 218 / 0.35);
-}
-.evolution-dashboard .evo-focus-fill {
-  position: absolute;
-  top: 1px;
-  bottom: 1px;
-  left: 0;
-  border-radius: 99px;
-  opacity: 0.9;
-  transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.evolution-dashboard .evo-focus-meta {
+.evolution-dashboard .evo-analysis-list em {
   color: var(--muted-foreground);
-  font-size: 11px;
-}
-.evolution-dashboard .evo-focus-meta b {
-  color: var(--foreground);
-  font-weight: 650;
-}
-.evolution-dashboard .evo-focus-meta em {
   font-style: normal;
 }
+.evolution-dashboard .evo-analysis-text {
+  margin-top: 10px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.evolution-dashboard .evo-analysis-note {
+  margin-top: 12px;
+  border-left: 2px solid #e8b56a;
+  padding-left: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.evolution-dashboard .evo-progression {
+  margin-top: 12px;
+  border: 1px solid rgb(242 193 78 / 0.45);
+  border-radius: 14px;
+  background: rgb(242 193 78 / 0.08);
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.evolution-dashboard .evo-progression b {
+  color: #f2c14e;
+}
+.evolution-dashboard .evo-progression ul {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+.evolution-dashboard .evo-progression li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+}
+.evolution-dashboard .evo-progression-action,
+.evolution-dashboard .evo-progression-confirm {
+  min-height: 34px;
+  border: 1px solid rgb(242 193 78 / 0.6);
+  border-radius: 999px;
+  padding: 0 12px;
+  color: #f2c14e;
+  font-weight: 600;
+}
+.evolution-dashboard .evo-progression-confirm {
+  background: #f2c14e;
+  color: #1a1408;
+}
+
 /* Filhos da grade podem encolher: sem isso, uma linha que não quebra (ex.: o
  * detalhe do músculo selecionado) alargava a coluna inteira além da tela. */
 .evolution-dashboard > * {
@@ -975,4 +1045,7 @@
 }
 .evolution-dashboard .evo-muscle-heading strong {
   text-align: right;
+}
+.evolution-dashboard .evo-radar-card svg [role="button"]:focus:not(:focus-visible) {
+  outline: none;
 }

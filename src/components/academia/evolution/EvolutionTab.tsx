@@ -15,7 +15,6 @@ import {
   muscleStimulus,
   detailSetCounts,
   previousRange,
-  rangeLengthDays,
   rangeOfLastDays,
   resolveSets,
   type DateRange,
@@ -24,8 +23,11 @@ import {
 import { BodyMap } from "./AnatomyMap";
 import { muscleProgress, progressLabel } from "@/lib/workout-map";
 import { RepetitionProfile } from "./RepetitionProfile";
-import { FocusChart } from "./FocusChart";
-import { muscleFocus } from "@/lib/workout-focus";
+import { RadarDistribution, type RadarMode } from "./RadarDistribution";
+import { MuscleAnalysisDetail } from "./MuscleAnalysisDetail";
+import { computeCompletion } from "@/lib/muscle-analysis/completion";
+import { computeEvolution } from "@/lib/muscle-analysis/evolution";
+import { todayISO } from "@/lib/goals-store";
 import { OverloadList } from "./OverloadList";
 import "./evolution.css";
 import { ExerciseDetailSheet } from "./ExerciseDetailSheet";
@@ -62,6 +64,7 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
   const exercises = useWorkoutStore((s) => s.exercises);
   const plans = useWorkoutStore((s) => s.plans);
   const bodyWeights = useWorkoutStore((s) => s.bodyWeights);
+  const weeklyAssignment = useWorkoutStore((s) => s.weeklyAssignment);
   const cycles = useCycleStore((s) => s.cycles);
   const blocks = useCycleStore((s) => s.blocks);
   const blockPlans = useCycleStore((s) => s.blockPlans);
@@ -80,6 +83,7 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [openExercise, setOpenExercise] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
+  const [radarMode, setRadarMode] = useState<RadarMode>("cumprimento");
 
   useEffect(() => {
     if (initialStageId) setStageId(initialStageId);
@@ -120,14 +124,40 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
   const stimulus = useMemo(() => muscleStimulus(data.sets), [data.sets]);
   const detailCounts = useMemo(() => detailSetCounts(data.sets), [data.sets]);
   const progress = useMemo(() => muscleProgress(data.sets), [data.sets]);
-  // Foco por músculo: séries semanais contra a faixa de cada músculo, com o
-  // período anterior de mesma duração para mostrar a variação.
-  const focusRows = useMemo(() => {
-    const days = rangeLengthDays(data.effectiveRange);
+  // Análise por músculo: cumprimento do treino planejado (referência = a ficha da
+  // própria pessoa) e evolução de desempenho contra o período anterior.
+  const analysis = useMemo(() => {
+    const lineages = planLineageIds ? new Set(planLineageIds) : null;
+    const scopedSessions = lineages
+      ? sessions.filter((s) => s.planLineageId && lineages.has(s.planLineageId))
+      : sessions;
+    const scopedPlans = lineages ? plans.filter((p) => lineages.has(p.lineageId)) : plans;
+    const today = todayISO();
+    const input = (range: { from: string; to: string }) => ({
+      sessions: scopedSessions,
+      exercises,
+      plans: scopedPlans,
+      blocks,
+      blockDays,
+      weeklyAssignment,
+      range,
+      today,
+    });
     const prev = previousRange(data.effectiveRange);
-    const prevData = applyFilters(sessions, exercises, plans, { range: prev, planLineageIds });
-    return muscleFocus(data.sets, days, progress, { sets: prevData.sets, days: rangeLengthDays(prev) });
-  }, [data.sets, data.effectiveRange, progress, sessions, exercises, plans, planLineageIds]);
+    return {
+      completion: computeCompletion(input(data.effectiveRange), input(prev)),
+      evolution: computeEvolution(scopedSessions, exercises, data.effectiveRange, prev),
+    };
+  }, [
+    sessions,
+    exercises,
+    plans,
+    blocks,
+    blockDays,
+    weeklyAssignment,
+    planLineageIds,
+    data.effectiveRange,
+  ]);
   const allSets = useMemo(
     () => resolveSets(sessions, exercises, plans),
     [sessions, exercises, plans],
@@ -324,11 +354,25 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
 
       <details className="evo-distribution" open>
         <summary>
-          <span>Foco por músculo</span>
-          <small>Séries por semana</small>
+          <span>Seus músculos</span>
+          <small>{radarMode === "cumprimento" ? "Cumprimento" : "Evolução"}</small>
         </summary>
         <div className="evo-radar-card">
-          <FocusChart rows={focusRows} selected={muscle} onSelect={setMuscle} />
+          <RadarDistribution
+            completion={analysis.completion}
+            evolution={analysis.evolution}
+            mode={radarMode}
+            onModeChange={setRadarMode}
+            selected={muscle}
+            onSelect={setMuscle}
+          />
+          {muscle && (
+            <MuscleAnalysisDetail
+              mode={radarMode}
+              completion={analysis.completion.find((c) => c.muscleId === muscle)}
+              evolution={analysis.evolution.find((e) => e.muscleId === muscle)}
+            />
+          )}
         </div>
       </details>
       <RepetitionProfile
