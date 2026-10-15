@@ -729,3 +729,250 @@
     padding-inline: 10px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Mapa corporal no próprio card (sem modal).
+ * Toque no boneco: o texto some, o card cresce e o boneco cresce e centraliza;
+ * os músculos ficam tocáveis e a análise segue logo abaixo, sem abrir/fechar janela.
+ * ------------------------------------------------------------------------- */
+.evolution-dashboard .evo-hero-card {
+  transition: min-height 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.evolution-dashboard .evo-hero-card.is-map-open {
+  min-height: 620px;
+}
+.evolution-dashboard .evo-hero-copy {
+  transition:
+    opacity 0.28s ease,
+    transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.evolution-dashboard .evo-hero-card.is-map-open .evo-hero-copy {
+  opacity: 0;
+  transform: translateX(-28px);
+  pointer-events: none;
+}
+/* palco sem fundo: o atlas é fundido ao card (mix-blend-mode no SVG) */
+.evolution-dashboard .evo-hero-card .evo-body-stage {
+  background: transparent;
+}
+.evolution-dashboard .evo-map-preview {
+  inset: auto;
+  top: 0;
+  left: 48%;
+  width: 52%;
+  height: 100%;
+  cursor: pointer;
+  transition:
+    left 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+    width 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.evolution-dashboard .evo-map-preview .evo-body-stage {
+  transition:
+    right 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+    top 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+    width 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+    height 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.evolution-dashboard .evo-map-compact.is-expanded .evo-map-preview {
+  left: 0;
+  width: 100%;
+  cursor: default;
+}
+.evolution-dashboard .evo-map-compact.is-expanded .evo-map-preview .evo-body-stage {
+  top: 66px;
+  right: 50%;
+  width: min(330px, 86%);
+  height: 440px;
+  transform: translateX(50%);
+}
+.evolution-dashboard .evo-map-compact > .evo-map-controls {
+  transition: opacity 0.3s ease;
+}
+.evolution-dashboard .evo-map-compact.is-expanded > .evo-map-controls {
+  top: 16px;
+  bottom: auto;
+  left: 16px;
+}
+.evolution-dashboard .evo-map-compact.is-expanded .evo-view-toggle {
+  top: 16px;
+  bottom: auto;
+  right: 64px;
+}
+.evolution-dashboard .evo-map-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 7;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgb(7 9 8 / 0.62);
+  color: var(--foreground);
+  font-size: 14px;
+  backdrop-filter: blur(10px);
+  animation: evo-fade-in 0.35s ease 0.2s both;
+}
+.evolution-dashboard .evo-map-hint {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 62px;
+  z-index: 3;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 560;
+  text-align: center;
+  animation: evo-fade-in 0.35s ease 0.25s both;
+}
+.evolution-dashboard .evo-map-compact .evo-map-legend {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 14px;
+  z-index: 3;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-height: 0;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  animation: evo-fade-in 0.35s ease 0.3s both;
+}
+.evolution-dashboard .evo-map-compact .evo-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.evolution-dashboard .evo-map-compact .evo-map-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+}
+@keyframes evo-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .evolution-dashboard .evo-hero-card,
+  .evolution-dashboard .evo-hero-copy,
+  .evolution-dashboard .evo-map-preview,
+  .evolution-dashboard .evo-map-preview .evo-body-stage {
+    transition: none;
+  }
+  .evolution-dashboard .evo-map-close,
+  .evolution-dashboard .evo-map-hint,
+  .evolution-dashboard .evo-map-compact .evo-map-legend {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Foco por músculo
+ * ------------------------------------------------------------------------- */
+.evolution-dashboard .evo-focus-summary {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.evolution-dashboard .evo-focus-summary p {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 8px;
+}
+.evolution-dashboard .evo-focus-summary b {
+  font-weight: 650;
+}
+.evolution-dashboard .evo-focus-scale {
+  position: relative;
+  height: 14px;
+  margin: 0 6px 2px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.evolution-dashboard .evo-focus-scale span {
+  position: absolute;
+  top: 0;
+}
+.evolution-dashboard .evo-focus-list {
+  display: grid;
+  gap: 2px;
+}
+.evolution-dashboard .evo-focus-row {
+  width: 100%;
+  border-radius: 12px;
+  padding: 9px 6px;
+  text-align: left;
+}
+.evolution-dashboard .evo-focus-row.is-active {
+  background: rgb(145 245 218 / 0.08);
+}
+.evolution-dashboard .evo-focus-head,
+.evolution-dashboard .evo-focus-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.evolution-dashboard .evo-focus-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+.evolution-dashboard .evo-focus-trend {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+}
+.evolution-dashboard .evo-focus-track {
+  position: relative;
+  height: 8px;
+  margin: 7px 0 6px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgb(255 255 255 / 0.06);
+}
+.evolution-dashboard .evo-focus-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgb(145 245 218 / 0.14);
+  border-inline: 1px solid rgb(145 245 218 / 0.35);
+}
+.evolution-dashboard .evo-focus-fill {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: 0;
+  border-radius: 99px;
+  opacity: 0.9;
+  transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.evolution-dashboard .evo-focus-meta {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.evolution-dashboard .evo-focus-meta b {
+  color: var(--foreground);
+  font-weight: 650;
+}
+.evolution-dashboard .evo-focus-meta em {
+  font-style: normal;
+}
+/* Filhos da grade podem encolher: sem isso, uma linha que não quebra (ex.: o
+ * detalhe do músculo selecionado) alargava a coluna inteira além da tela. */
+.evolution-dashboard > * {
+  min-width: 0;
+}
+.evolution-dashboard .evo-muscle-heading strong {
+  text-align: right;
+}

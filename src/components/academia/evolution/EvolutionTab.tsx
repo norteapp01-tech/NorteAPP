@@ -14,6 +14,8 @@ import {
   muscleGroupLabel,
   muscleStimulus,
   detailSetCounts,
+  previousRange,
+  rangeLengthDays,
   rangeOfLastDays,
   resolveSets,
   type DateRange,
@@ -22,7 +24,8 @@ import {
 import { BodyMap } from "./AnatomyMap";
 import { muscleProgress, progressLabel } from "@/lib/workout-map";
 import { RepetitionProfile } from "./RepetitionProfile";
-import { RadarDistribution } from "./RadarDistribution";
+import { FocusChart } from "./FocusChart";
+import { muscleFocus } from "@/lib/workout-focus";
 import { OverloadList } from "./OverloadList";
 import "./evolution.css";
 import { ExerciseDetailSheet } from "./ExerciseDetailSheet";
@@ -76,6 +79,7 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
   const [muscle, setMuscle] = useState<MuscleGroup | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [openExercise, setOpenExercise] = useState<string | null>(null);
+  const [mapOpen, setMapOpen] = useState(false);
 
   useEffect(() => {
     if (initialStageId) setStageId(initialStageId);
@@ -116,6 +120,14 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
   const stimulus = useMemo(() => muscleStimulus(data.sets), [data.sets]);
   const detailCounts = useMemo(() => detailSetCounts(data.sets), [data.sets]);
   const progress = useMemo(() => muscleProgress(data.sets), [data.sets]);
+  // Foco por músculo: séries semanais contra a faixa de cada músculo, com o
+  // período anterior de mesma duração para mostrar a variação.
+  const focusRows = useMemo(() => {
+    const days = rangeLengthDays(data.effectiveRange);
+    const prev = previousRange(data.effectiveRange);
+    const prevData = applyFilters(sessions, exercises, plans, { range: prev, planLineageIds });
+    return muscleFocus(data.sets, days, progress, { sets: prevData.sets, days: rangeLengthDays(prev) });
+  }, [data.sets, data.effectiveRange, progress, sessions, exercises, plans, planLineageIds]);
   const allSets = useMemo(
     () => resolveSets(sessions, exercises, plans),
     [sessions, exercises, plans],
@@ -256,7 +268,7 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
           </p>
         </ModuleCard>
       )}
-      <section className="evo-hero-card">
+      <section className={`evo-hero-card ${mapOpen ? "is-map-open" : ""}`}>
         <div className="evo-hero-copy">
           <p className="evo-hero-eyebrow">Sua evolução</p>
           <h2>
@@ -285,6 +297,19 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
           selected={muscle}
           onSelect={setMuscle}
           progress={progress}
+          expanded={mapOpen}
+          onExpand={() => {
+            setMapOpen(true);
+            // o card cresce para baixo: leva-o ao topo para o boneco, a dica e a legenda ficarem à vista
+            window.setTimeout(() => {
+              const card = document.querySelector(".evo-hero-card");
+              if (!card) return;
+              const top = card.getBoundingClientRect().top + window.scrollY - 64;
+              const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+              window.scrollTo({ top: Math.max(0, top), behavior: reduce ? "auto" : "smooth" });
+            }, 80);
+          }}
+          onCollapse={() => setMapOpen(false)}
         />
       </section>
       {muscle && (
@@ -299,11 +324,11 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
 
       <details className="evo-distribution" open>
         <summary>
-          <span>Distribuição de séries</span>
-          <small>Ver detalhes →</small>
+          <span>Foco por músculo</span>
+          <small>Séries por semana</small>
         </summary>
         <div className="evo-radar-card">
-          <RadarDistribution stimulus={stimulus} selected={muscle} onSelect={setMuscle} />
+          <FocusChart rows={focusRows} selected={muscle} onSelect={setMuscle} />
         </div>
       </details>
       <RepetitionProfile

@@ -1,5 +1,4 @@
 import { useId, useState } from "react";
-import { Modal } from "@/components/ui/modal";
 import type { MuscleGroup } from "@/lib/workout-store";
 import { muscleGroupLabel, regionSetCount, type MuscleStimulus } from "@/lib/workout-evolution";
 import { progressLabel, type muscleProgress } from "@/lib/workout-map";
@@ -198,55 +197,39 @@ export function BodyMap({
   selected,
   onSelect,
   progress,
+  expanded,
+  onExpand,
+  onCollapse,
 }: {
   stimulus: MuscleStimulus[];
   detailCounts: Map<MuscleGroup, number>;
   selected: MuscleGroup | null;
   onSelect: (g: MuscleGroup | null) => void;
   progress: ReturnType<typeof muscleProgress>;
+  /** O card do mapa está aberto: o boneco cresce, centraliza e os músculos ficam tocáveis. */
+  expanded: boolean;
+  onExpand: () => void;
+  onCollapse: () => void;
 }) {
   const [view, setView] = useState<"frente" | "costas">("frente");
   const [mode, setMode] = useState<"volume" | "progressao">("volume");
-  const [expanded, setExpanded] = useState(false);
   const id = useId().replace(/:/g, "");
+  const interactive = expanded;
+  const selectedInfo = selected ? stimulus.find((s) => s.group === selected) : undefined;
 
-  const controls = (full = false) => (
-    <div className={`evo-map-controls ${full ? "is-full" : ""}`}>
-      <div className="evo-tabs" role="group" aria-label="Análise do mapa">
-        <button aria-pressed={mode === "volume"} onClick={() => setMode("volume")}>
-          Volume
-        </button>
-        <button aria-pressed={mode === "progressao"} onClick={() => setMode("progressao")}>
-          Progressão
-        </button>
-      </div>
-      {full && (
-        <div className="evo-tabs" role="group" aria-label="Vista do corpo">
-          {(["frente", "costas"] as const).map((v) => (
-            <button key={v} aria-pressed={view === v} onClick={() => setView(v)}>
-              {v === "frente" ? "Frente" : "Costas"}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-  const stage = (interactive: boolean, suffix: string) => (
+  const stage = (
     <div className="evo-body-stage">
-      <svg
-        viewBox="10 0 610 1220"
-        role={interactive ? "group" : "img"}
-        aria-label={`Mapa muscular: ${view}`}
-      >
+      <svg viewBox="10 0 610 1220" role={interactive ? "group" : "img"} aria-label={`Mapa muscular: ${view}`}>
         <defs>
-          <clipPath id={`${id}-${suffix}`}>
+          <clipPath id={`${id}-atlas`}>
             <rect width="627" height="1254" />
           </clipPath>
         </defs>
+        {/* Atlas com fundo transparente (mesmo desenho do original, preto convertido em alfa):
+            só o boneco aparece sobre o card, sem retângulo preto. */}
         <image
-          clipPath={`url(#${id}-${suffix})`}
-          href="/images/academia/anatomy-atlas.png"
+          clipPath={`url(#${id}-atlas)`}
+          href="/images/academia/anatomy-atlas-alpha.png"
           x={view === "frente" ? 0 : -627}
           width="1254"
           height="1254"
@@ -273,13 +256,9 @@ export function BodyMap({
               <path
                 key={`${index}-${mirror}`}
                 d={region.d}
-                transform={
-                  mirror ? `translate(${view === "frente" ? 660 : 590} 0) scale(-1 1)` : undefined
-                }
+                transform={mirror ? `translate(${view === "frente" ? 660 : 590} 0) scale(-1 1)` : undefined}
                 fill={color}
-                fillOpacity={
-                  mode === "volume" ? (count > 0 ? 0.22 + ratio * 0.4 : 0.05) : known ? 0.48 : 0.05
-                }
+                fillOpacity={mode === "volume" ? (count > 0 ? 0.22 + ratio * 0.4 : 0.05) : known ? 0.48 : 0.05}
                 stroke={active ? "#fff" : color}
                 strokeOpacity={active ? 1 : 0.65}
                 strokeWidth={active ? 2.5 : 1.2}
@@ -321,13 +300,10 @@ export function BodyMap({
         ? [
             ["#63b4dd", "Poucas séries"],
             ["#80e780", "Intermediário"],
-            ["#efba5b", "Bastante (9+ séries)"],
+            ["#efba5b", "Bastante (9+)"],
             ["#63717d", "Sem registro"],
           ]
-        : Object.entries(COLORS).map(([key, color]) => [
-            color,
-            progressLabel[key as keyof typeof COLORS],
-          ])
+        : Object.entries(COLORS).map(([key, color]) => [color, progressLabel[key as keyof typeof COLORS]])
       ).map(([color, label]) => (
         <span key={label}>
           <i style={{ background: color }} />
@@ -338,37 +314,57 @@ export function BodyMap({
   );
 
   return (
-    <div className="evo-map-compact">
-      {controls()}
-      <button
-        type="button"
-        onClick={() => setExpanded(true)}
-        className="evo-map-preview interactive-press"
-        aria-label="Ampliar mapa corporal"
+    <div className={`evo-map-compact ${expanded ? "is-expanded" : ""}`}>
+      <div className="evo-map-controls">
+        <div className="evo-tabs" role="group" aria-label="Análise do mapa">
+          <button aria-pressed={mode === "volume"} onClick={() => setMode("volume")}>
+            Volume
+          </button>
+          <button aria-pressed={mode === "progressao"} onClick={() => setMode("progressao")}>
+            Progressão
+          </button>
+        </div>
+      </div>
+
+      {/* O mesmo palco nos dois estados: o card anima o crescimento e a centralização. */}
+      <div
+        className="evo-map-preview"
+        role={expanded ? undefined : "button"}
+        tabIndex={expanded ? undefined : 0}
+        aria-label={expanded ? undefined : "Abrir o mapa corporal"}
+        onClick={expanded ? undefined : onExpand}
+        onKeyDown={
+          expanded
+            ? undefined
+            : (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onExpand();
+                }
+              }
+        }
       >
-        <span>Toque para ampliar ↗</span>
-        {stage(false, "preview")}
-      </button>
-      <button
-        className="evo-view-toggle"
-        onClick={() => setView(view === "frente" ? "costas" : "frente")}
-      >
-        Frente <span>⇄</span> Costas
+        {stage}
+      </div>
+
+      <button className="evo-view-toggle" onClick={() => setView(view === "frente" ? "costas" : "frente")}>
+        {view === "frente" ? "Frente" : "Costas"} <span>⇄</span>
       </button>
 
       {expanded && (
-        <Modal onClose={() => setExpanded(false)} title="Mapa corporal">
-          <div className="evo-map-expanded">
-            {controls(true)}
-            <p className="mt-3 text-xs text-muted-foreground">
-              {mode === "volume"
-                ? "Onde você concentrou suas séries."
-                : "Desempenho dos exercícios, não crescimento muscular."}
-            </p>
-            {stage(true, "expanded")}
-            {legend}
-          </div>
-        </Modal>
+        <>
+          <button type="button" className="evo-map-close interactive-press" onClick={onCollapse} aria-label="Fechar o mapa">
+            ✕
+          </button>
+          <p className="evo-map-hint">
+            {selectedInfo
+              ? `${muscleGroupLabel[selected!]} · ${selectedInfo.directSets} séries · ${progressLabel[progress.get(selected!)?.state ?? "insuficiente"]}`
+              : mode === "volume"
+                ? "Toque em um músculo para ver a análise"
+                : "Desempenho dos exercícios, não crescimento muscular"}
+          </p>
+          {legend}
+        </>
       )}
     </div>
   );
