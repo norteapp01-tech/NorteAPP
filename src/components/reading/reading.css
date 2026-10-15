@@ -509,6 +509,6 @@
 
 :root[data-theme="light"] .reading-module,
 .light .reading-module {
-  --reading-panel: #f5f5f1;
-  --reading-line: rgb(22 30 26 / 0.18);
+  --reading-panel: rgb(220 226 222 / 0.82);
+  --reading-line: rgb(76 91 83 / 0.22);
 }

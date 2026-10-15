@@ -729,6 +729,6 @@
 }
 :root[data-theme="light"] .finance-module,
 .light .finance-module {
-  --finance-line: rgb(22 30 26 / 0.18);
-  --finance-panel: #f5f5f1;
+  --finance-line: rgb(76 91 83 / 0.22);
+  --finance-panel: rgb(220 226 222 / 0.82);
 }

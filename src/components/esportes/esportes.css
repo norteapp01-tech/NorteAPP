@@ -883,8 +883,8 @@
 .light .sports-planning,
 [data-theme="light"] .esportes-overview,
 [data-theme="light"] .sports-planning {
-  --sp-card: #f7f7f4;
-  --sp-card-soft: #efefeb;
-  --sp-border: rgb(22 30 26 / 0.2);
-  --sp-line: rgb(22 30 26 / 0.16);
+  --sp-card: rgb(225 230 227 / 0.8);
+  --sp-card-soft: rgb(199 207 202 / 0.82);
+  --sp-border: rgb(76 91 83 / 0.28);
+  --sp-line: rgb(76 91 83 / 0.2);
 }

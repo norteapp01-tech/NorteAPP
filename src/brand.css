@@ -208,6 +208,12 @@
     transform 500ms var(--ease-out),
     filter 300ms var(--ease-out);
 }
+:root[data-theme="light"] .routine-card-image img {
+  filter: saturate(0.8) contrast(0.98) brightness(0.93);
+}
+:root[data-theme="light"] .routine-card-shade {
+  background: linear-gradient(180deg, rgb(20 27 23 / 0.04) 12%, rgb(20 27 23 / 0.74) 100%);
+}
 .routine-card-image:active img {
   transform: scale(1.025);
 }
@@ -358,6 +364,21 @@
     url("/images/home/routine-academia.jpg") right center / 64% 100% no-repeat,
     var(--surface);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025);
+}
+:root[data-theme="light"] .academia-hero-card {
+  background:
+    linear-gradient(
+      90deg,
+      rgb(209 215 211 / 0.98) 0%,
+      rgb(209 215 211 / 0.9) 43%,
+      rgb(209 215 211 / 0.12) 74%
+    ),
+    linear-gradient(0deg, rgb(30 38 34 / 0.06), rgb(30 38 34 / 0.06)),
+    url("/images/home/routine-academia.jpg") right center / 64% 100% no-repeat,
+    var(--surface);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.48),
+    0 14px 30px -24px rgb(31 45 38 / 0.5);
 }
 .academia-hero-copy {
   position: relative;
