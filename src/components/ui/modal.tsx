@@ -115,14 +115,14 @@ export function Modal({
             }
           }}
           className={cn(
-            "card-surface fixed left-1/2 top-1/2 flex max-h-[85dvh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-3xl p-5 shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+            "card-surface fixed left-1/2 top-1/2 flex max-h-[85dvh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-3xl p-4 shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
             zIndexClassName,
             maxWidthClassName,
             panelClassName,
           )}
         >
           <div className="flex shrink-0 items-center justify-between gap-3">
-            <DialogPrimitive.Title className="text-lg font-bold text-balance-tight">
+            <DialogPrimitive.Title className="text-base font-bold text-balance-tight">
               {title}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close
@@ -133,7 +133,7 @@ export function Modal({
             </DialogPrimitive.Close>
           </div>
           <div className="mt-3 min-h-0 flex-1 overflow-y-auto">{children}</div>
-          {footer && <div className="mt-4 shrink-0">{footer}</div>}
+          {footer && <div className="mt-3 shrink-0">{footer}</div>}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
@@ -231,12 +231,12 @@ export function SidePanel({
         <DialogPrimitive.Content
           onAnimationEnd={onAnimationEnd}
           className={cn(
-            "card-surface fixed inset-y-0 right-0 z-50 flex h-full w-[calc(100%-2.5rem)] flex-col rounded-l-3xl rounded-r-none border-r-0 p-5 shadow-2xl outline-none duration-(--dur-state) data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right",
+            "card-surface fixed inset-y-0 right-0 z-50 flex h-full w-[calc(100%-2.5rem)] flex-col rounded-l-3xl rounded-r-none border-r-0 p-4 shadow-2xl outline-none duration-(--dur-state) data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right",
             widthClassName,
           )}
         >
           <div className="flex shrink-0 items-center justify-between gap-3">
-            <DialogPrimitive.Title className="text-lg font-bold text-balance-tight">
+            <DialogPrimitive.Title className="text-base font-bold text-balance-tight">
               {title}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close

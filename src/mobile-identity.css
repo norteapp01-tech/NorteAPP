@@ -4,8 +4,12 @@
   --norte-mint: #91f5da;
   --norte-cut: 14px;
   --norte-panel-radius: 14px;
-  --norte-phone-gutter: 18px;
-  --norte-heading: clamp(21px, 5.6vw, 25px);
+  --norte-phone-gutter: 16px;
+  --norte-heading: clamp(20px, 5.2vw, 23px);
+  --norte-card-padding: 16px;
+  --norte-section-gap: 24px;
+  --norte-section-size: 17px;
+  --norte-page-size: 26px;
   --norte-dawn: radial-gradient(
     ellipse 235px 200px at 88% -45px,
     rgb(157 106 57 / 0.18),
@@ -22,10 +26,13 @@
   isolation: isolate;
   background-image: var(--norte-dawn);
   background-repeat: no-repeat;
-  padding-bottom: calc(112px + env(safe-area-inset-bottom));
+  padding-top: 42px;
+  padding-bottom: calc(104px + env(safe-area-inset-bottom));
 }
 .norte-app .norte-page {
   min-width: 0;
+  padding-top: 16px;
+  padding-bottom: 20px;
   padding-inline: var(--norte-phone-gutter);
 }
 /* Page-specific glows previously escaped their containers or disappeared behind
@@ -43,15 +50,15 @@
   content: none;
 }
 .norte-app .norte-routine-header h1 {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1.2;
 }
 .norte-app .norte-tabs > button,
 .norte-app .norte-tabs [role="tab"] {
   height: auto;
-  min-height: 48px;
-  font-size: 14px;
+  min-height: 44px;
+  font-size: 13px;
   font-weight: 500;
   line-height: 1.25;
   padding-inline: 4px;
@@ -89,25 +96,50 @@
   );
 }
 .norte-app .routine-card {
-  width: clamp(154px, 45vw, 190px);
-  height: 144px;
+  width: clamp(204px, 58vw, 228px);
+  height: 138px;
+}
+.norte-app .routine-rail {
+  margin-inline: calc(var(--norte-phone-gutter) * -1);
+  padding-inline: var(--norte-phone-gutter);
 }
 .norte-app .today-stat-card {
-  min-height: 64px;
+  min-height: 60px;
   gap: 8px;
-  padding: 12px;
+  padding: 10px 12px;
 }
 .norte-app .today-stat-card > strong {
-  font-size: 28px;
+  font-size: 26px;
 }
 .norte-app .today-greeting {
-  font-size: clamp(32px, 9vw, 42px);
+  margin-top: 22px;
+  font-size: clamp(30px, 8vw, 36px);
+}
+.norte-app .today-page {
+  padding-top: 10px;
+}
+.norte-app .today-hero .norte-dawn-brand {
+  gap: 10px;
+}
+.norte-app .today-hero .norte-dawn-brand svg {
+  width: 82px;
+  height: 22px;
+}
+.norte-app .today-hero .norte-dawn-brand span {
+  font-size: 10px;
+  letter-spacing: 0.42em;
+}
+.norte-app .today-hero > p {
+  font-size: 15px;
+}
+.norte-app .today-day-progress {
+  margin-top: 18px;
 }
 .norte-app .today-next-card {
   position: relative;
-  margin-top: 26px;
-  min-height: 180px;
-  padding: 22px 18px 62px;
+  margin-top: 20px;
+  min-height: 152px;
+  padding: 16px 16px 54px;
   border: 1px solid var(--border);
   border-radius: var(--norte-panel-radius);
   clip-path: polygon(
@@ -123,47 +155,73 @@
   color: #f7f8f7;
 }
 .norte-app .today-next-card h2 {
-  font-size: 26px;
+  font-size: 22px;
   line-height: 1.12;
-  margin-top: 12px;
+  margin-top: 8px;
   overflow-wrap: anywhere;
 }
 .norte-app .today-next-time {
   display: flex;
   gap: 8px;
   align-items: center;
-  margin-top: 12px;
-  font-size: 16px;
+  margin-top: 8px;
+  font-size: 14px;
 }
 .norte-app .today-next-category {
-  margin-top: 6px;
+  margin-top: 4px;
   color: #bfc5c2;
-  font-size: 13px;
+  font-size: 12px;
 }
 .norte-app .today-next-open {
   position: absolute;
-  right: 16px;
-  bottom: 14px;
+  right: 14px;
+  bottom: 12px;
   display: flex;
   gap: 14px;
   align-items: center;
   min-height: 44px;
-  padding: 0 20px;
+  padding: 0 17px;
   border-radius: 99px;
   background: #f4f3ef;
   color: #111513;
 }
+.norte-app .today-agenda {
+  margin-top: 24px;
+}
+.norte-app .today-agenda-list {
+  margin-top: 16px;
+}
+.norte-app .today-agenda-row {
+  min-height: 64px;
+  padding-block: 9px;
+}
+.norte-app .today-status-strip {
+  margin-top: 20px;
+}
+.norte-app .today-status-action {
+  min-height: 62px;
+}
+.norte-app .today-routine-heading {
+  margin-top: 26px;
+}
+.norte-app .today-closing-actions {
+  margin-top: 22px;
+}
+.norte-app .today-closing-actions button {
+  min-height: 56px;
+  font-size: 13px;
+}
 .norte-app :is(.agenda-header, .plan-list-page) .norte-page-title {
-  font-size: clamp(30px, 8.5vw, 40px);
+  font-size: clamp(27px, 7.5vw, 34px);
   line-height: 1.06;
 }
 .norte-app .plan-detail-header h1 {
-  font-size: clamp(27px, 7.5vw, 34px);
+  font-size: clamp(25px, 7vw, 31px);
 }
 
 .norte-app .academia-hero-card,
 .norte-app .academia-hero-copy {
-  min-height: 205px;
+  min-height: 188px;
 }
 .norte-app .academia-hero-card {
   clip-path: polygon(
@@ -175,17 +233,17 @@
   );
 }
 .norte-app .academia-hero-copy {
-  padding: 18px;
+  padding: 16px;
 }
 .norte-app .academia-hero-title {
-  font-size: clamp(23px, 6vw, 28px);
+  font-size: clamp(21px, 5.6vw, 25px);
   max-width: 80%;
 }
 .norte-app .academia-hero-subtitle {
-  font-size: 14px;
+  font-size: 13px;
 }
 .norte-app .academia-hero-meta {
-  margin-top: 28px;
+  margin-top: 20px;
   max-width: 52%;
 }
 .norte-app .academia-hero-action {
@@ -195,7 +253,7 @@
   min-height: 44px;
 }
 .norte-app .academia-exercise-list > li > :is(button, div) {
-  min-height: 64px;
+  min-height: 60px;
   gap: 10px;
 }
 .norte-app .academia-exercise-state {
@@ -203,23 +261,23 @@
   height: 26px;
 }
 .norte-app .academia-week-card .norte-weekdays > button {
-  min-height: 66px;
+  min-height: 60px;
 }
 .norte-app :is(.academy-program-hero, .evolution-dashboard .evo-hero-card) {
   background:
     var(--norte-card-dawn), linear-gradient(110deg, var(--surface-quiet), var(--background));
 }
 .norte-app .academy-program-hero {
-  min-height: 250px;
-  padding: 18px;
+  min-height: 220px;
+  padding: 16px;
 }
 .norte-app .academy-program-hero h2 {
-  font-size: clamp(23px, 6vw, 28px);
+  font-size: clamp(21px, 5.6vw, 25px);
 }
 .norte-app .academy-program-main {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 14px;
-  margin-top: 24px;
+  margin-top: 18px;
 }
 .norte-app .academy-program-main > div:first-child {
   width: 100%;
@@ -244,20 +302,20 @@
   min-height: 44px;
 }
 .norte-app .evolution-dashboard .evo-hero-card {
-  min-height: 250px;
+  min-height: 225px;
 }
 .norte-app .evolution-dashboard .evo-hero-copy {
   padding: 18px;
   width: 64%;
 }
 .norte-app .evolution-dashboard .evo-hero-copy h2 {
-  font-size: 23px;
+  font-size: 21px;
 }
 .norte-app .evolution-dashboard .evo-constancy {
-  margin-top: 22px;
+  margin-top: 16px;
 }
 .norte-app .evolution-dashboard .evo-map-preview .evo-body-stage {
-  height: 270px;
+  height: 242px;
 }
 .norte-app .evolution-dashboard .evo-map-controls > .evo-tabs button {
   padding-inline: 10px;
@@ -271,17 +329,17 @@
 }
 
 .norte-app .esportes-overview .sp-start-card {
-  min-height: 205px;
+  min-height: 188px;
 }
 .norte-app .esportes-overview .sp-start-copy {
-  inset: 22px auto 20px 18px;
+  inset: 18px auto 16px 16px;
   width: 70%;
 }
 .norte-app .esportes-overview .sp-start-title {
-  font-size: 28px;
+  font-size: 25px;
 }
 .norte-app .esportes-overview .sp-start-subtitle {
-  font-size: 14px;
+  font-size: 13px;
 }
 .norte-app .esportes-overview .sp-start-action {
   height: 44px;
@@ -291,7 +349,7 @@
   bottom: 14px;
 }
 .norte-app .esportes-overview .sp-week-summary {
-  min-height: 150px;
+  min-height: 136px;
   grid-template-columns: minmax(96px, 0.8fr) minmax(0, 1.7fr);
 }
 .norte-app .esportes-overview .sp-week-next {
@@ -325,14 +383,14 @@
 
 .norte-app .reading-hero-card,
 .norte-app .reading-hero-copy {
-  min-height: 285px;
+  min-height: 260px;
 }
 .norte-app .reading-hero-copy {
   width: 68%;
-  padding: 20px 0 18px 18px;
+  padding: 18px 0 16px 16px;
 }
 .norte-app .reading-hero-copy h2 {
-  font-size: 24px;
+  font-size: 22px;
 }
 .norte-app .reading-hero-copy button {
   font-size: 13px;
@@ -351,14 +409,14 @@
   min-height: 44px;
 }
 .norte-app .nutrition-goals-hero {
-  min-height: 300px;
+  min-height: 268px;
 }
 .norte-app .nutrition-goals-copy {
   width: 76%;
-  padding: 20px 0 74px 16px;
+  padding: 18px 0 66px 16px;
 }
 .norte-app .nutrition-goals-copy h3 {
-  font-size: 25px;
+  font-size: 23px;
 }
 .norte-app .nutrition-macro-row {
   grid-template-columns: 76px minmax(20px, 1fr) auto;
@@ -371,18 +429,83 @@
 /* Safe phone controls: enough room above the dock, no horizontal page panning,
    and readable form text without iOS focus zoom. */
 .norte-app .norte-voice-dock {
-  grid-template-columns: minmax(100px, 1fr) minmax(16px, 0.35fr) 56px minmax(16px, 0.35fr) 44px;
-  min-height: 76px;
-  padding: 8px 12px;
+  grid-template-columns: minmax(100px, 1fr) minmax(14px, 0.35fr) 54px minmax(14px, 0.35fr) 44px;
+  min-height: 72px;
+  padding: 7px 11px;
 }
 .norte-app .norte-voice-mic {
-  width: 56px;
-  height: 56px;
+  width: 54px;
+  height: 54px;
 }
 .norte-app .norte-voice-copy {
   font-size: 13px;
 }
 @media (max-width: 480px) {
+  .norte-app .academia-page .norte-tabs > button,
+  .norte-app .reading-module .norte-tabs [role="tab"],
+  .norte-app .faith-module .norte-tabs [role="tab"],
+  .norte-app .nutrition-module > .norte-tabs [role="tab"],
+  .norte-app .finance-tabs [role="tab"],
+  .norte-app .esportes-page .esportes-tabs [role="tab"] {
+    min-height: 48px;
+    height: 48px;
+    font-size: 14px;
+  }
+  .norte-app :is(.reading-main-tab, .nutrition-today) {
+    gap: 22px;
+    padding-top: 14px;
+  }
+  .norte-app :is(.faith-records, .faith-prayers, .faith-bible) {
+    gap: 22px;
+  }
+  .norte-app .faith-module > div:last-child {
+    padding-top: 16px;
+  }
+  .norte-app .faith-capture {
+    min-height: 270px;
+    padding: 20px 16px 0;
+  }
+  .norte-app .faith-capture h2 {
+    font-size: 24px;
+  }
+  .norte-app .nutrition-today {
+    gap: 22px;
+  }
+  .norte-app .nutrition-macro-row {
+    padding-block: 9px;
+  }
+  .norte-app .nutrition-meal {
+    min-height: 72px;
+    padding-block: 11px;
+  }
+  .norte-app .finance-tab-content {
+    padding-top: 18px;
+  }
+  .norte-app .finance-overview {
+    gap: 24px;
+  }
+  .norte-app .finance-month-total {
+    font-size: clamp(28px, 8.5vw, 36px);
+  }
+  .norte-app .finance-facts {
+    margin-top: 20px;
+  }
+  .norte-app .norte-functions-sheet > header {
+    min-height: 104px;
+    padding: max(18px, env(safe-area-inset-top)) 18px 16px;
+  }
+  .norte-app .norte-functions-sheet > header h2 {
+    font-size: 25px;
+  }
+  .norte-app .norte-functions-scroll {
+    max-height: calc(100dvh - 104px);
+    gap: 22px;
+    padding: 18px 16px calc(104px + env(safe-area-inset-bottom));
+  }
+  .norte-app .norte-function-row {
+    min-height: 64px;
+    padding: 10px 12px;
+  }
   .norte-app :is(input, textarea, select) {
     font-size: 16px;
   }
@@ -420,7 +543,7 @@
     font-size: 21px;
   }
   .norte-app .academy-program-hero {
-    min-height: 275px;
+    min-height: 232px;
   }
   .norte-app .academy-program-main > div:first-child > strong {
     font-size: 18px;

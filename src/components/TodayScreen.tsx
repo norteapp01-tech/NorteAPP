@@ -380,7 +380,7 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
         />
       </div>
 
-      <div className="mt-9 flex items-end justify-between gap-4">
+      <div className="today-routine-heading mt-9 flex items-end justify-between gap-4">
         <h2 className="norte-view-title">Minha rotina</h2>
         <span className="pb-1 text-[11px] text-muted-foreground">deslize para acessar →</span>
       </div>
