@@ -24,7 +24,6 @@ export function PlanejamentoTab() {
       <section className="finance-planning-intro">
         <p className="finance-eyebrow">Planejamento financeiro</p>
         <h2>Transforme um objetivo em caminho</h2>
-        <p>Etapas, ações e cronograma para tirar seus planos do papel.</p>
       </section>
 
       {rows.length > 0 && (
@@ -85,10 +84,6 @@ export function PlanejamentoTab() {
         <div className="finance-planning-empty">
           <CalendarRange className="h-5 w-5 text-muted-foreground" />
           <p className="mt-3 text-sm font-semibold">Você ainda não tem um objetivo financeiro</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Crie primeiro um objetivo com valor e prazo. Depois, volte aqui para dividi-lo em
-            etapas.
-          </p>
         </div>
       )}
     </div>

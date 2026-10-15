@@ -1,6 +1,6 @@
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { categoryMeta } from "@/lib/mock-data";
-import { formatMinutes, type AgendaAnalysis, type Comparison } from "@/lib/mirror-analytics";
+import type { AgendaAnalysis, Comparison } from "@/lib/mirror-analytics";
 import { nextWeekAction, type Insight } from "@/lib/mirror-insights";
 import { ActionButton, InsightCard } from "./InsightCard";
 import { FeelingCheckin } from "./FeelingCheckin";
@@ -49,10 +49,7 @@ export function MirrorOverview({
           Como você está vivendo sua agenda
         </p>
         {a.sufficiency === "none" ? (
-          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-            Ainda não há compromissos encerrados {scope}. Conforme sua agenda for acontecendo, o
-            Espelho mostra aqui o que foi cumprido e para onde seu tempo foi.
-          </p>
+          <p className="mt-4 text-sm text-muted-foreground">Sem dados {scope}.</p>
         ) : (
           <>
             <div className="mt-4 flex items-center gap-5">
@@ -79,9 +76,7 @@ export function MirrorOverview({
                   </p>
                 )}
                 {a.sufficiency === "low" && (
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    Poucos dados ainda — os padrões aparecem com mais compromissos.
-                  </p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">Poucos dados</p>
                 )}
               </div>
             </div>
@@ -90,12 +85,6 @@ export function MirrorOverview({
               <Stat label="Cancelados" value={a.cancelled} />
               <Stat label="Reagendamentos" value={historyMissing ? "—" : a.reschedules} />
             </dl>
-            <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
-              Cancelar é uma escolha e fica fora da taxa. Eventos do Google contam no tempo, não na
-              taxa.{" "}
-              {a.time.unionMinutes > 0 &&
-                `${formatMinutes(a.time.unionMinutes)} planejados (duração planejada, não tempo real).`}
-            </p>
           </>
         )}
       </section>
@@ -114,9 +103,7 @@ export function MirrorOverview({
         <InsightCard insight={main} featured />
       ) : a.sufficiency === "low" ? (
         <section className="card-surface p-5">
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            {insights[0]?.text} {insights[0]?.evidence}
-          </p>
+          <p className="text-sm text-muted-foreground">{insights[0]?.text}</p>
         </section>
       ) : null}
 
@@ -125,7 +112,7 @@ export function MirrorOverview({
           <p className="text-[11px] font-semibold uppercase tracking-[.16em] text-muted-foreground">
             Para a próxima semana
           </p>
-          <p className="mt-2 text-sm leading-relaxed">{next.insight.text}</p>
+          <p className="mt-2 text-sm">{next.insight.text}</p>
           <ActionButton action={next.action} className="mt-3" />
         </section>
       )}
@@ -164,9 +151,6 @@ export function MirrorOverview({
       {recentUnanswered.length > 0 && (
         <section className="card-surface p-5">
           <h2 className="norte-section-title">Como foram?</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Opcional. Ajuda o Norte a separar o que cansa do que faz bem.
-          </p>
           <ul className="mt-3 divide-y divide-border">
             {recentUnanswered.map((o) => (
               <li key={o.key} className="py-3">

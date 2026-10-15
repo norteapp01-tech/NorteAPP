@@ -99,10 +99,6 @@ export function FitList({
 
       {open && (
         <div className="space-y-2.5 border-t border-border p-3">
-          <p className="text-[11px] text-muted-foreground">
-            Ações dos seus planos que têm prazo mas ainda não têm horário. Toque para encaixar, ou
-            arraste para a linha do tempo no computador.
-          </p>
           {items.map((item) => {
             const slots =
               expanded === item.execution.id

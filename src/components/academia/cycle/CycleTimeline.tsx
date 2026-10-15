@@ -196,10 +196,6 @@ export function CycleTimeline({
         </div>
       </div>
 
-      <p className="mt-2 text-[11px] text-muted-foreground">
-        Toque numa etapa para abrir seus treinos. Os alvos com prazo aparecem como marcos.
-      </p>
-
       {blocks.length === 0 && (
         <p className="mt-3 text-sm text-muted-foreground">
           Este ciclo ainda não tem etapas para posicionar.

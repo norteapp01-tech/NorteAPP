@@ -1458,9 +1458,7 @@ function FinishSummaryModal({ sessionId, onClose }: { sessionId: string; onClose
           </>
         ) : (
           <p className="academia-summary-empty-comparison">
-            {previous
-              ? "Não houve séries em condições equivalentes para uma comparação honesta."
-              : "Este é o primeiro registro deste treino. A próxima sessão terá comparação."}
+            {previous ? "Sem comparação equivalente." : "Primeiro treino registrado."}
           </p>
         )}
         {insights.length > 0 && (
@@ -1507,9 +1505,6 @@ function FinishSummaryModal({ sessionId, onClose }: { sessionId: string; onClose
 
       <section className="academia-summary-section academia-summary-effort">
         <p className="academia-summary-label">Como foi hoje?</p>
-        <p className="academia-summary-effort-help">
-          Sua percepção ajuda o Norte a interpretar manutenção, evolução e recuperação.
-        </p>
         <div role="group" aria-label="Percepção do treino">
           {(
             [

@@ -33,11 +33,7 @@ export function UpcomingView(props: ViewProps) {
   }, [all, limit]);
 
   if (sections.length === 0)
-    return (
-      <p className="mt-10 text-center text-sm text-muted-foreground">
-        Nenhum compromisso pela frente. Toque em “Novo” para marcar o primeiro.
-      </p>
-    );
+    return <p className="mt-10 text-center text-sm text-muted-foreground">Nenhum compromisso.</p>;
 
   return (
     <div className="mt-3 space-y-6">

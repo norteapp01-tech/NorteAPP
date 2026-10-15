@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { AlertTriangle, CalendarSync, Loader2, Lock, Plug, RefreshCw, Unplug } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarSync,
+  Check,
+  Loader2,
+  Lock,
+  Plug,
+  RefreshCw,
+  Send,
+  Unplug,
+} from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { InlineError } from "@/components/ui/inline-error";
 import {
@@ -16,13 +26,13 @@ import { GoogleConflictSheet } from "./GoogleConflictSheet";
 import "./agenda-ui.css";
 
 function relativeTime(iso: string | undefined, now = Date.now()): string {
-  if (!iso) return "ainda não sincronizou";
+  if (!iso) return "Nunca";
   const minutes = Math.round((now - new Date(iso).getTime()) / 60_000);
-  if (minutes < 1) return "agora há pouco";
-  if (minutes < 60) return `há ${minutes} min`;
+  if (minutes < 1) return "Agora";
+  if (minutes < 60) return `${minutes} min`;
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `há ${hours} h`;
-  return `há ${Math.round(hours / 24)} dia(s)`;
+  if (hours < 24) return `${hours} h`;
+  return `${Math.round(hours / 24)} d`;
 }
 
 const ROLE_TEXT: Record<GoogleCalendarRow["role"], string> = {
@@ -105,12 +115,7 @@ export function GoogleCalendarSection({
       </div>
 
       {(ui === "disconnected" || ui === "connecting") && (
-        <>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Sincronize nos dois sentidos: o que está no Google aparece no Norte, e o que você cria,
-            muda ou apaga no Norte vai para o Google. Você escolhe quais agendas participam e pode
-            desconectar quando quiser.
-          </p>
+        <div className="pt-1">
           <button
             type="button"
             onClick={connect}
@@ -124,10 +129,7 @@ export function GoogleCalendarSection({
             )}
             {ui === "connecting" ? "Conectando…" : "Conectar Google Agenda"}
           </button>
-          <p className="text-[11px] text-muted-foreground">
-            O Norte pede permissão para ver e editar eventos e listar suas agendas. Nada além disso.
-          </p>
-        </>
+        </div>
       )}
 
       {ui === "needs_reauth" && (
@@ -152,11 +154,14 @@ export function GoogleCalendarSection({
 
       {conn && ui !== "needs_reauth" && ui !== "disconnected" && ui !== "connecting" && (
         <>
-          <div className="card-surface-quiet space-y-1 p-3 text-xs">
-            <p className="truncate font-semibold text-foreground">{conn.email}</p>
-            <p className="text-muted-foreground">
-              Última sincronização: {relativeTime(conn.lastSyncAt)}
-            </p>
+          <div className="card-surface-quiet flex items-center gap-3 px-3 py-2.5 text-xs">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+              <Check className="h-4 w-4" />
+            </span>
+            <p className="min-w-0 flex-1 truncate font-semibold text-foreground">{conn.email}</p>
+            <time className="shrink-0 text-[11px] text-muted-foreground">
+              {relativeTime(conn.lastSyncAt)}
+            </time>
           </div>
 
           {ui === "error" && (
@@ -234,64 +239,63 @@ export function GoogleCalendarSection({
               {google.calendars.map((cal) => {
                 const writable = cal.role === "owner" || cal.role === "writer";
                 return (
-                  <li key={cal.id} className="card-surface-quiet space-y-2 p-3">
-                    <label className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={cal.selected}
-                        disabled={busy !== null}
-                        onChange={(e) =>
-                          void run(`cal-${cal.id}`, () =>
-                            selectGoogleCalendars([{ id: cal.id, selected: e.target.checked }]),
-                          )
-                        }
-                        aria-label={`Sincronizar ${cal.summary}`}
-                        className="h-5 w-5 shrink-0 accent-primary"
-                      />
-                      <i
-                        className="agenda-dot"
-                        style={{ ["--dot" as string]: cal.color ?? "var(--muted-foreground)" }}
-                      />
-                      <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                        {cal.summary}
-                      </span>
+                  <li key={cal.id} className="card-surface-quiet p-3">
+                    <div className="flex items-center gap-3">
+                      <label className="flex min-w-0 flex-1 items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={cal.selected}
+                          disabled={busy !== null}
+                          onChange={(e) =>
+                            void run(`cal-${cal.id}`, () =>
+                              selectGoogleCalendars([{ id: cal.id, selected: e.target.checked }]),
+                            )
+                          }
+                          aria-label={`Sincronizar ${cal.summary}`}
+                          className="h-5 w-5 shrink-0 accent-primary"
+                        />
+                        <i
+                          className="agenda-dot"
+                          style={{ ["--dot" as string]: cal.color ?? "var(--muted-foreground)" }}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                          {cal.summary}
+                        </span>
+                      </label>
                       <span
                         className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${writable ? "bg-surface-2 text-muted-foreground" : "bg-warning/10 text-warning"}`}
                       >
                         {!writable && <Lock className="h-2.5 w-2.5" />}
                         {ROLE_TEXT[cal.role]}
                       </span>
-                    </label>
-                    {cal.selected && writable && (
-                      <label className="flex items-center gap-3 pl-1 text-xs text-muted-foreground">
-                        <input
-                          type="radio"
-                          name="google-push-target"
-                          checked={cal.pushNewEvents}
+                      {cal.selected && writable && (
+                        <button
+                          type="button"
+                          aria-pressed={cal.pushNewEvents}
+                          aria-label={`${cal.summary} como destino dos eventos criados no Norte`}
+                          title="Destino dos novos eventos do Norte"
                           disabled={busy !== null}
-                          onChange={() =>
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
                             void run(`push-${cal.id}`, () =>
                               selectGoogleCalendars([{ id: cal.id, pushNewEvents: true }]),
-                            )
-                          }
-                          className="h-4 w-4 accent-primary"
-                        />
-                        Eventos criados no Norte vão para esta agenda
-                      </label>
-                    )}
+                            );
+                          }}
+                          className={`interactive-press inline-flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-[10px] font-semibold ${
+                            cal.pushNewEvents
+                              ? "bg-primary/15 text-primary"
+                              : "border border-border text-muted-foreground"
+                          }`}
+                        >
+                          <Send className="h-3 w-3" />
+                          {cal.pushNewEvents ? "Destino" : "Usar"}
+                        </button>
+                      )}
+                    </div>
                     {cal.selected && (cal.syncStatus === "error" || cal.lastError) && (
-                      <p className="text-[11px] text-danger">
+                      <p className="mt-2 text-[11px] text-danger">
                         {cal.lastError ?? "Erro ao sincronizar."}
-                      </p>
-                    )}
-                    {cal.selected && !cal.lastError && (
-                      <p className="text-[11px] text-muted-foreground">
-                        {cal.syncStatus === "syncing"
-                          ? "Sincronizando…"
-                          : `Sincronizada ${relativeTime(cal.lastSyncedAt)}`}
-                        {cal.webhookStatus === "unavailable"
-                          ? " · atualização em tempo real indisponível; o Norte confere a cada poucos minutos"
-                          : ""}
                       </p>
                     )}
                   </li>
@@ -299,9 +303,7 @@ export function GoogleCalendarSection({
               })}
             </ul>
             {writableSelected.length > 0 && !writableSelected.some((c) => c.pushNewEvents) && (
-              <p className="mt-2 text-[11px] text-warning">
-                Escolha em qual agenda os eventos criados no Norte devem aparecer.
-              </p>
+              <p className="mt-2 text-[11px] text-warning">Defina o destino dos novos eventos.</p>
             )}
             {google.calendars.every((c) => !c.selected) && (
               <p className="mt-2 text-[11px] text-muted-foreground">
@@ -310,13 +312,8 @@ export function GoogleCalendarSection({
             )}
           </div>
 
-          <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
-            <span className="text-sm">
-              Enviar rotinas do Norte (treino, leitura…)
-              <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                Desligado por padrão: rotinas geram muitos eventos.
-              </span>
-            </span>
+          <label className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-2.5">
+            <span className="text-sm font-medium">Sincronizar rotinas</span>
             <input
               type="checkbox"
               checked={conn.pushRoutines}
@@ -332,7 +329,7 @@ export function GoogleCalendarSection({
 
           {error && <InlineError message={error} />}
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-[1fr_48px_48px] gap-2">
             <button
               type="button"
               onClick={() =>
@@ -355,30 +352,34 @@ export function GoogleCalendarSection({
                 })
               }
               disabled={busy !== null || ui === "syncing"}
-              className="interactive-press col-span-2 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              className="interactive-press flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
             >
               {busy === "sync" || ui === "syncing" ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <RefreshCw className="h-4 w-4" />
               )}
-              Sincronizar agora
+              Sincronizar
             </button>
             <button
               type="button"
               onClick={connect}
               disabled={busy !== null}
-              className="interactive-press flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold disabled:opacity-50"
+              aria-label="Reconectar Google Agenda"
+              title="Reconectar"
+              className="interactive-press flex min-h-12 items-center justify-center rounded-xl border border-border disabled:opacity-50"
             >
-              <Plug className="h-4 w-4" /> Reconectar
+              <Plug className="h-4 w-4" />
             </button>
             <button
               type="button"
               onClick={() => setConfirmDisconnect(true)}
               disabled={busy !== null}
-              className="interactive-press flex min-h-11 items-center justify-center gap-2 rounded-xl border border-danger/40 text-sm font-semibold text-danger disabled:opacity-50"
+              aria-label="Desconectar Google Agenda"
+              title="Desconectar"
+              className="interactive-press flex min-h-12 items-center justify-center rounded-xl border border-danger/40 text-danger disabled:opacity-50"
             >
-              <Unplug className="h-4 w-4" /> Desconectar
+              <Unplug className="h-4 w-4" />
             </button>
           </div>
         </>
@@ -398,14 +399,9 @@ export function GoogleCalendarSection({
 
       {confirmDisconnect && (
         <Modal onClose={() => setConfirmDisconnect(false)} title="Desconectar o Google Agenda?">
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li>• O Norte para de sincronizar e o acesso ao Google é revogado.</li>
-            <li>• Seus compromissos criados no Norte continuam no Norte e no Google.</li>
-            <li>
-              • Eventos que vieram de agendas editáveis ficam no Norte como compromissos comuns.
-            </li>
-            <li>• Eventos de agendas somente leitura saem do Norte.</li>
-          </ul>
+          <p className="text-sm text-muted-foreground">
+            A sincronização para. Seus compromissos permanecem salvos.
+          </p>
           <div className="mt-5 grid grid-cols-2 gap-2">
             <button
               type="button"

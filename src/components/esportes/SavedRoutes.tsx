@@ -26,7 +26,6 @@ export function SavedRoutesSection({ modality }: { modality: SportModality }) {
   const routes = useSportRoutes(modality);
   const [open, setOpen] = useState<SportRoute | null>(null);
   const [showAll, setShowAll] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
 
   return (
     <section className="sp-saved-routes">
@@ -51,10 +50,6 @@ export function SavedRoutesSection({ modality }: { modality: SportModality }) {
           </div>
           <div className="sp-routes-empty-copy">
             <strong>Salve seus percursos favoritos</strong>
-            <p>Ao concluir uma atividade, guarde a rota para repetir depois.</p>
-            <button onClick={() => setHelpOpen(true)} className="interactive-press">
-              Como funciona
-            </button>
           </div>
         </div>
       ) : (
@@ -65,14 +60,6 @@ export function SavedRoutesSection({ modality }: { modality: SportModality }) {
         </div>
       )}
       {open && <RouteDetailSheet route={open} onClose={() => setOpen(null)} />}
-      {helpOpen && (
-        <Modal title="Como salvar uma rota" onClose={() => setHelpOpen(false)}>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Inicie uma atividade com o GPS. Ao concluir, escolha salvar o percurso. Ele aparecerá
-            aqui para você repetir e comparar seu desempenho nas próximas vezes.
-          </p>
-        </Modal>
-      )}
     </section>
   );
 }
@@ -170,10 +157,7 @@ export function RouteDetailSheet({ route, onClose }: { route: SportRoute; onClos
       </div>
 
       {stats.count === 0 ? (
-        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-          Esta rota ainda não foi percorrida. Assim que houver uma execução, o tempo dela aparece
-          aqui.
-        </p>
+        <p className="mt-4 text-sm text-muted-foreground">Sem execuções.</p>
       ) : (
         <>
           <div className="mt-5 flex items-center justify-between gap-2">
@@ -195,10 +179,7 @@ export function RouteDetailSheet({ route, onClose }: { route: SportRoute; onClos
           </div>
 
           {stats.count === 1 ? (
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Uma execução registrada. Com duas dá para mostrar a evolução — por enquanto, o que
-              existe é o resultado acima.
-            </p>
+            <p className="mt-2 text-sm text-muted-foreground">1 execução</p>
           ) : (
             <TrendChart runs={stats.runs} mode={mode} />
           )}

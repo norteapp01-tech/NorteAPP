@@ -245,7 +245,7 @@ function Face({
             onPick={setPicked}
           />
           <p className="sp-metric-detail">
-            {chosen ? describeWeek(chosen, face, modality) : "Toque num ponto para ver a semana."}
+            {chosen ? describeWeek(chosen, face, modality) : "Selecione uma semana."}
           </p>
         </div>
       )}

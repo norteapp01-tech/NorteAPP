@@ -202,10 +202,6 @@ export function BodyMap({
         </svg>
       </div>
 
-      <p className="mt-1 text-center text-[11px] text-muted-foreground">
-        Toque em um músculo para analisar
-      </p>
-
       <div className="mt-3 flex items-center gap-2">
         <span className="text-[10px] text-muted-foreground">Menos séries</span>
         <div className="flex h-2 flex-1 overflow-hidden rounded-full">

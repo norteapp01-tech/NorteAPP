@@ -48,7 +48,6 @@ export function NutritionAnalysis({ state }: { state: NutritionState }) {
     <div className="nutrition-analysis">
       <div>
         <h2>Sua análise</h2>
-        <p>Entenda seus padrões, sem complicação.</p>
       </div>
       <div className="norte-segmented" aria-label="Período da análise">
         {[7, 30, 90].map((n) => (
@@ -212,9 +211,7 @@ export function NutritionAnalysis({ state }: { state: NutritionState }) {
             </ResponsiveContainer>
           </div>
         </div>
-        {average === null && (
-          <p className="nutrition-empty">Registre suas refeições para acompanhar suas metas.</p>
-        )}
+        {average === null && <p className="nutrition-empty">Sem registros.</p>}
         <div className="nutrition-scroll-controls">
           <button
             aria-label="Ver dias anteriores"
@@ -233,7 +230,6 @@ export function NutritionAnalysis({ state }: { state: NutritionState }) {
       </section>
       <section>
         <h3>Regularidade das refeições</h3>
-        <p>Percentual das refeições planejadas que você registrou.</p>
         <div className="nutrition-regularity">
           {data.meals.map((m) => (
             <div key={m.id}>
@@ -243,9 +239,7 @@ export function NutritionAnalysis({ state }: { state: NutritionState }) {
             </div>
           ))}
         </div>
-        {!data.meals.length && (
-          <p className="nutrition-empty">Adicione refeições ao seu plano para começar.</p>
-        )}
+        {!data.meals.length && <p className="nutrition-empty">Sem refeições.</p>}
         <button className="nutrition-detail-link" onClick={() => setDetails(true)}>
           Ver detalhes →
         </button>

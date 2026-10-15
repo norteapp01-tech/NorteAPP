@@ -24,31 +24,26 @@ const filterTypes: Record<Exclude<Filter, "todas">, NotebookEntryType[]> = {
 const choices: {
   type: NotebookEntryType;
   title: string;
-  description: string;
   icon: typeof BookOpen;
 }[] = [
   {
     type: "aprendizado",
     title: "Estudo bíblico",
-    description: "Passagem, entendimento e aplicação",
     icon: BookOpen,
   },
   {
     type: "testemunho",
     title: "Experiência",
-    description: "Algo que você viveu e quer recordar",
     icon: Sparkles,
   },
   {
     type: "livre",
     title: "Reflexão",
-    description: "Um pensamento ou aprendizado pessoal",
     icon: Lightbulb,
   },
   {
     type: "versiculo",
     title: "Versículo",
-    description: "Uma palavra que você quer guardar",
     icon: BookOpen,
   },
 ];
@@ -106,9 +101,6 @@ export function CadernoTab() {
         <div className="py-8 text-center">
           <BookOpen className="mx-auto h-6 w-6 text-muted-foreground" />
           <p className="mt-3 text-sm font-semibold">Seu caderno começa aqui</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Registre um estudo, uma experiência ou uma reflexão.
-          </p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -120,7 +112,7 @@ export function CadernoTab() {
       {picking && (
         <Modal title="O que você quer registrar?" onClose={() => setPicking(false)}>
           <div className="space-y-2">
-            {choices.map(({ type, title, description, icon: Icon }) => (
+            {choices.map(({ type, title, icon: Icon }) => (
               <button
                 key={type}
                 onClick={() => {
@@ -134,7 +126,6 @@ export function CadernoTab() {
                 </span>
                 <span className="min-w-0 flex-1">
                   <strong className="block text-sm">{title}</strong>
-                  <span className="text-[11px] text-muted-foreground">{description}</span>
                 </span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </button>

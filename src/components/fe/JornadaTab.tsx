@@ -48,7 +48,7 @@ export function JornadaTab({ onOpenLogReading }: { onOpenLogReading: () => void 
               )}
             </>
           ) : (
-            <p className="faith-bible-empty">Registre onde sua leitura está acontecendo.</p>
+            <p className="faith-bible-empty">Nenhuma leitura.</p>
           )}
           <button onClick={onOpenLogReading} className="faith-bible-log">
             Registrar leitura <ArrowRight />

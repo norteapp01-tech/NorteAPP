@@ -532,15 +532,6 @@ function AgendaScreen() {
         }
       />
 
-      <div className="agenda-note mt-6 rounded-2xl border border-border bg-surface/60 p-4 text-xs text-muted-foreground">
-        <span className="font-semibold text-foreground">Agenda ≠ Planejamento.</span> Aqui só entram
-        compromissos com hora. Planejamentos vivem na aba{" "}
-        <Link to="/planejamento" className="text-primary underline">
-          Plano
-        </Link>
-        .
-      </div>
-
       {openOcc && (
         <EventSheet
           occ={openOcc}

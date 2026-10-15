@@ -73,9 +73,6 @@ export function HojeTab({
             <Plus className="h-5 w-5 text-primary" />
             <span>
               <strong className="block text-sm">Novo alvo de oração</strong>
-              <span className="text-xs text-muted-foreground">
-                Guarde uma pessoa ou situação para acompanhar.
-              </span>
             </span>
           </button>
         ) : (

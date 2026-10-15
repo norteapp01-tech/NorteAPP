@@ -69,7 +69,6 @@ export function MuscleAnalysisDetail({
                 </li>
               ))}
             </ul>
-            <p className="evo-analysis-text">{evolution.explanation}</p>
           </>
         )}
       </div>
@@ -170,9 +169,7 @@ export function MuscleAnalysisDetail({
       )}
 
       {c.planShareNote && <p className="evo-analysis-note">{c.planShareNote}</p>}
-      <p className="evo-analysis-text">
-        {c.explanation} {CONF[c.confidence]}.
-      </p>
+      <p className="evo-analysis-text">{CONF[c.confidence]}</p>
     </div>
   );
 }
@@ -201,8 +198,7 @@ function Progression({ items }: { items: ProgressionSuggestion[] }) {
   return (
     <div className="evo-progression">
       <p>
-        <b>Você cumpriu o treino e atingiu o topo da faixa de repetições.</b> Considere progredir a
-        carga ou atualizar a meta.
+        <b>Progressão sugerida</b>
       </p>
       <ul>
         {items.map((i) => (

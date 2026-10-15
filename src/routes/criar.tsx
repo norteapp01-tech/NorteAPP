@@ -1,15 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ChevronLeft,
-  Check,
-  CalendarDays,
-  Target,
-  GitBranch,
-  Plus,
-  Trash2,
-  Link2,
-} from "lucide-react";
+import { ChevronLeft, Check, CalendarDays, Target, Plus, Trash2, Link2 } from "lucide-react";
 import {
   createGoal,
   createExecution,
@@ -84,9 +75,6 @@ function CreateScreen() {
         <div className="mt-10 space-y-4">
           <div>
             <h1 className="norte-page-title mt-3">O que você quer criar?</h1>
-            <p className="mt-2 text-sm text-muted-foreground text-balance-tight">
-              Plano é o que você quer construir. Agenda é o que tem hora marcada.
-            </p>
           </div>
 
           <button
@@ -98,13 +86,7 @@ function CreateScreen() {
             </div>
             <div>
               <p className="font-bold">Criar um Plano</p>
-              <p className="mt-1 text-xs text-muted-foreground text-balance-tight">
-                Algo que você quer conquistar ou realizar. Ex: "Abrir uma loja", "Aprender inglês",
-                "Melhorar minha saúde".
-              </p>
-              <p className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-warning">
-                <GitBranch className="h-3 w-3" /> Só título e prazo já bastam pra salvar
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">Objetivo, etapas e prazo</p>
             </div>
           </button>
 
@@ -117,20 +99,9 @@ function CreateScreen() {
             </div>
             <div>
               <p className="font-bold">Adicionar à Agenda</p>
-              <p className="mt-1 text-xs text-muted-foreground text-balance-tight">
-                Algo pontual, com hora marcada. Ex: "Reunião segunda às 14h", "Médico sexta".
-              </p>
-              <p className="mt-2 text-[11px] font-medium text-muted-foreground">
-                3 campos · 15s · pode vincular a um plano
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">Compromisso ou tarefa</p>
             </div>
           </button>
-
-          <div className="mt-6 rounded-2xl border border-border bg-surface/60 p-4 text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">Regra do Norte:</span> compromissos são{" "}
-            <em>o que tem hora</em>. Planos são <em>o que você quer construir</em> — e cada
-            compromisso pode empurrar um plano.
-          </div>
         </div>
       )}
 
@@ -371,10 +342,7 @@ function PlanejamentoFlow({
       </div>
 
       {step === "identidade" && (
-        <Section
-          title="O que você quer realizar?"
-          hint="Uma frase basta. Prazo já é o suficiente pra salvar."
-        >
+        <Section title="O que você quer realizar?">
           <div className="space-y-3">
             <Field
               label="O que você quer realizar"
@@ -418,10 +386,7 @@ function PlanejamentoFlow({
       )}
 
       {step === "prazo" && (
-        <Section
-          title="Quando você quer realizar isso?"
-          hint="Escolha um atalho ou uma data específica."
-        >
+        <Section title="Quando você quer realizar isso?">
           <div className="grid grid-cols-2 gap-2">
             {(["Semana", "Mês", "90 dias", "Semestre", "Ano"] as const).map((d) => (
               <button
@@ -469,10 +434,7 @@ function PlanejamentoFlow({
       )}
 
       {step === "etapas" && (
-        <Section
-          title="Quer dividir esse plano em etapas?"
-          hint="Opcional. Data por etapa também é opcional — dá pra ajustar depois."
-        >
+        <Section title="Quer dividir esse plano em etapas?">
           <div className="space-y-2">
             {form.stepsList.map((s) => (
               <div key={s.id} className="card-surface flex items-center justify-between gap-2 p-3">

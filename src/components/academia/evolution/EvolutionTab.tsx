@@ -395,10 +395,6 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
         </span>
         <span>›</span>
       </button>
-      <p className="text-center text-[10px] text-muted-foreground">
-        Dados baseados nos treinos registrados.
-      </p>
-
       {filterOpen && (
         <EvolutionFilterSheet
           cycles={cycles}

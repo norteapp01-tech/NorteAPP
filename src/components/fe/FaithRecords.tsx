@@ -82,7 +82,6 @@ export function FaithRecords({ onOpenPrayer }: { onOpenPrayer: () => void }) {
         <div className="faith-capture-copy">
           <span className="faith-eyebrow">Guardar o que importa</span>
           <h2>O que você quer guardar?</h2>
-          <p>Registre algo que viveu, aprendeu ou quer lembrar.</p>
           <button className="faith-new" onClick={() => setPicker(true)}>
             <Plus size={23} /> Novo registro
           </button>
@@ -102,11 +101,7 @@ export function FaithRecords({ onOpenPrayer }: { onOpenPrayer: () => void }) {
           <button onClick={() => setAll(true)}>Ver todos →</button>
         </div>
         {recent.map((e, i) => row(e, i === 0))}
-        {!recent.length && (
-          <p className="faith-empty">
-            Suas experiências e aprendizados aparecerão aqui. Guarde seu primeiro registro.
-          </p>
-        )}
+        {!recent.length && <p className="faith-empty">Nenhum registro.</p>}
       </section>
       {memory && (
         <section className="faith-reminder-section">

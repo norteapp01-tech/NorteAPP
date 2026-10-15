@@ -87,11 +87,11 @@ beforeEach(() => {
 });
 
 describe("Google Agenda nas configurações", () => {
-  it("desconectado: oferece conectar e explica o que o Norte pede", () => {
+  it("desconectado: oferece conectar sem texto redundante", () => {
     renderSection();
     expect(screen.getByText("Desconectado")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Conectar Google Agenda/ })).toBeEnabled();
-    expect(screen.getByText(/ver e editar eventos e listar suas agendas/)).toBeInTheDocument();
+    expect(screen.queryByText(/ver e editar eventos e listar suas agendas/)).toBeNull();
   });
 
   it("conectar leva a pessoa ao Google", async () => {
@@ -118,13 +118,13 @@ describe("Google Agenda nas configurações", () => {
     renderSection();
     expect(screen.getByText("Conectado")).toBeInTheDocument();
     expect(screen.getByText("norteapp01@gmail.com")).toBeInTheDocument();
-    expect(screen.getByText(/Última sincronização: há 5 min/)).toBeInTheDocument();
+    expect(screen.getByText("5 min")).toBeInTheDocument();
     expect(screen.getByText("Principal")).toBeInTheDocument();
     expect(screen.getByText("Edição")).toBeInTheDocument();
     expect(screen.getByText("Somente leitura")).toBeInTheDocument();
     expect(screen.getByLabelText("Sincronizar Principal")).toBeChecked();
     expect(screen.getByLabelText("Sincronizar Feriados")).not.toBeChecked();
-    expect(screen.getByRole("button", { name: /Sincronizar agora/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^Sincronizar$/ })).toBeEnabled();
     expect(screen.getByRole("button", { name: /Reconectar/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Desconectar/ })).toBeInTheDocument();
   });
@@ -143,28 +143,27 @@ describe("Google Agenda nas configurações", () => {
     setState({ connection, calendars: [main, { ...holidays, selected: true }] });
     renderSection();
     // só a agenda editável tem a opção de receber os eventos do Norte
-    expect(screen.getAllByText(/Eventos criados no Norte vão para esta agenda/)).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /como destino dos eventos/ })).toHaveLength(1);
   });
 
   it("avisa quando nenhuma agenda editável recebe os eventos do Norte", () => {
     setState({ connection, calendars: [{ ...main, pushNewEvents: false }] });
     renderSection();
-    expect(
-      screen.getByText(/Escolha em qual agenda os eventos criados no Norte/),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Defina o destino dos novos eventos.")).toBeInTheDocument();
   });
 
-  it("tempo real indisponível é dito com clareza, sem parecer erro", () => {
+  it("tempo real indisponível não polui a tela nem parece erro", () => {
     setState({ connection, calendars: [{ ...main, webhookStatus: "unavailable" }] });
     renderSection();
-    expect(screen.getByText(/atualização em tempo real indisponível/)).toBeInTheDocument();
+    expect(screen.queryByText(/atualização em tempo real indisponível/)).toBeNull();
+    expect(screen.getByText("Conectado")).toBeInTheDocument();
   });
 
   it("sincronizando: mostra o andamento e trava o botão", () => {
     setState({ connection: { ...connection, syncState: "syncing" }, calendars: [main] });
     renderSection();
     expect(screen.getAllByText("Sincronizando…").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: /Sincronizar agora/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^Sincronizar$/ })).toBeDisabled();
   });
 
   it("Sincronizar agora chama a função e confirma", async () => {
@@ -175,7 +174,7 @@ describe("Google Agenda nas configurações", () => {
     });
     setState({ connection, calendars: [main] });
     renderSection();
-    fireEvent.click(screen.getByRole("button", { name: /Sincronizar agora/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Sincronizar$/ }));
     await waitFor(() => expect(store.syncGoogleNow).toHaveBeenCalledWith("manual"));
     expect(await screen.findByText(/Sincronizado: 2 novo\(s\) evento\(s\)/)).toBeInTheDocument();
   });
@@ -188,7 +187,7 @@ describe("Google Agenda nas configurações", () => {
     });
     setState({ connection, calendars: [main] });
     renderSection();
-    fireEvent.click(screen.getByRole("button", { name: /Sincronizar agora/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Sincronizar$/ }));
     expect(await screen.findByText(/Algumas alterações não foram enviadas/)).toBeInTheDocument();
     expect(screen.queryByText("Tudo sincronizado.")).toBeNull();
   });
@@ -234,16 +233,16 @@ describe("Google Agenda nas configurações", () => {
     expect(screen.getByText("Reconexão necessária")).toBeInTheDocument();
     expect(screen.getByText(/continuam no Norte/)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /Reconectar/ }).length).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: /Sincronizar agora/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Sincronizar$/ })).toBeNull();
   });
 
-  it("desconectar pede confirmação e explica o que acontece", async () => {
+  it("desconectar pede confirmação objetiva", async () => {
     store.disconnectGoogle.mockResolvedValue({ revoked: true });
     setState({ connection, calendars: [main] });
     renderSection();
-    fireEvent.click(screen.getByRole("button", { name: /^Desconectar$/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Desconectar Google Agenda" }));
     expect(await screen.findByText(/Desconectar o Google Agenda\?/)).toBeInTheDocument();
-    expect(screen.getByText(/somente leitura saem do Norte/)).toBeInTheDocument();
+    expect(screen.getByText(/Seus compromissos permanecem salvos/)).toBeInTheDocument();
     expect(store.disconnectGoogle).not.toHaveBeenCalled();
     const confirm = screen.getAllByRole("button", { name: /^Desconectar$/ }).at(-1)!;
     fireEvent.click(confirm);
@@ -330,7 +329,7 @@ describe("Google Agenda nas configurações", () => {
     store.selectGoogleCalendars.mockResolvedValue(undefined);
     setState({ connection, calendars: [main] });
     renderSection();
-    fireEvent.click(screen.getByLabelText(/Enviar rotinas do Norte/));
+    fireEvent.click(screen.getByLabelText(/Sincronizar rotinas/));
     await waitFor(() =>
       expect(store.selectGoogleCalendars).toHaveBeenCalledWith([], { pushRoutines: true }),
     );

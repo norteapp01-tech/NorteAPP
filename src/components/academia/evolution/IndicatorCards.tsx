@@ -66,92 +66,65 @@ export function IndicatorCards({
       {open === "frequencia" && (
         <Modal onClose={() => setOpen(null)} title="Frequência">
           {frequency.planned !== undefined ? (
-            <>
-              <p className="text-sm leading-relaxed">
-                {frequency.done} de {frequency.planned} treinos programados no período, ou{" "}
-                {frequency.percent}%.
-              </p>
+            <div className="grid grid-cols-2 gap-3">
+              <Metric value={`${frequency.percent}%`} label="cumprido" />
+              <Metric value={`${frequency.done}/${frequency.planned}`} label="treinos" />
               {frequency.extra > 0 && (
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  Você fez ainda {frequency.extra} treino(s) além do programado. Eles aparecem
-                  separados e não elevam o cumprimento acima de 100%.
+                <p className="col-span-2 text-xs font-semibold text-primary">
+                  +{frequency.extra} extra{frequency.extra === 1 ? "" : "s"}
                 </p>
               )}
-              <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-                O denominador vem dos dias marcados nas etapas do programa, cujas datas são fixas.
-                Mudar a ficha da semana hoje não reescreve o que estava previsto no passado.
-              </p>
-            </>
+            </div>
           ) : (
-            <>
-              <p className="text-sm leading-relaxed">
-                {frequency.done} treinos realizados no período.
-              </p>
-              <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-                {frequency.reason} Um percentual exigiria saber o que estava programado naquelas
-                datas, e a atribuição semanal atual não guarda esse histórico.
-              </p>
-            </>
+            <Metric value={String(frequency.done)} label="treinos" />
           )}
         </Modal>
       )}
 
       {open === "volume" && (
         <Modal onClose={() => setOpen(null)} title="Volume registrado">
-          <p className="text-sm leading-relaxed">
-            Soma de carga × repetições de {volume.sets} séries concluídas.
-          </p>
-          {volume.excludedSets > 0 && (
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              {volume.excludedSets} séries ficaram de fora por não terem carga externa comparável
-              (peso corporal, assistido ou sem carga). Somá-las produziria um número sem
-              significado.
-            </p>
-          )}
+          <div className="grid grid-cols-2 gap-3">
+            <Metric value={formatKg(volume.kg)} label="volume" />
+            <Metric value={String(volume.sets)} label="séries" />
+          </div>
           {comparison && (
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Comparado com {formatDateShortBR(comparison.from)} —{" "}
-              {formatDateShortBR(comparison.to)}, o mesmo escopo de filtros.
+            <p className="mt-3 text-xs text-muted-foreground">
+              {formatDateShortBR(comparison.from)}–{formatDateShortBR(comparison.to)}
             </p>
           )}
-          <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-            Volume maior não prova ganho de força: ele também sobe quando houve mais sessões ou
-            exercícios diferentes no período.
-          </p>
         </Modal>
       )}
 
       {open === "grupo" && (
         <Modal onClose={() => setOpen(null)} title="Grupo em destaque">
           {top ? (
-            <>
-              <p className="text-sm leading-relaxed">
-                {top.label} recebeu {top.directSets} séries diretas em {top.sessions}{" "}
-                {top.sessions === 1 ? "sessão" : "sessões"}
-                {top.lastDate ? `, a última em ${formatDateShortBR(top.lastDate)}` : ""}.
-              </p>
-              {top.assistedSets > 0 && (
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  Participou ainda como músculo secundário em {top.assistedSets} séries, contadas à
-                  parte.
+            <div>
+              <p className="text-xl font-bold">{top.label}</p>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <Metric value={String(top.directSets)} label="séries" />
+                <Metric value={String(top.sessions)} label="sessões" />
+              </div>
+              {top.lastDate && (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Última: {formatDateShortBR(top.lastDate)}
                 </p>
               )}
-            </>
+            </div>
           ) : (
-            <p className="text-sm leading-relaxed">
-              Nenhuma série com grupo muscular definido no período.
-            </p>
+            <p className="text-sm text-muted-foreground">Sem dados no período.</p>
           )}
-          <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-            É o grupo com mais séries registradas — não significa músculo mais forte, favorito nem
-            mais desenvolvido.
-          </p>
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Baseado em {data.sets.length} séries no período.
-          </p>
         </Modal>
       )}
     </>
+  );
+}
+
+function Metric({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-surface-quiet p-4">
+      <strong className="block font-mono text-2xl tabular-nums">{value}</strong>
+      <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</span>
+    </div>
   );
 }
 

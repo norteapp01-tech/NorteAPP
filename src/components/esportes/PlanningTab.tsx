@@ -196,7 +196,6 @@ export function PlanningTab({ modality }: { modality: SportModality }) {
                 <Footprints aria-hidden />
               </div>
               <strong>Nada planejado neste dia.</strong>
-              <p>Escolha um horário ou deixe livre para decidir depois.</p>
             </div>
           )}
           <button onClick={() => setAddingOpen(true)} className="sp-plan-add interactive-press">

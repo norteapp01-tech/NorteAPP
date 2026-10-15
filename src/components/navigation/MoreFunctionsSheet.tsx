@@ -27,20 +27,18 @@ type RouteLink =
 
 type Item = RouteLink & {
   label: string;
-  detail: string;
   icon: LucideIcon;
 };
 
 const mainItems: Item[] = [
-  { to: "/", label: "Hoje", detail: "Seu dia e próximas ações", icon: Home },
-  { to: "/agenda", label: "Agenda", detail: "Compromissos com horário", icon: CalendarDays },
+  { to: "/", label: "Hoje", icon: Home },
+  { to: "/agenda", label: "Agenda", icon: CalendarDays },
   {
     to: "/planejamento",
     label: "Planos",
-    detail: "Objetivos, etapas e cronogramas",
     icon: CalendarRange,
   },
-  { to: "/dashboard", label: "Espelho", detail: "Visão geral da sua evolução", icon: BarChart3 },
+  { to: "/dashboard", label: "Espelho", icon: BarChart3 },
 ];
 
 const routineItems: Item[] = [
@@ -48,42 +46,36 @@ const routineItems: Item[] = [
     to: "/sub-agenda/$categoria",
     params: { categoria: "academia" },
     label: "Academia",
-    detail: "Treinos, evolução e programa",
     icon: Dumbbell,
   },
   {
     to: "/sub-agenda/$categoria",
     params: { categoria: "esportes" },
     label: "Esportes",
-    detail: "Corrida, caminhada e ciclismo",
     icon: Footprints,
   },
   {
     to: "/sub-agenda/$categoria",
     params: { categoria: "leitura" },
     label: "Leitura",
-    detail: "Livros, rotina e caderno",
     icon: BookOpen,
   },
   {
     to: "/sub-agenda/$categoria",
     params: { categoria: "alimentacao" },
     label: "Alimentação",
-    detail: "Refeições, análise e plano",
     icon: Salad,
   },
   {
     to: "/sub-agenda/$categoria",
     params: { categoria: "financas" },
     label: "Finanças",
-    detail: "Visão, registros e objetivos",
     icon: Wallet,
   },
   {
     to: "/sub-agenda/$categoria",
     params: { categoria: "fe" },
     label: "Fé",
-    detail: "Registros, orações e Bíblia",
     icon: HandHeart,
   },
 ];
@@ -100,10 +92,7 @@ function FunctionRow({ item, onClose }: { item: Item; onClose: () => void }) {
       <span className="norte-function-icon">
         <Icon className="h-5 w-5" strokeWidth={1.65} />
       </span>
-      <span className="min-w-0 flex-1">
-        <strong>{item.label}</strong>
-        <small>{item.detail}</small>
-      </span>
+      <strong className="min-w-0 flex-1">{item.label}</strong>
       <ChevronRight className="h-4 w-4 text-muted-foreground" />
     </Link>
   );
@@ -133,7 +122,6 @@ export function MoreFunctionsSheet({
           <div>
             <p className="norte-eyebrow">Norte</p>
             <h2>Mais funções</h2>
-            <p>Tudo no seu lugar, sem atalhos escondidos.</p>
           </div>
           <button onClick={onClose} className="interactive-press" aria-label="Fechar mais funções">
             <X className="h-5 w-5" />
@@ -172,7 +160,6 @@ export function MoreFunctionsSheet({
                 </span>
                 <span className="min-w-0 flex-1">
                   <strong>Adicionar</strong>
-                  <small>Novo compromisso ou plano</small>
                 </span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </Link>
@@ -188,7 +175,6 @@ export function MoreFunctionsSheet({
                 </span>
                 <span className="min-w-0 flex-1">
                   <strong>Falar com o Norte</strong>
-                  <small>Peça, consulte ou execute por conversa</small>
                 </span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </button>
@@ -204,7 +190,6 @@ export function MoreFunctionsSheet({
                 </span>
                 <span className="min-w-0 flex-1">
                   <strong>Configurações</strong>
-                  <small>Conta, preferências e notificações</small>
                 </span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </button>

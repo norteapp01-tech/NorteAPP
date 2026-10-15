@@ -119,10 +119,10 @@ describe("Espelho: estados", () => {
     expect(retry).toHaveBeenCalled();
   });
 
-  it("sem dados: explica e não inventa números", () => {
+  it("sem dados: é objetivo e não inventa números", () => {
     mirror.value = ready([]);
     renderIt();
-    expect(screen.getByText(/ainda não há compromissos encerrados/i)).toBeInTheDocument();
+    expect(screen.getByText(/sem dados/i)).toBeInTheDocument();
     expect(screen.queryByText(/%/)).toBeNull();
   });
 
@@ -180,10 +180,10 @@ describe("Espelho: conteúdo e navegação", () => {
     expect(screen.getByText(/4 de 4 concluídos pela manhã/i)).toBeInTheDocument();
   });
 
-  it("não usa a expressão 'tempo real gasto' como dado", () => {
+  it("não apresenta tempo real gasto como dado", () => {
     mirror.value = ready(rich());
     renderIt();
-    expect(screen.getByText(/duração planejada, não tempo real/i)).toBeInTheDocument();
+    expect(screen.queryByText(/tempo real gasto/i)).toBeNull();
   });
 
   it("alterna entre Agenda e Rotinas", () => {

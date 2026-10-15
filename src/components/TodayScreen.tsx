@@ -582,12 +582,12 @@ function MoodActionPanel({
           : "Reorganizar o dia";
   const prompt =
     mood === "fogo"
-      ? "Toque no que você gostaria de adiantar."
+      ? "O que vai adiantar?"
       : mood === "normal"
-        ? "Seu plano continua como está."
+        ? "Sem mudanças."
         : mood === "cansado"
-          ? "Selecione somente o que prefere mover de hoje."
-          : "Selecione o que precisa sair de hoje.";
+          ? "O que vai mover?"
+          : "O que não cabe hoje?";
 
   const run = async (action: () => Promise<void>) => {
     if (busy) return;

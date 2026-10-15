@@ -119,7 +119,6 @@ export function RadarDistribution({
   onSelect: (group: MuscleGroup | null) => void;
 }) {
   const [view, setView] = useState<"radar" | "barras">("radar");
-  const [help, setHelp] = useState(false);
 
   // Mesmos músculos e mesma ordem nos dois modos: a troca não embaralha o radar.
   const groups = [
@@ -342,25 +341,6 @@ export function RadarDistribution({
           ))}
         </ul>
       )}
-
-      <button
-        type="button"
-        onClick={() => setHelp((h) => !h)}
-        aria-expanded={help}
-        className="mt-2 text-[11px] font-semibold text-primary"
-      >
-        {help ? "Fechar explicação" : "O que essa nota significa?"}
-      </button>
-      {help && (
-        <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-          {mode === "cumprimento"
-            ? "No modo Cumprimento, a nota 10 significa que você realizou 100% do treino planejado para esse músculo. Ela não representa uma recomendação universal de treino. Cada série vale as repetições feitas sobre as planejadas (até 100%); séries e treinos que ficaram para trás valem zero."
-            : "A evolução compara seu desempenho atual com o seu próprio histórico: este período contra o anterior de mesma duração, usando a força estimada (carga × (1 + repetições ÷ 30)). A nota mostra evolução no período, não qualidade absoluta."}
-        </p>
-      )}
-      <p className="mt-2 text-[11px] text-muted-foreground">
-        Toque em um músculo para ver o detalhamento.
-      </p>
     </div>
   );
 }

@@ -82,10 +82,6 @@ export function AgendaPreferences() {
               />
             </label>
           </div>
-          <p className="mt-1.5 text-[11px] text-muted-foreground">
-            Serve para abrir a tela no lugar certo, sugerir horários e destacar a janela. A linha do
-            tempo continua mostrando as 24 horas, e você pode marcar fora desse intervalo.
-          </p>
         </Field>
 
         <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">

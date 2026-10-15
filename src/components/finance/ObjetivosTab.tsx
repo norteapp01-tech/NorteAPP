@@ -30,7 +30,6 @@ export function ObjetivosTab() {
       <div className="finance-goals-heading">
         <div>
           <h2>Sonhos e objetivos</h2>
-          <p>Dê um destino ao que você guarda.</p>
         </div>
         <p>
           <strong>{formatBRL(savedTotal)}</strong>
@@ -55,18 +54,12 @@ export function ObjetivosTab() {
           <ArrowRightLeft />
           <span>
             <strong>Aportes recentes</strong>
-            <small>Veja seus últimos aportes nos objetivos.</small>
           </span>
           <ChevronRight />
         </button>
       )}
 
-      {goals.length === 0 && (
-        <p className="mt-3 text-sm text-muted-foreground">
-          Crie um objetivo pra guardar dinheiro com propósito — uma viagem, uma reserva, o que fizer
-          sentido.
-        </p>
-      )}
+      {goals.length === 0 && <p className="mt-3 text-sm text-muted-foreground">Nenhum objetivo.</p>}
 
       {openGoalId && <GoalDetailSheet goalId={openGoalId} onClose={() => setOpenGoalId(null)} />}
       {creating && <NewGoalSheet onClose={() => setCreating(false)} />}
@@ -142,8 +135,7 @@ function GoalDetailSheet({ goalId, onClose }: { goalId: string; onClose: () => v
           <p className="mt-1 text-xs text-primary">{pct}%</p>
           {goal.deadline && pace !== null && (
             <p className="mt-2 text-[11px] text-muted-foreground">
-              Para chegar nessa meta até {goal.deadline.split("-").reverse().join("/")}, o ritmo
-              necessário seria aproximadamente {formatBRL(pace)}/mês.
+              {formatBRL(pace)}/mês até {goal.deadline.split("-").reverse().join("/")}
             </p>
           )}
         </div>
@@ -178,9 +170,6 @@ function GoalDetailSheet({ goalId, onClose }: { goalId: string; onClose: () => v
 
         <div className="rounded-xl border border-border bg-surface-2 p-3">
           <p className="text-xs font-semibold">Planejamento da conquista</p>
-          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-            Opcional: divida este objetivo em etapas e acompanhe o cronograma na aba Plano.
-          </p>
           <button
             disabled={creatingPlan}
             onClick={async () => {

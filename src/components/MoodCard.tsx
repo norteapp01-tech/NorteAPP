@@ -105,7 +105,6 @@ export function MoodCard({
         <SmilePlus className="h-6 w-6 shrink-0 text-muted-foreground" strokeWidth={1.75} />
         <div className="min-w-0 flex-1">
           <p className="text-base font-medium">Como você está?</p>
-          <p className="text-[11px] text-muted-foreground">Registre como está se sentindo hoje</p>
         </div>
         {/* Indicação discreta do que já foi registrado — some do destaque, mas
             não esconde que o dia já tem resposta. */}

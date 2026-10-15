@@ -41,9 +41,6 @@ export function StageWeek({
           />
         </div>
       </div>
-      <p className="mt-2 text-[11px] text-muted-foreground">
-        Toque no dia para escolher o treino. Deslize para ver a semana.
-      </p>
       {plans.length === 0 && (
         <p className="mt-2 text-xs text-muted-foreground">
           Adicione um treino à etapa para distribuir sua semana.

@@ -277,17 +277,11 @@ function StageEvolution({
                 Variação: {(weights[weights.length - 1].weight - weights[0].weight).toFixed(1)} kg
               </p>
             ) : (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Registre outra pesagem para comparar.
-              </p>
+              <p className="mt-2 text-xs text-muted-foreground">Sem comparação.</p>
             )}
           </>
         )}
       </Card>
-      <p className="text-xs text-muted-foreground">
-        Tempo de cardio ainda não é registrado separadamente dos treinos e não entra nesta
-        comparação.
-      </p>
     </div>
   );
 }

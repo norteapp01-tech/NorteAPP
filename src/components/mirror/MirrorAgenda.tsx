@@ -60,9 +60,7 @@ export function MirrorAgenda({
   if (a.sufficiency === "none")
     return (
       <section className="card-surface p-5">
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Sem compromissos encerrados {scope}. Compromissos futuros não entram nas contas.
-        </p>
+        <p className="text-sm text-muted-foreground">Sem dados {scope}.</p>
       </section>
     );
 
@@ -84,7 +82,7 @@ export function MirrorAgenda({
     <div className="card-surface divide-y divide-border px-5">
       <Disclosure
         title="Para onde o tempo foi"
-        subtitle={`${formatMinutes(a.time.unionMinutes)} planejados · duração planejada, não tempo real`}
+        subtitle={`${formatMinutes(a.time.unionMinutes)} planejados`}
         defaultOpen
       >
         <UnderlineTabs
@@ -108,37 +106,20 @@ export function MirrorAgenda({
                 value={formatMinutes(g.minutes)}
                 fraction={g.minutes / maxMinutes}
                 color={g.color ?? NEUTRALS[i % NEUTRALS.length]}
-                detail={`${pct(g.share)} do tempo · ${g.done} ${g.done === 1 ? "concluído" : "concluídos"}${g.missed ? ` · ${g.missed} ${g.missed === 1 ? "não realizado" : "não realizados"}` : ""}${g.cancelled ? ` · ${g.cancelled} ${g.cancelled === 1 ? "cancelado" : "cancelados"}` : ""}`}
+                detail={`${pct(g.share)} · ${g.done} concluído${g.done === 1 ? "" : "s"}${g.missed ? ` · ${g.missed} pulado${g.missed === 1 ? "" : "s"}` : ""}`}
               />
             ))}
           </div>
         )}
-        {a.time.overlapMinutes > 0 && (
-          <p className="mt-3 text-[11px] text-muted-foreground">
-            {formatMinutes(a.time.overlapMinutes)} estavam sobrepostos e foram contados uma vez só.
-          </p>
-        )}
-        {a.untimedCount > 0 && (
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            {a.untimedCount}{" "}
-            {a.untimedCount === 1
-              ? "compromisso de dia inteiro não entra"
-              : "compromissos de dia inteiro não entram"}{" "}
-            nas horas.
-          </p>
-        )}
         {untouched.length > 0 && (
           <p className="mt-3 text-xs text-muted-foreground">
-            Sem nenhum compromisso no período:{" "}
+            Sem registros:{" "}
             <span className="text-foreground">{untouched.map((l) => l.name).join(", ")}</span>.
           </p>
         )}
       </Disclosure>
 
-      <Disclosure
-        title="Planejado × realizado"
-        subtitle="Quanto do tempo planejado virou compromisso concluído"
-      >
+      <Disclosure title="Planejado × realizado" subtitle="Tempo concluído">
         {a.time.doneShare === null ? (
           <EmptyNote>Sem compromissos com horário para comparar.</EmptyNote>
         ) : (
@@ -147,12 +128,12 @@ export function MirrorAgenda({
               name="Concluído do planejado"
               value={`${formatMinutes(a.time.doneUnionMinutes)} de ${formatMinutes(a.time.unionMinutes)}`}
               fraction={a.time.doneShare}
-              detail={`Duração planejada dos concluídos: ${pct(a.time.doneShare)} do tempo planejado. O app não mede o tempo real gasto — só o que foi marcado como concluído.`}
+              detail={pct(a.time.doneShare)}
             />
             {comparison.comparable && (
               <p className="mt-2 text-xs text-muted-foreground">
                 {comparison.minutesDelta === 0
-                  ? "Mesmo volume de tempo planejado do período anterior."
+                  ? "Igual ao período anterior"
                   : `${formatMinutes(Math.abs(comparison.minutesDelta))} ${comparison.minutesDelta > 0 ? "a mais" : "a menos"} planejados que no período anterior.`}
               </p>
             )}
@@ -199,7 +180,7 @@ export function MirrorAgenda({
         )}
       </Disclosure>
 
-      <Disclosure title="Dias e horários" subtitle="Quando você mais cumpre o que marca">
+      <Disclosure title="Dias e horários">
         <p className="text-xs font-semibold text-muted-foreground">Por dia da semana</p>
         <div className="mt-2">
           <MiniColumns
@@ -219,10 +200,6 @@ export function MirrorAgenda({
             highlight={bestOf(a.timeOfDay)}
           />
         </div>
-        <p className="mt-3 text-[11px] text-muted-foreground">
-          Colunas vazias têm menos de {MIN_BUCKET} compromissos: pouco para concluir algo. O número
-          embaixo é a quantidade.
-        </p>
       </Disclosure>
 
       <Disclosure
@@ -237,12 +214,7 @@ export function MirrorAgenda({
           <EmptyNote>Sem compromissos com horário no período.</EmptyNote>
         ) : (
           <>
-            <BarRow
-              name="Ocupação média"
-              value={pct(a.averageLoad)}
-              fraction={a.averageLoad}
-              detail="Dos dias com compromissos, em relação ao seu dia habitual (configurações da Agenda)."
-            />
+            <BarRow name="Ocupação média" value={pct(a.averageLoad)} fraction={a.averageLoad} />
             {worstDay && worstDay.busy > 0 && (
               <Link
                 to="/agenda"
@@ -256,7 +228,7 @@ export function MirrorAgenda({
         )}
       </Disclosure>
 
-      <Disclosure title="Consistência" subtitle="Taxa de realização ao longo do período">
+      <Disclosure title="Consistência">
         <MiniColumns
           label="Taxa de realização por semana"
           items={a.weeks.map((w, i) => ({
@@ -284,9 +256,6 @@ export function MirrorAgenda({
             ))}
           </ul>
         )}
-        <p className="mt-3 text-[11px] text-muted-foreground">
-          Recorrências que mudam toda hora são boas candidatas a um novo horário.
-        </p>
       </Disclosure>
 
       {a.feeling.answered > 0 && (
@@ -301,9 +270,6 @@ export function MirrorAgenda({
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-[11px] text-muted-foreground">
-            Só entra o que você respondeu. Sem resposta não vira “leve” nem “pesado”.
-          </p>
         </Disclosure>
       )}
     </div>

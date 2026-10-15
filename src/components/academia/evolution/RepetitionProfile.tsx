@@ -22,9 +22,6 @@ export function RepetitionProfile({
           {muscle ? muscleGroupLabel[muscle] : "Todos os músculos"}
         </span>
       </summary>
-      <p className="my-3 text-xs text-muted-foreground">
-        Como você distribuiu suas séries. Toque numa faixa para ver os exercícios.
-      </p>
       {bins.map((bin, i) => (
         <div key={bin.label}>
           <button

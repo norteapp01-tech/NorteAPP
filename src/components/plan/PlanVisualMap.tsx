@@ -79,8 +79,7 @@ export function PlanVisualMap({
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] text-muted-foreground">Toque num item pra ver o resumo.</p>
+      <div className="flex items-center justify-end">
         <div className="flex items-center gap-1">
           <button
             onClick={() => setScale((s) => Math.max(0.7, +(s - 0.15).toFixed(2)))}

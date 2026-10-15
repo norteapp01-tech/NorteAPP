@@ -71,22 +71,13 @@ export function SaveRouteCard({
         <RoutePreview points={points} className="h-14 w-14 shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold">Salvar esta rota</p>
-          <p className="text-[11px] text-muted-foreground">
-            {formatDistanceKm(distanceM)} · reutilize o percurso depois
-          </p>
+          <p className="text-[11px] text-muted-foreground">{formatDistanceKm(distanceM)}</p>
         </div>
       </div>
 
       {match && (
         <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
-          <p className="text-[11px] leading-relaxed">
-            Esta corrida parece corresponder à rota{" "}
-            <strong className="font-bold">{match.route.title}</strong>.
-          </p>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">
-            {match.reasons.join(" · ")}
-            {!match.highConfidence && " · confirme antes, a semelhança não é forte."}
-          </p>
+          <p className="text-[11px] font-semibold">Rota parecida: {match.route.title}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               onClick={async () => {

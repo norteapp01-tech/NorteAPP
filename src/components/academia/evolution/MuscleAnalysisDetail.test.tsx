@@ -48,7 +48,7 @@ const golden: CompletionResult = {
 
 it("estado dourado recomenda progredir e só altera a ficha depois de confirmar", async () => {
   render(<MuscleAnalysisDetail mode="cumprimento" completion={golden} />);
-  expect(screen.getByText(/atingiu o topo da faixa de repetições/)).toBeInTheDocument();
+  expect(screen.getByText("Progressão sugerida")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Subir para 22,5 kg" }));
   expect(updateExercise).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Confirmar 22,5 kg" }));

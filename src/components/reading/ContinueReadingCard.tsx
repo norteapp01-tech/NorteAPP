@@ -83,7 +83,6 @@ export function ContinueReadingCard({
           </div>
         ) : (
           <div className="reading-hero-schedule reading-hero-schedule--empty">
-            <p>Configure sua rotina para distribuir sua leitura.</p>
             <button onClick={onOpenRoutineSetup} className="norte-secondary-action shrink-0">
               configurar rotina
             </button>

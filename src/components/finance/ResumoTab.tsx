@@ -79,16 +79,12 @@ export function ResumoTab({
           <Fact label="Objetivos" value={directed} icon={<Target />} />
           <Fact label="Sem destino" value={unallocated} icon={<ArrowDownRight />} />
         </div>
-        <p className="finance-data-note">Valores baseados apenas no que você registrou no Norte.</p>
       </section>
 
       <Card featured title="Para onde foi seu dinheiro">
         {breakdown.length === 0 ? (
           <div className="py-5 text-center">
-            <p className="text-sm font-semibold">O gráfico começa com o primeiro gasto</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Registre uma movimentação para visualizar a distribuição por categoria.
-            </p>
+            <p className="text-sm font-semibold">Sem movimentações</p>
           </div>
         ) : (
           <>

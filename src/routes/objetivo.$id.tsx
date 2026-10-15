@@ -4,7 +4,6 @@ import { AlertTriangle } from "lucide-react";
 import { CategoryIcon } from "@/components/plan/CategoryIcon";
 import { PlanHeader } from "@/components/plan/PlanHeader";
 import { PlanTabs, type PlanTab } from "@/components/plan/PlanTabs";
-import { GuidanceEntry } from "@/components/plan/GuidanceEntry";
 import { NextActionCard } from "@/components/plan/NextActionCard";
 import { PlanPath } from "@/components/plan/PlanPath";
 import { ActionRow } from "@/components/plan/ActionRow";
@@ -185,8 +184,6 @@ export function GoalDetail() {
 
       {tab === "planejamento" && (
         <div className="plan-planning-tab mt-5 space-y-6">
-          <GuidanceEntry />
-
           {stalled && <StalledPlanAlert onDefineNext={handleDefineNext} />}
 
           <NextActionCard
@@ -364,12 +361,8 @@ function ExecutionPicker({ goalId, onClose }: { goalId: string; onClose: () => v
 
   return (
     <Modal onClose={onClose} title="Vincular ação">
-      <p className="text-xs text-muted-foreground">
-        Toque para vincular. Ela passa a contar como avanço deste planejamento (sem etapa — aparece
-        em "Ações sem etapa").
-      </p>
       {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
-      <div className="mt-4 space-y-2">
+      <div className="space-y-2">
         {available.length === 0 && (
           <p className="p-4 text-center text-sm text-muted-foreground">Nenhuma ação disponível.</p>
         )}

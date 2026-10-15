@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Archive, CheckCircle2, ChevronDown, ChevronRight, FilePenLine, Plus } from "lucide-react";
+import { Archive, CheckCircle2, ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { addPrayerSubject, useFeStore } from "@/lib/fe-store";
 import { Modal } from "@/components/ui/modal";
 import { PrayerSubjectDetail } from "./PrayerSubjectDetail";
@@ -30,9 +30,6 @@ export function OracaoTab() {
             <Plus />
           </button>
         </div>
-        <p className="faith-prayer-caption">
-          Acompanhe cada situação com calma, um dia de cada vez.
-        </p>
       </section>
 
       <section className="faith-prayer-active">
@@ -102,10 +99,6 @@ export function OracaoTab() {
           </button>
         ))}
       </Drawer>
-
-      <p className="faith-prayer-helper">
-        <FilePenLine /> Abra um alvo para registrar uma atualização.
-      </p>
 
       {adding && <NewPrayerTarget onClose={() => setAdding(false)} />}
       {openId && <PrayerSubjectDetail subjectId={openId} onClose={() => setOpenId(null)} />}

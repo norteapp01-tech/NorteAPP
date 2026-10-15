@@ -127,10 +127,7 @@ function TodayTab({
         </div>
         <div className="nutrition-timeline">
           {meals.length === 0 ? (
-            <div className="p-5 text-sm text-muted-foreground">
-              Nada planejado para hoje. Use a aba{" "}
-              <span className="text-primary">Plano alimentar</span>.
-            </div>
+            <div className="p-5 text-sm text-muted-foreground">Nada planejado.</div>
           ) : (
             meals.map((meal) => {
               const log = logForMealOnDate(state.logs, meal.id, todayISO());

@@ -207,11 +207,6 @@ export function CreateActionSheet({
             className="flex w-full items-center gap-2 rounded-xl border border-border bg-surface px-3 py-3 text-left text-sm outline-none focus:border-primary"
           />
         </div>
-        {previousEnd && (
-          <p className="mt-1.5 text-[10px] text-muted-foreground">
-            Sugerimos começar quando a ação anterior termina. Você pode alterar.
-          </p>
-        )}
       </div>
       <div className="mt-3">
         <span className="mb-1 block text-[11px] uppercase tracking-wider text-muted-foreground">

@@ -120,7 +120,7 @@ export function ExerciseDetailSheet({
         <div>
           <span>Frequência</span>
           <strong>{sessionCount} sessões</strong>
-          <small>{dates.length} dias no período</small>
+          <small>{dates.length} dias</small>
         </div>
         <div>
           <span>
@@ -129,9 +129,7 @@ export function ExerciseDetailSheet({
           <strong>
             {record ? `${record.value} ${effectiveMode === "carga" ? "kg" : "reps"}` : "—"}
           </strong>
-          <small>
-            {record ? `${formatDateShortBR(record.date)} · histórico completo` : "Sem referência"}
-          </small>
+          <small>{record ? formatDateShortBR(record.date) : "Sem referência"}</small>
         </div>
       </div>
       <h3 className="mt-5 text-base font-semibold">Sua progressão</h3>
@@ -175,19 +173,10 @@ export function ExerciseDetailSheet({
         </select>
       </div>
 
-      <p className="mt-1 text-[10px] text-muted-foreground">
-        {effectiveMode === "carga"
-          ? `Carga registrada com exatamente ${effective} repetições.`
-          : `Repetições registradas com exatamente ${effective} kg.`}
-      </p>
       <p className="mt-2 text-sm font-medium">
         {delta === null
-          ? "Mais registros comparáveis mostrarão sua evolução."
-          : `${delta > 0 ? "+" : ""}${delta} ${effectiveMode === "carga" ? "kg" : "reps"} · ${points.length} sessões comparáveis`}
-      </p>
-      <p className="mt-1 text-[11px] text-muted-foreground">
-        O melhor registro usa a mesma referência e equipamento, mesmo fora do período. Carga
-        assistida não representa força levantada; variações de técnica e amplitude não são medidas.
+          ? "Primeiro registro"
+          : `${delta > 0 ? "+" : ""}${delta} ${effectiveMode === "carga" ? "kg" : "reps"}`}
       </p>
 
       {points.length === 0 ? (
@@ -242,7 +231,7 @@ export function ExerciseDetailSheet({
       )}
       <details className="evo-detail-history mt-5">
         <summary className="cursor-pointer py-3 text-sm font-semibold">
-          Histórico completo do período · {sessionCount} sessões
+          Histórico · {sessionCount} sessões
         </summary>
         {[...new Set(mine.map((s) => s.sessionId))].reverse().map((id) => {
           const rows = mine
@@ -338,9 +327,7 @@ function Chart({
       </div>
       {/* Alternativa em lista: nada importante depende do gráfico. */}
       <details className="mt-3">
-        <summary className="cursor-pointer text-xs text-muted-foreground">
-          Ver valores do gráfico
-        </summary>
+        <summary className="cursor-pointer text-xs text-muted-foreground">Ver dados</summary>
         <ul className="mt-2 space-y-0.5">
           {points.map((p) => (
             <li key={`row-${p.sessionId}`}>
