@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bell, Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { DateField } from "@/components/ui/date-wheel-picker";
+import { todayISO } from "@/lib/goals-store";
 import {
   useRemindersStore,
   highlightedReminders,
@@ -227,7 +228,8 @@ export function RemindersCard({
 
 function QuickAddReminderModal({ onClose }: { onClose: () => void }) {
   const [text, setText] = useState("");
-  const [date, setDate] = useState("");
+  // Lembrete criado no dia já nasce para hoje; a pessoa só troca se for outro dia.
+  const [date, setDate] = useState(() => todayISO());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 

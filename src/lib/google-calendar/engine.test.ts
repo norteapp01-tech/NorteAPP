@@ -1044,3 +1044,38 @@ describe("isolamento entre pessoas", () => {
     expect(bExec.title).toBe("Do B");
   });
 });
+
+describe("primeira conexão e rodadas longas", () => {
+  const exec = (title: string, date: string, status = "planejada") =>
+    t.fake.seed("executions", {
+      user_id: "user-a",
+      title,
+      category: "trabalho",
+      due_date: date,
+      agenda_date: date,
+      start_time: "10:00",
+      end_time: "11:00",
+      status,
+      source: "norte",
+      agenda_sessions: [],
+    });
+
+  it("ao conectar, só envia o que ainda vai acontecer (nada do passado nem concluído)", async () => {
+    exec("Passado", "2026-10-05");
+    exec("Concluído hoje", "2026-10-12", "concluida");
+    exec("Hoje", "2026-10-12");
+    exec("Semana que vem", "2026-10-19");
+    await enqueueBackfill(t.ctx);
+    const queued = t.fake.rows("agenda_sync_outbox").map((r) => execs().find((e) => e.id === r.entity_id)?.title);
+    expect(queued.sort()).toEqual(["Hoje", "Semana que vem"]);
+  });
+
+  it("uma rodada para no orçamento de tempo e deixa o resto na fila", async () => {
+    for (let i = 0; i < 5; i++) await t.enqueue("execution", exec(`Item ${i}`, "2026-10-13").id);
+    let clock = 0;
+    t.ctx.wallNow = () => (clock += 20_000); // cada leitura do relógio "anda" 20 s
+    await t.push();
+    expect(t.fake.rows("agenda_sync_outbox").length).toBeGreaterThan(0);
+    expect(t.ctx.stats.envio_continua_na_proxima).toBe(1);
+  });
+});

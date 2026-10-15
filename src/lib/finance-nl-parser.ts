@@ -82,18 +82,13 @@ const categoryKeywords: { category: string; words: string[] }[] = [
 
 function detectAmount(text: string): number | null {
   const normalized = text.toLowerCase();
-  // ex: "8 reais", "r$8", "r$ 8,50", "2500", "2.500,00"
-  const match = normalized.match(
-    /(?:r\$|\$)?\s?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:reais|real)?/,
-  );
+  // ex: "8 reais", "r$8", "r$ 8,50", "2500", "2.500,00", "1.200", "10.5".
+  // (?!\d) garante que o número inteiro foi lido: antes "1200" virava 120 e "2500" virava 250.
+  const match = normalized.match(/(?:r\$\s?)?(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)(?!\d)/);
   if (!match) return null;
   let raw = match[1];
-  // "2.500,00" ou "2500" → normaliza separador decimal
-  if (/,\d{1,2}$/.test(raw)) {
-    raw = raw.replace(/\./g, "").replace(",", ".");
-  } else {
-    raw = raw.replace(/,/g, "");
-  }
+  if (raw.includes(",")) raw = raw.replace(/\./g, "").replace(",", "."); // 2.500,00 → 2500.00
+  else if (/^\d{1,3}(\.\d{3})+$/.test(raw)) raw = raw.replace(/\./g, ""); // 1.200 → 1200
   const value = parseFloat(raw);
   return Number.isFinite(value) && value > 0 ? value : null;
 }
@@ -121,6 +116,9 @@ function buildDescription(text: string, amountMatch: string | null): string {
     .replace(/^\s*(comprei|gastei|paguei|torrei|recebi|ganhei|entrou|caiu|faturei)\s+/i, "")
     .replace(/\breais?\b/gi, "")
     .replace(/\s{2,}/g, " ")
+    .trim()
+    // "paguei 89,90 de farmácia" → "farmácia" (sem a preposição que sobra no começo)
+    .replace(/^(de|da|do|das|dos|no|na|em|com|pra|para|pro)\s+/i, "")
     .trim();
   if (!cleaned) cleaned = text.trim();
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
@@ -135,9 +133,7 @@ export function parseFinanceEntry(text: string): ParsedEntry | null {
   const category = detectCategory(trimmed, type);
   const amountMatch = trimmed
     .toLowerCase()
-    .match(
-      /(?:r\$|\$)?\s?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:reais|real)?/,
-    );
+    .match(/(?:r\$\s?)?(?:\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)(?!\d)\s*(?:reais|real)?/);
   const description = buildDescription(trimmed, amountMatch ? amountMatch[0] : null);
   return { type, amount, description, category };
 }

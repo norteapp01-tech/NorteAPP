@@ -703,6 +703,14 @@ export async function syncConnection(
   }
   if (!acquired) return { skipped: true, stats: {} };
 
+  // Rodadas que ficaram "rodando" foram interrompidas (a função foi encerrada no meio):
+  // fecha-as para o histórico não mentir e a interface não mostrar sincronização eterna.
+  await deps.db
+    .from("google_calendar_sync_runs")
+    .update({ status: "error", finished_at: deps.now().toISOString(), error: "Rodada interrompida antes do fim; retomada na seguinte." })
+    .eq("connection_id", conn.id)
+    .eq("status", "running");
+
   const stats: Stats = {};
   const run = await q<Row>(
     deps.db

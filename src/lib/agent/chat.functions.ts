@@ -70,32 +70,33 @@ export const agentStep = createServerFn({ method: "POST" })
     });
 
     const finishedAt = new Date();
-    // Aguardado (não "fire and forget"): em runtime serverless/edge (Cloudflare
-    // Workers, o alvo de deploy deste app), uma promise não aguardada pode ser
-    // cancelada assim que a resposta é enviada — "melhor esforço" aqui significa
-    // "nunca derruba a resposta se falhar", não "roda depois de responder".
+    if (!res.ok) {
+      const body = await res.text();
+      await recordUsageBestEffort({
+        accessToken: data.accessToken,
+        feature: "agent_chat",
+        model,
+        startedAt,
+        finishedAt,
+        ok: false,
+        errorMessage: `HTTP ${res.status}`,
+        usageFromBody: undefined,
+      });
+      throw new Error(`OpenAI respondeu ${res.status}: ${body}`);
+    }
+    const json = await res.json();
+    // Aguardado (em Workers, promise solta pode ser cancelada), mas agora sem ler a
+    // resposta duas vezes e sem atrasar a leitura: só antes de devolver.
     await recordUsageBestEffort({
       accessToken: data.accessToken,
       feature: "agent_chat",
       model,
       startedAt,
       finishedAt,
-      ok: res.ok,
-      errorMessage: res.ok ? undefined : `HTTP ${res.status}`,
-      usageFromBody: res.ok
-        ? await res
-            .clone()
-            .json()
-            .catch(() => undefined)
-        : undefined,
+      ok: true,
+      errorMessage: undefined,
+      usageFromBody: json,
     });
-
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`OpenAI respondeu ${res.status}: ${body}`);
-    }
-
-    const json = await res.json();
     const choice = json.choices?.[0]?.message;
     if (!choice) throw new Error("Resposta da OpenAI sem mensagem.");
 

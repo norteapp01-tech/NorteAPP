@@ -280,8 +280,8 @@ describe("Agente Norte — três personas e cenários adversariais", () => {
   it("manda o turno atual como multimodal quando há foto, sem alterar o histórico", async () => {
     let sentMessages: unknown[] = [];
     const step = vi.fn(async ({ data }: { data: { messages: unknown[] } }) => {
-      sentMessages = data.messages;
-      return { content: "Registrado (estimativa): frango com arroz.", tool_calls: undefined };
+      if (!sentMessages.length) sentMessages = [...data.messages]; // a 1ª chamada é a que leva a foto
+      return { content: "Frango com arroz, certo?", tool_calls: undefined };
     });
     const history: ChatTurn[] = [
       { role: "user", text: "oi" },
@@ -297,7 +297,7 @@ describe("Agente Norte — três personas e cenários adversariais", () => {
     expect(last.role).toBe("user");
     expect(last.content).toEqual([
       { type: "text", text: "comi isso" },
-      { type: "image_url", image_url: { url: "data:image/jpeg;base64,ZmFrZQ==" } },
+      { type: "image_url", image_url: { url: "data:image/jpeg;base64,ZmFrZQ==", detail: "low" } },
     ]);
     // Histórico replay continua texto puro — nunca carrega base64.
     const historyMessages = sentMessages.slice(0, -1) as { content: unknown }[];

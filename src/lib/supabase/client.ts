@@ -24,6 +24,112 @@ export const supabase = createClient(url, anonKey, {
 
 let bootstrapped: Promise<string> | null = null;
 
+// ---------------------------------------------------------------------------
+// Proteção contra perda silenciosa de dados.
+//
+// Se a renovação do token falhar (ex.: refresh token já usado em outra aba, ou
+// recusado pelo servidor), o supabase-js apaga a sessão local. Antes, o próximo
+// ensureSession() criava OUTRO usuário anônimo sem avisar — e a pessoa via o app
+// vazio. Agora guardamos uma cópia da sessão; sem sessão, tentamos recuperá-la, e
+// só criamos um usuário novo quando não existe nenhum usuário anterior neste
+// aparelho (primeiro uso) ou quando a pessoa escolhe começar do zero.
+// ---------------------------------------------------------------------------
+const BACKUP_KEY = "norte-session-backup";
+type SessionBackup = { userId: string; refreshToken: string };
+
+/** A sessão anterior existe mas não pôde ser recuperada: a UI pergunta à pessoa. */
+export class SessionLostError extends Error {
+  constructor() {
+    super("Sua sessão neste aparelho expirou e não pôde ser recuperada.");
+    this.name = "SessionLostError";
+  }
+}
+
+function readBackup(): SessionBackup | null {
+  try {
+    const raw = localStorage.getItem(BACKUP_KEY);
+    const v = raw ? JSON.parse(raw) : null;
+    return v?.userId && v?.refreshToken ? v : null;
+  } catch {
+    return null;
+  }
+}
+function writeBackup(userId: string, refreshToken: string) {
+  try {
+    localStorage.setItem(BACKUP_KEY, JSON.stringify({ userId, refreshToken }));
+  } catch {
+    /* sem storage: sem proteção extra, mas o app segue funcionando */
+  }
+}
+export function clearSessionBackup() {
+  try {
+    localStorage.removeItem(BACKUP_KEY);
+  } catch {
+    /* nada a limpar */
+  }
+}
+
+/** Saída pedida pela própria pessoa (sair, excluir conta): não é perda de sessão. */
+let intentionalSignOut = false;
+export function markIntentionalSignOut() {
+  intentionalSignOut = true;
+  clearSessionBackup();
+}
+
+type LostListener = () => void;
+const lostListeners = new Set<LostListener>();
+/** Avisa quando a sessão cai sem a pessoa ter pedido (para o AuthGate reagir). */
+export function onSessionLost(fn: LostListener) {
+  lostListeners.add(fn);
+  return () => {
+    lostListeners.delete(fn);
+  };
+}
+
+if (typeof window !== "undefined") {
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (session?.user.id && session.refresh_token) {
+      intentionalSignOut = false;
+      writeBackup(session.user.id, session.refresh_token);
+      return;
+    }
+    if (event === "SIGNED_OUT") {
+      bootstrapped = null;
+      if (!intentionalSignOut && readBackup()) lostListeners.forEach((fn) => fn());
+    }
+  });
+}
+
+const isNetworkError = (e: unknown) => {
+  const err = e as { name?: string; status?: number; message?: string } | null;
+  return (
+    !err ||
+    err.name === "AuthRetryableFetchError" ||
+    err.status === 0 ||
+    (typeof err.status === "number" && err.status >= 500) ||
+    /fetch|network|timeout/i.test(err.message ?? "")
+  );
+};
+
+/** Tenta recuperar a sessão anterior a partir da cópia guardada. */
+async function recoverFromBackup(backup: SessionBackup): Promise<string> {
+  const { data, error } = await supabase.auth.refreshSession({ refresh_token: backup.refreshToken });
+  if (data.session?.user.id === backup.userId) return backup.userId;
+  if (error && isNetworkError(error)) throw new Error(`Sem conexão para recuperar a sessão: ${error.message}`);
+  // A sessão recuperada é de outra pessoa (não deveria acontecer) ou o token foi recusado.
+  if (data.session) await supabase.auth.signOut({ scope: "local" });
+  throw new SessionLostError();
+}
+
+/** Primarily called by tests and the "start fresh" choice. */
+async function createAnonymousSession(): Promise<string> {
+  const { data, error } = await supabase.auth.signInAnonymously();
+  if (error || !data.session) {
+    throw new Error(`Falha ao iniciar sessão anônima do Supabase: ${error?.message}`);
+  }
+  return data.session.user.id;
+}
+
 /** Preenche o cache de `ensureSession()` quando quem chama já resolveu a sessão
  * (ex.: `AuthGate` no warm-start) — evita que cada `useSupabaseUserId()` filho
  * dispare seu próprio `getSession()` redundante e enxergue `userId` undefined
@@ -32,28 +138,37 @@ export function primeSession(userId: string) {
   if (!bootstrapped) bootstrapped = Promise.resolve(userId);
 }
 
-/** Garante uma sessão anônima ativa e devolve o user_id — chamar uma vez no boot do app.
- * Se falhar (rede indisponível, Supabase fora do ar), a próxima chamada tenta de novo —
- * sem isso, uma falha transitória "grudava" pra sempre e nenhum "tentar novamente"
- * funcionava, mesmo com a rede já restabelecida. */
+/** Garante uma sessão ativa e devolve o user_id. Só cria um usuário anônimo novo no
+ * primeiro uso do aparelho; se já houve uma sessão aqui, recupera-a ou lança
+ * SessionLostError (nunca troca de usuário em silêncio). Falhas são refeitas na
+ * próxima chamada. */
 export function ensureSession(): Promise<string> {
   if (!bootstrapped) {
     bootstrapped = (async () => {
       try {
         const { data: existing } = await supabase.auth.getSession();
         if (existing.session?.user.id) return existing.session.user.id;
-
-        const { data, error } = await supabase.auth.signInAnonymously();
-        if (error || !data.session) {
-          throw new Error(`Falha ao iniciar sessão anônima do Supabase: ${error?.message}`);
-        }
-        return data.session.user.id;
+        const backup = readBackup();
+        if (backup) return await recoverFromBackup(backup);
+        return await createAnonymousSession();
       } catch (err) {
         bootstrapped = null;
         throw err;
       }
     })();
   }
+  return bootstrapped;
+}
+
+/** Escolha explícita da pessoa depois de uma sessão perdida: começa um uso novo. */
+export async function startFreshSession(): Promise<string> {
+  clearSessionBackup();
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch {
+    /* já não havia sessão */
+  }
+  bootstrapped = createAnonymousSession();
   return bootstrapped;
 }
 
@@ -73,7 +188,7 @@ export function useSupabaseUserId(): string | undefined {
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      bootstrapped = session?.user.id ? Promise.resolve(session.user.id) : null;
+      if (session?.user.id) bootstrapped = Promise.resolve(session.user.id);
       if (!cancelled) setUserId(session?.user.id);
     });
     const attempt = () => {
@@ -81,11 +196,12 @@ export function useSupabaseUserId(): string | undefined {
         (id) => {
           if (!cancelled) setUserId(id);
         },
-        () => {
+        (err) => {
           // ensureSession() já zera o cache interno em caso de erro (ver comentário
           // acima) — sem este retry, uma falha transitória de rede deixava este hook
           // parado em `undefined` para sempre, mesmo depois da rede voltar.
-          if (!cancelled) retryTimer = setTimeout(attempt, 3000);
+          // Sessão perdida não se resolve sozinha: o AuthGate pergunta à pessoa.
+          if (!cancelled && !(err instanceof SessionLostError)) retryTimer = setTimeout(attempt, 3000);
         },
       );
     };
@@ -141,6 +257,7 @@ export async function changePassword(password: string) {
 }
 
 export async function signOutNorte() {
+  markIntentionalSignOut();
   const { error } = await supabase.auth.signOut({ scope: "local" });
   if (error) throw error;
   bootstrapped = null;

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { AuthGate, SignInScreen } from "./AuthGate";
-import { supabase, hasLinkedAccount } from "@/lib/supabase/client";
+import { supabase, hasLinkedAccount, ensureSession, SessionLostError, startFreshSession } from "@/lib/supabase/client";
 
 vi.mock("@/lib/supabase/client", () => ({
   supabase: {
@@ -16,6 +16,9 @@ vi.mock("@/lib/supabase/client", () => ({
   ensureSession: vi.fn(),
   hasLinkedAccount: vi.fn(),
   primeSession: vi.fn(),
+  onSessionLost: vi.fn(() => () => {}),
+  startFreshSession: vi.fn(),
+  SessionLostError: class SessionLostError extends Error {},
 }));
 
 vi.mock("./ui/drawer", () => ({
@@ -122,4 +125,26 @@ it("oferece login Apple para contas criadas com Apple", async () => {
       options: { redirectTo: `${window.location.origin}/?auth=login` },
     }),
   );
+});
+
+it("sessão perdida não vira outro usuário em silêncio: pergunta à pessoa", async () => {
+  vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: null }, error: null } as never);
+  vi.mocked(hasLinkedAccount).mockReturnValue(false);
+  vi.mocked(ensureSession).mockRejectedValue(new SessionLostError());
+  render(<AuthGate><p>app</p></AuthGate>);
+  expect(await screen.findByRole("heading", { name: "Sua sessão neste aparelho expirou" })).toBeInTheDocument();
+  expect(screen.queryByText("app")).not.toBeInTheDocument();
+  expect(startFreshSession).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Começar do zero" }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirmar: começar do zero neste aparelho" }));
+  await waitFor(() => expect(startFreshSession).toHaveBeenCalledTimes(1));
+  expect(await screen.findByText("app")).toBeInTheDocument();
+});
+
+it("primeiro uso do aparelho segue direto para o app", async () => {
+  vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: null }, error: null } as never);
+  vi.mocked(hasLinkedAccount).mockReturnValue(false);
+  vi.mocked(ensureSession).mockResolvedValue("novo");
+  render(<AuthGate><p>app</p></AuthGate>);
+  expect(await screen.findByText("app")).toBeInTheDocument();
 });

@@ -9,7 +9,7 @@ import {
 } from "./policy";
 
 type AgentMessageContentPart =
-  { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+  { type: "text"; text: string } | { type: "image_url"; image_url: { url: string; detail?: "low" | "high" | "auto" } };
 
 type AgentMessage =
   | { role: "system" | "assistant"; content: string }
@@ -100,25 +100,49 @@ export async function runAgentTurnWith(
     content: imageDataUrl
       ? [
           { type: "text", text: userMessage || "Foto de refeição anexada." },
-          { type: "image_url", image_url: { url: imageDataUrl } },
+          { type: "image_url", image_url: { url: imageDataUrl, detail: "low" } },
         ]
       : userMessage,
   });
   const toolTrace: { name: string; args: Record<string, unknown>; result: string }[] = [];
+  let nudgedPlan = false;
+  let nudgedWrite = false;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const step = await deps.step({ data: { messages } });
     if (
       !step.tool_calls?.length &&
-      /\b(marquei|agendei|reagendei|registrei|salvei|criei|alterei|atualizei|concluí)\b/i.test(
-        step.content || "",
-      ) &&
-      !toolTrace.some((t) => !t.name.startsWith("consultar") && !/^Erro|^Não /i.test(t.result))
+      !nudgedWrite &&
+      claimsWrite(step.content) &&
+      !toolTrace.some(
+        (t) =>
+          !t.name.startsWith("consultar") &&
+          !t.name.startsWith("verificar") &&
+          !/^Erro|^Não |^Ação duplicada|^Ação preparada/i.test(t.result),
+      )
     ) {
+      nudgedWrite = true;
+      messages.push({ role: "assistant", content: step.content ?? "" });
       messages.push({
         role: "system",
         content:
           "Você afirmou uma alteração, mas nenhuma ferramenta de escrita foi executada neste turno. Execute agora a ferramenta apropriada com os dados do pedido; se faltarem dados essenciais, pergunte. Nunca anuncie sucesso sem execução.",
+      });
+      continue;
+    }
+    if (
+      !step.tool_calls?.length &&
+      !nudgedPlan &&
+      looksLikeTextPlan(step.content) &&
+      !toolTrace.some((t) => t.name === "criar_plano")
+    ) {
+      // Plano escrito em texto não vira nada no app: o padrão é sempre o card de proposta.
+      nudgedPlan = true;
+      messages.push({ role: "assistant", content: step.content ?? "" });
+      messages.push({
+        role: "system",
+        content:
+          "Você listou etapas em texto. Planos SEMPRE devem ser propostos com a ferramenta criar_plano (o card mostra as etapas para a pessoa confirmar). Chame criar_plano agora com essas etapas, ações e datas; não escreva a lista em texto.",
       });
       continue;
     }
@@ -132,6 +156,7 @@ export async function runAgentTurnWith(
     messages.push({ role: "assistant", content: step.content, tool_calls: step.tool_calls });
     const proposed: PendingAgentAction[] = [];
     const seenThisRound = new Set<string>();
+    const traceBefore = toolTrace.length;
     for (const call of step.tool_calls) {
       let action: PendingAgentAction;
       try {
@@ -168,13 +193,29 @@ export async function runAgentTurnWith(
       toolTrace.push({ name: action.name, args: action.args, result });
       messages.push({ role: "tool", tool_call_id: call.id, content: result });
     }
+    const roundExecuted = toolTrace.length - traceBefore;
+    // Atalho: tudo o que foi feito nesta rodada são escritas que voltaram como card.
+    // O card já mostra o resultado; uma segunda ida ao modelo só para dizer "pronto"
+    // custava segundos a cada ação (e às vezes ele seguia chamando ferramentas).
+    const thisRound = toolTrace.slice(toolTrace.length - roundExecuted);
+    const writes = thisRound.filter(isWriteCard);
+    const restAreReads = thisRound.every((t) => isWriteCard(t) || isRead(t));
+    if (!proposed.length && writes.length && restAreReads) {
+      return {
+        role: "assistant",
+        text: [...new Set(writes.map((t) => cardSummary(t.result)))].join(" "),
+        toolTrace,
+      };
+    }
     if (proposed.length) {
       return {
         role: "assistant",
         // Não reutilize a fala do modelo aqui: ele pode ter dito "criado" antes
         // da confirmação. O estado real é sempre comunicado pelo orquestrador.
         text:
-          proposed.length === 1
+          proposed.length === 1 && proposed[0].name === "criar_plano"
+            ? "Montei uma proposta de plano. Revise as etapas e confirme para salvar."
+            : proposed.length === 1
             ? `${toolTrace.length ? "Registrei os itens seguros. " : ""}Preparei uma alteração, mas ainda não salvei. Confirmar?`
             : `${toolTrace.length ? "Registrei os itens seguros. " : ""}Preparei ${proposed.length} alterações, mas ainda não salvei. Confirmar?`,
         toolTrace: toolTrace.length ? toolTrace : undefined,
@@ -197,4 +238,49 @@ export async function runAgentTurnWith(
       : "Não consegui concluir com segurança. Nada foi alterado.",
     toolTrace,
   };
+}
+
+/** Escrita bem-sucedida cujo resultado é um card (o app já mostra o que aconteceu). */
+function isWriteCard(t: { name: string; result: string }): boolean {
+  if (t.name.startsWith("consultar") || t.name.startsWith("verificar")) return false;
+  try {
+    const d = JSON.parse(t.result);
+    return typeof d?.card === "string";
+  } catch {
+    return false;
+  }
+}
+function isRead(t: { name: string; result: string }): boolean {
+  return (t.name.startsWith("consultar") || t.name.startsWith("verificar")) && !/^Erro/i.test(t.result);
+}
+function cardSummary(result: string): string {
+  try {
+    return String(JSON.parse(result).summary || "Feito.");
+  } catch {
+    return "Feito.";
+  }
+}
+/** Resposta em texto que é, na prática, um plano (3+ itens numerados ou com marcador). */
+export function looksLikeTextPlan(content: string | null | undefined): boolean {
+  if (!content) return false;
+  if (/\b(preparei|montei|elaborei|criei|segue|aqui est[aá])\b[^.]{0,40}\bplano\b/i.test(content)) return true;
+  const items = content.split("\n").filter((l) => /^\s*(\d+[.)]|[-•*])\s+\S/.test(l));
+  return items.length >= 3 && /plano|etapa|passo|objetivo|loja|meta/i.test(content);
+}
+
+/** O texto afirma que algo foi gravado/feito (1ª pessoa ou particípio: "registrei", "registrada",
+ * "foi marcado", "preparei um plano"…). Sem ferramenta de escrita executada, é uma afirmação falsa. */
+export function claimsWrite(content: string | null | undefined): boolean {
+  if (!content) return false;
+  if (/\b(marquei|agendei|reagendei|registrei|salvei|criei|alterei|atualizei|conclu[ií]|anotei|adicionei|lancei|removi|apaguei|preparei|montei|elaborei)\b/i.test(content))
+    return true;
+  // Particípio anunciando um resultado ("Água registrada.", "Movimentação registrada como
+  // entrada", "Lembrete criado") — mas não descrições do que já existe ("você tem 3 marcados").
+  const participle = /\b(registrad[oa]s?|marcad[oa]s?|agendad[oa]s?|reagendad[oa]s?|salv[oa]s?|criad[oa]s?|adicionad[oa]s?|anotad[oa]s?|lan[çc]ad[oa]s?|atualizad[oa]s?|removid[oa]s?)\b/i;
+  return content
+    .split(/(?<=[.!?\n])\s*/)
+    .some((sentence) => {
+      if (/\b(voc[eê] tem|h[aá] |existem|tem \d|seus|suas|est[aã]o|ainda|j[aá] tinha)\b/i.test(sentence)) return false;
+      return participle.test(sentence.split(/\s+/).slice(0, 6).join(" "));
+    });
 }

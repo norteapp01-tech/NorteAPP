@@ -10,6 +10,7 @@ vi.mock("./supabase/client", () => ({
     rpc: vi.fn(),
     storage: { from: vi.fn(() => ({ list: vi.fn(async () => ({ data: [] })), remove: vi.fn() })) },
   },
+  markIntentionalSignOut: vi.fn(),
 }));
 vi.mock("./sport-recording-db", () => ({ clearRecordingState: vi.fn() }));
 vi.mock("./query-client", () => ({ queryClient: { cancelQueries: vi.fn(), clear: vi.fn() } }));

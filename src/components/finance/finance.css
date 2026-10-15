@@ -114,13 +114,18 @@
 }
 .finance-month-reading-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
+  gap: 4px 16px;
+}
+.finance-month-reading-head > div {
+  min-width: 0;
 }
 .finance-month-total {
   margin-top: 6px;
-  font-size: 40px;
+  /* valores grandes (ex.: R$ 13.034,90) não podem empurrar a página em telas de 320px */
+  font-size: clamp(30px, 10vw, 40px);
   font-weight: 740;
   line-height: 1;
   letter-spacing: -0.04em;

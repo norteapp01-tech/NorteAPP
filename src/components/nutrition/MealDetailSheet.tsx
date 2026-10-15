@@ -83,6 +83,12 @@ export function MealDetailSheet({ meal, onClose }: { meal: Meal; onClose: () => 
       }
     >
       <div className="space-y-2">
+        {options.length === 0 && !customMode && (
+          <p className="text-sm text-muted-foreground">
+            Nenhuma opção cadastrada para esta refeição. Conte o que você comeu em “Registrar
+            diferente” ou cadastre opções no Plano alimentar.
+          </p>
+        )}
         {options.map((o) => {
           const active = !customMode && selectedOptionId === o.id;
           return (

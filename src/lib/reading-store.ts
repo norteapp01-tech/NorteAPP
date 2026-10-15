@@ -963,9 +963,17 @@ export async function updateProgress(
       : book.progressMode === "percentage"
         ? 100
         : book.totalSeconds;
-  if (newValue < 0) return { ok: false, error: "não pode ser menor que zero" };
+  if (newValue < 0) return { ok: false, error: "O valor não pode ser menor que zero." };
   if (total !== undefined && newValue > total)
-    return { ok: false, error: "não pode passar do total" };
+    return {
+      ok: false,
+      error:
+        book.progressMode === "pages"
+          ? `Este livro tem ${total} páginas — confira o número digitado.`
+          : book.progressMode === "percentage"
+            ? "O progresso vai até 100%."
+            : `O audiolivro tem ${Math.round(total / 60)} minutos — confira o tempo digitado.`,
+    };
   if (newValue < current && !opts?.confirm) return { ok: false, needsConfirmation: true };
 
   const userId = await ensureSession();

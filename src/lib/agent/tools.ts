@@ -1110,7 +1110,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
         offsetMinutes,
       });
       const timeLabel = remindAt ? ` às ${dateAndTimeInZone(new Date(remindAt), zone).time}` : "";
-      const summary = `Lembrete criado: "${args.text}" pra ${args.date}${timeLabel}.`;
+      const summary = `Lembrete criado: "${args.text}" ${friendlyDay(args.date as string, todayISO())}${timeLabel}.`;
       if (remindAt && !(await hasPushSubscription())) {
         return JSON.stringify({
           card: "notifications",
@@ -1564,4 +1564,12 @@ function planDeadline(args: Record<string, unknown>): { iso?: string; label: str
   const iso = planStepEnds(args, n, today)[n - 1];
   const days = Math.round((Date.parse(iso) - Date.parse(today)) / 86_400_000);
   return { iso, label: `${days} dias` };
+}
+
+/** "hoje", "amanhã" ou "em 15/10" — nunca a data crua AAAA-MM-DD na conversa. */
+export function friendlyDay(date: string, today: string): string {
+  if (date === today) return "para hoje";
+  if (date === addDaysISO(today, 1)) return "para amanhã";
+  const [, m, d] = date.split("-");
+  return `para ${d}/${m}`;
 }

@@ -1,4 +1,4 @@
-import { supabase } from "./supabase/client";
+import { markIntentionalSignOut, supabase } from "./supabase/client";
 import { queryClient } from "./query-client";
 import { clearRecordingState } from "./sport-recording-db";
 import { setAppTimeZone } from "./app-time-zone";
@@ -74,6 +74,7 @@ export async function resetAccountContent(userId: string) {
 export async function deleteAccountPermanently(userId: string) {
   await invokeAccountAction("delete-account");
   await clearLocalContent(userId);
+  markIntentionalSignOut();
   try {
     await supabase.auth.signOut({ scope: "local" });
   } catch {

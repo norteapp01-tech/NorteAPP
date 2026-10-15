@@ -41,8 +41,27 @@ const labels: Record<string, [string, string]> = {
   registrar_refeicao: ["Confirmar refeição", "/sub-agenda/alimentacao"],
   registrar_refeicao_estimada: ["Refeição registrada", "/sub-agenda/alimentacao"],
   criar_lembrete: ["Lembrete", "/agenda"],
+  registrar_agua: ["Água", "/"],
+  corrigir_ultima_agua: ["Água", "/"],
+  concluir_execucao: ["Agenda", "/agenda"],
+  registrar_peso_corporal: ["Peso", "/sub-agenda/academia"],
+  salvar_nota_leitura: ["Caderno", "/sub-agenda/leitura"],
+  salvar_nota_fe: ["Fé", "/sub-agenda/fe"],
+  capturar_caixa_norte: ["Caixa do Norte", "/"],
+  corrigir_ultima_transacao: ["Movimentação", "/sub-agenda/financas"],
   gerenciar_lembrete: ["Lembrete", "/agenda"],
 };
+/** Negrito simples (**texto**) vira <strong>; o resto fica como texto puro (sem HTML do modelo). */
+function RichText({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*\n]+\*\*)/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        /^\*\*[^*\n]+\*\*$/.test(part) ? <strong key={i}>{part.slice(2, -2)}</strong> : part.replace(/^#{1,4}\s+/gm, ""),
+      )}
+    </>
+  );
+}
 /** Consultas e dados estruturados (ex.: disponibilidade em JSON) servem ao modelo, não à pessoa. */
 function isInternalResult(t: { name: string; result: string }): boolean {
   if (t.name.startsWith("consultar") || t.name.startsWith("verificar")) return true;
@@ -267,6 +286,8 @@ export function NorteChat({
       return;
     }
     lock.current = true;
+    // Quem acabou de mandar uma mensagem quer ver a resposta: volta a acompanhar o fim.
+    nearBottom.current = true;
     setBusy(true);
     setError("");
     setDraft("");
@@ -544,13 +565,21 @@ export function NorteChat({
                 <DawnMark compact /> Norte
               </div>
             )}
-            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{turn.text}</p>
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+              <RichText text={turn.text} />
+            </p>
             {turn.toolTrace
               ?.filter(
                 (t) =>
                   !(
-                    parseCard(t.result)?.card === "agenda" &&
-                    turn.toolTrace?.some((other) => parseCard(other.result)?.card === "appointment")
+                    (t.name.startsWith("consultar") || t.name.startsWith("verificar")) &&
+                    turn.toolTrace?.some(
+                      (other) =>
+                        other !== t &&
+                        !other.name.startsWith("consultar") &&
+                        !other.name.startsWith("verificar") &&
+                        parseCard(other.result),
+                    )
                   ) &&
                   (parseCard(t.result) || !isInternalResult(t)) &&
                   !/^Erro|^Não /i.test(t.result),

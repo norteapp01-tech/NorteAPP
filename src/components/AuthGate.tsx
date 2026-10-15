@@ -1,11 +1,19 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { AlertTriangle, RefreshCcw, WifiOff } from "lucide-react";
-import { supabase, ensureSession, hasLinkedAccount, primeSession } from "@/lib/supabase/client";
+import {
+  supabase,
+  ensureSession,
+  hasLinkedAccount,
+  primeSession,
+  onSessionLost,
+  SessionLostError,
+  startFreshSession,
+} from "@/lib/supabase/client";
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "./ui/drawer";
 import "./signup-sheet.css";
 import { DawnMark } from "./ui/app-design-system";
 
-type Status = "checking" | "ready" | "needs-login" | "connection-error";
+type Status = "checking" | "ready" | "needs-login" | "connection-error" | "session-lost";
 type Provider = "google" | "apple";
 type LoginView = "login" | "forgot" | "sent" | "new-password";
 
@@ -45,6 +53,10 @@ export function AuthGate({
         if (!cancelled) setStatus("ready");
       } catch (err) {
         if (cancelled) return;
+        if (err instanceof SessionLostError) {
+          setStatus(hasLinkedAccount() ? "needs-login" : "session-lost");
+          return;
+        }
         setErrorMessage(err instanceof Error ? err.message : "Falha desconhecida.");
         setStatus("connection-error");
       }
@@ -54,12 +66,26 @@ export function AuthGate({
     };
   }, [attempt]);
 
+  // Sessão caiu com o app aberto (renovação recusada): reavalia em vez de seguir com outro usuário.
+  useEffect(() => onSessionLost(() => setAttempt((a) => a + 1)), []);
+
   if (status === "checking") return <BootScreen />;
   if (status === "connection-error") {
     return (
       <ConnectionErrorScreen message={errorMessage} onRetry={() => setAttempt((a) => a + 1)} />
     );
   }
+  if (status === "session-lost")
+    return (
+      <SessionLostScreen
+        onRetry={() => setAttempt((a) => a + 1)}
+        onLogin={() => setStatus("needs-login")}
+        onFresh={async () => {
+          await startFreshSession();
+          setStatus("ready");
+        }}
+      />
+    );
   if (status === "needs-login")
     return <SignInScreen onSuccess={() => setStatus("ready")} onBack={onBack} />;
   return <>{children}</>;
@@ -70,6 +96,65 @@ function BootScreen() {
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="h-6 w-6 animate-pulse rounded-full bg-primary/40" aria-hidden="true" />
       <span className="sr-only">Carregando…</span>
+    </div>
+  );
+}
+
+function SessionLostScreen({
+  onRetry,
+  onLogin,
+  onFresh,
+}: {
+  onRetry: () => void;
+  onLogin: () => void;
+  onFresh: () => Promise<void>;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div
+      role="alert"
+      className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-6 text-center"
+    >
+      <AlertTriangle className="h-8 w-8 text-warning" aria-hidden="true" />
+      <div>
+        <h1 className="text-lg font-bold">Sua sessão neste aparelho expirou</h1>
+        <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+          Não conseguimos reabrir seus dados automaticamente. Se você criou uma conta, entre nela para
+          recuperar tudo.
+        </p>
+      </div>
+      <div className="flex w-full max-w-xs flex-col gap-2">
+        <button
+          onClick={onRetry}
+          className="flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+        >
+          <RefreshCcw className="h-4 w-4" /> Tentar novamente
+        </button>
+        <button onClick={onLogin} className="rounded-xl border border-border px-5 py-2.5 text-sm font-semibold">
+          Entrar na minha conta
+        </button>
+        {confirming ? (
+          <button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await onFresh();
+              } finally {
+                setBusy(false);
+              }
+            }}
+            className="rounded-xl border border-warning/50 px-5 py-2.5 text-sm text-warning"
+          >
+            {busy ? "Começando…" : "Confirmar: começar do zero neste aparelho"}
+          </button>
+        ) : (
+          <button onClick={() => setConfirming(true)} className="px-5 py-2 text-xs text-muted-foreground">
+            Começar do zero
+          </button>
+        )}
+      </div>
     </div>
   );
 }

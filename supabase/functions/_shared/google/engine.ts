@@ -57,7 +57,14 @@ export type Ctx = {
   now: () => Date;
   stats: Stats;
   newId: () => string;
+  /** Relógio real (ms) para o orçamento de tempo de uma rodada. Padrão: Date.now. */
+  wallNow?: () => number;
 };
+
+/** Uma rodada de envio para o Google não pode passar disso: a Edge Function é encerrada
+ * no limite de tempo e a rodada ficava presa como "rodando", travando as próximas. O que
+ * sobrar continua na fila e sai na próxima rodada (cron a cada 5 min, webhook ou manual). */
+export const PUSH_BUDGET_MS = 35_000;
 
 /** Erro que a PESSOA precisa resolver (não adianta repetir sozinho). */
 export class SyncUserError extends Error {}
@@ -1249,7 +1256,13 @@ export async function pushOutbox(ctx: Ctx): Promise<void> {
   // Séries antes das exceções que dependem delas.
   rows.sort((a, b) => (a.entity_type === b.entity_type ? 0 : a.entity_type === "series" ? -1 : 1));
 
+  const wall = ctx.wallNow ?? Date.now;
+  const started = wall();
   for (const row of rows) {
+    if (wall() - started >= PUSH_BUDGET_MS) {
+      ctx.stats.envio_continua_na_proxima = (ctx.stats.envio_continua_na_proxima ?? 0) + 1;
+      break;
+    }
     try {
       if (row.op === "delete") {
         for (const link of (row.snapshot as Row[] | null) ?? [])
@@ -1309,7 +1322,9 @@ export async function pushOutbox(ctx: Ctx): Promise<void> {
 
 /** Primeira conexão: coloca na fila o que o Norte já tem e ainda não foi ao Google. */
 export async function enqueueBackfill(ctx: Ctx): Promise<number> {
-  const from = addDaysISO(todayIn(ctx), -30);
+  // Só o que ainda vai acontecer: compromissos passados não entram no Google da pessoa
+  // ao conectar (antes ia o último mês inteiro, inclusive concluídos e perdidos).
+  const from = todayIn(ctx);
   let count = 0;
   const execs =
     (await q<Row[]>(
@@ -1320,7 +1335,7 @@ export async function enqueueBackfill(ctx: Ctx): Promise<number> {
         .gte("agenda_date", from),
     )) ?? [];
   for (const e of execs) {
-    if (e.status === "reagendada" || e.status === "cancelada") continue;
+    if (e.status !== "planejada") continue;
     if (e.routine_id && !ctx.conn.push_routines) continue;
     if (e.series_id && !e.series_overridden) continue;
     await ctx.db
