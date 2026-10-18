@@ -616,6 +616,6 @@
 }
 :root[data-theme="light"] .nutrition-module,
 .light .nutrition-module {
-  --nutrition-panel: #f5f5f1;
-  --nutrition-border: rgb(22 30 26 / 0.18);
+  --nutrition-panel: rgb(220 226 222 / 0.82);
+  --nutrition-border: rgb(76 91 83 / 0.26);
 }
