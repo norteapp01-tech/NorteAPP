@@ -971,3 +971,30 @@
     width: 100%;
   }
 }
+
+/* Alvos de toque: botões e links de texto pequenos ganham uma área invisível de
+ * ~44px, sem mexer no layout. */
+.norte-hit,
+.academia-section-heading > button,
+.reading-section-heading > button,
+.finance-section-heading > button,
+.faith-heading > button,
+.sp-flip-controls button {
+  position: relative;
+}
+.norte-hit::after,
+.academia-section-heading > button::after,
+.reading-section-heading > button::after,
+.finance-section-heading > button::after,
+.faith-heading > button::after,
+.sp-flip-controls button::after {
+  content: "";
+  position: absolute;
+  inset: -12px -8px;
+}
+
+/* Quando o app rola até um campo ou botão (foco, âncora), deixa folga para o dock
+ * fixo da parte de baixo — nada para atrás dele. */
+html {
+  scroll-padding-bottom: 9rem;
+}

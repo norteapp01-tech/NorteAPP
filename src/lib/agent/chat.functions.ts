@@ -237,9 +237,18 @@ export const transcribeAudio = createServerFn({ method: "POST" })
 /** Hoje e os próximos 7 dias com o dia da semana, no fuso da pessoa. Sem isso o modelo
  * errava "sexta às 15h" (ex.: numa quinta, marcava na terça seguinte). */
 export function calendarContext(timeZone: string, now = new Date()): string {
-  const iso = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  const iso = (d: Date) =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
   const wd = (d: Date) => new Intl.DateTimeFormat("pt-BR", { timeZone, weekday: "long" }).format(d);
   const days = Array.from({ length: 8 }, (_, i) => new Date(now.getTime() + i * 86_400_000));
-  const list = days.slice(1).map((d) => `${wd(d)} = ${iso(d)}`).join("; ");
+  const list = days
+    .slice(1)
+    .map((d) => `${wd(d)} = ${iso(d)}`)
+    .join("; ");
   return `Hoje nesse fuso: ${wd(days[0])}, ${iso(days[0])}. Próximos dias: ${list}. Para "segunda", "sexta" etc., use SEMPRE esta tabela (o próximo dia com esse nome; hoje só se a pessoa disser "hoje").`;
 }

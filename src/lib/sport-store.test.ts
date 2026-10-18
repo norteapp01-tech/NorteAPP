@@ -117,7 +117,7 @@ describe("pace/velocidade e formatação", () => {
   it("20km em 1h = 20km/h", () => {
     const speed = computeSpeedKmh(20000, 3600);
     expect(speed).toBe(20);
-    expect(formatSpeedKmh(speed)).toBe("20.0 km/h");
+    expect(formatSpeedKmh(speed)).toBe("20,0 km/h");
   });
 
   it("pace/velocidade nulos viram travessão, nunca NaN/Infinity", () => {
@@ -128,7 +128,7 @@ describe("pace/velocidade e formatação", () => {
   });
 
   it("formata distância e duração", () => {
-    expect(formatDistanceKm(8234)).toBe("8.23 km");
+    expect(formatDistanceKm(8234)).toBe("8,23 km");
     expect(formatDurationClock(65)).toBe("01:05");
     expect(formatDurationClock(3725)).toBe("1:02:05");
   });

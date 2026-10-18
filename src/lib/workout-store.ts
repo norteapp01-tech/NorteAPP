@@ -873,7 +873,9 @@ export function workoutInsights(
     if (daysSince > 10) {
       insights.push(`Fazia ${daysSince} dias desde o último registro deste treino.`);
     } else if (recentCount >= 4) {
-      insights.push(`${recentCount} sessões deste treino nos últimos 14 dias — ritmo consistente.`);
+      insights.push(
+        `${recentCount} ${recentCount === 1 ? "sessão" : "sessões"} deste treino nos últimos 14 dias — ritmo consistente.`,
+      );
     }
   }
 
@@ -1044,8 +1046,17 @@ export async function fetchState(): Promise<State> {
 }
 
 const QUERY_KEY = ["workout-domain"] as const;
+let scheduledInvalidate: Promise<unknown> | null = null;
+/** Recarrega o estado do treino. Chamadas do MESMO instante (ex.: registrar a
+ * série e iniciar o descanso juntos) dividem uma única recarga — antes cada uma
+ * refazia as sete consultas. Uma chamada posterior sempre dispara a sua. */
 function invalidate() {
-  return queryClient.invalidateQueries({ queryKey: QUERY_KEY, refetchType: "all" });
+  if (scheduledInvalidate) return scheduledInvalidate;
+  scheduledInvalidate = Promise.resolve().then(() => {
+    scheduledInvalidate = null;
+    return queryClient.invalidateQueries({ queryKey: QUERY_KEY, refetchType: "all" });
+  });
+  return scheduledInvalidate;
 }
 
 /** Carregamento REAL da consulta. Inferir "carregando" de arrays vazios
@@ -1392,10 +1403,22 @@ export async function setRestOverride(
   });
 }
 
+/** Id do registro do exercício na sessão, guardado depois da primeira busca:
+ * registrar a segunda série não precisa perguntar de novo ao banco. */
+const exerciseLogIds = new Map<string, string>();
+
+/** Esquece o que foi guardado — usado quando a conta é zerada e nos testes. */
+export function resetWorkoutCaches() {
+  exerciseLogIds.clear();
+}
+
 /** Autocura: se por algum motivo a sessão não tiver o log deste exercício (ex.: exercício
  * adicionado ao treino depois da sessão já ter começado), cria na hora em vez de travar
  * "Finalizar treino" pra sempre num loading que nunca resolve. */
 async function findExerciseLogId(sessionId: string, exerciseId: string): Promise<string> {
+  const key = `${sessionId}:${exerciseId}`;
+  const known = exerciseLogIds.get(key);
+  if (known) return known;
   const userId = await ensureSession();
   const row = unwrap<{ id: string }>(
     await supabase
@@ -1407,12 +1430,26 @@ async function findExerciseLogId(sessionId: string, exerciseId: string): Promise
       .select("id")
       .single(),
   );
+  exerciseLogIds.set(key, row.id);
   return row.id;
 }
 
+/** O registro do exercício que o app já tem em memória (evita ir ao banco). */
+function cachedExerciseLog(sessionId: string, exerciseId: string): ExerciseLog | undefined {
+  const state = queryClient.getQueryData<State>(QUERY_KEY);
+  return state?.sessions
+    .find((session) => session.id === sessionId)
+    ?.exerciseLogs.find((log) => log.exerciseId === exerciseId);
+}
+
 /** Próxima posição da sequência: depois da maior já usada, pulada ou não — com
- * buracos (série desfeita no meio) uma contagem simples repetiria um índice. */
-async function nextSetIndex(exerciseLogId: string): Promise<number> {
+ * buracos (série desfeita no meio) uma contagem simples repetiria um índice.
+ * Usa o que o app já sabe; só pergunta ao banco quando não sabe. */
+async function nextSetIndex(exerciseLogId: string, known?: ExerciseLog): Promise<number> {
+  if (known) {
+    const used = [...known.sets.map((set) => set.setIndex), ...(known.skippedSets ?? [])];
+    return used.length ? Math.max(...used) + 1 : 0;
+  }
   const { data } = await supabase
     .from("workout_set_logs")
     .select("set_index")
@@ -1431,8 +1468,9 @@ export async function logSet(
   options: { isDrop?: boolean; drop?: { weight: number; reps: number } } = {},
 ) {
   const userId = await ensureSession();
+  const known = cachedExerciseLog(sessionId, exerciseId);
   const exerciseLogId = await findExerciseLogId(sessionId, exerciseId);
-  const setIndex = await nextSetIndex(exerciseLogId);
+  const setIndex = await nextSetIndex(exerciseLogId, known);
   unwrap(
     await supabase
       .from("workout_set_logs")
@@ -1451,11 +1489,14 @@ export async function logSet(
       .single(),
   );
   // Registrar uma série desfaz o "pulado": a pessoa voltou para o exercício.
-  await supabase
-    .from("workout_exercise_logs")
-    .update({ skipped: false })
-    .eq("id", exerciseLogId)
-    .eq("skipped", true);
+  // Só pergunta ao banco quando o app não sabe, ou sabe que estava pulado.
+  if (!known || known.skipped) {
+    await supabase
+      .from("workout_exercise_logs")
+      .update({ skipped: false })
+      .eq("id", exerciseLogId)
+      .eq("skipped", true);
+  }
   await invalidate();
 }
 
@@ -1463,8 +1504,9 @@ export async function logSet(
  * fica sem peso nem repetições e não conta como feita. */
 export async function skipSet(sessionId: string, exerciseId: string) {
   const userId = await ensureSession();
+  const known = cachedExerciseLog(sessionId, exerciseId);
   const exerciseLogId = await findExerciseLogId(sessionId, exerciseId);
-  const setIndex = await nextSetIndex(exerciseLogId);
+  const setIndex = await nextSetIndex(exerciseLogId, known);
   unwrap(
     await supabase
       .from("workout_set_logs")

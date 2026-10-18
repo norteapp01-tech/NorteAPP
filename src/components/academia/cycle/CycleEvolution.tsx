@@ -1,3 +1,4 @@
+import { decimalBR } from "@/lib/format-utils";
 import { useMemo, useState } from "react";
 import { TrendingUp } from "lucide-react";
 import { formatDateShortBR, todayISO } from "@/lib/goals-store";
@@ -224,7 +225,7 @@ function StageEvolution({
             {inCycle.length > 1 && (
               <p className="mt-1 text-sm text-primary">
                 Variação de carga:{" "}
-                {(inCycle[inCycle.length - 1].maxWeight - inCycle[0].maxWeight).toFixed(1)} kg
+                {decimalBR(inCycle[inCycle.length - 1].maxWeight - inCycle[0].maxWeight, 1)} kg
               </p>
             )}
             <ul className="mt-2.5 space-y-1">
@@ -274,7 +275,7 @@ function StageEvolution({
             </p>
             {weights.length > 1 ? (
               <p className="mt-2 text-sm">
-                Variação: {(weights[weights.length - 1].weight - weights[0].weight).toFixed(1)} kg
+                Variação: {decimalBR(weights[weights.length - 1].weight - weights[0].weight, 1)} kg
               </p>
             ) : (
               <p className="mt-2 text-xs text-muted-foreground">Sem comparação.</p>

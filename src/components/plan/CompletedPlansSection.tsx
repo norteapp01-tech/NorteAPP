@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { plural } from "@/lib/format-utils";
 import { ChevronRight, ChevronUp, Trophy } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { CategoryIcon } from "./CategoryIcon";
@@ -78,7 +79,9 @@ export function CompletedPlansSection({
                       {completionDate
                         ? `Concluído em ${formatDateBR(completionDate)}`
                         : "Concluído"}
-                      {gSteps.length > 0 ? ` · ${gSteps.length} etapas` : ""}
+                      {gSteps.length > 0
+                        ? ` · ${gSteps.length} ${plural(gSteps.length, "etapa", "etapas")}`
+                        : ""}
                       {gExecs.length > 0 ? ` · ${gExecs.length} execuções` : ""}
                     </p>
                   </div>

@@ -788,7 +788,7 @@ export function EventComposer({
                 <Lock className="h-3.5 w-3.5" /> Rígido
               </p>
               <p className="text-[11px] text-muted-foreground">
-                Não pode ser renegociado sem confronto.
+                Horário fixo: o Norte não sugere mudá-lo.
               </p>
             </div>
           </label>

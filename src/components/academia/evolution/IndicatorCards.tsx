@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { plural } from "@/lib/format-utils";
 import { Modal } from "@/components/ui/modal";
 import { formatDateShortBR } from "@/lib/goals-store";
 import type {
@@ -40,7 +41,7 @@ export function IndicatorCards({
           hint={
             frequency.planned !== undefined
               ? `${frequency.done} de ${frequency.planned} treinos`
-              : `${frequency.done} treinos realizados`
+              : `${frequency.done} ${plural(frequency.done, "treino realizado", "treinos realizados")}`
           }
           onClick={() => setOpen("frequencia")}
         />

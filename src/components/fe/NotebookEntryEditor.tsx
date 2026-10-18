@@ -135,6 +135,13 @@ export function NotebookEntryEditor({
       />
 
       {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
+      {!canSave && !saving && (
+        <p className="mt-4 text-center text-[11px] text-muted-foreground">
+          {type === "versiculo"
+            ? "Informe a referência do versículo para salvar."
+            : "Escreva um título e o conteúdo para salvar."}
+        </p>
+      )}
       <button
         onClick={save}
         disabled={!canSave || saving}

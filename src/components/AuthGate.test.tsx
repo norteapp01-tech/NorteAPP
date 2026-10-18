@@ -1,7 +1,13 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { AuthGate, SignInScreen } from "./AuthGate";
-import { supabase, hasLinkedAccount, ensureSession, SessionLostError, startFreshSession } from "@/lib/supabase/client";
+import {
+  supabase,
+  hasLinkedAccount,
+  ensureSession,
+  SessionLostError,
+  startFreshSession,
+} from "@/lib/supabase/client";
 
 vi.mock("@/lib/supabase/client", () => ({
   supabase: {
@@ -21,6 +27,11 @@ vi.mock("@/lib/supabase/client", () => ({
   SessionLostError: class SessionLostError extends Error {},
 }));
 
+const providers = vi.hoisted(() => ({ apple: true }));
+vi.mock("@/lib/supabase/providers", () => ({
+  useProviderEnabled: (provider: string) => (provider === "apple" ? providers.apple : true),
+}));
+
 vi.mock("./ui/drawer", () => ({
   Drawer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DrawerContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -28,7 +39,10 @@ vi.mock("./ui/drawer", () => ({
   DrawerDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
 }));
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  providers.apple = true;
+});
 afterEach(cleanup);
 
 it("mostra e-mail, senha e ambos os provedores no painel de entrada", () => {
@@ -39,6 +53,13 @@ it("mostra e-mail, senha e ambos os provedores no painel de entrada", () => {
   expect(screen.getByRole("button", { name: "Esqueci minha senha" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Entrar com Google" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Entrar com Apple" })).toBeInTheDocument();
+});
+
+it("não mostra 'Entrar com Apple' quando o provedor não está ligado no projeto", () => {
+  providers.apple = false;
+  render(<SignInScreen onSuccess={vi.fn()} />);
+  expect(screen.getByRole("button", { name: "Entrar com Google" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Entrar com Apple" })).toBeNull();
 });
 
 it("envia recuperação e mantém a confirmação genérica", async () => {
@@ -128,23 +149,41 @@ it("oferece login Apple para contas criadas com Apple", async () => {
 });
 
 it("sessão perdida não vira outro usuário em silêncio: pergunta à pessoa", async () => {
-  vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: null }, error: null } as never);
+  vi.mocked(supabase.auth.getSession).mockResolvedValue({
+    data: { session: null },
+    error: null,
+  } as never);
   vi.mocked(hasLinkedAccount).mockReturnValue(false);
   vi.mocked(ensureSession).mockRejectedValue(new SessionLostError());
-  render(<AuthGate><p>app</p></AuthGate>);
-  expect(await screen.findByRole("heading", { name: "Sua sessão neste aparelho expirou" })).toBeInTheDocument();
+  render(
+    <AuthGate>
+      <p>app</p>
+    </AuthGate>,
+  );
+  expect(
+    await screen.findByRole("heading", { name: "Sua sessão neste aparelho expirou" }),
+  ).toBeInTheDocument();
   expect(screen.queryByText("app")).not.toBeInTheDocument();
   expect(startFreshSession).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Começar do zero" }));
-  fireEvent.click(screen.getByRole("button", { name: "Confirmar: começar do zero neste aparelho" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Confirmar: começar do zero neste aparelho" }),
+  );
   await waitFor(() => expect(startFreshSession).toHaveBeenCalledTimes(1));
   expect(await screen.findByText("app")).toBeInTheDocument();
 });
 
 it("primeiro uso do aparelho segue direto para o app", async () => {
-  vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: null }, error: null } as never);
+  vi.mocked(supabase.auth.getSession).mockResolvedValue({
+    data: { session: null },
+    error: null,
+  } as never);
   vi.mocked(hasLinkedAccount).mockReturnValue(false);
   vi.mocked(ensureSession).mockResolvedValue("novo");
-  render(<AuthGate><p>app</p></AuthGate>);
+  render(
+    <AuthGate>
+      <p>app</p>
+    </AuthGate>,
+  );
   expect(await screen.findByText("app")).toBeInTheDocument();
 });

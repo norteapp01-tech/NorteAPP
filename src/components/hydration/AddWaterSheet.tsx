@@ -1,3 +1,4 @@
+import { decimalBR } from "@/lib/format-utils";
 import { useState } from "react";
 import { Droplet, Undo2, Pencil, Check } from "lucide-react";
 import { useTodayHydration, todayIntake, addWater, undoLastLog } from "@/lib/hydration-store";
@@ -53,7 +54,7 @@ export function AddWaterSheet({ onClose }: { onClose: () => void }) {
     <Modal onClose={onClose} title="Adicionar água" maxWidthClassName="max-w-sm">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          {(current / 1000).toFixed(1)} / {(goal / 1000).toFixed(1)} L
+          {decimalBR(current / 1000, 1)} / {decimalBR(goal / 1000, 1)} L
         </p>
         {!editingGoal && (
           <button

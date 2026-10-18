@@ -1066,7 +1066,9 @@ describe("primeira conexão e rodadas longas", () => {
     exec("Hoje", "2026-10-12");
     exec("Semana que vem", "2026-10-19");
     await enqueueBackfill(t.ctx);
-    const queued = t.fake.rows("agenda_sync_outbox").map((r) => execs().find((e) => e.id === r.entity_id)?.title);
+    const queued = t.fake
+      .rows("agenda_sync_outbox")
+      .map((r) => execs().find((e) => e.id === r.entity_id)?.title);
     expect(queued.sort()).toEqual(["Hoje", "Semana que vem"]);
   });
 

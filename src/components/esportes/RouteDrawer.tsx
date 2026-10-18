@@ -138,7 +138,7 @@ export function RouteDrawer({
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-6 text-center">
         <p className="text-sm text-muted-foreground">
-          Desenhar rota precisa do mapa — token do Mapbox não configurado nesta versão.
+          Desenhar rota precisa do mapa, que não está disponível agora.
         </p>
         <button
           onClick={onCancel}

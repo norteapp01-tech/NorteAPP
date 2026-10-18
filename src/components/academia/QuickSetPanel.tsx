@@ -168,30 +168,31 @@ export function QuickSetPanel({
       const weight = parseFloat(values.weight) || 0;
       const reps = parseInt(values.reps, 10) || 0;
       const wasDone = Boolean(log?.done);
-      await logSet(
-        session.id,
-        current.exerciseId,
-        weight,
-        reps,
-        dropOn
-          ? {
-              drop: {
-                weight: parseFloat(dropValues.weight) || 0,
-                reps: parseInt(dropValues.reps, 10) || 0,
-              },
-            }
-          : {},
-      );
       const isLastPlanned = setIndex + 1 >= totalSets;
-      if (isLastPlanned) await completeExerciseLog(session.id, current.exerciseId);
-      // Duração da série que acabou de ser concluída — com a escolha temporária
-      // deste exercício tendo precedência, se houver uma.
-      if (autoRest) {
-        await startRest(
+      // Série, conclusão do exercício e descanso são independentes: saem juntos,
+      // em vez de esperar um pelo outro — o descanso começa no toque, não segundos depois.
+      await Promise.all([
+        logSet(
           session.id,
-          restBaseSeconds(session, current.exerciseId, target.restSeconds),
-        );
-      }
+          current.exerciseId,
+          weight,
+          reps,
+          dropOn
+            ? {
+                drop: {
+                  weight: parseFloat(dropValues.weight) || 0,
+                  reps: parseInt(dropValues.reps, 10) || 0,
+                },
+              }
+            : {},
+        ),
+        isLastPlanned ? completeExerciseLog(session.id, current.exerciseId) : undefined,
+        // Duração da série que acabou de ser concluída — com a escolha temporária
+        // deste exercício tendo precedência, se houver uma.
+        autoRest
+          ? startRest(session.id, restBaseSeconds(session, current.exerciseId, target.restSeconds))
+          : undefined,
+      ]);
       // Só depois de tudo gravado: uma falha acima interrompe aqui e mantém os
       // valores digitados na tela, sem avançar.
       setDraft(null);
@@ -445,7 +446,11 @@ export function QuickSetPanel({
               <div className="py-2 text-center">
                 <Check className="check-enter mx-auto h-7 w-7 text-success" strokeWidth={2.5} />
                 <p className="mt-1.5 text-sm font-semibold">Exercício concluído</p>
-                <p className="text-[11px] text-muted-foreground">{setIndex} séries registradas</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {regularDone} {regularDone === 1 ? "série registrada" : "séries registradas"}
+                  {(log?.skippedSets?.length ?? 0) > 0 &&
+                    ` · ${log?.skippedSets?.length} ${log?.skippedSets?.length === 1 ? "pulada" : "puladas"}`}
+                </p>
                 <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                   <button
                     onClick={addSet}

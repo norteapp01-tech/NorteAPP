@@ -1,3 +1,4 @@
+import { plural } from "@/lib/format-utils";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { categoryMeta } from "@/lib/mock-data";
 import type { AgendaAnalysis, Comparison } from "@/lib/mirror-analytics";
@@ -63,7 +64,7 @@ export function MirrorOverview({
               <div className="min-w-0">
                 <p className="text-lg font-bold leading-snug">
                   {decided > 0
-                    ? `${a.done} de ${decided} compromissos realizados`
+                    ? `${a.done} de ${decided} ${plural(decided, "compromisso realizado", "compromissos realizados")}`
                     : "Nada para medir ainda"}
                 </p>
                 {comparison.rateDelta !== null && (
@@ -121,7 +122,7 @@ export function MirrorOverview({
         <section className="card-surface p-5">
           <div className="flex items-end justify-between gap-3">
             <h2 className="norte-section-title">Equilíbrio do tempo</h2>
-            <button type="button" onClick={onSeeAgenda} className="text-xs text-primary">
+            <button type="button" onClick={onSeeAgenda} className="norte-hit text-xs text-primary">
               Ver detalhes
             </button>
           </div>

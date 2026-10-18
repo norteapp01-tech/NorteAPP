@@ -83,6 +83,7 @@ import {
 import { formatDurationClock } from "@/lib/sport-store";
 import { useGymSession } from "@/lib/gym-session-context";
 import { recordsForSession, resolveSets } from "@/lib/workout-evolution";
+import { decimalBR, plural } from "@/lib/format-utils";
 import { DropInputs, suggestDrop, type DropDraft } from "@/components/academia/DropFields";
 import { SwipeToSkip } from "@/components/academia/SwipeToSkip";
 import { TimerBlock } from "@/components/academia/TimerBlock";
@@ -440,7 +441,7 @@ function AcademiaModule() {
               <p className="text-sm text-muted-foreground">
                 {programming.source === "descanso"
                   ? "Descanso programado pelo ciclo."
-                  : "Hoje é dia de descanso."}
+                  : "Nenhum treino programado para hoje."}
               </p>
             )}
 
@@ -669,7 +670,7 @@ function AcademiaModule() {
           <div className="academia-weight-row">
             <div>
               <span>Peso corporal</span>
-              <strong>{currentWeight !== undefined ? currentWeight.toFixed(1) : "—"} kg</strong>
+              <strong>{currentWeight !== undefined ? decimalBR(currentWeight, 1) : "—"} kg</strong>
               {weightDelta !== undefined && olderWeight && (
                 <small>
                   {weightDelta > 0 ? "+" : ""}
@@ -831,6 +832,8 @@ function PlanManagerCard() {
   const [showNewPlan, setShowNewPlan] = useState(false);
   const [newPlan, setNewPlan] = useState({ letter: "", name: "" });
   const [creatingPlan, setCreatingPlan] = useState(false);
+  // Excluir um treino pede confirmação: era um toque de 14px, sem aviso.
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   return (
     <details className="academia-library-row group">
@@ -839,7 +842,8 @@ function PlanManagerCard() {
         <div className="flex-1">
           <p className="text-sm font-semibold">Treinos cadastrados</p>
           <p className="text-xs text-muted-foreground">
-            {plans.length} treinos · {exercises.length} exercícios
+            {plans.length} {plural(plans.length, "treino", "treinos")} · {exercises.length}{" "}
+            {plural(exercises.length, "exercício", "exercícios")}
           </p>
         </div>
         <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-90" />
@@ -859,7 +863,8 @@ function PlanManagerCard() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{p.name}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      {exercisesForPlan(exercises, p.id).length} exercícios
+                      {exercisesForPlan(exercises, p.id).length}{" "}
+                      {plural(exercisesForPlan(exercises, p.id).length, "exercício", "exercícios")}
                     </p>
                   </div>
                   {expandedId === p.id ? (
@@ -868,14 +873,33 @@ function PlanManagerCard() {
                     <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                   )}
                 </button>
-                <button
-                  onClick={async () => {
-                    await removePlan(p.id);
-                  }}
-                  className="shrink-0 text-muted-foreground hover:text-danger"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                {deletingId === p.id ? (
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      onClick={() => setDeletingId(null)}
+                      className="min-h-9 rounded-lg border border-border px-2.5 text-[11px] font-semibold text-muted-foreground"
+                    >
+                      Manter
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await removePlan(p.id);
+                        setDeletingId(null);
+                      }}
+                      className="min-h-9 rounded-lg border border-danger/50 px-2.5 text-[11px] font-semibold text-danger"
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setDeletingId(p.id)}
+                    aria-label={`Excluir treino ${p.letter} ${p.name}`}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-danger"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
               </div>
               {expandedId === p.id && <PlanExerciseEditor planId={p.id} />}
             </div>

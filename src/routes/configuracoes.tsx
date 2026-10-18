@@ -8,7 +8,10 @@ export const Route = createFileRoute("/configuracoes")({
 function ConfiguracoesScreen() {
   return (
     <div className="norte-page pb-10">
-      <Link to="/" className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+      <Link
+        to="/"
+        className="norte-hit inline-flex items-center gap-1 text-xs text-muted-foreground"
+      >
         <ChevronLeft size={16} /> Hoje
       </Link>
       <h1 className="norte-page-title mt-3">Configurações</h1>

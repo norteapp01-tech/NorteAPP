@@ -1,3 +1,4 @@
+import { decimalBR } from "./format-utils";
 // ---------------------------------------------------------------------------
 // Geometria de rota desenhada — funções puras, sem I/O. Uma rota é um
 // desenho no mapa (só lat/lng, sem tempo real), diferente de GeoPoint (que
@@ -245,5 +246,5 @@ export function computeRouteGuidanceState(
 
 export function formatChangeDistanceM(m: number): string {
   if (m < 1000) return `${Math.round(m)} m`;
-  return `${(m / 1000).toFixed(1)} km`;
+  return `${decimalBR(m / 1000, 1)} km`;
 }

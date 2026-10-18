@@ -1,3 +1,4 @@
+import { plural } from "@/lib/format-utils";
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { UnderlineTabs } from "@/components/ui/app-design-system";
@@ -242,7 +243,7 @@ export function MirrorAgenda({
 
       <Disclosure
         title="Reagendamentos"
-        subtitle={`${a.reschedules} mudanças em ${a.rescheduledCommitments} compromissos`}
+        subtitle={`${a.reschedules} ${plural(a.reschedules, "mudança", "mudanças")} em ${a.rescheduledCommitments} ${plural(a.rescheduledCommitments, "compromisso", "compromissos")}`}
       >
         {a.movedCommitments.length === 0 ? (
           <EmptyNote>Nenhuma mudança de horário no período.</EmptyNote>

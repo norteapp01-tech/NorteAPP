@@ -229,7 +229,7 @@ export function MapboxRouteMap({
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-surface-2 text-center">
         <MapPinOff className="h-6 w-6 text-muted-foreground" strokeWidth={1.8} />
         <p className="px-6 text-xs text-muted-foreground">
-          Mapa indisponível — token do Mapbox não configurado. A gravação continua normalmente.
+          O mapa não está disponível agora. A gravação continua normalmente.
         </p>
       </div>
     );

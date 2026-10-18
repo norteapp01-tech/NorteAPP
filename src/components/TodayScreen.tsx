@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { isValidTimeRange } from "@/lib/agenda-intervals";
 import { useSeriesMaterialization } from "@/components/agenda/use-agenda-data";
+import { formatLongDate } from "@/lib/agenda-navigation";
 import { nowDate } from "@/lib/test-clock";
 import {
   Check,
@@ -183,13 +184,7 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
           {greeting()}
           {profile.displayName ? `, ${profile.displayName}` : ""}
         </h1>
-        <p className="mt-1 text-[17px] capitalize text-muted-foreground">
-          {nowDate().toLocaleDateString("pt-BR", {
-            weekday: "long",
-            day: "2-digit",
-            month: "long",
-          })}
-        </p>
+        <p className="mt-1 text-[17px] text-muted-foreground">{formatLongDate(todayISO())}</p>
         <div className="today-day-progress mt-6">
           <div className="flex items-center justify-between gap-4 text-sm">
             <span className="text-muted-foreground">
@@ -482,7 +477,7 @@ function TaskCheckbox({ id, done }: { id: string; done: boolean }) {
         onClick={toggle}
         disabled={pending}
         aria-label={done ? "Reabrir tarefa" : "Concluir tarefa"}
-        className={`interactive-press mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors ${done ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground bg-transparent"}`}
+        className={`norte-hit interactive-press mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors ${done ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground bg-transparent"}`}
       >
         {done && (
           <Check className={`h-4 w-4 ${justCompleted ? "check-enter" : ""}`} strokeWidth={3} />

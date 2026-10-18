@@ -9,7 +9,8 @@ import {
 } from "./policy";
 
 type AgentMessageContentPart =
-  { type: "text"; text: string } | { type: "image_url"; image_url: { url: string; detail?: "low" | "high" | "auto" } };
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string; detail?: "low" | "high" | "auto" } };
 
 type AgentMessage =
   | { role: "system" | "assistant"; content: string }
@@ -216,8 +217,8 @@ export async function runAgentTurnWith(
           proposed.length === 1 && proposed[0].name === "criar_plano"
             ? "Montei uma proposta de plano. Revise as etapas e confirme para salvar."
             : proposed.length === 1
-            ? `${toolTrace.length ? "Registrei os itens seguros. " : ""}Preparei uma alteração, mas ainda não salvei. Confirmar?`
-            : `${toolTrace.length ? "Registrei os itens seguros. " : ""}Preparei ${proposed.length} alterações, mas ainda não salvei. Confirmar?`,
+              ? `${toolTrace.length ? "Registrei os itens seguros. " : ""}Preparei uma alteração, mas ainda não salvei. Confirmar?`
+              : `${toolTrace.length ? "Registrei os itens seguros. " : ""}Preparei ${proposed.length} alterações, mas ainda não salvei. Confirmar?`,
         toolTrace: toolTrace.length ? toolTrace : undefined,
         pendingActions: proposed,
       };
@@ -251,7 +252,9 @@ function isWriteCard(t: { name: string; result: string }): boolean {
   }
 }
 function isRead(t: { name: string; result: string }): boolean {
-  return (t.name.startsWith("consultar") || t.name.startsWith("verificar")) && !/^Erro/i.test(t.result);
+  return (
+    (t.name.startsWith("consultar") || t.name.startsWith("verificar")) && !/^Erro/i.test(t.result)
+  );
 }
 function cardSummary(result: string): string {
   try {
@@ -263,7 +266,8 @@ function cardSummary(result: string): string {
 /** Resposta em texto que é, na prática, um plano (3+ itens numerados ou com marcador). */
 export function looksLikeTextPlan(content: string | null | undefined): boolean {
   if (!content) return false;
-  if (/\b(preparei|montei|elaborei|criei|segue|aqui est[aá])\b[^.]{0,40}\bplano\b/i.test(content)) return true;
+  if (/\b(preparei|montei|elaborei|criei|segue|aqui est[aá])\b[^.]{0,40}\bplano\b/i.test(content))
+    return true;
   const items = content.split("\n").filter((l) => /^\s*(\d+[.)]|[-•*])\s+\S/.test(l));
   return items.length >= 3 && /plano|etapa|passo|objetivo|loja|meta/i.test(content);
 }
@@ -272,15 +276,21 @@ export function looksLikeTextPlan(content: string | null | undefined): boolean {
  * "foi marcado", "preparei um plano"…). Sem ferramenta de escrita executada, é uma afirmação falsa. */
 export function claimsWrite(content: string | null | undefined): boolean {
   if (!content) return false;
-  if (/\b(marquei|agendei|reagendei|registrei|salvei|criei|alterei|atualizei|conclu[ií]|anotei|adicionei|lancei|removi|apaguei|preparei|montei|elaborei)\b/i.test(content))
+  if (
+    /\b(marquei|agendei|reagendei|registrei|salvei|criei|alterei|atualizei|conclu[ií]|anotei|adicionei|lancei|removi|apaguei|preparei|montei|elaborei)\b/i.test(
+      content,
+    )
+  )
     return true;
   // Particípio anunciando um resultado ("Água registrada.", "Movimentação registrada como
   // entrada", "Lembrete criado") — mas não descrições do que já existe ("você tem 3 marcados").
-  const participle = /\b(registrad[oa]s?|marcad[oa]s?|agendad[oa]s?|reagendad[oa]s?|salv[oa]s?|criad[oa]s?|adicionad[oa]s?|anotad[oa]s?|lan[çc]ad[oa]s?|atualizad[oa]s?|removid[oa]s?)\b/i;
-  return content
-    .split(/(?<=[.!?\n])\s*/)
-    .some((sentence) => {
-      if (/\b(voc[eê] tem|h[aá] |existem|tem \d|seus|suas|est[aã]o|ainda|j[aá] tinha)\b/i.test(sentence)) return false;
-      return participle.test(sentence.split(/\s+/).slice(0, 6).join(" "));
-    });
+  const participle =
+    /\b(registrad[oa]s?|marcad[oa]s?|agendad[oa]s?|reagendad[oa]s?|salv[oa]s?|criad[oa]s?|adicionad[oa]s?|anotad[oa]s?|lan[çc]ad[oa]s?|atualizad[oa]s?|removid[oa]s?)\b/i;
+  return content.split(/(?<=[.!?\n])\s*/).some((sentence) => {
+    if (
+      /\b(voc[eê] tem|h[aá] |existem|tem \d|seus|suas|est[aã]o|ainda|j[aá] tinha)\b/i.test(sentence)
+    )
+      return false;
+    return participle.test(sentence.split(/\s+/).slice(0, 6).join(" "));
+  });
 }

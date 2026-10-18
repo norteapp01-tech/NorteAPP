@@ -144,6 +144,6 @@ describe("formatChangeDistanceM", () => {
   });
 
   it("formata quilômetros a partir de 1km", () => {
-    expect(formatChangeDistanceM(1500)).toBe("1.5 km");
+    expect(formatChangeDistanceM(1500)).toBe("1,5 km");
   });
 });

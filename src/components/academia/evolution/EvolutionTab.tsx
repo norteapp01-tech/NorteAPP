@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { plural } from "@/lib/format-utils";
 import { CalendarDays, ListFilter, X } from "lucide-react";
 import { formatDateShortBR } from "@/lib/goals-store";
 import { useWorkoutLoading, useWorkoutStore, type MuscleGroup } from "@/lib/workout-store";
@@ -308,7 +309,8 @@ export function EvolutionTab({ initialStageId }: { initialStageId?: string }) {
               : `em ${PRESETS.find((p) => p.key === preset)?.label}`}
           </h2>
           <p className="evo-hero-count">
-            {freq.done} treinos{freq.planned !== undefined ? ` · ${freq.planned} programados` : ""}
+            {freq.done} {plural(freq.done, "treino", "treinos")}
+            {freq.planned !== undefined ? ` · ${freq.planned} programados` : ""}
           </p>
           <div className="evo-constancy">
             <span>Constância</span>

@@ -1,5 +1,6 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AlertTriangle, RefreshCcw, WifiOff } from "lucide-react";
+import { useProviderEnabled } from "@/lib/supabase/providers";
 import {
   supabase,
   ensureSession,
@@ -120,8 +121,8 @@ function SessionLostScreen({
       <div>
         <h1 className="text-lg font-bold">Sua sessão neste aparelho expirou</h1>
         <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-          Não conseguimos reabrir seus dados automaticamente. Se você criou uma conta, entre nela para
-          recuperar tudo.
+          Não conseguimos reabrir seus dados automaticamente. Se você criou uma conta, entre nela
+          para recuperar tudo.
         </p>
       </div>
       <div className="flex w-full max-w-xs flex-col gap-2">
@@ -131,7 +132,10 @@ function SessionLostScreen({
         >
           <RefreshCcw className="h-4 w-4" /> Tentar novamente
         </button>
-        <button onClick={onLogin} className="rounded-xl border border-border px-5 py-2.5 text-sm font-semibold">
+        <button
+          onClick={onLogin}
+          className="rounded-xl border border-border px-5 py-2.5 text-sm font-semibold"
+        >
           Entrar na minha conta
         </button>
         {confirming ? (
@@ -150,7 +154,10 @@ function SessionLostScreen({
             {busy ? "Começando…" : "Confirmar: começar do zero neste aparelho"}
           </button>
         ) : (
-          <button onClick={() => setConfirming(true)} className="px-5 py-2 text-xs text-muted-foreground">
+          <button
+            onClick={() => setConfirming(true)}
+            className="px-5 py-2 text-xs text-muted-foreground"
+          >
             Começar do zero
           </button>
         )}
@@ -225,6 +232,12 @@ export function SignInScreen({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const appleEnabled = useProviderEnabled("apple");
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  // O aviso de erro fica no fim do painel: em telas baixas estava fora da vista.
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [error]);
   const [loading, setLoading] = useState(false);
 
   async function submitLogin(event: FormEvent<HTMLFormElement>) {
@@ -418,17 +431,19 @@ export function SignInScreen({
                     </svg>
                     <span>Entrar com Google</span>
                   </button>
-                  <button
-                    type="button"
-                    disabled={loading}
-                    className="signup-provider signup-apple"
-                    onClick={() => void signInWithProvider("apple")}
-                  >
-                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M17.05 12.54c.03 3.14 2.75 4.18 2.78 4.2-.02.07-.43 1.49-1.43 2.96-.87 1.27-1.78 2.54-3.2 2.57-1.4.04-1.85-.83-3.45-.83-1.6 0-2.1.8-3.43.86-1.38.05-2.43-1.38-3.31-2.65-1.8-2.6-3.17-7.35-1.32-10.56a5.13 5.13 0 0 1 4.33-2.63c1.35-.03 2.63.92 3.45.92.83 0 2.37-1.14 3.99-.97.67.03 2.57.27 3.78 2.04-.1.06-2.25 1.31-2.23 4.09ZM14.43 4.7c.73-.89 1.22-2.13 1.08-3.36-1.05.04-2.33.7-3.08 1.59-.67.77-1.26 2.02-1.1 3.22 1.17.09 2.37-.6 3.1-1.45Z" />
-                    </svg>
-                    <span>Entrar com Apple</span>
-                  </button>
+                  {appleEnabled && (
+                    <button
+                      type="button"
+                      disabled={loading}
+                      className="signup-provider signup-apple"
+                      onClick={() => void signInWithProvider("apple")}
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17.05 12.54c.03 3.14 2.75 4.18 2.78 4.2-.02.07-.43 1.49-1.43 2.96-.87 1.27-1.78 2.54-3.2 2.57-1.4.04-1.85-.83-3.45-.83-1.6 0-2.1.8-3.43.86-1.38.05-2.43-1.38-3.31-2.65-1.8-2.6-3.17-7.35-1.32-10.56a5.13 5.13 0 0 1 4.33-2.63c1.35-.03 2.63.92 3.45.92.83 0 2.37-1.14 3.99-.97.67.03 2.57.27 3.78 2.04-.1.06-2.25 1.31-2.23 4.09ZM14.43 4.7c.73-.89 1.22-2.13 1.08-3.36-1.05.04-2.33.7-3.08 1.59-.67.77-1.26 2.02-1.1 3.22 1.17.09 2.37-.6 3.1-1.45Z" />
+                      </svg>
+                      <span>Entrar com Apple</span>
+                    </button>
+                  )}
                 </div>
               </>
             )}
@@ -512,7 +527,7 @@ export function SignInScreen({
             )}
 
             {error && (
-              <p role="alert" className="mt-4 text-sm text-destructive">
+              <p ref={errorRef} role="alert" className="mt-4 text-sm text-destructive">
                 {error}
               </p>
             )}

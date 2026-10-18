@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { plural } from "@/lib/format-utils";
 import { Check, ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { ActionRow } from "@/components/plan/ActionRow";
 import { useCompletedInSession } from "@/hooks/use-completed-in-session";
@@ -170,7 +171,8 @@ export function StageAccordion({
       {pendingConfirm && (
         <div className="mt-2.5 rounded-lg border border-warning/30 bg-warning/10 p-2.5">
           <p className="text-[11px] text-foreground">
-            Esta etapa ainda tem {pendingExecs.length} ações pendentes. O que prefere?
+            Esta etapa ainda tem {pendingExecs.length}{" "}
+            {plural(pendingExecs.length, "ação pendente", "ações pendentes")}. O que prefere?
           </p>
           <div className="mt-1.5 flex gap-1.5">
             <button

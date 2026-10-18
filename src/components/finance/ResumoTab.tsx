@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactElement } from "react";
+import { plural } from "@/lib/format-utils";
 import { ArrowDownRight, ArrowUpRight, ChevronDown, ChevronRight, Target } from "lucide-react";
 import {
   useFinanceStore,
@@ -33,6 +34,7 @@ export function ResumoTab({
     () => transactionsForMonth(state.transactions, month),
     [state.transactions, month],
   );
+  const expenseCount = monthTransactions.filter((t) => t.type === "expense").length;
   const income = monthTransactions
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + t.amount, 0);
@@ -118,8 +120,7 @@ export function ResumoTab({
               <summary>
                 <span>Gastos recentes</span>
                 <span className="min-w-0 truncate text-xs text-muted-foreground">
-                  {selected ??
-                    `${monthTransactions.filter((t) => t.type === "expense").length} registros`}
+                  {selected ?? `${expenseCount} ${plural(expenseCount, "registro", "registros")}`}
                 </span>
                 <ChevronDown size={16} aria-hidden />
               </summary>
@@ -160,7 +161,7 @@ export function ResumoTab({
       <section className="finance-goal-preview">
         <div className="finance-section-heading">
           <h2 className="norte-section-title">Sonhos e objetivos</h2>
-          <button onClick={onOpenObjetivos} className="text-xs text-muted-foreground">
+          <button onClick={onOpenObjetivos} className="norte-hit text-xs text-muted-foreground">
             ver todos
           </button>
         </div>

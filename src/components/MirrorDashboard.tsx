@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { AppMenuButton, UnderlineTabs } from "@/components/ui/app-design-system";
 import { todayISO } from "@/lib/goals-store";
-import { resolvePeriod, type Period, type PeriodKey } from "@/lib/mirror-analytics";
+import { previousPeriod, resolvePeriod, type Period, type PeriodKey } from "@/lib/mirror-analytics";
 import { useMirror } from "@/lib/mirror-store";
 import { PeriodPicker } from "./mirror/PeriodPicker";
 import { MirrorOverview } from "./mirror/MirrorOverview";
@@ -109,6 +109,8 @@ export function MirrorDashboard() {
             current={mirror.routines.current}
             previous={mirror.routines.previous}
             scope={SCOPE[key]}
+            period={mirror.period}
+            previousPeriod={previousPeriod(mirror.period)}
           />
         )}
       </div>

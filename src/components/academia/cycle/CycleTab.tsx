@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { plural } from "@/lib/format-utils";
 import { Link } from "@tanstack/react-router";
 import {
   CalendarRange,
@@ -108,7 +109,7 @@ export function CycleTab() {
             <h2>{active.name}</h2>
             <p className="academy-program-dates">
               {formatDateShortBR(active.startDate)} — {formatDateShortBR(active.endDate)} ·{" "}
-              {stages.length} etapas
+              {stages.length} {plural(stages.length, "etapa", "etapas")}
             </p>
             <div className="academy-program-main">
               <div>

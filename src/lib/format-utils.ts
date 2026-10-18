@@ -36,3 +36,16 @@ export function weekdayLabelsFor(weekStart: WeekStart, labels: string[]): string
   const startsOn = weekStartsOnFor(weekStart);
   return [...labels.slice(startsOn), ...labels.slice(0, startsOn)];
 }
+
+/** "1 treino" / "2 treinos": escolhe o singular só quando o número é exatamente 1. */
+export function plural(n: number, one: string, many: string): string {
+  return n === 1 ? one : many;
+}
+
+/** Número com vírgula decimal (pt-BR): 8,23 · 2,0. */
+export function decimalBR(value: number, digits = 1): string {
+  return value.toLocaleString("pt-BR", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}

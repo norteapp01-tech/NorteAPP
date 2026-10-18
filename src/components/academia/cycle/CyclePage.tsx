@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { plural } from "@/lib/format-utils";
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, ChevronLeft, Play, Plus, Square } from "lucide-react";
 import { UnderlineTabs } from "@/components/ui/app-design-system";
@@ -123,7 +124,8 @@ export function CyclePage({
         <h1 className="norte-page-title mt-3">{cycle.name}</h1>
         <p className="mt-1 text-xs text-muted-foreground">
           {formatDateShortBR(cycle.startDate)} — {formatDateShortBR(cycle.endDate)} ·{" "}
-          {progress.totalDays} dias · {stages.length} etapas
+          {progress.totalDays} {plural(progress.totalDays, "dia", "dias")} · {stages.length}{" "}
+          {plural(stages.length, "etapa", "etapas")}
         </p>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -271,7 +273,9 @@ export function CyclePage({
             )}
             <div className="mb-3 flex items-center justify-between">
               <h2 className="norte-section-title">Caminho do programa</h2>
-              <span className="text-[13px] text-muted-foreground">{stages.length} etapas</span>
+              <span className="text-[13px] text-muted-foreground">
+                {stages.length} {plural(stages.length, "etapa", "etapas")}
+              </span>
             </div>
             {stages.map((block, index) => (
               <div key={block.id} id={`cycle-stage-${block.id}`} className="flex gap-3 scroll-mt-6">
@@ -382,7 +386,8 @@ function ActivationPreview({
         <>
           <p className="mt-1 text-[11px] text-muted-foreground">
             Etapa vigente: <span className="font-semibold text-foreground">{current.name}</span> ·{" "}
-            {plansOfBlock(blockPlans, plans, current.id).length} treinos
+            {plansOfBlock(blockPlans, plans, current.id).length}{" "}
+            {plural(plansOfBlock(blockPlans, plans, current.id).length, "treino", "treinos")}
           </p>
           <ul className="mt-2 space-y-0.5">
             {weekVisualOrder.map((weekday, i) => {

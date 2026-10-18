@@ -271,7 +271,9 @@ export function AgentCard({
         <>
           <p className="mb-3 text-sm">{data.description}</p>
           {/estimativa/i.test(String(data.summary ?? "")) && (
-            <p className="-mt-1 mb-3 text-xs text-muted-foreground">Estimativa visual pela foto — não é uma medição exata.</p>
+            <p className="-mt-1 mb-3 text-xs text-muted-foreground">
+              Estimativa visual pela foto — não é uma medição exata.
+            </p>
           )}
           <div className="grid grid-cols-2 gap-2">
             {[

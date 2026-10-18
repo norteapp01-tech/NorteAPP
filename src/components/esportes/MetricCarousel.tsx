@@ -1,3 +1,4 @@
+import { decimalBR } from "@/lib/format-utils";
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatDateShortBR } from "@/lib/goals-store";
@@ -198,7 +199,7 @@ function Face({
         : isPace
           ? formatPace(last.paceSPerKm)
           : face === "volume"
-            ? `${(last.distanceM / 1000).toFixed(1)} km`
+            ? `${decimalBR(last.distanceM / 1000, 1)} km`
             : `${last.sessions} ${last.sessions === 1 ? "atividade" : "atividades"}`;
 
   const sub =
@@ -269,7 +270,7 @@ function describeWeek(w: WeeklyMetrics, face: MetricFace, modality: SportModalit
       ? `${period}: nenhuma atividade.`
       : `${period}: ${count} — ${w.dates.map((d) => formatDateShortBR(d)).join(", ")}.`;
   }
-  const km = `${(w.distanceM / 1000).toFixed(1)} km`;
+  const km = `${decimalBR(w.distanceM / 1000, 1)} km`;
   const time = formatDurationClock(w.activeDurationS);
   if (face === "volume") return `${period}: ${km} em ${count}, ${time} no total.`;
   const speed = modality === "ciclismo" ? formatSpeedKmh(w.speedKmh) : formatPace(w.paceSPerKm);

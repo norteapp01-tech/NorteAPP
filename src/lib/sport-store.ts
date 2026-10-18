@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { decimalBR } from "./format-utils";
 import { supabase, ensureSession, useSupabaseUserId } from "./supabase/client";
 import { queryClient } from "./query-client";
 import { type SportModality } from "./goals-store";
@@ -184,7 +185,7 @@ export function computeSpeedKmh(distanceM: number, activeDurationS: number): num
 }
 
 export function formatDistanceKm(distanceM: number): string {
-  return `${(distanceM / 1000).toFixed(2)} km`;
+  return `${decimalBR(distanceM / 1000, 2)} km`;
 }
 
 export function formatPace(sPerKm: number | null): string {
@@ -197,7 +198,7 @@ export function formatPace(sPerKm: number | null): string {
 
 export function formatSpeedKmh(kmh: number | null): string {
   if (kmh === null || !Number.isFinite(kmh)) return "—";
-  return `${kmh.toFixed(1)} km/h`;
+  return `${decimalBR(kmh, 1)} km/h`;
 }
 
 export function formatDurationClock(totalSeconds: number): string {

@@ -214,7 +214,8 @@ export function presetRules(start: string): { id: string; label: string; rule: R
     { id: "daily", label: "Todos os dias", rule: { freq: "daily", interval: 1 } },
     {
       id: "weekly",
-      label: `Toda ${WEEKDAY_LONG[wd]}`,
+      // sábado e domingo são masculinos: "Todo sábado", "Toda sexta"
+      label: `${wd === 0 || wd === 6 ? "Todo" : "Toda"} ${WEEKDAY_LONG[wd]}`,
       rule: { freq: "weekly", interval: 1, byWeekday: [wd] },
     },
     {

@@ -180,7 +180,7 @@ export function nextPlannedSportActivity(
 /** Objetivo do treino planejado em uma linha, ou null quando não há. */
 export function plannedTargetLabel(execution: Execution): string | null {
   if (execution.sportTargetDistanceM) {
-    return `${(execution.sportTargetDistanceM / 1000).toFixed(1).replace(".0", "")} km`;
+    return `${(execution.sportTargetDistanceM / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} km`;
   }
   if (execution.sportTargetDurationS) {
     const min = Math.round(execution.sportTargetDurationS / 60);

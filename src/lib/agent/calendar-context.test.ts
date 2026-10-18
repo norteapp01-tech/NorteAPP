@@ -1,5 +1,7 @@
 import { expect, it, vi } from "vitest";
-vi.mock("@tanstack/react-start", () => ({ createServerFn: () => ({ validator: () => ({ handler: (h: unknown) => h }) }) }));
+vi.mock("@tanstack/react-start", () => ({
+  createServerFn: () => ({ validator: () => ({ handler: (h: unknown) => h }) }),
+}));
 import { calendarContext } from "./chat.functions";
 
 it("lista o dia da semana de hoje e dos próximos dias", () => {

@@ -136,6 +136,12 @@ describe("Espelho: estados", () => {
     expect(screen.getAllByText(/poucos/i).length).toBeGreaterThan(0);
   });
 
+  it("um único compromisso fica no singular", () => {
+    mirror.value = ready([occ({ date: "2026-10-13", status: "perdida" })]);
+    renderIt();
+    expect(screen.getByText(/0 de 1 compromisso realizado\b/i)).toBeInTheDocument();
+  });
+
   it("histórico de mudanças indisponível: avisa e não mostra zero", () => {
     mirror.value = ready(
       [

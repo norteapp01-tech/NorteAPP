@@ -18,8 +18,32 @@ if (!url || !anonKey) {
   );
 }
 
+/** Nenhuma chamada fica pendurada para sempre: sem isso, uma resposta que não
+ * volta deixa "Salvando…" na tela indefinidamente. Consultas e gravações têm 30 s;
+ * arquivos e funções, que podem demorar mais, 120 s. Estourou, vira erro e a
+ * interface mostra o aviso de sempre. */
+const REQUEST_TIMEOUT_MS = 30_000;
+const LONG_REQUEST_TIMEOUT_MS = 120_000;
+
+function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const target = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const long = target.includes("/storage/v1/") || target.includes("/functions/v1/");
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(new DOMException("A conexão demorou demais.", "TimeoutError")),
+    long ? LONG_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
+  );
+  const outer = init?.signal;
+  if (outer) {
+    if (outer.aborted) controller.abort(outer.reason);
+    else outer.addEventListener("abort", () => controller.abort(outer.reason), { once: true });
+  }
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 export const supabase = createClient(url, anonKey, {
   auth: { persistSession: true, autoRefreshToken: true },
+  global: { fetch: fetchWithTimeout },
 });
 
 /** Região do banco. As Edge Functions rodam aqui (e não na borda mais próxima da

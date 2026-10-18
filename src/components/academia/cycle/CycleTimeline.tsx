@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { plural } from "@/lib/format-utils";
 import { Target } from "lucide-react";
 import { ScaleSelector } from "@/components/plan/gantt/ScaleSelector";
 import {
@@ -88,7 +89,8 @@ export function CycleTimeline({
             {formatDateShortBR(cycle.startDate)} — {formatDateShortBR(cycle.endDate)}
           </p>
           <p className="text-[11px] text-muted-foreground">
-            {totalDays} dias · {blocks.length} etapas
+            {totalDays} {plural(totalDays, "dia", "dias")} · {blocks.length}{" "}
+            {plural(blocks.length, "etapa", "etapas")}
           </p>
         </div>
       </div>

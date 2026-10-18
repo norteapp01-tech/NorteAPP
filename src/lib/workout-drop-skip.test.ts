@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { queryClient } from "./query-client";
 import type { createFakeSupabase } from "../test/fake-supabase";
 
 type Fake = ReturnType<typeof createFakeSupabase>;
@@ -21,6 +22,7 @@ import {
   logSet,
   nextPendingExerciseId,
   removeLastSet,
+  resetWorkoutCaches,
   seriesPosition,
   skipExercise,
   skipSet,
@@ -34,6 +36,8 @@ const SESSION = "11111111-1111-1111-1111-111111111111";
 const EX = "ex-1";
 
 beforeEach(() => {
+  resetWorkoutCaches();
+  queryClient.clear();
   fake.reset();
   fake.setUser("user-a");
   fake.seed("workout_sessions", {

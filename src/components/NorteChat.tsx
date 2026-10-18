@@ -57,7 +57,11 @@ function RichText({ text }: { text: string }) {
   return (
     <>
       {parts.map((part, i) =>
-        /^\*\*[^*\n]+\*\*$/.test(part) ? <strong key={i}>{part.slice(2, -2)}</strong> : part.replace(/^#{1,4}\s+/gm, ""),
+        /^\*\*[^*\n]+\*\*$/.test(part) ? (
+          <strong key={i}>{part.slice(2, -2)}</strong>
+        ) : (
+          part.replace(/^#{1,4}\s+/gm, "")
+        ),
       )}
     </>
   );

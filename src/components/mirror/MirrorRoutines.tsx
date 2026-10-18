@@ -23,7 +23,13 @@ import {
   streakForTitle,
   useGoalsStore,
 } from "@/lib/goals-store";
-import type { AgendaAnalysis } from "@/lib/mirror-analytics";
+import { formatMinutes, type AgendaAnalysis, type Period } from "@/lib/mirror-analytics";
+import { hasModuleActivity, moduleActivity } from "@/lib/mirror-modules";
+import { plural, decimalBR } from "@/lib/format-utils";
+import { useWorkoutStore } from "@/lib/workout-store";
+import { useSportStore } from "@/lib/sport-store";
+import { useReadingStore } from "@/lib/reading-store";
+import { useMemo } from "react";
 import { Disclosure } from "./charts";
 
 const icons: Record<string, LucideIcon> = {
@@ -42,11 +48,22 @@ export function MirrorRoutines({
   current,
   previous,
   scope,
+  period,
+  previousPeriod,
 }: {
   current: AgendaAnalysis;
   previous: AgendaAnalysis;
   scope: string;
+  period: Period;
+  previousPeriod: Period;
 }) {
+  const workouts = useWorkoutStore((s) => s.sessions);
+  const activities = useSportStore((s) => s.activities);
+  const readingSessions = useReadingStore((s) => s.sessions);
+  const modules = useMemo(() => {
+    const input = { workouts, activities, readingSessions };
+    return { now: moduleActivity(input, period), before: moduleActivity(input, previousPeriod) };
+  }, [workouts, activities, readingSessions, period, previousPeriod]);
   const state = useGoalsStore((s) => s);
   const { goals, steps, executions } = state;
   const achievements = achievementsEarned(state);
@@ -74,6 +91,45 @@ export function MirrorRoutines({
 
   return (
     <div className="space-y-4">
+      {hasModuleActivity(modules.now) && (
+        <section>
+          <h2 className="norte-section-title">Registrado nos módulos</h2>
+          <div className="card-surface mt-3 divide-y divide-border px-4">
+            {modules.now.workouts.count > 0 && (
+              <ModuleRow
+                icon={Dumbbell}
+                title="Academia"
+                value={`${modules.now.workouts.count} ${plural(modules.now.workouts.count, "treino", "treinos")}`}
+                detail={`em ${modules.now.workouts.days} ${plural(modules.now.workouts.days, "dia", "dias")} ${scope}`}
+                delta={modules.now.workouts.count - modules.before.workouts.count}
+              />
+            )}
+            {modules.now.sport.count > 0 && (
+              <ModuleRow
+                icon={Activity}
+                title="Esportes"
+                value={`${modules.now.sport.count} ${plural(modules.now.sport.count, "atividade", "atividades")}`}
+                detail={`${decimalBR(modules.now.sport.distanceM / 1000, 1)} km · ${formatMinutes(modules.now.sport.activeSeconds / 60)} em movimento`}
+                delta={modules.now.sport.count - modules.before.sport.count}
+              />
+            )}
+            {modules.now.reading.sessions > 0 && (
+              <ModuleRow
+                icon={BookOpen}
+                title="Leitura"
+                value={`${modules.now.reading.sessions} ${plural(modules.now.reading.sessions, "sessão", "sessões")}`}
+                detail={`${formatMinutes(modules.now.reading.seconds / 60)}${modules.now.reading.pages ? ` · ${modules.now.reading.pages} ${plural(modules.now.reading.pages, "página", "páginas")}` : ""}`}
+                delta={modules.now.reading.sessions - modules.before.reading.sessions}
+              />
+            )}
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Vem do que você registrou em cada módulo, sem estimativas. A comparação é com o período
+            anterior.
+          </p>
+        </section>
+      )}
+
       <section>
         <h2 className="norte-section-title">Áreas da sua vida</h2>
         <div className="card-surface mt-3 grid grid-cols-2 overflow-hidden">
@@ -146,7 +202,7 @@ export function MirrorRoutines({
             }
             detail={
               strongStreak
-                ? `${strongStreak.streak} dias seguidos em “${strongStreak.title}”`
+                ? `${strongStreak.streak} ${strongStreak.streak === 1 ? "dia seguido" : "dias seguidos"} em “${strongStreak.title}”`
                 : strongest
                   ? `${strongest.done} de ${strongest.done + strongest.missed} realizadas ${scope}`
                   : "Continue registrando suas ações"
@@ -234,7 +290,7 @@ export function MirrorRoutines({
             {streaks.map((x) => (
               <p key={x.title}>
                 <Flame className="mr-2 inline h-3.5 w-3.5 text-primary" />
-                {x.title} · {x.streak} dias seguidos
+                {x.title} · {x.streak} {x.streak === 1 ? "dia seguido" : "dias seguidos"}
               </p>
             ))}
           </div>
@@ -282,6 +338,38 @@ function Row({
         <p className="truncate text-sm font-semibold">{title}</p>
         <p className="text-xs text-muted-foreground">{detail}</p>
       </div>
+    </div>
+  );
+}
+
+function ModuleRow({
+  icon: Icon,
+  title,
+  value,
+  detail,
+  delta,
+}: {
+  icon: LucideIcon;
+  title: string;
+  value: string;
+  detail: string;
+  delta: number;
+}) {
+  return (
+    <div className="flex items-center gap-3 py-3.5">
+      <Icon className="h-6 w-6 shrink-0 text-muted-foreground" strokeWidth={1.8} />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-muted-foreground">{title}</p>
+        <p className="text-sm font-semibold">{value}</p>
+        <p className="text-xs text-muted-foreground">{detail}</p>
+      </div>
+      {delta !== 0 && (
+        <span
+          className={`shrink-0 text-xs font-semibold ${delta > 0 ? "text-primary" : "text-muted-foreground"}`}
+        >
+          {delta > 0 ? `+${delta}` : delta}
+        </span>
+      )}
     </div>
   );
 }

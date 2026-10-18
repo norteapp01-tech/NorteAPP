@@ -157,5 +157,8 @@ describe("texto", () => {
   it("os atalhos acompanham o dia de início", () => {
     const presets = presetRules(MON);
     expect(presets.find((p) => p.id === "weekly")!.label).toBe("Toda segunda");
+    // fim de semana é masculino
+    expect(presetRules("2026-10-18").find((p) => p.id === "weekly")!.label).toBe("Todo domingo");
+    expect(presetRules("2026-10-17").find((p) => p.id === "weekly")!.label).toBe("Todo sábado");
   });
 });

@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { formatTime, weekStartsOnFor, startOfWeekLocal, weekdayLabelsFor } from "./format-utils";
+import {
+  decimalBR,
+  formatTime,
+  plural,
+  weekStartsOnFor,
+  startOfWeekLocal,
+  weekdayLabelsFor,
+} from "./format-utils";
 
 describe("formatTime", () => {
   it("24h: devolve a string como está", () => {
@@ -63,5 +70,18 @@ describe("weekdayLabelsFor", () => {
       "Sáb",
       "Dom",
     ]);
+  });
+});
+
+describe("plural e decimalBR", () => {
+  it("singular só para exatamente 1", () => {
+    expect(plural(1, "treino", "treinos")).toBe("treino");
+    expect(plural(0, "treino", "treinos")).toBe("treinos");
+    expect(plural(2, "treino", "treinos")).toBe("treinos");
+  });
+  it("vírgula decimal em pt-BR", () => {
+    expect(decimalBR(8.234, 2)).toBe("8,23");
+    expect(decimalBR(2, 1)).toBe("2,0");
+    expect(decimalBR(0.16, 2)).toBe("0,16");
   });
 });

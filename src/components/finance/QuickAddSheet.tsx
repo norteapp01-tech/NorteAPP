@@ -154,7 +154,9 @@ export function QuickAddSheet({ onClose }: { onClose: () => void }) {
         <div className="space-y-3">
           {!manualMode && (
             <p className="rounded-lg bg-primary/10 px-3 py-2 text-sm text-primary">
-              {description} · {Number(amount).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} · {category}
+              {description} ·{" "}
+              {Number(amount).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} ·{" "}
+              {category}
             </p>
           )}
 

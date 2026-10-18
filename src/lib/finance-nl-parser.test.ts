@@ -7,14 +7,26 @@ it("descrição sem preposição sobrando", () => {
 });
 
 it("valor com vírgula e tipo de lançamento", () => {
-  expect(parseFinanceEntry("paguei 89,90 de farmácia")).toMatchObject({ amount: 89.9, type: "expense" });
-  expect(parseFinanceEntry("recebi 1200 de um freela")).toMatchObject({ amount: 1200, type: "income" });
+  expect(parseFinanceEntry("paguei 89,90 de farmácia")).toMatchObject({
+    amount: 89.9,
+    type: "expense",
+  });
+  expect(parseFinanceEntry("recebi 1200 de um freela")).toMatchObject({
+    amount: 1200,
+    type: "income",
+  });
 });
 
 it("lê o número inteiro em qualquer formato", () => {
   const cases: [string, number][] = [
-    ["recebi 2500 de salário", 2500], ["gastei 1.200 no mercado", 1200], ["paguei R$ 2.500,00 de aluguel", 2500],
-    ["uber 32", 32], ["r$8,50 café", 8.5], ["comprei tênis por 349,9", 349.9], ["recebi 15000", 15000], ["gastei 10.5 em pão", 10.5],
+    ["recebi 2500 de salário", 2500],
+    ["gastei 1.200 no mercado", 1200],
+    ["paguei R$ 2.500,00 de aluguel", 2500],
+    ["uber 32", 32],
+    ["r$8,50 café", 8.5],
+    ["comprei tênis por 349,9", 349.9],
+    ["recebi 15000", 15000],
+    ["gastei 10.5 em pão", 10.5],
   ];
   for (const [text, value] of cases) expect(parseFinanceEntry(text)?.amount, text).toBe(value);
 });

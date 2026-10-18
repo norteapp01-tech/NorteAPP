@@ -1,3 +1,4 @@
+import { decimalBR } from "@/lib/format-utils";
 import { useEffect, useState } from "react";
 import { useTheme, setTheme } from "@/lib/theme";
 import { ProfileEditor } from "@/components/settings/ProfileEditor";
@@ -416,9 +417,9 @@ function PreferencesSection() {
             <button
               key={ml}
               onClick={() => updateProfile({ waterGoalMl: ml })}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${profile.waterGoalMl === ml ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
+              className={`min-h-10 rounded-full px-4 text-xs font-semibold ${profile.waterGoalMl === ml ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
             >
-              {(ml / 1000).toFixed(1)} L
+              {decimalBR(ml / 1000, 1)} L
             </button>
           ))}
         </div>
@@ -431,7 +432,7 @@ function PreferencesSection() {
             <button
               key={o.value}
               onClick={() => updateProfile({ timeFormat: o.value })}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${profile.timeFormat === o.value ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
+              className={`min-h-10 rounded-full px-4 text-xs font-semibold ${profile.timeFormat === o.value ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
             >
               {o.label}
             </button>
@@ -446,7 +447,7 @@ function PreferencesSection() {
             <button
               key={o.value}
               onClick={() => updateProfile({ weekStart: o.value })}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${profile.weekStart === o.value ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
+              className={`min-h-10 rounded-full px-4 text-xs font-semibold ${profile.weekStart === o.value ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
             >
               {o.label}
             </button>
@@ -528,7 +529,10 @@ function PushToggle() {
       <button
         disabled={busy || permission === "denied" || subscribed === null}
         onClick={toggle}
-        className={`h-6 w-10 shrink-0 rounded-full transition-colors disabled:opacity-40 ${subscribed ? "bg-primary" : "bg-surface-2"}`}
+        role="switch"
+        aria-checked={Boolean(subscribed)}
+        aria-label="Notificações push"
+        className={`norte-hit h-6 w-10 shrink-0 rounded-full transition-colors disabled:opacity-40 ${subscribed ? "bg-primary" : "bg-surface-2"}`}
       >
         <span
           className={`block h-5 w-5 rounded-full bg-background transition-transform ${subscribed ? "translate-x-[18px]" : "translate-x-0.5"}`}
@@ -554,7 +558,10 @@ function NotificationsSection() {
             <span className="text-sm">{r.label}</span>
             <button
               onClick={() => updateProfile({ [r.key]: !profile[r.key] })}
-              className={`h-6 w-10 shrink-0 rounded-full transition-colors ${profile[r.key] ? "bg-primary" : "bg-surface-2"}`}
+              role="switch"
+              aria-checked={Boolean(profile[r.key])}
+              aria-label={r.label}
+              className={`norte-hit h-6 w-10 shrink-0 rounded-full transition-colors ${profile[r.key] ? "bg-primary" : "bg-surface-2"}`}
             >
               <span
                 className={`block h-5 w-5 rounded-full bg-background transition-transform ${profile[r.key] ? "translate-x-[18px]" : "translate-x-0.5"}`}

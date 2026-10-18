@@ -59,14 +59,18 @@ function CreateScreen() {
       <div className="flex items-center justify-between">
         <button
           onClick={() => (mode === "escolha" ? nav({ to: "/" }) : setMode("escolha"))}
-          className="-ml-2 flex h-9 w-9 items-center justify-center rounded-full hover:bg-surface"
+          aria-label="Voltar"
+          className="-ml-2 flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {mode === "escolha" ? "Novo" : mode === "agenda" ? "Compromisso" : "Plano"}
         </p>
-        <button onClick={() => nav({ to: "/" })} className="text-xs text-muted-foreground">
+        <button
+          onClick={() => nav({ to: "/" })}
+          className="norte-hit text-xs text-muted-foreground"
+        >
           Cancelar
         </button>
       </div>
@@ -450,7 +454,8 @@ function PlanejamentoFlow({
                   onClick={() =>
                     setForm({ ...form, stepsList: form.stepsList.filter((x) => x.id !== s.id) })
                   }
-                  className="shrink-0 text-muted-foreground hover:text-danger"
+                  aria-label={`Remover etapa ${s.title}`}
+                  className="norte-hit shrink-0 text-muted-foreground hover:text-danger"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>

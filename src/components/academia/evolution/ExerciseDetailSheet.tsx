@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { plural } from "@/lib/format-utils";
 import { Modal } from "@/components/ui/modal";
 import { formatDateShortBR } from "@/lib/goals-store";
 import {
@@ -119,8 +120,12 @@ export function ExerciseDetailSheet({
       <div className="evo-detail-stats">
         <div>
           <span>Frequência</span>
-          <strong>{sessionCount} sessões</strong>
-          <small>{dates.length} dias</small>
+          <strong>
+            {sessionCount} {plural(sessionCount, "sessão", "sessões")}
+          </strong>
+          <small>
+            {dates.length} {plural(dates.length, "dia", "dias")}
+          </small>
         </div>
         <div>
           <span>
@@ -231,7 +236,7 @@ export function ExerciseDetailSheet({
       )}
       <details className="evo-detail-history mt-5">
         <summary className="cursor-pointer py-3 text-sm font-semibold">
-          Histórico · {sessionCount} sessões
+          Histórico · {sessionCount} {plural(sessionCount, "sessão", "sessões")}
         </summary>
         {[...new Set(mine.map((s) => s.sessionId))].reverse().map((id) => {
           const rows = mine

@@ -1,3 +1,4 @@
+import { decimalBR } from "@/lib/format-utils";
 import { useState, type CSSProperties } from "react";
 import { Droplet } from "lucide-react";
 import { useTodayHydration, todayIntake } from "@/lib/hydration-store";
@@ -19,8 +20,8 @@ export function HydrationCard({
   const current = todayIntake(logs);
   const goal = profile.waterGoalMl;
   const pct = goal > 0 ? Math.min(100, Math.round((current / goal) * 100)) : 0;
-  const currentL = (current / 1000).toFixed(current % 1000 === 0 ? 0 : 1);
-  const goalL = (goal / 1000).toFixed(goal % 1000 === 0 ? 0 : 1);
+  const currentL = decimalBR(current / 1000, current % 1000 === 0 ? 0 : 1);
+  const goalL = decimalBR(goal / 1000, goal % 1000 === 0 ? 0 : 1);
 
   if (inline) {
     return (
