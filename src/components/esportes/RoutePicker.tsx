@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { ChevronDown, Check, Plus, X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { type SportModality } from "@/lib/sport-store";
 import { formatChangeDistanceM, type RoutePoint } from "@/lib/sport-route-geometry";
 import { useSportRoutes, type SportRoute } from "@/lib/sport-routes-data";
-import { RouteDrawer } from "./RouteDrawer";
 import type { RouteGuidanceMode } from "@/hooks/use-activity-recorder";
+
+const RouteDrawer = lazy(() =>
+  import("./RouteDrawer").then((module) => ({ default: module.RouteDrawer })),
+);
 
 export type RouteSelection = { id: string; points: RoutePoint[]; guidanceMode: RouteGuidanceMode };
 
@@ -68,14 +71,22 @@ export function RoutePicker({
   if (drawerOpen) {
     return (
       <div className="fixed inset-0 z-50 bg-background">
-        <RouteDrawer
-          modality={modality}
-          onCancel={() => setDrawerOpen(false)}
-          onSaved={(route) => {
-            setDrawerOpen(false);
-            chooseRoute(route);
-          }}
-        />
+        <Suspense
+          fallback={
+            <div className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">
+              Carregando mapa…
+            </div>
+          }
+        >
+          <RouteDrawer
+            modality={modality}
+            onCancel={() => setDrawerOpen(false)}
+            onSaved={(route) => {
+              setDrawerOpen(false);
+              chooseRoute(route);
+            }}
+          />
+        </Suspense>
       </div>
     );
   }

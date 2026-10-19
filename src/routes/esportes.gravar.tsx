@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { X, Volume2, VolumeX, Camera, Share2 } from "lucide-react";
-import { MapboxRouteMap } from "@/components/esportes/MapboxRouteMap";
 import { RoutePicker, type RouteSelection } from "@/components/esportes/RoutePicker";
 import { RoutePreview } from "@/components/esportes/RoutePreview";
 import { SaveRouteCard } from "@/components/esportes/SaveRouteCard";
@@ -33,6 +32,12 @@ import {
 } from "@/lib/sport-store";
 import { formatChangeDistanceM } from "@/lib/sport-route-geometry";
 import { useSportRoutes } from "@/lib/sport-routes-data";
+
+const MapboxRouteMap = lazy(() =>
+  import("@/components/esportes/MapboxRouteMap").then((module) => ({
+    default: module.MapboxRouteMap,
+  })),
+);
 
 const OFF_ROUTE_THRESHOLD_M = 40;
 const CHANGE_ALERT_RADIUS_M = 60;
@@ -78,6 +83,7 @@ function GravarPage() {
   const navigate = useNavigate();
   const recorder = useSportRecorder();
   const [discardConfirm, setDiscardConfirm] = useState(false);
+  const [requestingGps, setRequestingGps] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [finishedData, setFinishedData] = useState<ReturnType<typeof recorder.finish>>(null);
   const [routeSelection, setRouteSelection] = useState<RouteSelection | null>(null);
@@ -175,7 +181,7 @@ function GravarPage() {
               ? recorder.gpsError
               : recorder.gpsReady
                 ? "GPS pronto"
-                : "Verificando GPS…"}
+                : "O GPS será ativado ao iniciar."}
           </p>
         </div>
         <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-xs text-warning">
@@ -190,14 +196,18 @@ function GravarPage() {
           />
         </div>
         <button
-          disabled={!recorder.gpsReady}
-          onClick={() => {
+          disabled={requestingGps}
+          onClick={async () => {
+            setRequestingGps(true);
+            const ready = recorder.gpsReady || (await recorder.requestGps());
+            setRequestingGps(false);
+            if (!ready) return;
             alertedChangeIndexRef.current = null;
             recorder.start(activeModality, execucao, routeSelection ?? undefined);
           }}
           className="w-full max-w-xs rounded-2xl bg-primary py-4 text-base font-bold text-primary-foreground disabled:opacity-40"
         >
-          {modalityActionLabel[activeModality]}
+          {requestingGps ? "Ativando GPS…" : modalityActionLabel[activeModality]}
         </button>
       </div>
     );
@@ -220,7 +230,15 @@ function GravarPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <div className="relative flex-1">
-        <MapboxRouteMap points={recorder.points} routePoints={recorder.route?.points} />
+        <Suspense
+          fallback={
+            <div className="flex h-full min-h-[50vh] items-center justify-center text-sm text-muted-foreground">
+              Carregando mapa…
+            </div>
+          }
+        >
+          <MapboxRouteMap points={recorder.points} routePoints={recorder.route?.points} />
+        </Suspense>
         <div className="absolute left-4 top-12 flex gap-2">
           <button
             onClick={() => setDiscardConfirm(true)}

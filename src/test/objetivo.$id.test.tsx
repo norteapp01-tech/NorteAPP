@@ -37,7 +37,8 @@ vi.mock("@tanstack/react-router", async () => {
 
 // Import depois dos mocks — objetivo.$id.tsx roda `createFileRoute(...)(...)` no
 // nível de módulo, então precisa ver a versão mockada.
-const { GoalDetail } = await import("../routes/objetivo.$id");
+const { Route } = await import("../routes/objetivo.$id");
+const GoalDetail = (Route as unknown as { component: React.ComponentType }).component;
 const { QUERY_KEY } = await import("@/lib/goals-store");
 
 function fixtureGoal(overrides: Partial<Goal> = {}): Goal {

@@ -60,7 +60,7 @@ export const Route = createFileRoute("/objetivo/$id")({
   ),
 });
 
-export function GoalDetail() {
+function GoalDetail() {
   const { id } = Route.useParams();
   const search = Route.useSearch();
   const nav = useNavigate();

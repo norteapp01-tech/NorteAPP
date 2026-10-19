@@ -313,12 +313,11 @@ export function NorteChat({
       }
     } catch {
       if (mounted.current) {
-        setError("A conexão foi interrompida. Confira os registros antes de repetir uma ação.");
         setTurns((old) => [
           ...old,
           {
             role: "assistant",
-            text: "Não consegui terminar a resposta. Confira os registros antes de repetir uma ação.",
+            text: "A conexão caiu antes de eu terminar. Confira os registros antes de tentar de novo.",
           },
         ]);
       }

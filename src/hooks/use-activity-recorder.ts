@@ -65,17 +65,38 @@ export function useActivityRecorder() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!("geolocation" in navigator)) {
-      setGpsError("Este navegador não tem suporte a GPS.");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      () => setGpsReady(true),
-      (err) => setGpsError(err.message),
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
-  }, []);
+  // O gravador vive na raiz do app para continuar ativo durante a navegação.
+  // Por isso, nunca devemos consultar a localização ao montar o provider: isso
+  // faria qualquer tela (Home, Espelho, Agenda…) pedir GPS sem contexto. A
+  // permissão só é solicitada depois de uma ação explícita na tela de esporte.
+  const requestGps = useCallback(
+    () =>
+      new Promise<boolean>((resolve) => {
+        if (!("geolocation" in navigator)) {
+          setGpsError("Este aparelho não oferece acesso à localização.");
+          resolve(false);
+          return;
+        }
+        setGpsError(null);
+        navigator.geolocation.getCurrentPosition(
+          () => {
+            setGpsReady(true);
+            resolve(true);
+          },
+          (err) => {
+            setGpsReady(false);
+            setGpsError(
+              err.code === err.PERMISSION_DENIED
+                ? "Permita o acesso à localização para gravar o percurso."
+                : "Não foi possível obter sua localização. Tente novamente ao ar livre.",
+            );
+            resolve(false);
+          },
+          { enableHighAccuracy: true, timeout: 10000 },
+        );
+      }),
+    [],
+  );
 
   const requestWakeLock = useCallback(async () => {
     try {
@@ -294,6 +315,7 @@ export function useActivityRecorder() {
     recoverable,
     route,
     routeGuidanceState,
+    requestGps,
     start,
     pause,
     resume,

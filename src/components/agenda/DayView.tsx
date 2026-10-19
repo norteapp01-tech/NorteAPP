@@ -77,7 +77,8 @@ export function DayView(props: ViewProps) {
       <p className="mt-2 text-center text-[11px] text-muted-foreground">
         {items.filter((o) => o.status !== "cancelada").length} compromisso
         {items.filter((o) => o.status !== "cancelada").length === 1 ? "" : "s"} ·{" "}
-        {formatDuration(load.busy)} ocupadas · {formatDuration(load.free)} livres
+        {formatDuration(load.busy)} {load.busy === 1 ? "ocupado" : "ocupados"} ·{" "}
+        {formatDuration(load.free)} {load.free === 1 ? "livre" : "livres"}
         {dayConflicts > 0 && (
           <span className="ml-2 inline-flex items-center gap-1 text-warning">
             <AlertTriangle className="h-3 w-3" /> {dayConflicts} em conflito
