@@ -4,7 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import { CategoryIcon } from "@/components/plan/CategoryIcon";
 import { PlanHeader } from "@/components/plan/PlanHeader";
 import { PlanTabs, type PlanTab } from "@/components/plan/PlanTabs";
-import { NextActionCard } from "@/components/plan/NextActionCard";
+import { PlanNowTab } from "@/components/plan/PlanNowTab";
 import { PlanPath } from "@/components/plan/PlanPath";
 import { ActionRow } from "@/components/plan/ActionRow";
 import { CreateStageSheet } from "@/components/plan/CreateStageSheet";
@@ -70,7 +70,7 @@ function GoalDetail() {
   const cycles = useCycleStore((s) => s.cycles);
   const loading = useGoalsLoading();
 
-  const [tab, setTab] = useState<PlanTab>("planejamento");
+  const [tab, setTab] = useState<PlanTab>("agora");
   const [openStepId, setOpenStepId] = useState<string | null>(null);
   const [flashId, setFlashId] = useState<string | null>(null);
   const [showCreateStage, setShowCreateStage] = useState(false);
@@ -97,7 +97,7 @@ function GoalDetail() {
     const stepId = search.openStep;
     autoOpenedRef.current = true;
     setOpenStepId(stepId);
-    setTab("planejamento");
+    setTab("caminho");
     setFlashId(stepId);
     if (search.create) setCreateActionStepId(stepId);
     requestAnimationFrame(() => {
@@ -132,7 +132,7 @@ function GoalDetail() {
   const nextActionId = planNext.kind === "action" ? planNext.execution.id : null;
 
   const goToStep = (stepId: string) => {
-    setTab("planejamento");
+    setTab("caminho");
     setOpenStepId(stepId);
     setFlashId(stepId);
     requestAnimationFrame(() => {
@@ -150,7 +150,7 @@ function GoalDetail() {
 
   const handleDefineNext = () => {
     if (steps.length === 0) {
-      setTab("planejamento");
+      setTab("caminho");
       setShowCreateStage(true);
       return;
     }
@@ -182,17 +182,20 @@ function GoalDetail() {
         <PlanTabs tab={tab} onChange={setTab} />
       </div>
 
-      {tab === "planejamento" && (
+      {tab === "agora" && (
+        <PlanNowTab
+          goal={goal}
+          steps={steps}
+          executions={executions}
+          onCreateAction={handleCreateAction}
+          onCreateStage={() => setShowCreateStage(true)}
+          onOpenStep={goToStep}
+        />
+      )}
+
+      {tab === "caminho" && (
         <div className="plan-planning-tab mt-5 space-y-6">
           {stalled && <StalledPlanAlert onDefineNext={handleDefineNext} />}
-
-          <NextActionCard
-            goal={goal}
-            steps={steps}
-            executions={executions}
-            onCreateAction={handleCreateAction}
-            onCreateStage={() => setShowCreateStage(true)}
-          />
 
           <PlanPath
             goal={goal}

@@ -100,6 +100,10 @@ import {
   assignLanes,
   hasPlannedRange,
   isPlannedOverdue,
+  dependencyReplanSuggestions,
+  isExecutionBlocked,
+  procrastinationSignal,
+  stepFlowStatus,
 } from "./goals-store";
 import type { Execution, Goal, Step } from "./goals-store";
 import { setTestClockOverride } from "./test-clock";
@@ -932,5 +936,73 @@ describe("assignLanes — empacotamento por sobreposição", () => {
     const { laneOf, laneCount } = assignLanes(items);
     expect(laneCount).toBe(2);
     expect(laneOf.c).toBe(laneOf.a);
+  });
+});
+
+describe("fluxo do plano — dependências, bloqueios e foco", () => {
+  it("libera automaticamente uma ação quando sua dependência é concluída", () => {
+    const dependency = makeExecution({ id: "a", status: "planejada" });
+    const dependent = makeExecution({ id: "b", dependsOnExecutionId: "a" });
+    expect(isExecutionBlocked(dependent, [dependency, dependent])).toBe(true);
+    expect(
+      isExecutionBlocked({ ...dependent }, [{ ...dependency, status: "concluida" }, dependent]),
+    ).toBe(false);
+  });
+
+  it("só sinaliza procrastinação com reagendamento repetido e inatividade real", () => {
+    const execution = makeExecution({
+      rescheduleCount: 2,
+      lastProgressAt: "2026-09-01T12:00:00.000Z",
+    });
+    expect(procrastinationSignal(execution, [execution], "2026-09-05")).toEqual({
+      daysWithoutProgress: 4,
+      rescheduleCount: 2,
+      sinceISO: "2026-09-01",
+    });
+    expect(
+      procrastinationSignal({ ...execution, rescheduleCount: 1 }, [execution], "2026-09-05"),
+    ).toBeNull();
+  });
+
+  it("classifica uma etapa atrasada antes de classificá-la como bloqueada", () => {
+    const step: Step = {
+      id: "s1",
+      goalId: "g1",
+      title: "Entrega",
+      done: false,
+      targetDate: "2026-09-01",
+      isCurrent: true,
+      order: 0,
+    };
+    const execution = makeExecution({
+      stepId: step.id,
+      planWorkStatus: "blocked",
+      plannedEndDate: "2026-09-02",
+    });
+    expect(stepFlowStatus(step, [execution], "2026-09-05")).toBe("delayed");
+  });
+
+  it("reorganiza uma cadeia preservando duração e respeitando a ordem", () => {
+    const first = makeExecution({
+      id: "a",
+      plannedStartDate: "2026-09-01",
+      plannedEndDate: "2026-09-05",
+    });
+    const second = makeExecution({
+      id: "b",
+      dependsOnExecutionId: "a",
+      plannedStartDate: "2026-09-03",
+      plannedEndDate: "2026-09-04",
+    });
+    const third = makeExecution({
+      id: "c",
+      dependsOnExecutionId: "b",
+      plannedStartDate: "2026-09-04",
+      plannedEndDate: "2026-09-06",
+    });
+    expect(dependencyReplanSuggestions([first, second, third])).toEqual([
+      { id: "b", plannedStartDate: "2026-09-06", plannedEndDate: "2026-09-07" },
+      { id: "c", plannedStartDate: "2026-09-08", plannedEndDate: "2026-09-10" },
+    ]);
   });
 });

@@ -1,9 +1,10 @@
 import { UnderlineTabs } from "@/components/ui/app-design-system";
 
-export type PlanTab = "planejamento" | "cronograma" | "evolucao";
+export type PlanTab = "agora" | "caminho" | "cronograma" | "evolucao";
 
 const tabLabel: Record<PlanTab, string> = {
-  planejamento: "Planejamento",
+  agora: "Agora",
+  caminho: "Caminho",
   cronograma: "Cronograma",
   evolucao: "Evolução",
 };

@@ -113,10 +113,16 @@ function renderGoalDetail() {
   );
 }
 
-describe("GoalDetail — abas: só Planejamento e Evolução", () => {
-  it("a barra de abas tem exatamente Planejamento e Evolução, sem Execuções separada", () => {
+function openPath() {
+  fireEvent.click(screen.getByRole("tab", { name: "Caminho" }));
+}
+
+describe("GoalDetail — arquitetura do plano", () => {
+  it("a barra de abas separa decisão, estrutura, tempo e leitura do progresso", () => {
     renderGoalDetail();
-    expect(screen.getByRole("tab", { name: "Planejamento" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Agora" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Caminho" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Cronograma" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Evolução" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /^Execuções/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Visão" })).not.toBeInTheDocument();
@@ -134,6 +140,7 @@ describe("GoalDetail — abas: só Planejamento e Evolução", () => {
 
   it("as etapas aparecem dentro de Planejamento, com 'Nova etapa' abrindo um modal (sem input permanente na tela)", () => {
     renderGoalDetail();
+    openPath();
     expect(screen.getAllByText("Terminar front-end").length).toBeGreaterThan(0);
     expect(screen.queryByPlaceholderText("Ex: Terminar capítulo 3")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /nova etapa/i }));
@@ -142,6 +149,7 @@ describe("GoalDetail — abas: só Planejamento e Evolução", () => {
 
   it("a execução aparece aninhada dentro do card da etapa, não numa lista separada", () => {
     renderGoalDetail();
+    openPath();
     // Também pode aparecer resumida no módulo "Próxima ação" — o que importa é
     // que não existe uma seção "Execuções" à parte listando-a como item independente.
     expect(screen.getAllByText("Decidir layout").length).toBeGreaterThan(0);
@@ -153,8 +161,9 @@ describe("GoalDetail — plano sem etapas (cenário 1 da checklist)", () => {
   it("mostra o alerta de plano parado e o fallback vazio, sem quebrar", () => {
     seed({ steps: [], executions: [] });
     renderGoalDetail();
+    openPath();
     expect(screen.getByText(/sem uma próxima ação/i)).toBeInTheDocument();
-    expect(screen.getByText(/defina o primeiro passo deste plano/i)).toBeInTheDocument();
+    expect(screen.getByText(/comece dividindo seu objetivo/i)).toBeInTheDocument();
   });
 });
 
@@ -180,6 +189,7 @@ describe("GoalDetail — etapa atual", () => {
   it("primeira etapa não concluída aparece destacada como 'Etapa atual' (derivado da ordem, não de isCurrent)", () => {
     seed({ steps: [fixtureStep({ isCurrent: false })] });
     renderGoalDetail();
+    openPath();
     expect(screen.getByText(/etapa atual/i)).toBeInTheDocument();
   });
 });
@@ -193,6 +203,7 @@ describe("GoalDetail — execução sem etapa (órfã)", () => {
       ],
     });
     renderGoalDetail();
+    openPath();
     expect(screen.getByText("Ações sem etapa")).toBeInTheDocument();
     expect(screen.getByText("Sem etapa nenhuma")).toBeInTheDocument();
   });
@@ -202,6 +213,7 @@ describe("GoalDetail — etapa sem ações (estado vazio, item 18)", () => {
   it("mostra 'Criar primeira ação' só quando a etapa não tem nenhuma ação", () => {
     seed({ steps: [fixtureStep()], executions: [] });
     renderGoalDetail();
+    openPath();
     expect(
       screen.getByText(/o que precisa acontecer para concluir esta etapa/i),
     ).toBeInTheDocument();
@@ -211,12 +223,14 @@ describe("GoalDetail — etapa sem ações (estado vazio, item 18)", () => {
   it("some assim que a etapa já tem uma ação própria", () => {
     seed({ steps: [fixtureStep()], executions: [fixtureExecution()] });
     renderGoalDetail();
+    openPath();
     expect(screen.queryByRole("button", { name: /criar primeira ação/i })).not.toBeInTheDocument();
   });
 
   it("não aparece pra etapa já concluída (nasce recolhida)", () => {
     seed({ steps: [fixtureStep({ done: true })], executions: [] });
     renderGoalDetail();
+    openPath();
     expect(screen.queryByRole("button", { name: /criar primeira ação/i })).not.toBeInTheDocument();
   });
 });
@@ -225,12 +239,14 @@ describe("GoalDetail — alerta de plano parado desaparece com qualquer etapa ab
   it("etapa recém-criada (aberta, não marcada como atual, sem execução) já basta pra tirar o alerta", () => {
     seed({ steps: [fixtureStep({ isCurrent: false, done: false })], executions: [] });
     renderGoalDetail();
+    openPath();
     expect(screen.queryByText(/sem uma próxima ação/i)).not.toBeInTheDocument();
   });
 
   it("plano sem nenhuma etapa continua mostrando o alerta", () => {
     seed({ steps: [], executions: [] });
     renderGoalDetail();
+    openPath();
     expect(screen.getByText(/sem uma próxima ação/i)).toBeInTheDocument();
   });
 });

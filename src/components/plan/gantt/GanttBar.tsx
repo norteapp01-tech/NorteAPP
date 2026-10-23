@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, GripVertical, MoreHorizontal } from "lucide-react";
+import { Check, GripVertical, LockKeyhole, MoreHorizontal } from "lucide-react";
 import {
   addDays,
   daysBetweenISO,
@@ -37,6 +37,7 @@ export function GanttBar({
   rowHeight,
   lane,
   isTodayActive,
+  blocked,
   onOpenDetails,
   onError,
   goalId,
@@ -48,6 +49,7 @@ export function GanttBar({
   rowHeight: number;
   lane: number;
   isTodayActive: boolean;
+  blocked: boolean;
   onOpenDetails: () => void;
   onError: (message: string) => void;
   goalId: string;
@@ -196,9 +198,11 @@ export function GanttBar({
 
   const tone = done
     ? "border-border/80 bg-surface-2/60 text-muted-foreground"
-    : isTodayActive
-      ? "border-primary bg-background/80 text-primary"
-      : "border-border bg-surface-2/95 text-foreground";
+    : blocked
+      ? "border-danger/35 bg-surface-2/95 text-foreground"
+      : isTodayActive
+        ? "border-primary bg-background/80 text-primary"
+        : "border-border bg-surface-2/95 text-foreground";
 
   // Calculado uma vez por montagem, não a cada pointermove do arrasto (o
   // valor não muda durante uma sessão — recomputar a cada render é custo à toa).
@@ -219,6 +223,7 @@ export function GanttBar({
           <GripVertical className="h-4 w-3 shrink-0 text-primary/80" aria-hidden />
         )}
         {done && <Check className="h-3.5 w-3.5 shrink-0 text-primary" strokeWidth={2.5} />}
+        {blocked && !done && <LockKeyhole className="h-3.5 w-3.5 shrink-0 text-danger" />}
         <span className={`truncate text-xs font-medium ${done ? "line-through" : ""}`}>
           {execution.title}
         </span>

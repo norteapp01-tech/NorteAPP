@@ -90,7 +90,10 @@ export function PlanPath({
                 : "future";
             const nodeGreen = state !== "future";
             const stepExecs = executions
-              .filter((e) => e.stepId === step.id)
+              .filter(
+                (e) =>
+                  e.stepId === step.id && e.status !== "cancelada" && e.status !== "reagendada",
+              )
               .sort((a, b) => {
                 const byStart = (a.plannedStartDate ?? a.dueDate).localeCompare(
                   b.plannedStartDate ?? b.dueDate,
@@ -122,6 +125,7 @@ export function PlanPath({
                       step={step}
                       goal={goal}
                       executions={stepExecs}
+                      allGoalExecutions={executions}
                       index={i}
                       state={state}
                       isOpen={openStepId === step.id}

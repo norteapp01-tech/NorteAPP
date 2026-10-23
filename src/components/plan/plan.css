@@ -140,6 +140,13 @@
 
 .plan-evolution-card {
   padding: 20px;
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.025), transparent 52%),
+    color-mix(in srgb, var(--surface) 97%, transparent);
+}
+
+.plan-evolution-card::after {
+  background: color-mix(in srgb, var(--border) 78%, transparent);
 }
 
 .plan-evolution-card.is-summary {
