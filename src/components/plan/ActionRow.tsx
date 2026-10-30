@@ -184,7 +184,7 @@ export function ActionRow({
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Até {formatDateShortBR(e.dueDate)} ·{" "}
                   {scheduled
-                    ? `${formatDateShortBR(e.agendaDate!)} ${formatTime(e.startTime, profile.timeFormat)}`
+                    ? `${formatDateShortBR(e.agendaDate!)}${e.startTime ? ` ${formatTime(e.startTime, profile.timeFormat)}` : ""}`
                     : "Sem agenda"}
                 </p>
               )}

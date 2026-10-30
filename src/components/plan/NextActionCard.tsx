@@ -121,7 +121,8 @@ export function NextActionCard({
           <p className="mt-1 text-[13px] text-muted-foreground">
             Até {formatDateShortBR(execution.dueDate)} ·{" "}
             {scheduled
-              ? `${formatDateShortBR(execution.agendaDate!)} ${execution.startTime}`
+              ? // Compromisso de dia inteiro não tem hora: mostra só a data.
+                `${formatDateShortBR(execution.agendaDate!)}${execution.startTime ? ` ${execution.startTime}` : ""}`
               : "Sem agenda"}
           </p>
         </div>
