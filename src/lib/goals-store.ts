@@ -26,6 +26,10 @@ export type TaskWeight = "leve" | "medio" | "pesado";
  * precisam do tipo, e os dois são o único jeito de planejar uma atividade. */
 export type SportModality = "corrida" | "caminhada" | "ciclismo";
 export type ExecutionStatus = "planejada" | "concluida" | "perdida" | "reagendada" | "cancelada";
+/** Estado do trabalho dentro de um plano. É intencionalmente separado do
+ * status da Agenda: reagendar horário não significa voltar uma ação para o
+ * início do fluxo. */
+export type PlanWorkStatus = "next" | "in_progress" | "blocked";
 /** Como o progresso deste planejamento é medido. */
 export type TrackingType = "etapas" | "frequencia" | "numero";
 /** Especialização do planejamento, persistida na própria linha — abrir por
@@ -119,6 +123,14 @@ export type Execution = {
   how?: string;
   why?: string;
   status: ExecutionStatus;
+  /** Ausente só em objetos legados/cache anterior à migração; equivale a `next`. */
+  planWorkStatus?: PlanWorkStatus;
+  blockedReason?: string;
+  dependsOnExecutionId?: string;
+  workStartedAt?: string;
+  lastProgressAt?: string;
+  /** Ausente em dados legados; equivale a zero. */
+  rescheduleCount?: number;
   goalId?: string;
   stepId?: string;
   rescheduledFromId?: string;
@@ -798,6 +810,81 @@ export function stepsForGoalId(steps: Step[], goalId: string): Step[] {
   return stepsForGoal(steps, goalId);
 }
 
+export function dependencyFor(
+  execution: Execution,
+  executions: Execution[],
+): Execution | undefined {
+  if (!execution.dependsOnExecutionId) return undefined;
+  return executions.find((candidate) => candidate.id === execution.dependsOnExecutionId);
+}
+
+/** Bloqueio manual ou dependência ainda não concluída. Uma dependência já
+ * concluída deixa de bloquear automaticamente, sem precisar editar a ação. */
+export function isExecutionBlocked(execution: Execution, executions: Execution[]): boolean {
+  if (execution.planWorkStatus === "blocked") return true;
+  const dependency = dependencyFor(execution, executions);
+  return !!dependency && dependency.status !== "concluida";
+}
+
+export type ProcrastinationSignal = {
+  daysWithoutProgress: number;
+  rescheduleCount: number;
+  sinceISO: string;
+};
+
+/** Não transforma atraso em julgamento. Só sinaliza procrastinação quando há
+ * duas evidências observáveis: reagendamentos repetidos e pelo menos três dias
+ * sem um avanço explícito. Ação bloqueada nunca entra neste cálculo. */
+export function procrastinationSignal(
+  execution: Execution,
+  executions: Execution[],
+  today = todayISO(),
+): ProcrastinationSignal | null {
+  if (
+    execution.status === "concluida" ||
+    execution.status === "cancelada" ||
+    execution.status === "reagendada" ||
+    isExecutionBlocked(execution, executions) ||
+    (execution.rescheduleCount ?? 0) < 2
+  )
+    return null;
+  const sinceISO = (
+    execution.lastProgressAt ??
+    execution.workStartedAt ??
+    execution.createdAt
+  ).slice(0, 10);
+  const daysWithoutProgress = Math.max(0, daysBetweenISO(sinceISO, today));
+  if (daysWithoutProgress < 3) return null;
+  return { daysWithoutProgress, rescheduleCount: execution.rescheduleCount ?? 0, sinceISO };
+}
+
+export type StepFlowStatus = "completed" | "in_progress" | "delayed" | "blocked" | "next";
+
+/** Estado mutuamente exclusivo usado nos filtros da Evolução. Atraso tem
+ * prioridade sobre bloqueio porque é a informação temporal mais urgente. */
+export function stepFlowStatus(
+  step: Step,
+  executions: Execution[],
+  today = todayISO(),
+): StepFlowStatus {
+  if (step.done) return "completed";
+  const active = executions.filter(
+    (execution) =>
+      execution.stepId === step.id &&
+      execution.status !== "concluida" &&
+      execution.status !== "cancelada" &&
+      execution.status !== "reagendada",
+  );
+  if (
+    (!!step.targetDate && step.targetDate < today) ||
+    active.some((execution) => isPlannedOverdue(execution, today))
+  )
+    return "delayed";
+  if (active.some((execution) => isExecutionBlocked(execution, executions))) return "blocked";
+  if (active.some((execution) => execution.planWorkStatus === "in_progress")) return "in_progress";
+  return "next";
+}
+
 /** Próxima ação real de um plano — única fonte usada por "Em foco", "Outros
  * planos" (planejamento.tsx) e pelo módulo "Próxima ação" (objetivo.$id.tsx),
  * pra nunca haver dois caminhos calculando isso de formas diferentes. */
@@ -812,8 +899,18 @@ export function nextActionForGoal(goal: Goal, steps: Step[], executions: Executi
   if (!openStep) return { kind: "none" };
   const stepExecs = executionsForGoal(executions, goal.id).filter((e) => e.stepId === openStep.id);
   const pending = stepExecs
-    .filter((e) => e.status !== "concluida" && e.status !== "cancelada")
-    .sort((a, b) => relevantDate(a).localeCompare(relevantDate(b)))[0];
+    .filter(
+      (e) => e.status !== "concluida" && e.status !== "cancelada" && e.status !== "reagendada",
+    )
+    .sort((a, b) => {
+      const aBlocked = isExecutionBlocked(a, executions) ? 1 : 0;
+      const bBlocked = isExecutionBlocked(b, executions) ? 1 : 0;
+      if (aBlocked !== bBlocked) return aBlocked - bBlocked;
+      const aStarted = a.planWorkStatus === "in_progress" ? 0 : 1;
+      const bStarted = b.planWorkStatus === "in_progress" ? 0 : 1;
+      if (aStarted !== bStarted) return aStarted - bStarted;
+      return relevantDate(a).localeCompare(relevantDate(b));
+    })[0];
   if (pending) return { kind: "execution", step: openStep, execution: pending };
   if (stepExecs.length === 0) return { kind: "define", step: openStep };
   return { kind: "step", step: openStep };
@@ -876,10 +973,13 @@ export function nextPlanAction(goal: Goal, steps: Step[], executions: Execution[
   );
   if (candidates.length === 0) return { kind: "define", step: openSteps[0] };
 
-  const rank = (e: Execution): [number, string, number] => {
+  const rank = (e: Execution): [number, number, number, string, number] => {
     const belongsFirst = e.stepId === firstOpenId ? 0 : 1;
-    if (isScheduled(e)) return [0, `${e.agendaDate}${e.startTime ?? "00:00"}`, belongsFirst];
-    return [1, e.dueDate, belongsFirst];
+    const blocked = isExecutionBlocked(e, executions) ? 1 : 0;
+    const started = e.planWorkStatus === "in_progress" ? 0 : 1;
+    if (isScheduled(e))
+      return [blocked, started, 0, `${e.agendaDate}${e.startTime ?? "00:00"}`, belongsFirst];
+    return [blocked, started, 1, e.dueDate, belongsFirst];
   };
   const winner = [...candidates].sort((a, b) => {
     const ra = rank(a);
@@ -908,6 +1008,49 @@ export function isPlannedOverdue(e: Execution, todayIso: string): boolean {
   if (!e.plannedEndDate) return false;
   if (e.status === "concluida" || e.status === "cancelada") return false;
   return e.plannedEndDate < todayIso;
+}
+
+export type DependencyReplan = {
+  id: string;
+  plannedStartDate: string;
+  plannedEndDate: string;
+};
+
+/** Empurra somente ações que invadiram a ação da qual dependem, preservando a
+ * duração original. Roda em passes para propagar cadeias A -> B -> C. */
+export function dependencyReplanSuggestions(executions: Execution[]): DependencyReplan[] {
+  const ranges = new Map(
+    executions
+      .filter(hasPlannedRange)
+      .map((execution) => [
+        execution.id,
+        { start: execution.plannedStartDate!, end: execution.plannedEndDate! },
+      ]),
+  );
+  const changed = new Map<string, DependencyReplan>();
+  for (let pass = 0; pass < executions.length; pass += 1) {
+    let movedInPass = false;
+    for (const execution of executions) {
+      if (!execution.dependsOnExecutionId) continue;
+      if (
+        execution.status === "concluida" ||
+        execution.status === "cancelada" ||
+        execution.status === "reagendada"
+      )
+        continue;
+      const range = ranges.get(execution.id);
+      const dependencyRange = ranges.get(execution.dependsOnExecutionId);
+      if (!range || !dependencyRange || range.start > dependencyRange.end) continue;
+      const duration = daysBetweenISO(range.start, range.end);
+      const plannedStartDate = toISODate(addDays(new Date(dependencyRange.end + "T00:00:00"), 1));
+      const plannedEndDate = toISODate(addDays(new Date(plannedStartDate + "T00:00:00"), duration));
+      ranges.set(execution.id, { start: plannedStartDate, end: plannedEndDate });
+      changed.set(execution.id, { id: execution.id, plannedStartDate, plannedEndDate });
+      movedInPass = true;
+    }
+    if (!movedInPass) break;
+  }
+  return [...changed.values()];
 }
 
 export type GanttScale = "dia" | "semana" | "mes" | "45dias" | "90dias";
@@ -1100,6 +1243,12 @@ function mapExecution(r: Row, history: ExecutionHistoryEntry[]): Execution {
     how: (r.how as string) ?? undefined,
     why: (r.why as string) ?? undefined,
     status: r.status as ExecutionStatus,
+    planWorkStatus: (r.plan_work_status as PlanWorkStatus) ?? "next",
+    blockedReason: (r.blocked_reason as string) ?? undefined,
+    dependsOnExecutionId: (r.depends_on_execution_id as string) ?? undefined,
+    workStartedAt: (r.work_started_at as string) ?? undefined,
+    lastProgressAt: (r.last_progress_at as string) ?? undefined,
+    rescheduleCount: (r.reschedule_count as number) ?? 0,
     goalId: (r.goal_id as string) ?? undefined,
     stepId: (r.step_id as string) ?? undefined,
     rescheduledFromId: (r.rescheduled_from_id as string) ?? undefined,
@@ -1445,6 +1594,9 @@ export async function createExecution(input: {
   goalId?: string;
   stepId?: string;
   status?: ExecutionStatus;
+  planWorkStatus?: PlanWorkStatus;
+  blockedReason?: string;
+  dependsOnExecutionId?: string;
   labelId?: string;
   notes?: string;
   link?: string;
@@ -1486,6 +1638,9 @@ export async function createExecution(input: {
         how: input.how,
         why: input.why,
         status: input.status ?? "planejada",
+        plan_work_status: input.planWorkStatus ?? "next",
+        blocked_reason: input.blockedReason,
+        depends_on_execution_id: input.dependsOnExecutionId,
         goal_id: input.goalId,
         step_id: input.stepId,
       })
@@ -1737,6 +1892,48 @@ export async function setPlannedRange(
   await invalidate();
 }
 
+/** Aplica a proposta de reorganização das dependências e, se necessário,
+ * estende o prazo final para não esconder trabalho fora da janela. A interface
+ * confirma a extensão antes de chamar esta mutation. */
+export async function reorganizePlanDependencies(
+  goal: Goal,
+  executions: Execution[],
+): Promise<{ moved: number; deadlineISO?: string }> {
+  const suggestions = dependencyReplanSuggestions(executionsForGoal(executions, goal.id));
+  if (suggestions.length === 0) return { moved: 0, deadlineISO: goal.deadlineISO };
+  await Promise.all(
+    suggestions.map((suggestion) =>
+      supabase
+        .from("executions")
+        .update({
+          planned_start_date: suggestion.plannedStartDate,
+          planned_end_date: suggestion.plannedEndDate,
+          due_date: suggestion.plannedEndDate,
+        })
+        .eq("id", suggestion.id)
+        .then(unwrap),
+    ),
+  );
+  const latest = suggestions
+    .map((suggestion) => suggestion.plannedEndDate)
+    .sort()
+    .at(-1);
+  const deadlineISO =
+    latest && (!goal.deadlineISO || latest > goal.deadlineISO) ? latest : goal.deadlineISO;
+  if (deadlineISO && deadlineISO !== goal.deadlineISO) {
+    unwrap(
+      await supabase
+        .from("goals")
+        .update({ deadline_date: deadlineISO })
+        .eq("id", goal.id)
+        .select()
+        .single(),
+    );
+  }
+  await invalidate();
+  return { moved: suggestions.length, deadlineISO };
+}
+
 /** Estender o cronograma além do prazo é uma decisão explícita do usuário. */
 export async function updateGoalDeadline(goalId: string, deadlineISO: string): Promise<void> {
   unwrap(
@@ -1936,6 +2133,44 @@ export async function patchExecution(
   if (patch.sportTargetDurationS !== undefined)
     dbPatch.sport_target_duration_s = patch.sportTargetDurationS;
   unwrap(await supabase.from("executions").update(dbPatch).eq("id", id).select().single());
+  await invalidate();
+}
+
+/** Atualiza apenas o fluxo do plano; não mexe no status nem no horário da
+ * Agenda. Marcar "em andamento" também registra um avanço observável, usado
+ * pela detecção responsável de procrastinação. */
+export async function setExecutionWorkStatus(
+  id: string,
+  workStatus: PlanWorkStatus,
+  blockedReason?: string,
+): Promise<void> {
+  const row = await fetchExecutionRow(id);
+  const now = new Date().toISOString();
+  const patch: Row = {
+    plan_work_status: workStatus,
+    blocked_reason: workStatus === "blocked" ? blockedReason?.trim() || null : null,
+  };
+  if (workStatus === "in_progress") {
+    patch.work_started_at = row.work_started_at ?? now;
+    patch.last_progress_at = now;
+  }
+  unwrap(await supabase.from("executions").update(patch).eq("id", id).select().single());
+  await invalidate();
+}
+
+export async function setExecutionDependency(
+  id: string,
+  dependsOnExecutionId: string | null,
+): Promise<void> {
+  if (id === dependsOnExecutionId) throw new Error("Uma ação não pode depender dela mesma.");
+  unwrap(
+    await supabase
+      .from("executions")
+      .update({ depends_on_execution_id: dependsOnExecutionId })
+      .eq("id", id)
+      .select()
+      .single(),
+  );
   await invalidate();
 }
 
@@ -2214,6 +2449,8 @@ export async function rescheduleExecution(
         agenda_date: newAgendaDate,
         start_time: newStartTime,
         end_time: newEndTime,
+        planned_start_date: originalRow.planned_start_date,
+        planned_end_date: originalRow.planned_end_date,
         category: originalRow.category,
         location: originalRow.location,
         rigid: opts?.rigid ?? originalRow.rigid,
@@ -2221,6 +2458,12 @@ export async function rescheduleExecution(
         how: originalRow.how,
         why: originalRow.why,
         status: "planejada",
+        plan_work_status: originalRow.plan_work_status ?? "next",
+        blocked_reason: originalRow.blocked_reason,
+        depends_on_execution_id: originalRow.depends_on_execution_id,
+        work_started_at: originalRow.work_started_at,
+        last_progress_at: originalRow.last_progress_at,
+        reschedule_count: ((originalRow.reschedule_count as number | null) ?? 0) + 1,
         goal_id: originalRow.goal_id,
         step_id: originalRow.step_id,
         rescheduled_from_id: id,
@@ -2232,6 +2475,17 @@ export async function rescheduleExecution(
       })
       .select()
       .single(),
+  );
+  // A dependência representa o trabalho, não a linha histórica. Quando uma
+  // ação é reagendada e ganha uma nova linha, a cadeia deve acompanhar a ação
+  // nova; caso contrário, as próximas ficariam bloqueadas para sempre pela
+  // ocorrência antiga marcada como `reagendada`.
+  unwrap(
+    await supabase
+      .from("executions")
+      .update({ depends_on_execution_id: clone.id })
+      .eq("depends_on_execution_id", id)
+      .select(),
   );
   await pushHistory(id, originalRow.status as ExecutionStatus, "reagendada", note);
   await invalidate();

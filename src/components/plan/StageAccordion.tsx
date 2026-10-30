@@ -24,6 +24,7 @@ export function StageAccordion({
   step,
   goal,
   executions,
+  allGoalExecutions,
   index,
   state,
   isOpen,
@@ -36,6 +37,7 @@ export function StageAccordion({
   step: Step;
   goal: Goal;
   executions: Execution[];
+  allGoalExecutions: Execution[];
   index: number;
   state: StageState;
   isOpen: boolean;
@@ -54,7 +56,7 @@ export function StageAccordion({
 
   const doneCount = executions.filter((e) => e.status === "concluida").length;
   const pendingExecs = executions.filter(
-    (e) => e.status !== "concluida" && e.status !== "cancelada",
+    (e) => e.status !== "concluida" && e.status !== "cancelada" && e.status !== "reagendada",
   );
 
   const doToggle = async () => {
@@ -222,7 +224,7 @@ export function StageAccordion({
                     >
                       <ActionRow
                         e={e}
-                        allExecutions={executions}
+                        allExecutions={allGoalExecutions}
                         highlighted={flashId === e.id}
                         isNext={e.id === nextActionId}
                       />

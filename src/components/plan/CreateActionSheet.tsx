@@ -53,6 +53,7 @@ export function CreateActionSheet({
     plannedStartDate: suggestedStart,
     plannedEndDate: suggestedStart,
     weight: undefined as TaskWeight | undefined,
+    dependsOnExecutionId: "",
   });
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -95,6 +96,7 @@ export function CreateActionSheet({
         weight: form.weight ?? "medio",
         goalId: goal.id,
         stepId: step.id,
+        dependsOnExecutionId: form.dependsOnExecutionId || undefined,
       });
       setCreatedId(id);
     } catch (err) {
@@ -227,6 +229,37 @@ export function CreateActionSheet({
           ))}
         </div>
       </div>
+      {allExecutions.some(
+        (execution) =>
+          execution.goalId === goal.id &&
+          execution.status !== "cancelada" &&
+          execution.status !== "reagendada",
+      ) && (
+        <label className="mt-3 block">
+          <span className="mb-1 block text-[11px] uppercase tracking-wider text-muted-foreground">
+            Depende de (opcional)
+          </span>
+          <select
+            value={form.dependsOnExecutionId}
+            onChange={(event) => setForm({ ...form, dependsOnExecutionId: event.target.value })}
+            className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-primary"
+          >
+            <option value="">Nenhuma ação</option>
+            {allExecutions
+              .filter(
+                (execution) =>
+                  execution.goalId === goal.id &&
+                  execution.status !== "cancelada" &&
+                  execution.status !== "reagendada",
+              )
+              .map((execution) => (
+                <option key={execution.id} value={execution.id}>
+                  {execution.title}
+                </option>
+              ))}
+          </select>
+        </label>
+      )}
       {formError && <p className="mt-2 text-[11px] text-danger">{formError}</p>}
       <button
         disabled={!form.title || !form.plannedStartDate || !form.plannedEndDate || saving}
