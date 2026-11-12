@@ -65,7 +65,9 @@ describe("espelho das rotinas", () => {
     expect(r.paused).toBe(2);
     expect(r.none).toBe(1); // dia 9 sem registro; o dia 10 é hoje e ainda está em andamento
     expect(m.pausedDays).toBe(2);
-    expect(m.consistency).toBeCloseTo(5 / 6, 1);
+    expect(m.completionRate).toBe(1); // dos dias com resultado informado, todos cumpridos
+    expect(m.coverage).toBeCloseTo(5 / 6, 2); // 1 dia sem informação
+    expect(m.planAdherence).toBeCloseTo(5 / 6, 2);
     expect(m.sufficient).toBe(true);
   });
 
@@ -85,7 +87,22 @@ describe("espelho das rotinas", () => {
     const saude = m.byArea.find((x) => x.area === "Saúde")!;
     expect(saude).toMatchObject({ habits: 2, judged: 10, completed: 6 });
     expect(m.steady[0].habit.id).toMatch(/a|c/);
+    // b registrou 1 dia de 5: isso é falta de informação, não prova de falha.
+    expect(m.needsAttention).toEqual([]);
+    const b = m.rows.find((r) => r.habit.id === "b")!;
+    expect(b.summary.coverage).toBeCloseTo(0.2);
+  });
+
+  it("só aponta 'para ajustar' quando há resultado registrado suficiente e baixo", () => {
+    const logs = [
+      log("b", "2026-11-01"),
+      log("b", "2026-11-02", { status: "missed", value: 0 }),
+      log("b", "2026-11-03", { status: "missed", value: 0 }),
+      log("b", "2026-11-04", { status: "missed", value: 0 }),
+    ];
+    const m = mirrorHabits(ctx, [habit("b")], logs, "2026-11-01", "2026-11-04");
     expect(m.needsAttention.map((r) => r.habit.id)).toEqual(["b"]);
+    expect(m.completionRate).toBeCloseTo(0.25);
   });
 
   it("rotina que começou no meio do período só conta a partir do início; arquivada antes não entra", () => {

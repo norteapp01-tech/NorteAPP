@@ -417,8 +417,17 @@ export type Summary = {
   to: string;
   totals: Record<Outcome, number>;
   scheduledDays: number;
-  /** completed / (completed + partial + missed + none + exceeded + unconfirmed): pausas e pulos ficam fora. */
-  consistency: number | null;
+  /** Dias com resultado informado: cumpridos + parciais + não realizados + acima do limite. */
+  informed: number;
+  /** Dias passados sem informação (sem registro, ou redução nunca fechada): não são falha nem sucesso. */
+  noInfo: number;
+  /** Cumprimento REGISTRADO: cumpridos ÷ dias com resultado informado. */
+  completionRate: number | null;
+  /** Cobertura dos registros: dias informados ÷ (informados + sem informação). */
+  coverage: number | null;
+  /** Adesão ao planejado: cumpridos ÷ todos os dias programados avaliáveis, tratando
+   * a ausência de registro como não cumprido. Só use com esse nome. */
+  planAdherence: number | null;
   value: number;
   activeDays: number;
   average: number | null;
@@ -445,8 +454,9 @@ export function summarize(
     value += e.value;
   }
   const t = (o: Outcome) => totals[o] ?? 0;
-  const judged =
-    t("completed") + t("partial") + t("missed") + t("none") + t("exceeded") + t("unconfirmed");
+  const informed = t("completed") + t("partial") + t("missed") + t("exceeded");
+  const noInfo = t("none") + t("unconfirmed");
+  const judged = informed + noInfo;
   const inRange = logs.filter(
     (l) => !l.deletedAt && l.status === "recorded" && l.localDate >= from && l.localDate <= to,
   );
@@ -456,7 +466,11 @@ export function summarize(
     to,
     totals,
     scheduledDays,
-    consistency: judged > 0 ? t("completed") / judged : null,
+    informed,
+    noInfo,
+    completionRate: informed > 0 ? t("completed") / informed : null,
+    coverage: judged > 0 ? informed / judged : null,
+    planAdherence: judged > 0 ? t("completed") / judged : null,
     value,
     activeDays,
     average: activeDays > 0 ? value / activeDays : null,

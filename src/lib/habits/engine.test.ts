@@ -375,7 +375,11 @@ describe("resumo, sequência e gráficos", () => {
     expect(s.totals.skipped).toBe(1);
     expect(s.totals.none).toBe(2);
     expect(s.totals.paused).toBe(1);
-    expect(s.consistency).toBeCloseTo(2 / 4); // pulado e pausa ficam fora
+    expect(s.informed).toBe(2);
+    expect(s.noInfo).toBe(2);
+    expect(s.completionRate).toBe(1); // dos dias com resultado informado, todos cumpridos
+    expect(s.coverage).toBeCloseTo(2 / 4); // registrado em metade dos dias avaliáveis
+    expect(s.planAdherence).toBeCloseTo(2 / 4); // ausência contada como não cumprido: só com este nome
     expect(motivesOfSkips(logs)).toEqual([{ reason: "viagem", count: 1 }]);
   });
   it("sequência: pular não quebra, ficar sem registro quebra; hoje aberto não quebra", () => {

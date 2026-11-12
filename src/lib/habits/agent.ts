@@ -334,13 +334,16 @@ export async function executeHabitTool(
         naoRealizados: t.missed ?? 0,
         semRegistro: (t.none ?? 0) + (t.unconfirmed ?? 0),
         emPausa: t.paused ?? 0,
-        consistencia: s.consistency === null ? null : Math.round(s.consistency * 100),
+        cumprimentoRegistradoPct:
+          s.completionRate === null ? null : Math.round(s.completionRate * 100),
+        coberturaDosRegistrosPct: s.coverage === null ? null : Math.round(s.coverage * 100),
+        adesaoAoPlanejadoPct: s.planAdherence === null ? null : Math.round(s.planAdherence * 100),
         motivosInformados: motivesOfSkips(logs),
         sensacoes: feelingCounts(logs),
         aviso:
           judged < 4
             ? "Poucos dias avaliados: não conclua padrões."
-            : "Use só estes números. Motivos são apenas os que a pessoa informou; não deduza causas.",
+            : "Use só estes números. Dias sem registro são ausência de informação, não falha. Motivos são apenas os que a pessoa informou; não deduza causas.",
       });
     }
 

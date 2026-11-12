@@ -5,6 +5,8 @@ import { evaluateDay, evaluatePeriod, todayItem } from "@/lib/habits/engine";
 import { indexFor, useHabitData } from "@/lib/habits/store";
 import { HabitToast, type ToastState } from "./HabitToast";
 import { HabitRow, type LogDone } from "./HabitRow";
+import { QuickValueSheet } from "./QuickValueSheet";
+import { TimerSheet } from "./TimerSheet";
 import "./habits.css";
 
 /** Rotinas de hoje na Home: as mesmas rotinas, o mesmo registro. Poucas por vez. */
@@ -12,6 +14,7 @@ export function HomeHabits() {
   const data = useHabitData();
   const navigate = useNavigate();
   const [toast, setToast] = useState<ToastState>(null);
+  const [sheet, setSheet] = useState<{ kind: "quick" | "timer"; habitId: string } | null>(null);
 
   if (data.loading && data.habits.length === 0) return null;
   if (data.error) return null; // a Home não vira tela de erro por causa das rotinas
@@ -59,6 +62,7 @@ export function HomeHabits() {
     window.setTimeout(() => setToast((t) => (t?.message === message ? null : t)), 6000);
   };
   const go = () => void navigate({ to: "/rotinas" });
+  const sheetHabit = sheet ? data.habits.find((h) => h.id === sheet.habitId) : undefined;
 
   return (
     <section className="mt-8" aria-label="Rotinas de hoje">
@@ -83,8 +87,8 @@ export function HomeHabits() {
               date={data.ctx.today}
               todayLogs={i.logs}
               onOpen={go}
-              onQuick={go}
-              onTimer={go}
+              onQuick={() => setSheet({ kind: "quick", habitId: i.habit.id })}
+              onTimer={() => setSheet({ kind: "timer", habitId: i.habit.id })}
               onDone={onDone}
               onError={(message) => setToast({ message, error: true })}
             />
@@ -95,6 +99,22 @@ export function HomeHabits() {
         <p className="mt-2 text-xs text-muted-foreground">
           +{pending.length - shown.length} em Rotinas
         </p>
+      )}
+      {sheet?.kind === "quick" && sheetHabit && (
+        <QuickValueSheet
+          habit={sheetHabit}
+          date={data.ctx.today}
+          onClose={() => setSheet(null)}
+          onDone={onDone}
+        />
+      )}
+      {sheet?.kind === "timer" && sheetHabit && (
+        <TimerSheet
+          habit={sheetHabit}
+          timer={data.timer}
+          onClose={() => setSheet(null)}
+          onDone={onDone}
+        />
       )}
       <HabitToast
         toast={toast}

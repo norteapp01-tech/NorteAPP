@@ -140,21 +140,13 @@ export function HabitDetail({
   const t = data.now.totals;
   const count = (o: Outcome) => t[o] ?? 0;
   // Só compara quando o período anterior tem base (3+ dias avaliados); senão é ruído.
-  const judged = (s: typeof data.now | null) =>
-    s
-      ? (s.totals.completed ?? 0) +
-        (s.totals.partial ?? 0) +
-        (s.totals.missed ?? 0) +
-        (s.totals.none ?? 0) +
-        (s.totals.exceeded ?? 0) +
-        (s.totals.unconfirmed ?? 0)
-      : 0;
+  const informedDays = (s: typeof data.now | null) => (s ? s.informed : 0);
   const deltaPts =
     data.before &&
-    judged(data.before) >= 3 &&
-    data.before.consistency !== null &&
-    data.now.consistency !== null
-      ? Math.round((data.now.consistency - data.before.consistency) * 100)
+    informedDays(data.before) >= 3 &&
+    data.before.completionRate !== null &&
+    data.now.completionRate !== null
+      ? Math.round((data.now.completionRate - data.before.completionRate) * 100)
       : null;
   const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)}%`);
 
@@ -241,27 +233,23 @@ export function HabitDetail({
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
                 Meta × realizado · {RANGE_LABEL[range]}
               </p>
-              {data.now.consistency === null ? (
+              {data.now.completionRate === null ? (
                 <p className="mt-2 text-sm text-muted-foreground">
                   {count("paused") > 0 && data.now.sessions === 0
                     ? "Período em pausa — nada a avaliar."
-                    : "Ainda sem dados suficientes neste período."}
+                    : data.now.noInfo > 0
+                      ? `${data.now.noInfo} ${data.now.noInfo === 1 ? "dia" : "dias"} sem informação — nada a avaliar ainda.`
+                      : "Ainda sem dados suficientes neste período."}
                 </p>
               ) : (
                 <>
                   <p className="mt-1 text-3xl font-bold tabular-nums">
-                    {pct(data.now.consistency)}
+                    {pct(data.now.completionRate)}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {count("completed")}{" "}
                     {count("completed") === 1 ? "dia cumprido" : "dias cumpridos"} de{" "}
-                    {count("completed") +
-                      count("partial") +
-                      count("missed") +
-                      count("none") +
-                      count("exceeded") +
-                      count("unconfirmed")}{" "}
-                    avaliados
+                    {data.now.informed} com resultado registrado
                     {deltaPts !== null && (
                       <>
                         {" · "}
@@ -273,6 +261,13 @@ export function HabitDetail({
                       </>
                     )}
                   </p>
+                  {data.now.noInfo > 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {data.now.noInfo} {data.now.noInfo === 1 ? "dia" : "dias"} sem informação ·
+                      registrado em {pct(data.now.coverage)} dos dias. Ausência de registro não
+                      prova que não foi feito.
+                    </p>
+                  )}
                 </>
               )}
               <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-3 text-center">

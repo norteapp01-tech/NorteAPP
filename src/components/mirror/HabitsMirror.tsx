@@ -80,19 +80,23 @@ export function HabitsMirror({ period, scope }: { period: Period; scope: string 
       <div className="card-surface mt-3 p-4">
         {!mirror.sufficient ? (
           <p className="text-sm text-muted-foreground">
-            Ainda há poucos dias avaliados {scope} para falar em padrão ({mirror.judged} de 4
-            necessários). Os registros já estão guardados.
+            Ainda há poucos dias com resultado registrado {scope} para falar em padrão (
+            {mirror.informed} de 4 necessários). Os registros já estão guardados.
           </p>
         ) : (
           <>
-            <p className="text-3xl font-bold tabular-nums">{pct(mirror.consistency)}</p>
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              Cumprimento nos dias registrados
+            </p>
+            <p className="text-3xl font-bold tabular-nums">{pct(mirror.completionRate)}</p>
             <p className="text-sm text-muted-foreground">
-              {mirror.completed} de {mirror.judged}{" "}
-              {plural(mirror.judged, "dia avaliado cumprido", "dias avaliados cumpridos")} {scope}
+              {mirror.completed} de {mirror.informed}{" "}
+              {plural(mirror.informed, "dia com resultado", "dias com resultado")} {scope}
             </p>
             <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-              {mirror.noRecordDays} sem registro (não contam como falha de caráter, só como ausência
-              de informação) · {mirror.pausedDays}{" "}
+              Registrado em {pct(mirror.coverage)} dos dias · {mirror.noRecordDays}{" "}
+              {plural(mirror.noRecordDays, "dia sem informação", "dias sem informação")} (ausência
+              de registro não prova que não foi feito) · {mirror.pausedDays}{" "}
               {plural(mirror.pausedDays, "dia em pausa", "dias em pausa")} fora da conta.
             </p>
           </>
@@ -110,21 +114,21 @@ export function HabitsMirror({ period, scope }: { period: Period; scope: string 
               <BarRow
                 key={a.area}
                 name={a.area}
-                value={pct(a.consistency)}
-                fraction={a.consistency ?? 0}
-                detail={`${a.completed} de ${a.judged} dias avaliados · ${a.habits} ${plural(a.habits, "rotina", "rotinas")}`}
+                value={pct(a.completionRate)}
+                fraction={a.completionRate ?? 0}
+                detail={`${a.completed} de ${a.informed} dias registrados · ${a.habits} ${plural(a.habits, "rotina", "rotinas")}`}
               />
             ))}
           </Disclosure>
           {mirror.steady.length > 0 && (
-            <Disclosure title="Mais regulares" subtitle="Rotinas com 4+ dias avaliados">
+            <Disclosure title="Mais regulares" subtitle="Rotinas com 4+ dias registrados">
               {mirror.steady.map((r) => (
                 <BarRow
                   key={r.habit.id}
                   name={r.habit.name}
-                  value={pct(r.summary.consistency)}
-                  fraction={r.summary.consistency ?? 0}
-                  detail={`${r.completed} de ${r.judged} dias avaliados`}
+                  value={pct(r.summary.completionRate)}
+                  fraction={r.summary.completionRate ?? 0}
+                  detail={`${r.completed} de ${r.informed} dias registrados`}
                 />
               ))}
             </Disclosure>
@@ -138,9 +142,9 @@ export function HabitsMirror({ period, scope }: { period: Period; scope: string 
                 <div key={r.habit.id} className="py-2">
                   <BarRow
                     name={r.habit.name}
-                    value={pct(r.summary.consistency)}
-                    fraction={r.summary.consistency ?? 0}
-                    detail={`${r.completed} de ${r.judged} dias avaliados · ${r.none} sem registro`}
+                    value={pct(r.summary.completionRate)}
+                    fraction={r.summary.completionRate ?? 0}
+                    detail={`${r.completed} de ${r.informed} dias registrados · ${r.none} sem informação`}
                   />
                   <p className="text-[11px] text-muted-foreground">
                     Ideias: reduzir a meta, mudar o horário ou pausar. É uma sugestão, não um

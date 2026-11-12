@@ -13,6 +13,9 @@ export const MIN_JUDGED = 4;
 export type HabitMirrorRow = {
   habit: Habit;
   summary: Summary;
+  /** Dias com resultado informado. */
+  informed: number;
+  /** Dias com resultado informado + dias sem informação. */
   judged: number;
   completed: number;
   none: number;
@@ -23,16 +26,23 @@ export type HabitMirrorRow = {
 export type HabitMirror = {
   rows: HabitMirrorRow[];
   judged: number;
+  /** Dias com resultado informado. */
+  informed: number;
   completed: number;
-  /** completed / judged, ou null sem base. */
-  consistency: number | null;
+  /** Cumprimento registrado: cumpridos ÷ dias com resultado informado. */
+  completionRate: number | null;
+  /** Cobertura: dias informados ÷ (informados + sem informação). */
+  coverage: number | null;
+  /** Adesão ao planejado (ausência conta como não cumprido) — só com esse nome. */
+  planAdherence: number | null;
   pausedDays: number;
   noRecordDays: number;
   byArea: {
     area: string;
     judged: number;
+    informed: number;
     completed: number;
-    consistency: number | null;
+    completionRate: number | null;
     habits: number;
   }[];
   /** Rotinas com base suficiente, da mais para a menos regular. */
@@ -43,13 +53,7 @@ export type HabitMirror = {
   sufficient: boolean;
 };
 
-const judgedOf = (s: Summary) =>
-  (s.totals.completed ?? 0) +
-  (s.totals.partial ?? 0) +
-  (s.totals.missed ?? 0) +
-  (s.totals.none ?? 0) +
-  (s.totals.exceeded ?? 0) +
-  (s.totals.unconfirmed ?? 0);
+const judgedOf = (s: Summary) => s.informed + s.noInfo;
 
 export function mirrorHabits(
   ctx: EvalContext,
@@ -74,6 +78,7 @@ export function mirrorHabits(
     rows.push({
       habit,
       summary,
+      informed: summary.informed,
       judged: judgedOf(summary),
       completed: summary.totals.completed ?? 0,
       none: (summary.totals.none ?? 0) + (summary.totals.unconfirmed ?? 0),
@@ -82,21 +87,27 @@ export function mirrorHabits(
     });
   }
   const judged = rows.reduce((s, r) => s + r.judged, 0);
+  const informed = rows.reduce((s, r) => s + r.informed, 0);
   const completed = rows.reduce((s, r) => s + r.completed, 0);
 
-  const areaMap = new Map<string, { judged: number; completed: number; habits: number }>();
+  const areaMap = new Map<
+    string,
+    { judged: number; informed: number; completed: number; habits: number }
+  >();
   for (const r of rows) {
     const key = r.habit.area ?? "Sem área";
-    const cur = areaMap.get(key) ?? { judged: 0, completed: 0, habits: 0 };
+    const cur = areaMap.get(key) ?? { judged: 0, informed: 0, completed: 0, habits: 0 };
     cur.judged += r.judged;
+    cur.informed += r.informed;
     cur.completed += r.completed;
     cur.habits += 1;
     areaMap.set(key, cur);
   }
 
   const ranked = rows
-    .filter((r) => r.judged >= MIN_JUDGED && r.summary.consistency !== null)
-    .sort((a, b) => (b.summary.consistency ?? 0) - (a.summary.consistency ?? 0));
+    // Só rotinas com resultado INFORMADO suficiente entram em destaque: ausência de registro não rebaixa ninguém.
+    .filter((r) => r.informed >= MIN_JUDGED && r.summary.completionRate !== null)
+    .sort((a, b) => (b.summary.completionRate ?? 0) - (a.summary.completionRate ?? 0));
 
   const feelings = { leve: 0, neutro: 0, pesado: 0, answered: 0 };
   for (const l of logs) {
@@ -108,23 +119,26 @@ export function mirrorHabits(
   return {
     rows,
     judged,
+    informed,
     completed,
-    consistency: judged > 0 ? completed / judged : null,
+    completionRate: informed > 0 ? completed / informed : null,
+    coverage: judged > 0 ? informed / judged : null,
+    planAdherence: judged > 0 ? completed / judged : null,
     pausedDays: rows.reduce((s, r) => s + r.paused, 0),
     noRecordDays: rows.reduce((s, r) => s + r.none, 0),
     byArea: [...areaMap.entries()]
       .map(([area, v]) => ({
         area,
         ...v,
-        consistency: v.judged > 0 ? v.completed / v.judged : null,
+        completionRate: v.informed > 0 ? v.completed / v.informed : null,
       }))
       .sort((a, b) => b.judged - a.judged),
     steady: ranked.slice(0, 3),
     needsAttention: [...ranked]
       .reverse()
-      .filter((r) => (r.summary.consistency ?? 1) < 0.5)
+      .filter((r) => (r.summary.completionRate ?? 1) < 0.5)
       .slice(0, 3),
     feelings,
-    sufficient: judged >= MIN_JUDGED,
+    sufficient: informed >= MIN_JUDGED,
   };
 }
