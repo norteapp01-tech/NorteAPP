@@ -21,9 +21,9 @@ O push falhou por falta de autenticação nesta sessão. Comando: `git push orig
 | 0062_plan_flow | **Não aplicada** no banco de produção (tabelas `plans/plan_phases/plan_steps` ausentes via API; pertence a outra sessão). Não publicar `main` (contém `de290de`) sem aplicá-la. |
 | 0063_habits_core | Aplicada (tabelas e RPCs respondem). |
 | 0064_reminders_habit_origin | Aplicada (inserção com `origin='habit_reminder'` aceita). |
-| **0065_habit_effects** | **Escrita, NÃO aplicada.** Sem credencial de banco nesta sessão (`PGPASSWORD`/token ausentes). O código dos commits `cd88b40`+ depende dela (`finish_habit_timer`, `sync_module_habits`, `set_habit_reminders`, `cancel_habit_effects`, colunas em `reminders`, `habit_settings`). **Não publicar o site antes de aplicá-la.** |
+| **0065_habit_effects** | **Aplicada em 2026-11-11** no banco de produção (`yorlxyoixeeqlcjrwasf`), após dry-run e conferência do catálogo. 26 verificações de RPC/RLS passaram (abaixo). |
 
-Como aplicar: `node ~/.cache/norte-db/apply.mjs supabase/migrations/0065_habit_effects.sql --dry` e depois sem `--dry` (com `PGPASSWORD` definido). É aditiva; não remove dados.
+Aplicada com `apply.mjs` (dry-run, depois real, registrada em `schema_migrations`). É aditiva; não removeu dados. A 0062 continua pendente (outra sessão).
 
 ## Decisões
 
@@ -42,7 +42,9 @@ Como aplicar: `node ~/.cache/norte-db/apply.mjs supabase/migrations/0065_habit_e
 - Verificação de esquema em produção via API (0063/0064 presentes; 0062/0065 ausentes).
 - Rodadas anteriores (antes da 0065): 26 verificações no banco real e 15/15 de navegador (criar, registrar, desfazer, pausar, encadear, timer com recarga).
 
-**Não executado nesta rodada** (dependem da 0065 aplicada e de credenciais): E2E das RPCs novas, entrega real de push, dois dispositivos, falha de rede na fila, meia-noite/fuso em navegador, conversa real com o agente, duas contas via UI, acessibilidade por teclado, desempenho com muitos hábitos, regressão de módulos. Nenhum desses está marcado como passado.
+- **Banco real, 0065 (26/26):** troca atômica de lembretes preserva os anteriores quando um item é inválido; sincronização de módulo não duplica em retry, propaga edição e remove ao zerar; encerrar timer com revisão errada não grava nada, com revisão certa grava e remove, repetir devolve o mesmo log; lembrete encadeado duplicado (mesma origem+cadeia+data) é recusado; cancelar remove pendentes e só conta os já entregues; outra conta não troca lembretes, não gera log, não vê lembretes nem configurações. Usuários de teste removidos.
+
+**Não executado nesta rodada**: navegador com as telas alteradas, entrega real de push, dois dispositivos, falha de rede na fila, meia-noite/fuso em navegador, conversa real com o agente, duas contas via UI, acessibilidade por teclado, desempenho com muitos hábitos, regressão de módulos. Nenhum desses está marcado como passado.
 
 ## Matriz Habitify × Norte
 
@@ -52,10 +54,10 @@ Fontes: ficha do app na App Store (id1111447047) e central de ajuda do Habitify 
 |---|---|---|---|---|
 | Hábitos com metas diária/semanal/mensal/anual, unidades (C) | Versões de meta datadas, famílias de unidade | engine.test | Validado (unit + DB) | — |
 | Registro rápido, vários registros/dia, desfazer (C) | `log_habit`, toast com Desfazer, Home abre sheet no lugar | testes; browser (rodada anterior) | Validado (browser parcial) | Rever Home no browser |
-| Timer / foco (C) | Timer por timestamps, cronômetro/contagem/Pomodoro | timer.test; browser | Parcial: encerramento atômico exige 0065 | Aplicar 0065, testar 2 aparelhos |
+| Timer / foco (C) | Timer por timestamps, cronômetro/contagem/Pomodoro, encerramento atômico | timer.test; RPC real (revisão, idempotência) | Validado no banco; falta teste de 2 aparelhos no navegador | Teste de UI |
 | Pausa individual/área/global (I) | Pausas excluídas das métricas | engine.test; browser | Validado | — |
-| Lembretes por horário (C) | Materialização em `reminders` + dispatch Web Push | effects.test | **Implementado sem validação externa** | Aplicar 0065, deploy da função, teste em aparelho |
-| Encadeamento (hábito "depois de") (I) | Cadeias por transição, dedupe, silêncio | effects.test | Implementado; E2E pendente (0065) | idem |
+| Lembretes por horário (C) | Materialização em `reminders` + dispatch Web Push | effects.test | **Implementado sem validação externa** (RPCs validadas no banco) | Deploy da função `dispatch-reminders`, teste em aparelho |
+| Encadeamento (hábito "depois de") (I) | Cadeias por transição, dedupe, silêncio | effects.test | Implementado; dedupe/cancelamento validados no banco; fluxo de UI pendente | Teste de navegador | |
 | Estatísticas, calendário, histórico (C) | Detalhe + Espelho (cumprimento/cobertura/adesão) | mirror/engine.test | Validado (unit) | Teste visual |
 | Checklist por hábito (I) | Checklist de itens por versão | unit | Implementado | — |
 | Áreas/categorias, ordenação (C) | Áreas, reorder | browser (parcial) | Implementado | Configurações dedicadas |
@@ -75,7 +77,7 @@ Fontes: ficha do app na App Store (id1111447047) e central de ajuda do Habitify 
 
 ## Pendências externas exatas
 
-1. Credencial de banco (ou token do Supabase CLI) para aplicar 0065 — e 0062 pelo outro trabalho.
+1. Aplicar a 0062 (outro trabalho) antes de qualquer publicação.
 2. Autenticação do GitHub para `git push origin main`.
 3. Deploy da Edge Function `dispatch-reminders` atualizada (URL por origem) e confirmação de cron + chaves VAPID.
 4. Integrações nativas e OAuth: contas de desenvolvedor Apple/Google, client id/secret de Strava, Fitbit, Microsoft.
