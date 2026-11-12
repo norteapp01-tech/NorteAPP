@@ -21,6 +21,7 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body,
+      tag: payload.tag,
       data: { url: payload.url || "/agenda" },
     }),
   );

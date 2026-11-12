@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { syncModuleHabits } from "./habits/store";
 import { toISODate, todayISO, addDays, createRoutine, removeRoutine } from "./goals-store";
 import { supabase, ensureSession, useSupabaseUserId } from "./supabase/client";
 import { queryClient } from "./query-client";
@@ -1123,6 +1124,13 @@ export async function finishSession(
       progress_seconds: progress.progressSeconds,
     })
     .eq("id", sessionId);
+
+  // Rotinas ligadas à Leitura recebem esta sessão uma única vez (a referência é a sessão).
+  void syncModuleHabits("leitura", sessionId, iso, {
+    sessions: 1,
+    pages: progress.pagesRead ?? 0,
+    minutes: Math.round((durationSeconds / 60) * 100) / 100,
+  });
 
   const field =
     book.progressMode === "pages"

@@ -23,9 +23,9 @@ Deno.serve(async (req) => {
 
   try {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-    await removeUserFiles(admin, data.user.id);
     const { error: resetError } = await caller.rpc("reset_my_account_content");
     if (resetError) throw resetError;
+    await removeUserFiles(admin, data.user.id);
     return Response.json({ ok: true }, { headers: cors });
   } catch {
     return Response.json(

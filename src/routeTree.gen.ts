@@ -16,8 +16,10 @@ import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as CriarRouteImport } from './routes/criar'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ExcluirContaRouteImport } from './routes/excluir-conta'
+import { Route as JuntosRouteImport } from './routes/juntos'
 import { Route as PlanejamentoRouteImport } from './routes/planejamento'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
+import { Route as RotinasRouteImport } from './routes/rotinas'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as CicloIdRouteImport } from './routes/ciclo.$id'
 import { Route as EsportesGravarRouteImport } from './routes/esportes.gravar'
@@ -59,6 +61,11 @@ const ExcluirContaRoute = ExcluirContaRouteImport.update({
   path: '/excluir-conta',
   getParentRoute: () => rootRouteImport,
 } as any)
+const JuntosRoute = JuntosRouteImport.update({
+  id: '/juntos',
+  path: '/juntos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlanejamentoRoute = PlanejamentoRouteImport.update({
   id: '/planejamento',
   path: '/planejamento',
@@ -67,6 +74,11 @@ const PlanejamentoRoute = PlanejamentoRouteImport.update({
 const PrivacidadeRoute = PrivacidadeRouteImport.update({
   id: '/privacidade',
   path: '/privacidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RotinasRoute = RotinasRouteImport.update({
+  id: '/rotinas',
+  path: '/rotinas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermosRoute = TermosRouteImport.update({
@@ -103,8 +115,10 @@ export interface FileRoutesByFullPath {
   '/criar': typeof CriarRoute
   '/dashboard': typeof DashboardRoute
   '/excluir-conta': typeof ExcluirContaRoute
+  '/juntos': typeof JuntosRoute
   '/planejamento': typeof PlanejamentoRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/rotinas': typeof RotinasRoute
   '/termos': typeof TermosRoute
   '/ciclo/$id': typeof CicloIdRoute
   '/esportes/gravar': typeof EsportesGravarRoute
@@ -119,8 +133,10 @@ export interface FileRoutesByTo {
   '/criar': typeof CriarRoute
   '/dashboard': typeof DashboardRoute
   '/excluir-conta': typeof ExcluirContaRoute
+  '/juntos': typeof JuntosRoute
   '/planejamento': typeof PlanejamentoRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/rotinas': typeof RotinasRoute
   '/termos': typeof TermosRoute
   '/ciclo/$id': typeof CicloIdRoute
   '/esportes/gravar': typeof EsportesGravarRoute
@@ -136,8 +152,10 @@ export interface FileRoutesById {
   '/criar': typeof CriarRoute
   '/dashboard': typeof DashboardRoute
   '/excluir-conta': typeof ExcluirContaRoute
+  '/juntos': typeof JuntosRoute
   '/planejamento': typeof PlanejamentoRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/rotinas': typeof RotinasRoute
   '/termos': typeof TermosRoute
   '/ciclo/$id': typeof CicloIdRoute
   '/esportes/gravar': typeof EsportesGravarRoute
@@ -154,8 +172,10 @@ export interface FileRouteTypes {
     | '/criar'
     | '/dashboard'
     | '/excluir-conta'
+    | '/juntos'
     | '/planejamento'
     | '/privacidade'
+    | '/rotinas'
     | '/termos'
     | '/ciclo/$id'
     | '/esportes/gravar'
@@ -170,8 +190,10 @@ export interface FileRouteTypes {
     | '/criar'
     | '/dashboard'
     | '/excluir-conta'
+    | '/juntos'
     | '/planejamento'
     | '/privacidade'
+    | '/rotinas'
     | '/termos'
     | '/ciclo/$id'
     | '/esportes/gravar'
@@ -186,8 +208,10 @@ export interface FileRouteTypes {
     | '/criar'
     | '/dashboard'
     | '/excluir-conta'
+    | '/juntos'
     | '/planejamento'
     | '/privacidade'
+    | '/rotinas'
     | '/termos'
     | '/ciclo/$id'
     | '/esportes/gravar'
@@ -203,8 +227,10 @@ export interface RootRouteChildren {
   CriarRoute: typeof CriarRoute
   DashboardRoute: typeof DashboardRoute
   ExcluirContaRoute: typeof ExcluirContaRoute
+  JuntosRoute: typeof JuntosRoute
   PlanejamentoRoute: typeof PlanejamentoRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
+  RotinasRoute: typeof RotinasRoute
   TermosRoute: typeof TermosRoute
   CicloIdRoute: typeof CicloIdRoute
   EsportesGravarRoute: typeof EsportesGravarRoute
@@ -263,6 +289,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ExcluirContaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/juntos': {
+      id: '/juntos'
+      path: '/juntos'
+      fullPath: '/juntos'
+      preLoaderRoute: typeof JuntosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/planejamento': {
       id: '/planejamento'
       path: '/planejamento'
@@ -275,6 +308,13 @@ declare module '@tanstack/react-router' {
       path: '/privacidade'
       fullPath: '/privacidade'
       preLoaderRoute: typeof PrivacidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rotinas': {
+      id: '/rotinas'
+      path: '/rotinas'
+      fullPath: '/rotinas'
+      preLoaderRoute: typeof RotinasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/termos': {
@@ -323,8 +363,10 @@ const rootRouteChildren: RootRouteChildren = {
   CriarRoute: CriarRoute,
   DashboardRoute: DashboardRoute,
   ExcluirContaRoute: ExcluirContaRoute,
+  JuntosRoute: JuntosRoute,
   PlanejamentoRoute: PlanejamentoRoute,
   PrivacidadeRoute: PrivacidadeRoute,
+  RotinasRoute: RotinasRoute,
   TermosRoute: TermosRoute,
   CicloIdRoute: CicloIdRoute,
   EsportesGravarRoute: EsportesGravarRoute,

@@ -11,15 +11,20 @@ import {
   Home,
   MessageCircle,
   Plus,
+  Repeat,
   Salad,
   Settings,
   Wallet,
+  Users,
   X,
   type LucideIcon,
 } from "lucide-react";
 
 type RouteLink =
-  | { to: "/" | "/agenda" | "/planejamento" | "/dashboard" | "/criar"; params?: never }
+  | {
+      to: "/" | "/agenda" | "/planejamento" | "/dashboard" | "/criar" | "/rotinas" | "/juntos";
+      params?: never;
+    }
   | {
       to: "/sub-agenda/$categoria";
       params: { categoria: string };
@@ -38,6 +43,8 @@ const mainItems: Item[] = [
     label: "Planos",
     icon: CalendarRange,
   },
+  { to: "/rotinas", label: "Rotinas", icon: Repeat },
+  { to: "/juntos", label: "Juntos", icon: Users },
   { to: "/dashboard", label: "Espelho", icon: BarChart3 },
 ];
 

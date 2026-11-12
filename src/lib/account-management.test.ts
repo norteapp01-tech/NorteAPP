@@ -29,9 +29,13 @@ it("reseta direto pelo banco quando a função de servidor não existe", async (
   } as never);
   vi.mocked(supabase.rpc).mockResolvedValue({ error: null } as never);
   localStorage.setItem("norte-chat:user-1", "conteúdo");
+  localStorage.setItem("norte-habit-outbox:user-1", "registros pendentes");
+  localStorage.setItem("norte-habit-outbox:user-2", "outra conta");
   await resetAccountContent("user-1");
   expect(supabase.rpc).toHaveBeenCalledWith("reset_my_account_content");
   expect(localStorage.getItem("norte-chat:user-1")).toBeNull();
+  expect(localStorage.getItem("norte-habit-outbox:user-1")).toBe("[]");
+  expect(localStorage.getItem("norte-habit-outbox:user-2")).toBe("outra conta");
 });
 
 it("não limpa conteúdo local se o reset remoto falhar", async () => {

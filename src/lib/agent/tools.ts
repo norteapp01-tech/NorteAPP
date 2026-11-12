@@ -8,6 +8,7 @@
  * app já funciona. O servidor só intermedia a chamada ao modelo de IA
  * (chat.functions.ts) — nunca toca no banco.
  */
+import { HABIT_TOOLS, HABIT_TOOL_NAMES, executeHabitTool } from "../habits/agent";
 import {
   addWater,
   correctLastWaterLog,
@@ -146,6 +147,7 @@ function shiftedEnd(oldStart: string, oldEnd: string | undefined, newStart: stri
 
 /** Formato OpenAI de tool (function calling). */
 export const AGENT_TOOLS = [
+  ...HABIT_TOOLS,
   {
     type: "function" as const,
     function: {
@@ -812,6 +814,7 @@ export const AGENT_TOOLS = [
 
 /** Executa uma tool call e devolve um resultado (string) pro modelo interpretar. */
 export async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
+  if (HABIT_TOOL_NAMES.has(name)) return executeHabitTool(name, args);
   switch (name) {
     case "consultar_agenda": {
       const state = await fetchGoalsState();

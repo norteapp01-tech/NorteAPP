@@ -31,6 +31,7 @@ import { useSportStore } from "@/lib/sport-store";
 import { useReadingStore } from "@/lib/reading-store";
 import { useMemo } from "react";
 import { Disclosure } from "./charts";
+import { HabitsMirror } from "./HabitsMirror";
 
 const icons: Record<string, LucideIcon> = {
   academia: Dumbbell,
@@ -91,6 +92,7 @@ export function MirrorRoutines({
 
   return (
     <div className="space-y-4">
+      <HabitsMirror period={period} scope={scope} />
       {hasModuleActivity(modules.now) && (
         <section>
           <h2 className="norte-section-title">Registrado nos módulos</h2>

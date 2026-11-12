@@ -2,6 +2,7 @@ import { FUNCTIONS_REGION, markIntentionalSignOut, supabase } from "./supabase/c
 import { queryClient } from "./query-client";
 import { clearRecordingState } from "./sport-recording-db";
 import { setAppTimeZone } from "./app-time-zone";
+import { clearOutbox } from "./habits/outbox";
 
 async function invokeAccountAction(name: "reset-account" | "delete-account") {
   const { data, error } = await supabase.functions.invoke(name, {
@@ -29,6 +30,7 @@ async function clearLocalContent(userId: string) {
     for (const storage of [localStorage, sessionStorage]) {
       storage.removeItem(`norte-chat:${userId}`);
       storage.removeItem(`norte-demo-replies:${userId}`);
+      clearOutbox(storage, userId);
     }
   } catch {
     // Local storage is unavailable; the server-side content was still erased.
@@ -51,13 +53,13 @@ async function removeOwnFiles(userId: string) {
  * linhas da PRÓPRIA pessoa (usa o auth.uid() da sessão). Usado quando a função
  * `reset-account` não está publicada ou não responde. */
 async function resetViaDatabase(userId: string) {
+  const { error } = await supabase.rpc("reset_my_account_content");
+  if (error) throw error;
   try {
     await removeOwnFiles(userId);
   } catch {
     /* Arquivos são melhor esforço; o conteúdo é o que importa. */
   }
-  const { error } = await supabase.rpc("reset_my_account_content");
-  if (error) throw error;
 }
 
 export async function resetAccountContent(userId: string) {
@@ -66,7 +68,9 @@ export async function resetAccountContent(userId: string) {
   } catch (cause) {
     try {
       await resetViaDatabase(userId);
-    } catch {
+    } catch (databaseCause) {
+      if (databaseCause && typeof databaseCause === "object" && "message" in databaseCause)
+        throw new Error(String(databaseCause.message));
       throw cause;
     }
   }

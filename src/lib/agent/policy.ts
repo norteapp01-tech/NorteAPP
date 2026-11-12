@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { HABIT_CONFIRMATION_TOOLS, habitSchemas } from "../habits/agent";
 
 export type AgentToolCall = {
   id: string;
@@ -75,6 +76,7 @@ const blockInput = z.object({
 });
 
 const schemas: Record<string, z.ZodType<Record<string, unknown>>> = {
+  ...habitSchemas,
   consultar_rotina: z.object({
     area: z.enum(["alimentacao", "leitura", "fe", "planos", "academia"]),
   }),
@@ -273,7 +275,12 @@ const schemas: Record<string, z.ZodType<Record<string, unknown>>> = {
 
 // Estas ações mudam agenda ou planejamento. Mesmo que o modelo tente executá-las,
 // o orquestrador interrompe e exige confirmação explícita da pessoa.
-const confirmationRequired = new Set(["criar_plano", "registrar_refeicao", "criar_ciclo_treino"]);
+const confirmationRequired = new Set([
+  "criar_plano",
+  "registrar_refeicao",
+  "criar_ciclo_treino",
+  ...HABIT_CONFIRMATION_TOOLS,
+]);
 
 export function parseAndValidateToolCall(call: AgentToolCall): PendingAgentAction {
   const schema = schemas[call.function.name];

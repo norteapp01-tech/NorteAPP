@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { localDateOfInstant, syncModuleHabits } from "./habits/store";
 import { decimalBR } from "./format-utils";
 import { supabase, ensureSession, useSupabaseUserId } from "./supabase/client";
 import { queryClient } from "./query-client";
@@ -454,6 +455,12 @@ export async function saveRecordedActivity(input: {
     );
   }
   await invalidate();
+  // Rotinas ligadas a Esportes recebem esta atividade uma única vez.
+  void syncModuleHabits("esportes", activityId, localDateOfInstant(input.startedAt), {
+    km: Math.round((distanceM / 1000) * 100) / 100,
+    minutes: Math.round((activeDurationS / 60) * 100) / 100,
+    sessions: 1,
+  });
   return activityId;
 }
 
