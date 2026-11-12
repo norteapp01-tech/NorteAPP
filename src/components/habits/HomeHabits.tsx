@@ -3,6 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronRight, Plus } from "lucide-react";
 import { evaluateDay, evaluatePeriod, todayItem } from "@/lib/habits/engine";
 import { indexFor, useHabitData } from "@/lib/habits/store";
+import { HabitToast, type ToastState } from "./HabitToast";
 import { HabitRow, type LogDone } from "./HabitRow";
 import "./habits.css";
 
@@ -10,11 +11,7 @@ import "./habits.css";
 export function HomeHabits() {
   const data = useHabitData();
   const navigate = useNavigate();
-  const [toast, setToast] = useState<{
-    message: string;
-    undo?: () => Promise<void>;
-    error?: boolean;
-  } | null>(null);
+  const [toast, setToast] = useState<ToastState>(null);
 
   if (data.loading && data.habits.length === 0) return null;
   if (data.error) return null; // a Home não vira tela de erro por causa das rotinas
@@ -99,33 +96,11 @@ export function HomeHabits() {
           +{pending.length - shown.length} em Rotinas
         </p>
       )}
-      {toast && (
-        <div
-          role={toast.error ? "alert" : "status"}
-          className={`habit-toast ${toast.error ? "is-error" : ""}`}
-        >
-          <span className="min-w-0 flex-1">{toast.message}</span>
-          {toast.undo && (
-            <button
-              onClick={async () => {
-                const undo = toast.undo;
-                setToast(null);
-                try {
-                  await undo?.();
-                } catch (e) {
-                  setToast({
-                    message: e instanceof Error ? e.message : "Não foi possível desfazer.",
-                    error: true,
-                  });
-                }
-              }}
-              className="min-h-11 px-2 font-semibold text-primary"
-            >
-              Desfazer
-            </button>
-          )}
-        </div>
-      )}
+      <HabitToast
+        toast={toast}
+        onClose={() => setToast(null)}
+        onUndoError={(m) => setToast({ message: m, error: true })}
+      />
     </section>
   );
 }

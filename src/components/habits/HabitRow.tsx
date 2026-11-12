@@ -1,14 +1,5 @@
 import { useState } from "react";
-import {
-  Check,
-  ChevronRight,
-  MoreHorizontal,
-  Pause,
-  Play,
-  Plus,
-  SkipForward,
-  Timer,
-} from "lucide-react";
+import { Check, ChevronRight, MoreHorizontal, Undo2, X, Play, Plus, Timer } from "lucide-react";
 import type { DayEval, PeriodEval } from "@/lib/habits/engine";
 import { formatAmount } from "@/lib/habits/units";
 import { logHabit, newKey, undoLog } from "@/lib/habits/store";
@@ -245,7 +236,7 @@ export function HabitRow({
         </span>
         <span className="habit-sub">
           <OutcomeMark outcome={day.outcome} size={14} />
-          <span className="truncate">
+          <span className="min-w-0">
             {stateLog ? OUTCOME_LABEL[day.outcome] : progressText(habit, day, period)}
             {!stateLog &&
             day.outcome !== "open" &&
@@ -305,7 +296,7 @@ export function HabitRow({
           )}
           {last && (
             <button role="menuitem" onClick={undoLast} disabled={busy}>
-              <Pause className="h-4 w-4 rotate-90" /> Desfazer último registro
+              <Undo2 className="h-4 w-4" /> Desfazer último registro
             </button>
           )}
           <p className="habit-menu-title">Pular hoje</p>
@@ -323,7 +314,7 @@ export function HabitRow({
             ))}
           </div>
           <button role="menuitem" onClick={miss} disabled={busy}>
-            <SkipForward className="h-4 w-4" /> Marcar como não realizada
+            <X className="h-4 w-4" /> Marcar como não realizada
           </button>
           <button role="menuitem" onClick={onOpen}>
             <Play className="h-4 w-4 opacity-0" /> Ver detalhes{" "}

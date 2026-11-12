@@ -840,19 +840,20 @@ async function afterLog(habitId: string, log: HabitLog) {
     )
       continue;
     const at = new Date(Date.now() + chain.delayMinutes * 60_000);
-    // Chave por (rotina-alvo, minuto): repetir o mesmo evento não cria dois lembretes.
-    await supabase.from("reminders").upsert(
-      {
-        user_id: userId,
-        text: `${target.name} — depois de ${core.habits.find((h) => h.id === habitId)?.name ?? "sua rotina"}`,
-        date: today,
-        remind_at: at.toISOString(),
-        related_habit_id: target.id,
-        habit_occurrence_date: today,
-        origin: "habit_chain",
-      },
-      { onConflict: "user_id,related_habit_id,remind_at", ignoreDuplicates: true },
-    );
+    at.setSeconds(0, 0); // um lembrete por rotina-alvo e minuto
+    // O índice único (usuário, rotina, instante) impede o segundo: repetir o mesmo
+    // evento devolve 23505 e isso é o resultado esperado, não um erro.
+    const { error } = await supabase.from("reminders").insert({
+      user_id: userId,
+      text: `${target.name} — depois de ${core.habits.find((h) => h.id === habitId)?.name ?? "sua rotina"}`,
+      date: today,
+      remind_at: at.toISOString(),
+      related_habit_id: target.id,
+      habit_occurrence_date: today,
+      origin: "habit_chain",
+    });
+    if (error && error.code !== "23505")
+      console.warn("[rotinas] lembrete encadeado não criado:", error.message);
   }
 }
 

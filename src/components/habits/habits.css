@@ -95,7 +95,7 @@
 .habit-row {
   position: relative;
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(48px, auto) minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
@@ -120,7 +120,8 @@
 .habit-add {
   display: inline-flex;
   height: 44px;
-  min-width: 44px;
+  min-width: 48px;
+  white-space: nowrap;
   flex-direction: row;
   align-items: center;
   justify-content: center;
@@ -148,7 +149,7 @@
 }
 .habit-sub {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 5px;
   min-width: 0;
   font-size: 12px;

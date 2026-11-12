@@ -28,6 +28,7 @@ import { formatClock, viewOf } from "@/lib/habits/timer";
 import type { Habit, TimeOfDay } from "@/lib/habits/types";
 import { HabitDetail } from "./HabitDetail";
 import { HabitEditor } from "./HabitEditor";
+import { HabitToast, type ToastState } from "./HabitToast";
 import { HabitRow, OutcomeMark, type LogDone } from "./HabitRow";
 import { PauseSheet } from "./PauseSheet";
 import { QuickValueSheet } from "./QuickValueSheet";
@@ -68,11 +69,7 @@ export function HabitsScreen() {
   const [area, setArea] = useState("");
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    undo?: () => Promise<void>;
-    error?: boolean;
-  } | null>(null);
+  const [toast, setToast] = useState<ToastState>(null);
 
   const today = data.ctx.today;
   const shownDate = date ?? today;
@@ -279,37 +276,7 @@ export function HabitsScreen() {
         )}
       </div>
 
-      {toast && (
-        <div
-          role={toast.error ? "alert" : "status"}
-          className={`habit-toast ${toast.error ? "is-error" : ""}`}
-        >
-          <span className="min-w-0 flex-1">{toast.message}</span>
-          {toast.undo && (
-            <button
-              onClick={async () => {
-                const undo = toast.undo;
-                setToast(null);
-                try {
-                  await undo?.();
-                } catch (e) {
-                  onError(e instanceof Error ? e.message : "Não foi possível desfazer.");
-                }
-              }}
-              className="font-semibold text-primary"
-            >
-              Desfazer
-            </button>
-          )}
-          <button
-            onClick={() => setToast(null)}
-            aria-label="Fechar aviso"
-            className="grid h-9 w-9 place-items-center"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+      <HabitToast toast={toast} onClose={() => setToast(null)} onUndoError={onError} />
 
       {sheet?.kind === "editor" && (
         <HabitEditor

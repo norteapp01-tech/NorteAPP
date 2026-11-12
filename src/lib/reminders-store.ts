@@ -58,8 +58,9 @@ export async function fetchState(): Promise<Reminder[]> {
     .from("reminders")
     .select("*")
     .eq("user_id", userId)
-    // Alertas de compromisso vivem na Agenda; aqui ficam só os lembretes.
-    .neq("origin", "agenda_alert")
+    // Alertas da Agenda e avisos gerados por rotinas têm a sua própria casa; aqui
+    // ficam só os lembretes que a pessoa escreveu.
+    .not("origin", "in", "(agenda_alert,habit_chain,habit_reminder)")
     .order("date", { ascending: true });
   if (error) throw new Error(error.message);
   return (data as Row[]).map(mapReminder);
