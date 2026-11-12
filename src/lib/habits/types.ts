@@ -103,6 +103,8 @@ export type HabitTimer = {
   targetSeconds?: number;
   pomodoro?: PomodoroConfig;
   deviceId?: string;
+  /** Quando a sessão foi criada: é o dia em que ela conta. */
+  createdAt?: string;
   revision: number;
 };
 

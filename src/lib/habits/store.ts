@@ -1,11 +1,11 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ensureSession, supabase, useSupabaseUserId } from "../supabase/client";
 import { queryClient } from "../query-client";
 import { dateAndTimeInZone, getAppTimeZone } from "../app-time-zone";
 import { addDaysISO } from "../agenda-intervals";
 import { todayISO } from "../goals-store";
-import { useProfile } from "../profile-store";
+import { getProfileWeekStart, useProfile } from "../profile-store";
 import {
   eachDay,
   endOfPeriod,
@@ -16,6 +16,16 @@ import {
   type LogIndex,
 } from "./engine";
 import { DEFAULT_POMODORO, measuredSeconds } from "./timer";
+import {
+  firesTrigger,
+  goalOutcome,
+  reminderOccurrences,
+  scheduleAt,
+  targetNeedsReminder,
+  transitionOf,
+  type QuietHours,
+} from "./effects";
+import { enqueue, flushOutbox, readOutbox, type OutboxOp } from "./outbox";
 import type {
   Chain,
   ChecklistItem,
@@ -155,6 +165,7 @@ function mapTimer(r: Row): HabitTimer {
     targetSeconds: opt<number>(r.target_seconds),
     pomodoro: opt<PomodoroConfig>(r.pomodoro),
     deviceId: opt(r.device_id),
+    createdAt: opt(r.created_at),
     revision: Number(r.revision ?? 0),
   };
 }
@@ -233,6 +244,13 @@ const EMPTY_CORE: HabitsCore = { habits: [], pauses: [], chains: [], reminders: 
 export function useHabitsCore() {
   const userId = useSupabaseUserId();
   const q = useQuery({ queryKey: HABITS_KEY, queryFn: fetchCore, enabled: !!userId });
+  // Fila de módulos e lembretes: ao abrir o app com a sessão pronta.
+  useEffect(() => {
+    if (!userId) return;
+    const stop = startOutboxWorker(userId);
+    scheduleReminderReconcile();
+    return stop;
+  }, [userId]);
   return {
     ...(q.data ?? EMPTY_CORE),
     loading: !!userId && q.isLoading,
@@ -391,6 +409,7 @@ export async function refreshHabits() {
     queryClient.invalidateQueries({ queryKey: HABITS_KEY, refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: LOGS_KEY, refetchType: "all" }),
   ]);
+  scheduleReminderReconcile();
 }
 
 export type HabitInput = {
@@ -678,12 +697,16 @@ export async function logHabit(input: LogInput): Promise<HabitLog> {
   ) as Row;
   const log = mapLog(row);
   await refreshHabits();
-  await afterLog(input.habitId, log);
+  await runEffects(log);
   return log;
 }
 
-/** Desfazer: o registro some das contas e das telas, em todas as superfícies. */
-export async function undoLog(logId: string) {
+export type EffectsReport = { cancelled: number; alreadySent: number };
+
+/** Desfazer: o registro some das contas e das telas, em todas as superfícies, e os
+ * lembretes que ele gerou e ainda não saíram são cancelados. Um aviso já entregue
+ * não tem como ser desfeito — `alreadySent` conta quantos foram. */
+export async function undoLog(logId: string): Promise<EffectsReport> {
   unwrap(
     await supabase
       .from("habit_logs")
@@ -692,7 +715,19 @@ export async function undoLog(logId: string) {
       .select()
       .single(),
   );
+  const report = await cancelEffects(logId);
   await refreshHabits();
+  return report;
+}
+
+async function cancelEffects(logId: string): Promise<EffectsReport> {
+  const { data, error } = await supabase.rpc("cancel_habit_effects", { p_log: logId });
+  if (error) {
+    console.warn("[rotinas] não consegui cancelar lembretes do registro:", error.message);
+    return { cancelled: 0, alreadySent: 0 };
+  }
+  const row = (Array.isArray(data) ? data[0] : data) as Row | null;
+  return { cancelled: Number(row?.cancelled ?? 0), alreadySent: Number(row?.already_sent ?? 0) };
 }
 
 export async function editLog(
@@ -704,7 +739,7 @@ export async function editLog(
     reason?: string | null;
     checks?: string[];
   },
-) {
+): Promise<EffectsReport> {
   const row: Row = {};
   if (patch.value !== undefined) {
     if (!Number.isFinite(patch.value) || patch.value < 0)
@@ -715,8 +750,20 @@ export async function editLog(
   if (patch.feeling !== undefined) row.feeling = patch.feeling;
   if (patch.reason !== undefined) row.reason = patch.reason;
   if (patch.checks !== undefined) row.checks = patch.checks;
-  unwrap(await supabase.from("habit_logs").update(row).eq("id", logId).select().single());
-  await refreshHabits();
+  const updated = mapLog(
+    unwrap(await supabase.from("habit_logs").update(row).eq("id", logId).select().single()) as Row,
+  );
+  // O valor mudou: o que este registro gerou pode não valer mais. Cancela o que
+  // está pendente e reavalia com o valor novo.
+  let report: EffectsReport = { cancelled: 0, alreadySent: 0 };
+  if (patch.value !== undefined) {
+    report = await cancelEffects(logId);
+    await refreshHabits();
+    await runEffects(updated);
+  } else {
+    await refreshHabits();
+  }
+  return report;
 }
 
 // --- pausas ----------------------------------------------------------------
@@ -807,54 +854,194 @@ export async function removeChain(id: string) {
   await refreshHabits();
 }
 
-/** Depois de um registro, avisa a próxima rotina da cadeia (uma vez só, e só se
- * ela não estiver em pausa nem já resolvida hoje). */
-async function afterLog(habitId: string, log: HabitLog) {
-  const status =
-    log.status === "skipped"
-      ? "skipped"
-      : log.status === "missed"
-        ? "missed"
-        : log.status === "recorded"
-          ? "done"
-          : null;
-  if (!status) return;
-  const core = queryClient.getQueryData<HabitsCore>(HABITS_KEY);
-  if (!core) return;
-  const links = core.chains.filter((c) => c.baseHabitId === habitId && c.trigger === status);
-  if (links.length === 0) return;
-  const today = todayISO();
-  const userId = await ensureSession();
-  for (const chain of links) {
-    const target = core.habits.find((h) => h.id === chain.targetHabitId);
-    if (!target || target.archivedAt) continue;
-    if (
-      core.pauses.some(
-        (p) =>
-          (p.scope === "global" ||
-            (p.scope === "habit" && p.habitId === target.id) ||
-            (p.scope === "area" && p.area === target.area)) &&
-          today >= p.startDate &&
-          (!p.endDate || today <= p.endDate),
-      )
-    )
-      continue;
-    const at = new Date(Date.now() + chain.delayMinutes * 60_000);
-    at.setSeconds(0, 0); // um lembrete por rotina-alvo e minuto
-    // O índice único (usuário, rotina, instante) impede o segundo: repetir o mesmo
-    // evento devolve 23505 e isso é o resultado esperado, não um erro.
-    const { error } = await supabase.from("reminders").insert({
-      user_id: userId,
-      text: `${target.name} — depois de ${core.habits.find((h) => h.id === habitId)?.name ?? "sua rotina"}`,
-      date: today,
-      remind_at: at.toISOString(),
-      related_habit_id: target.id,
-      habit_occurrence_date: today,
-      origin: "habit_chain",
-    });
-    if (error && error.code !== "23505")
-      console.warn("[rotinas] lembrete encadeado não criado:", error.message);
+// Horário silencioso (0065). Sem a tabela ou sem configuração: sem silêncio.
+async function fetchQuietHours(): Promise<QuietHours> {
+  const { data, error } = await supabase
+    .from("habit_settings")
+    .select("quiet_start, quiet_end")
+    .maybeSingle();
+  if (error || !data?.quiet_start || !data?.quiet_end) return null;
+  return { start: data.quiet_start as string, end: data.quiet_end as string };
+}
+
+const zoneNow = () => getAppTimeZone() ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+async function periodLogs(habit: Habit, date: string, weekStart: 0 | 1): Promise<HabitLog[]> {
+  const v = versionAt(habit, date);
+  const period = v?.goalPeriod ?? "day";
+  return fetchLogs(
+    startOfPeriod(date, period, weekStart),
+    endOfPeriod(date, period, weekStart),
+    habit.id,
+  );
+}
+
+/** Efeitos de um registro: avisa a próxima rotina da cadeia — só quando o registro
+ * MUDA o estado da meta (não a cada toque), só para registros de hoje, e uma vez
+ * por origem/encadeamento/data. Falhar aqui nunca desfaz o registro. */
+export async function runEffects(log: HabitLog): Promise<void> {
+  try {
+    if (log.deletedAt) return;
+    const core = queryClient.getQueryData<HabitsCore>(HABITS_KEY) ?? (await fetchCore());
+    const links = core.chains.filter((c) => c.baseHabitId === log.habitId);
+    if (links.length === 0) return;
+    const today = todayISO();
+    if (log.localDate !== today) return; // registro retroativo não avisa "agora"
+    const habit = core.habits.find((h) => h.id === log.habitId);
+    if (!habit) return;
+    const weekStart = await getProfileWeekStart();
+    const ctx: EvalContext = { today, weekStart, pauses: core.pauses };
+    const transition = transitionOf(
+      ctx,
+      habit,
+      await periodLogs(habit, log.localDate, weekStart),
+      log,
+    );
+    const fired = links.filter((c) => firesTrigger(c.trigger, log, transition));
+    if (fired.length === 0) return;
+    const quiet = await fetchQuietHours();
+    const userId = await ensureSession();
+    for (const chain of fired) {
+      const target = core.habits.find((h) => h.id === chain.targetHabitId);
+      if (!target) continue;
+      const verdict = targetNeedsReminder(
+        ctx,
+        target,
+        await periodLogs(target, today, weekStart),
+        today,
+      );
+      if (!verdict.ok) continue;
+      const when = scheduleAt(new Date(), chain.delayMinutes, zoneNow(), quiet, today);
+      if (!when) continue;
+      // Índice único (encadeamento, registro de origem, data): repetir devolve 23505,
+      // que é o resultado esperado — não um erro.
+      const { error } = await supabase.from("reminders").insert({
+        user_id: userId,
+        text: `${target.name} — depois de ${habit.name}`,
+        date: when.date,
+        remind_at: when.at.toISOString(),
+        related_habit_id: target.id,
+        habit_occurrence_date: when.date,
+        habit_chain_id: chain.id,
+        source_log_id: log.id,
+        origin: "habit_chain",
+      });
+      if (error && error.code !== "23505")
+        console.warn("[rotinas] lembrete encadeado não criado:", error.message);
+    }
+  } catch (e) {
+    console.warn("[rotinas] efeitos do registro:", e instanceof Error ? e.message : e);
   }
+}
+
+// --- lembretes por horário -> notificações reais ---------------------------
+
+const REMINDER_HORIZON_DAYS = 14;
+let reconcileTimer: ReturnType<typeof setTimeout> | null = null;
+let reconciling: Promise<void> | null = null;
+
+function scheduleReminderReconcile() {
+  if (typeof window === "undefined") return;
+  if (reconcileTimer) clearTimeout(reconcileTimer);
+  reconcileTimer = setTimeout(() => {
+    reconcileTimer = null;
+    void reconcileHabitReminders();
+  }, 1200);
+}
+
+/** Mantém a tabela de lembretes igual ao que as configurações pedem para os
+ * próximos dias: cria o que falta, move o que mudou de horário e remove o que
+ * deixou de valer (rotina arquivada, em pausa, já feita hoje, lembrete apagado).
+ * Lembretes já entregues ficam como estão. */
+export function reconcileHabitReminders(): Promise<void> {
+  if (reconciling) return reconciling;
+  reconciling = (async () => {
+    try {
+      const userId = await ensureSession();
+      const core = queryClient.getQueryData<HabitsCore>(HABITS_KEY) ?? (await fetchCore());
+      const zone = zoneNow();
+      const now = new Date();
+      const today = dateAndTimeInZone(now, zone).date;
+      const weekStart = await getProfileWeekStart();
+      const ctx: EvalContext = { today, weekStart, pauses: core.pauses };
+      const quiet = await fetchQuietHours();
+
+      const desired = new Map<
+        string,
+        { at: string; date: string; text: string; habitId: string; rid: string }
+      >();
+      for (const habit of core.habits) {
+        const rs = core.reminders.filter((r) => r.habitId === habit.id);
+        if (rs.length === 0) continue;
+        const resolvedToday = ["completed", "skipped", "missed"].includes(
+          goalOutcome(ctx, habit, await periodLogs(habit, today, weekStart), today),
+        );
+        for (const o of reminderOccurrences(ctx, habit, rs, {
+          now,
+          days: REMINDER_HORIZON_DAYS,
+          zone,
+          quiet,
+        })) {
+          if (o.date === today && resolvedToday) continue;
+          desired.set(`${o.reminderId}|${o.date}`, {
+            at: o.at,
+            date: o.date,
+            text: habit.name,
+            habitId: habit.id,
+            rid: o.reminderId,
+          });
+        }
+      }
+
+      const { data, error } = await supabase
+        .from("reminders")
+        .select("id, habit_reminder_id, habit_occurrence_date, remind_at, notified_at, done")
+        .eq("origin", "habit_reminder")
+        .gte("habit_occurrence_date", today);
+      if (error) throw new Error(error.message);
+      const existing = (data ?? []) as Row[];
+      const have = new Map(
+        existing.map((r) => [`${r.habit_reminder_id}|${r.habit_occurrence_date}`, r]),
+      );
+
+      const stale = existing.filter((r) => {
+        if (r.notified_at || r.done) return false; // já entregue: não se mexe
+        const d = desired.get(`${r.habit_reminder_id}|${r.habit_occurrence_date}`);
+        return !d || new Date(d.at).getTime() !== new Date(r.remind_at as string).getTime();
+      });
+      if (stale.length)
+        await supabase
+          .from("reminders")
+          .delete()
+          .in(
+            "id",
+            stale.map((r) => r.id as string),
+          );
+      const staleIds = new Set(stale.map((r) => r.id));
+
+      for (const [key, d] of desired) {
+        const cur = have.get(key);
+        if (cur && !staleIds.has(cur.id)) continue;
+        const { error: insertError } = await supabase.from("reminders").insert({
+          user_id: userId,
+          text: d.text,
+          date: d.date,
+          remind_at: d.at,
+          related_habit_id: d.habitId,
+          habit_occurrence_date: d.date,
+          habit_reminder_id: d.rid,
+          origin: "habit_reminder",
+        });
+        if (insertError && insertError.code !== "23505")
+          console.warn("[rotinas] lembrete não criado:", insertError.message);
+      }
+    } catch (e) {
+      console.warn("[rotinas] reconciliação de lembretes:", e instanceof Error ? e.message : e);
+    }
+  })().finally(() => {
+    reconciling = null;
+  });
+  return reconciling;
 }
 
 // --- timer -----------------------------------------------------------------
@@ -947,7 +1134,11 @@ export async function discardTimer(timer: HabitTimer) {
   await refreshHabits();
 }
 
-/** Encerra e registra a duração REAL medida (idempotente: a chave é o timer). */
+/** Encerra e registra a duração REAL medida. Gravar o registro e remover o timer
+ * acontece numa única transação no banco, só se a revisão ainda for a que esta tela
+ * viu: se outro aparelho mexeu antes, nada é gravado e a tela mostra o estado atual.
+ * A sessão conta no dia em que foi iniciada (mesmo que termine depois da meia-noite);
+ * a duração é a medida, não o tempo entre dois horários. */
 export async function finishTimer(
   timer: HabitTimer,
   habit: Habit,
@@ -959,50 +1150,40 @@ export async function finishTimer(
     return null;
   }
   const minutes = Math.round((seconds / 60) * 100) / 100;
-  const value =
-    habit.measure === "duration"
-      ? minutes
-      : habit.measure === "binary"
-        ? 1
-        : habit.measure === "count"
-          ? 1
-          : minutes;
-  const log = await logHabit({
-    habitId: habit.id,
-    date: todayISO(),
-    value,
-    durationSeconds: seconds,
-    source: "timer",
-    key: `timer:${timer.id}`,
+  const value = habit.measure === "binary" || habit.measure === "count" ? 1 : minutes;
+  const date = localDateOfInstant(timer.createdAt ?? timer.startedAt);
+  const { data, error } = await supabase.rpc("finish_habit_timer", {
+    p_timer: timer.id,
+    p_revision: timer.revision,
+    p_date: date,
+    p_value: value,
+    p_duration: seconds,
+    p_time_zone: zoneNow(),
+    p_occurred_at: new Date(nowMs).toISOString(),
   });
-  await supabase.from("habit_timers").delete().eq("id", timer.id);
+  if (error) {
+    await refreshHabits();
+    if (error.code === "40001" || /timer_changed/.test(error.message))
+      throw new Error("O timer foi alterado em outro aparelho. Mostrando o estado atual.");
+    if (error.code === "P0002" || /timer_not_found/.test(error.message))
+      throw new Error("Este timer já foi encerrado em outro aparelho.");
+    throw new Error(error.message);
+  }
+  const log = mapLog(data as Row);
   await refreshHabits();
+  await runEffects(log);
   return log;
 }
 
 // --- lembretes e reflexões -------------------------------------------------
 
+/** Troca todos os lembretes da rotina de uma vez: se algo for inválido, os anteriores
+ * continuam exatamente como estavam (uma transação no banco). */
 export async function setHabitReminders(
   habitId: string,
-  items: { time: string; weekdays: number[] }[],
+  items: { time: string; weekdays: number[]; enabled?: boolean }[],
 ) {
-  const userId = await ensureSession();
-  unwrap(await supabase.from("habit_reminders").delete().eq("habit_id", habitId).select());
-  if (items.length) {
-    unwrap(
-      await supabase
-        .from("habit_reminders")
-        .insert(
-          items.map((r) => ({
-            habit_id: habitId,
-            user_id: userId,
-            time: r.time,
-            weekdays: r.weekdays,
-          })),
-        )
-        .select(),
-    );
-  }
+  unwrap(await supabase.rpc("set_habit_reminders", { p_habit: habitId, p_items: items }));
   await refreshHabits();
 }
 
@@ -1054,44 +1235,130 @@ export async function fetchReflections(
 
 // --- módulos (Academia, Esportes, Leitura, Água) ---------------------------
 
-/** Um treino, corrida, leitura ou copo d'água alimenta as rotinas vinculadas.
- * A referência é única por rotina: chamar de novo (retry, reabrir) não soma duas
- * vezes. Falhar aqui nunca impede o módulo de salvar o próprio registro. */
+const storage = (): Storage | null => {
+  try {
+    return typeof localStorage === "undefined" ? null : localStorage;
+  } catch {
+    return null;
+  }
+};
+
+async function runOutboxOp(op: OutboxOp): Promise<void> {
+  if (op.kind === "unsync") {
+    const res = await supabase
+      .from("habit_logs")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("source_ref", `${op.module}:${op.ref}`)
+      .is("deleted_at", null)
+      .select("id");
+    if (res.error) throw new Error(res.error.message);
+    for (const row of res.data ?? []) await cancelEffects(row.id as string);
+    return;
+  }
+  const { data, error } = await supabase.rpc("sync_module_habits", {
+    p_module: op.module,
+    p_ref: op.ref,
+    p_date: op.date,
+    p_metrics: op.metrics,
+    p_time_zone: zoneNow(),
+  });
+  if (error) throw new Error(error.message);
+  // Mesmos efeitos do registro manual (cadeias, lembretes).
+  for (const row of (data ?? []) as Row[]) await runEffects(mapLog(row));
+}
+
+let flushing: Promise<{ done: number; pending: number }> | null = null;
+
+/** Envia o que estiver na fila. Seguro chamar a qualquer momento. */
+export function flushHabitOutbox(opts: { includeStalled?: boolean } = {}) {
+  const store = storage();
+  if (!store) return Promise.resolve({ done: 0, pending: 0 });
+  if (flushing) return flushing;
+  flushing = (async () => {
+    const userId = await ensureSession();
+    const r = await flushOutbox(store, userId, runOutboxOp, opts);
+    if (r.done > 0) await refreshHabits();
+    notifyOutbox();
+    return r;
+  })()
+    .catch(() => ({ done: 0, pending: pendingOutbox() }))
+    .finally(() => {
+      flushing = null;
+    });
+  return flushing;
+}
+
+let outboxUser: string | null = null;
+export function pendingOutbox(): number {
+  const store = storage();
+  return store && outboxUser ? readOutbox(store, outboxUser).length : 0;
+}
+const outboxListeners = new Set<() => void>();
+const notifyOutbox = () => outboxListeners.forEach((fn) => fn());
+export const subscribeOutbox = (fn: () => void) => {
+  outboxListeners.add(fn);
+  return () => void outboxListeners.delete(fn);
+};
+
+let workerRefs = 0;
+let stopWorker: (() => void) | null = null;
+/** Liga o reenvio automático: ao abrir, ao voltar a rede e a cada minuto com pendência.
+ * Várias telas podem pedir; só um relógio roda. */
+export function startOutboxWorker(userId: string) {
+  outboxUser = userId;
+  if (typeof window === "undefined") return () => {};
+  workerRefs += 1;
+  if (workerRefs === 1) {
+    const tick = () => void flushHabitOutbox();
+    window.addEventListener("online", tick);
+    const interval = setInterval(() => {
+      if (pendingOutbox() > 0) tick();
+    }, 60_000);
+    stopWorker = () => {
+      window.removeEventListener("online", tick);
+      clearInterval(interval);
+    };
+  }
+  void flushHabitOutbox();
+  return () => {
+    workerRefs -= 1;
+    if (workerRefs === 0) stopWorker?.();
+  };
+}
+
+async function enqueueAndFlush(op: OutboxOp) {
+  const store = storage();
+  if (!store) return;
+  const userId = await ensureSession();
+  outboxUser = userId;
+  enqueue(store, userId, op);
+  notifyOutbox();
+  await flushHabitOutbox();
+}
+
+/** Um treino, corrida, leitura ou copo d'água alimenta as rotinas vinculadas. O
+ * pedido entra primeiro numa fila persistente e só sai dela quando o banco confirma:
+ * sem rede ou com erro momentâneo, ele é reenviado sozinho. A referência é única por
+ * rotina, então reenviar não soma duas vezes; editar a origem atualiza o valor. */
 export async function syncModuleHabits(
   module: HabitModule,
   ref: string,
   date: string,
   metrics: Partial<Record<ModuleMetric, number>>,
-): Promise<number> {
-  try {
-    const { data, error } = await supabase.rpc("log_habits_from_module", {
-      p_module: module,
-      p_ref: ref,
-      p_date: date,
-      p_metrics: metrics,
-      p_time_zone: getAppTimeZone() ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-    });
-    if (error) return 0;
-    const n = Number(data ?? 0);
-    if (n > 0) await refreshHabits();
-    return n;
-  } catch {
-    return 0;
-  }
+): Promise<void> {
+  await enqueueAndFlush({
+    kind: "sync",
+    module,
+    ref,
+    date,
+    metrics: metrics as Record<string, number>,
+    attempts: 0,
+  });
 }
 
-/** Remove o que um módulo lançou quando o registro de origem é desfeito. */
+/** Remove o que um módulo lançou quando o registro de origem é desfeito (também via fila). */
 export async function unsyncModuleHabits(module: HabitModule, ref: string): Promise<void> {
-  try {
-    await supabase
-      .from("habit_logs")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("source_ref", `${module}:${ref}`)
-      .is("deleted_at", null);
-    await refreshHabits();
-  } catch {
-    /* sem rede: o módulo segue valendo e a rotina corrige na próxima sincronização */
-  }
+  await enqueueAndFlush({ kind: "unsync", module, ref, attempts: 0 });
 }
 
 /** Data civil (no fuso do app) de um instante — a mesma regra de `todayISO`. */

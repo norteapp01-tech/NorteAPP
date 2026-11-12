@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
-export type ToastState = { message: string; undo?: () => Promise<void>; error?: boolean } | null;
+export type ToastState = { message: string; undo?: () => Promise<unknown>; error?: boolean } | null;
 
 /** Aviso com "Desfazer". Vai para o <body>: dentro da página, a animação de
  * entrada (transform) faria o `position: fixed` ficar preso ao conteúdo. */
@@ -27,7 +27,9 @@ export function HabitToast({
             const undo = toast.undo;
             onClose();
             try {
-              await undo?.();
+              const report = (await undo?.()) as { alreadySent?: number } | undefined;
+              if (report?.alreadySent)
+                onUndoError("Desfeito. Um lembrete que já foi enviado não pode ser recolhido.");
             } catch (e) {
               onUndoError(e instanceof Error ? e.message : "Não foi possível desfazer.");
             }

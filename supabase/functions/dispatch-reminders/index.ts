@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
   // se o cron rodar de novo antes do próximo minuto por qualquer motivo.
   const { data: due, error: dueError } = await admin
     .from("reminders")
-    .select("id, user_id, text, remind_at")
+    .select("id, user_id, text, remind_at, origin")
     .lte("remind_at", new Date().toISOString())
     .is("notified_at", null)
     .eq("done", false);
@@ -59,7 +59,12 @@ Deno.serve(async (req) => {
             endpoint: sub.endpoint,
             keys: { p256dh: sub.p256dh, auth: sub.auth },
           },
-          JSON.stringify({ title: "Norte", body: reminder.text, url: "/agenda" }),
+          JSON.stringify({
+            title: "Norte",
+            body: reminder.text,
+            // lembretes de rotinas abrem Rotinas; os demais, a Agenda
+            url: String(reminder.origin ?? "").startsWith("habit_") ? "/rotinas" : "/agenda",
+          }),
         );
       } catch (err) {
         const status = (err as { statusCode?: number }).statusCode;

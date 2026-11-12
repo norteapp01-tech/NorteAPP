@@ -14,7 +14,7 @@ import {
   stepsFor,
 } from "@/lib/habits/format";
 
-export type LogDone = (message: string, undo: () => Promise<void>) => void;
+export type LogDone = (message: string, undo: () => Promise<unknown>) => void;
 
 /** Estado mostrado ao lado do nome: nunca só pela cor. */
 export function OutcomeMark({
