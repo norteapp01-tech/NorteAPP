@@ -51,8 +51,20 @@ export const UNIT_SUGGESTIONS = [
   "kg",
 ];
 
+/** "1 treino" / "2 treinos": unidade livre vai para o singular quando o valor é 1.
+ * Unidades conhecidas (ml, km, min…) não variam. */
+export function unitLabel(unit: string, value: number): string {
+  const known = KNOWN[norm(unit)];
+  if (known) return known.label;
+  if (Math.abs(value) !== 1) return unit;
+  if (/ezes$/i.test(unit)) return unit.slice(0, -2); // vezes → vez
+  if (/[^s]s$/i.test(unit) || /ões$/i.test(unit))
+    return /ões$/i.test(unit) ? `${unit.slice(0, -3)}ão` : unit.slice(0, -1);
+  return unit;
+}
+
 export function formatAmount(value: number, unit?: string): string {
   const rounded = Math.round(value * 100) / 100;
   const text = rounded.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
-  return unit ? `${text} ${KNOWN[norm(unit)]?.label ?? unit}` : text;
+  return unit ? `${text} ${unitLabel(unit, rounded)}` : text;
 }

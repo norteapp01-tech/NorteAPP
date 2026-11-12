@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { syncModuleHabits } from "./habits/store";
 import { todayISO, toISODate } from "./goals-store";
 import { supabase, ensureSession, useSupabaseUserId } from "./supabase/client";
 import { queryClient } from "./query-client";
@@ -1613,7 +1614,7 @@ export async function finishSession(sessionId: string) {
     .eq("id", sessionId)
     .maybeSingle();
   const pausedAt = (current?.paused_at as string) ?? null;
-  unwrap(
+  const finished = unwrap<Row>(
     await supabase
       .from("workout_sessions")
       .update({
@@ -1631,6 +1632,18 @@ export async function finishSession(sessionId: string) {
       .select()
       .single(),
   );
+  // Rotinas ligadas à Academia recebem este treino uma única vez (a referência é a sessão).
+  const minutes = Math.max(
+    0,
+    (new Date(finished.finished_at as string).getTime() -
+      new Date(finished.started_at as string).getTime()) /
+      60000 -
+      ((finished.paused_seconds as number) ?? 0) / 60,
+  );
+  void syncModuleHabits("academia", sessionId, finished.date as string, {
+    sessions: 1,
+    minutes: Math.round(minutes * 100) / 100,
+  });
   await invalidate();
 }
 

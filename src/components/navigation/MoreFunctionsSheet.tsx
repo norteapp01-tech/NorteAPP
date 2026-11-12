@@ -11,6 +11,7 @@ import {
   Home,
   MessageCircle,
   Plus,
+  Repeat,
   Salad,
   Settings,
   Wallet,
@@ -19,7 +20,7 @@ import {
 } from "lucide-react";
 
 type RouteLink =
-  | { to: "/" | "/agenda" | "/planejamento" | "/dashboard" | "/criar"; params?: never }
+  | { to: "/" | "/agenda" | "/planejamento" | "/dashboard" | "/criar" | "/rotinas"; params?: never }
   | {
       to: "/sub-agenda/$categoria";
       params: { categoria: string };
@@ -38,6 +39,7 @@ const mainItems: Item[] = [
     label: "Planos",
     icon: CalendarRange,
   },
+  { to: "/rotinas", label: "Rotinas", icon: Repeat },
   { to: "/dashboard", label: "Espelho", icon: BarChart3 },
 ];
 

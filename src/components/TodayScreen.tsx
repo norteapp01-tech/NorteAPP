@@ -26,6 +26,7 @@ import { useCompletedInSession } from "@/hooks/use-completed-in-session";
 import { categoryMeta } from "@/lib/mock-data";
 import { useProfile, greeting, updateProfile } from "@/lib/profile-store";
 import { formatTime } from "@/lib/format-utils";
+import { HomeHabits } from "@/components/habits/HomeHabits";
 import { HydrationCard } from "@/components/hydration/HydrationCard";
 import { RemindersCard } from "@/components/RemindersCard";
 import { SubagendasGrid } from "@/components/SubagendasGrid";
@@ -374,6 +375,8 @@ export function TodayScreen({ onOpenChat }: { onOpenChat?: () => void } = {}) {
           onPick={(v) => pickMood(v as EnergyMood)}
         />
       </div>
+
+      <HomeHabits />
 
       <div className="today-routine-heading mt-9 flex items-end justify-between gap-4">
         <h2 className="norte-view-title">Minha rotina</h2>

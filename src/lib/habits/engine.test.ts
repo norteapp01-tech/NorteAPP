@@ -408,6 +408,15 @@ describe("unidades", () => {
     expect(canSum("copos", "copos")).toBe(true);
     expect(canSum("copos", "xícaras")).toBe(false);
   });
+  it("unidade livre vai para o singular quando o valor é 1", () => {
+    expect(formatAmount(1, "treinos")).toBe("1 treino");
+    expect(formatAmount(2, "treinos")).toBe("2 treinos");
+    expect(formatAmount(1, "vezes")).toBe("1 vez");
+    expect(formatAmount(1, "xícaras")).toBe("1 xícara");
+    expect(formatAmount(1, "páginas")).toBe("1 página");
+    expect(formatAmount(1, "ml")).toBe("1 ml");
+    expect(formatAmount(0, "copos")).toBe("0 copos");
+  });
   it("formata com vírgula decimal", () => {
     expect(formatAmount(2.5, "L")).toBe("2,5 L");
     expect(formatAmount(1500, "ml")).toBe("1.500 ml");

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, useSupabaseUserId, ensureSession } from "./supabase/client";
 import { queryClient } from "./query-client";
 import { todayISO } from "./goals-store";
+import { syncModuleHabits, unsyncModuleHabits } from "./habits/store";
 
 // ---------------------------------------------------------------------------
 // Hidratação — registros reais por dia/horário, meta lida do perfil
@@ -56,11 +57,15 @@ export function todayIntake(logs: HydrationLog[]): number {
 
 export async function addWater(amountMl: number) {
   const userId = await ensureSession();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("hydration_logs")
-    .insert({ user_id: userId, date: todayISO(), amount_ml: amountMl });
+    .insert({ user_id: userId, date: todayISO(), amount_ml: amountMl })
+    .select("id, date")
+    .single();
   if (error) throw new Error(error.message);
   await queryClient.invalidateQueries({ queryKey: hydrationQueryKey() });
+  // Rotinas ligadas à água recebem o mesmo copo, uma única vez.
+  if (data) void syncModuleHabits("agua", data.id as string, data.date as string, { ml: amountMl });
 }
 
 /** Corrige a quantidade do registro mais recente de hoje, sem criar outro. */
@@ -73,6 +78,9 @@ export async function correctLastWaterLog(logs: HydrationLog[], amountMl: number
     .eq("id", last.id);
   if (error) throw new Error(error.message);
   await queryClient.invalidateQueries({ queryKey: hydrationQueryKey() });
+  // O copo corrigido substitui o anterior nas rotinas ligadas.
+  await unsyncModuleHabits("agua", last.id);
+  void syncModuleHabits("agua", last.id, last.date, { ml: amountMl });
 }
 
 /** Apaga o último registro de hoje — corrige toque acidental sem mexer no resto do histórico. */
@@ -82,4 +90,5 @@ export async function undoLastLog(logs: HydrationLog[]) {
   const { error } = await supabase.from("hydration_logs").delete().eq("id", last.id);
   if (error) throw new Error(error.message);
   await queryClient.invalidateQueries({ queryKey: hydrationQueryKey() });
+  void unsyncModuleHabits("agua", last.id);
 }

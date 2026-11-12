@@ -108,6 +108,16 @@ export function useProfile(): Profile {
   return data ?? DEFAULT_PROFILE;
 }
 
+/** Primeiro dia da semana lido de fora de componentes (agente, rotinas). */
+export async function getProfileWeekStart(): Promise<0 | 1> {
+  try {
+    const profile = await fetchProfile();
+    return profile.weekStart === "sunday" ? 0 : 1;
+  } catch {
+    return 1;
+  }
+}
+
 export function useProfileLoading(): boolean {
   const userId = useSupabaseUserId();
   const { isLoading } = useQuery({
