@@ -25,7 +25,7 @@ import {
   transitionOf,
   type QuietHours,
 } from "./effects";
-import { enqueue, flushOutbox, readOutbox, type OutboxOp } from "./outbox";
+import { acknowledge, enqueue, flushOutbox, readOutbox, type OutboxOp } from "./outbox";
 import type {
   Chain,
   ChecklistItem,
@@ -677,28 +677,85 @@ export type LogInput = {
 export async function logHabit(input: LogInput): Promise<HabitLog> {
   if (input.value !== undefined && (!Number.isFinite(input.value) || input.value < 0))
     throw new Error("Informe um valor válido.");
-  const row = unwrap(
-    await supabase.rpc("log_habit", {
-      p_habit: input.habitId,
-      p_date: input.date,
-      p_status: input.status ?? "recorded",
-      p_value: input.value ?? 0,
-      p_duration: input.durationSeconds ?? null,
-      p_note: input.note ?? "",
-      p_reason: input.reason ?? null,
-      p_feeling: input.feeling ?? null,
-      p_checks: input.checks ?? [],
-      p_source: input.source ?? "manual",
-      p_source_ref: input.sourceRef ?? null,
-      p_idempotency_key: input.key ?? null,
-      p_time_zone: getAppTimeZone() ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-      p_occurred_at: input.occurredAt ?? new Date().toISOString(),
-    }),
-  ) as Row;
-  const log = mapLog(row);
+  const zone = zoneNow();
+  const store = storage();
+  const persist = store && (!input.source || input.source === "manual");
+  const user = persist ? await ensureSession() : null;
+  const prepared = {
+    ...input,
+    key: input.key ?? newKey(),
+    occurredAt: input.occurredAt ?? new Date().toISOString(),
+  };
+  const op: OutboxOp = {
+    kind: "manual",
+    module: "manual",
+    ref: prepared.key,
+    input: prepared,
+    timeZone: zone,
+    attempts: 0,
+  };
+  if (persist && user) {
+    outboxUser = user;
+    enqueue(store, user, op);
+    notifyOutbox();
+  }
+  let log: HabitLog;
+  try {
+    log = await sendHabitLog(prepared, zone);
+  } catch (error) {
+    const transient = error instanceof Error && "retryable" in error && error.retryable === true;
+    if (!persist || !user || !transient) {
+      if (persist && user) acknowledge(store, user, op);
+      notifyOutbox();
+      throw error;
+    }
+    return {
+      id: `pending:${prepared.key}`,
+      pending: true,
+      habitId: input.habitId,
+      localDate: input.date,
+      occurredAt: prepared.occurredAt,
+      timeZone: zone,
+      status: input.status ?? "recorded",
+      value: input.value ?? 0,
+      durationSeconds: input.durationSeconds,
+      note: input.note ?? "",
+      reason: input.reason,
+      feeling: input.feeling,
+      checks: input.checks ?? [],
+      source: "manual",
+    };
+  }
+  if (persist && user) acknowledge(store, user, op);
+  notifyOutbox();
   await refreshHabits();
   await runEffects(log);
   return log;
+}
+
+async function sendHabitLog(input: LogInput, timeZone: string): Promise<HabitLog> {
+  const result = await supabase.rpc("log_habit", {
+    p_habit: input.habitId,
+    p_date: input.date,
+    p_status: input.status ?? "recorded",
+    p_value: input.value ?? 0,
+    p_duration: input.durationSeconds ?? null,
+    p_note: input.note ?? "",
+    p_reason: input.reason ?? null,
+    p_feeling: input.feeling ?? null,
+    p_checks: input.checks ?? [],
+    p_source: input.source ?? "manual",
+    p_source_ref: input.sourceRef ?? null,
+    p_idempotency_key: input.key ?? null,
+    p_time_zone: timeZone,
+    p_occurred_at: input.occurredAt ?? new Date().toISOString(),
+  });
+  if (result.error) {
+    throw Object.assign(new Error(result.error.message), {
+      retryable: result.status === 0 || result.status >= 500,
+    });
+  }
+  return mapLog(result.data as Row);
 }
 
 export type EffectsReport = { cancelled: number; alreadySent: number };
@@ -707,6 +764,16 @@ export type EffectsReport = { cancelled: number; alreadySent: number };
  * lembretes que ele gerou e ainda não saíram são cancelados. Um aviso já entregue
  * não tem como ser desfeito — `alreadySent` conta quantos foram. */
 export async function undoLog(logId: string): Promise<EffectsReport> {
+  if (logId.startsWith("pending:")) {
+    const result = await supabase
+      .from("habit_logs")
+      .select("id")
+      .eq("idempotency_key", logId.slice(8))
+      .maybeSingle();
+    if (result.error || !result.data)
+      throw new Error("O registro aguarda conexão. Sincronize antes de desfazer.");
+    return undoLog(result.data.id as string);
+  }
   unwrap(
     await supabase
       .from("habit_logs")
@@ -1244,6 +1311,11 @@ const storage = (): Storage | null => {
 };
 
 async function runOutboxOp(op: OutboxOp): Promise<void> {
+  if (op.kind === "manual") {
+    const log = await sendHabitLog(op.input, op.timeZone);
+    if (!log.deletedAt) await runEffects(log);
+    return;
+  }
   if (op.kind === "unsync") {
     const res = await supabase
       .from("habit_logs")
@@ -1276,7 +1348,16 @@ export function flushHabitOutbox(opts: { includeStalled?: boolean } = {}) {
   if (flushing) return flushing;
   flushing = (async () => {
     const userId = await ensureSession();
-    const r = await flushOutbox(store, userId, runOutboxOp, opts);
+    const r = await flushOutbox(
+      store,
+      userId,
+      async (op) => {
+        if ((await ensureSession()) !== userId)
+          throw new Error("A conta mudou. Entre na conta original para sincronizar.");
+        await runOutboxOp(op);
+      },
+      opts,
+    );
     if (r.done > 0) await refreshHabits();
     notifyOutbox();
     return r;
@@ -1292,6 +1373,10 @@ let outboxUser: string | null = null;
 export function pendingOutbox(): number {
   const store = storage();
   return store && outboxUser ? readOutbox(store, outboxUser).length : 0;
+}
+export function pendingHabitOperations(): OutboxOp[] {
+  const store = storage();
+  return store && outboxUser ? readOutbox(store, outboxUser) : [];
 }
 const outboxListeners = new Set<() => void>();
 const notifyOutbox = () => outboxListeners.forEach((fn) => fn());
@@ -1328,7 +1413,7 @@ export function startOutboxWorker(userId: string) {
 
 async function enqueueAndFlush(op: OutboxOp) {
   const store = storage();
-  if (!store) return;
+  if (!store) throw new Error("Não foi possível guardar a sincronização neste aparelho.");
   const userId = await ensureSession();
   outboxUser = userId;
   enqueue(store, userId, op);

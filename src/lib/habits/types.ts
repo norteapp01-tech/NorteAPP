@@ -63,6 +63,8 @@ export type LogSource = "manual" | "timer" | "module" | "import" | "agent";
 export type Feeling = "leve" | "neutro" | "pesado";
 
 export type HabitLog = {
+  /** Stored on this device; not included in confirmed metrics until synchronized. */
+  pending?: boolean;
   id: string;
   habitId: string;
   localDate: string;

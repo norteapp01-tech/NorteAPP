@@ -141,7 +141,10 @@ export function HabitRow({
     setBusy(true);
     try {
       const created = await action();
-      if (created) onDone(message, () => undoLog(created.id));
+      if (created)
+        onDone(created.pending ? "Guardado neste aparelho. Aguardando conexão." : message, () =>
+          undoLog(created.id),
+        );
     } catch (e) {
       onError(e instanceof Error ? e.message : "Não foi possível registrar.");
     } finally {

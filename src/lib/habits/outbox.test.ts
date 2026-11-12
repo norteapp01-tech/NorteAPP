@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { enqueue, flushOutbox, readOutbox, MAX_AUTO_ATTEMPTS, type OutboxOp } from "./outbox";
+import {
+  acknowledge,
+  clearOutbox,
+  enqueue,
+  flushOutbox,
+  readOutbox,
+  MAX_AUTO_ATTEMPTS,
+  type OutboxOp,
+} from "./outbox";
 
 const mem = () => {
   const m = new Map<string, string>();
@@ -18,6 +26,61 @@ const sync = (ref: string, ml = 250): OutboxOp => ({
 });
 
 describe("fila de módulos", () => {
+  it("uma tentativa em voo não restaura registros após recomeçar a conta", async () => {
+    const storage = mem();
+    enqueue(storage, "u1", sync("old"));
+    await flushOutbox(storage, "u1", async () => {
+      clearOutbox(storage, "u1");
+      enqueue(storage, "u1", sync("new"));
+      throw new Error("request from before reset");
+    });
+    expect(readOutbox(storage, "u1").map((op) => op.ref)).toEqual(["new"]);
+  });
+  it("mantém chave, data original e fuso do registro manual entre tentativas", async () => {
+    const s = mem();
+    const op: OutboxOp = {
+      kind: "manual",
+      module: "manual",
+      ref: "same-action",
+      attempts: 0,
+      timeZone: "America/Sao_Paulo",
+      input: {
+        habitId: "h1",
+        date: "2026-11-11",
+        value: 20,
+        key: "same-action",
+        occurredAt: "2026-11-12T02:59:00Z",
+      },
+    };
+    enqueue(s, "u1", op);
+    await flushOutbox(s, "u1", async () => {
+      throw new Error("offline");
+    });
+    const [pending] = readOutbox(s, "u1");
+    expect(pending).toMatchObject({ ...op, attempts: 1 });
+    expect(readOutbox(s, "u2")).toEqual([]);
+    await flushOutbox(s, "u1", async (stored) => {
+      expect(stored.ref).toBe("same-action");
+    });
+    expect(readOutbox(s, "u1")).toEqual([]);
+  });
+  it("confirmação antiga não remove uma alteração mais recente", () => {
+    const s = mem();
+    const first = sync("a", 250);
+    enqueue(s, "u1", first);
+    enqueue(s, "u1", sync("a", 500));
+    acknowledge(s, "u1", first);
+    expect(readOutbox(s, "u1")[0]).toMatchObject({ metrics: { ml: 500 } });
+  });
+  it("não confirma armazenamento quando o aparelho está sem espaço", () => {
+    const storage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("QuotaExceededError");
+      },
+    };
+    expect(() => enqueue(storage, "u1", sync("a"))).toThrow("Libere espaço");
+  });
   it("falha momentânea mantém a operação e a próxima tentativa conclui", async () => {
     const s = mem();
     enqueue(s, "u1", sync("a"));

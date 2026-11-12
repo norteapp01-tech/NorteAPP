@@ -46,6 +46,7 @@ export function TimerSheet({
 }) {
   const [mode, setMode] = useState<TimerMode>("stopwatch");
   const [minutes, setMinutes] = useState(25);
+  const [pomodoro, setPomodoro] = useState(DEFAULT_POMODORO);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const mine = timer && timer.habitId === habit.id ? timer : null;
@@ -89,7 +90,7 @@ export function TimerSheet({
                   habitId: habit.id,
                   mode,
                   targetSeconds: mode === "countdown" ? Math.round(minutes * 60) : undefined,
-                  pomodoro: mode === "pomodoro" ? DEFAULT_POMODORO : undefined,
+                  pomodoro: mode === "pomodoro" ? pomodoro : undefined,
                 });
               })
             }
@@ -132,10 +133,38 @@ export function TimerSheet({
             </label>
           )}
           {mode === "pomodoro" && (
-            <p className="text-sm text-muted-foreground">
-              4 sessões de 25 min com pausas de 5 min e uma pausa final de 15 min. Só o tempo de
-              foco entra na rotina.
-            </p>
+            <fieldset className="grid grid-cols-2 gap-3">
+              <legend className="mb-3 text-sm">Seu ritmo de foco</legend>
+              {(
+                [
+                  ["focus", "Foco (min)", 120],
+                  ["short", "Pausa curta (min)", 60],
+                  ["long", "Pausa final (min)", 120],
+                  ["cycles", "Sessões", 12],
+                ] as const
+              ).map(([key, label, max]) => (
+                <label key={key} className="text-sm">
+                  {label}
+                  <NumberField
+                    integer
+                    aria-label={label}
+                    value={key === "cycles" ? pomodoro[key] : pomodoro[key] / 60}
+                    onValue={(value) =>
+                      setPomodoro((old) => ({
+                        ...old,
+                        [key]:
+                          Math.min(max, Math.max(1, Math.round(value))) *
+                          (key === "cycles" ? 1 : 60),
+                      }))
+                    }
+                    className="mt-1 min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-center text-lg font-semibold"
+                  />
+                </label>
+              ))}
+              <p className="col-span-2 text-xs text-muted-foreground">
+                Só o tempo de foco conta na rotina.
+              </p>
+            </fieldset>
           )}
           <p className="text-[11px] text-muted-foreground">
             O tempo vem dos horários, não de um relógio rodando: fechar o app ou recarregar a página

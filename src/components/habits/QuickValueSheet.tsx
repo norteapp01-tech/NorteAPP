@@ -52,7 +52,12 @@ export function QuickValueSheet({
     setError(null);
     try {
       const log = await logHabit({ habitId: habit.id, date, value, note, feeling, checks, key });
-      onDone(`${habit.name}: ${formatAmount(value, unit)} registrado.`, () => undoLog(log.id));
+      onDone(
+        log.pending
+          ? "Guardado neste aparelho. Aguardando conexão."
+          : `${habit.name}: ${formatAmount(value, unit)} registrado.`,
+        () => undoLog(log.id),
+      );
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível registrar. Tente de novo.");

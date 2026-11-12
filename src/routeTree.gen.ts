@@ -16,6 +16,7 @@ import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as CriarRouteImport } from './routes/criar'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ExcluirContaRouteImport } from './routes/excluir-conta'
+import { Route as JuntosRouteImport } from './routes/juntos'
 import { Route as PlanejamentoRouteImport } from './routes/planejamento'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as RotinasRouteImport } from './routes/rotinas'
@@ -58,6 +59,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const ExcluirContaRoute = ExcluirContaRouteImport.update({
   id: '/excluir-conta',
   path: '/excluir-conta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JuntosRoute = JuntosRouteImport.update({
+  id: '/juntos',
+  path: '/juntos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlanejamentoRoute = PlanejamentoRouteImport.update({
@@ -109,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/criar': typeof CriarRoute
   '/dashboard': typeof DashboardRoute
   '/excluir-conta': typeof ExcluirContaRoute
+  '/juntos': typeof JuntosRoute
   '/planejamento': typeof PlanejamentoRoute
   '/privacidade': typeof PrivacidadeRoute
   '/rotinas': typeof RotinasRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByTo {
   '/criar': typeof CriarRoute
   '/dashboard': typeof DashboardRoute
   '/excluir-conta': typeof ExcluirContaRoute
+  '/juntos': typeof JuntosRoute
   '/planejamento': typeof PlanejamentoRoute
   '/privacidade': typeof PrivacidadeRoute
   '/rotinas': typeof RotinasRoute
@@ -144,6 +152,7 @@ export interface FileRoutesById {
   '/criar': typeof CriarRoute
   '/dashboard': typeof DashboardRoute
   '/excluir-conta': typeof ExcluirContaRoute
+  '/juntos': typeof JuntosRoute
   '/planejamento': typeof PlanejamentoRoute
   '/privacidade': typeof PrivacidadeRoute
   '/rotinas': typeof RotinasRoute
@@ -163,6 +172,7 @@ export interface FileRouteTypes {
     | '/criar'
     | '/dashboard'
     | '/excluir-conta'
+    | '/juntos'
     | '/planejamento'
     | '/privacidade'
     | '/rotinas'
@@ -180,6 +190,7 @@ export interface FileRouteTypes {
     | '/criar'
     | '/dashboard'
     | '/excluir-conta'
+    | '/juntos'
     | '/planejamento'
     | '/privacidade'
     | '/rotinas'
@@ -197,6 +208,7 @@ export interface FileRouteTypes {
     | '/criar'
     | '/dashboard'
     | '/excluir-conta'
+    | '/juntos'
     | '/planejamento'
     | '/privacidade'
     | '/rotinas'
@@ -215,6 +227,7 @@ export interface RootRouteChildren {
   CriarRoute: typeof CriarRoute
   DashboardRoute: typeof DashboardRoute
   ExcluirContaRoute: typeof ExcluirContaRoute
+  JuntosRoute: typeof JuntosRoute
   PlanejamentoRoute: typeof PlanejamentoRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   RotinasRoute: typeof RotinasRoute
@@ -274,6 +287,13 @@ declare module '@tanstack/react-router' {
       path: '/excluir-conta'
       fullPath: '/excluir-conta'
       preLoaderRoute: typeof ExcluirContaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/juntos': {
+      id: '/juntos'
+      path: '/juntos'
+      fullPath: '/juntos'
+      preLoaderRoute: typeof JuntosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/planejamento': {
@@ -343,6 +363,7 @@ const rootRouteChildren: RootRouteChildren = {
   CriarRoute: CriarRoute,
   DashboardRoute: DashboardRoute,
   ExcluirContaRoute: ExcluirContaRoute,
+  JuntosRoute: JuntosRoute,
   PlanejamentoRoute: PlanejamentoRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   RotinasRoute: RotinasRoute,

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -6,6 +6,7 @@ import {
   Pause,
   Plus,
   Search,
+  Settings,
   Timer as TimerIcon,
   X,
 } from "lucide-react";
@@ -23,7 +24,13 @@ import {
   versionAt,
   type Outcome,
 } from "@/lib/habits/engine";
-import { indexFor, useHabitData, type HabitData } from "@/lib/habits/store";
+import {
+  indexFor,
+  useHabitData,
+  pendingOutbox,
+  subscribeOutbox,
+  type HabitData,
+} from "@/lib/habits/store";
 import { formatClock, viewOf } from "@/lib/habits/timer";
 import type { Habit, TimeOfDay } from "@/lib/habits/types";
 import { HabitDetail } from "./HabitDetail";
@@ -42,6 +49,7 @@ import {
   scheduleText,
 } from "@/lib/habits/format";
 import "./habits.css";
+import { HabitSettings } from "./HabitSettings";
 
 type Tab = "hoje" | "semana" | "todas";
 type Sheet =
@@ -51,6 +59,7 @@ type Sheet =
   | { kind: "timer"; habitId: string }
   | { kind: "pause"; habitId?: string }
   | { kind: "reflections" }
+  | { kind: "settings" }
   | null;
 
 const GROUP_ORDER: (TimeOfDay | "any")[] = ["morning", "afternoon", "evening", "any"];
@@ -61,6 +70,7 @@ const GROUP_LABEL: Record<TimeOfDay | "any", string> = {
 
 export function HabitsScreen() {
   const data = useHabitData();
+  const pending = useSyncExternalStore(subscribeOutbox, pendingOutbox, () => 0);
   const [tab, setTab] = useState<Tab>("hoje");
   const [date, setDate] = useState<string | null>(null);
   const [weekAnchor, setWeekAnchor] = useState<string | null>(null);
@@ -104,6 +114,16 @@ export function HabitsScreen() {
 
   return (
     <main className="norte-page habits-page">
+      {sheet?.kind === "settings" && <HabitSettings onClose={() => setSheet(null)} />}
+      {pending > 0 && (
+        <button
+          className="mb-3 min-h-11 w-full rounded-xl border border-border px-3 text-left text-sm"
+          onClick={() => setSheet({ kind: "settings" })}
+        >
+          {pending} {pending === 1 ? "registro aguardando envio" : "registros aguardando envio"} ·
+          Ver
+        </button>
+      )}
       <header className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[.2em] text-muted-foreground">
@@ -128,6 +148,13 @@ export function HabitsScreen() {
       />
 
       <div className="mt-4 flex items-center gap-2">
+        <button
+          className="habit-icon-btn interactive-press"
+          aria-label="Preferências das rotinas"
+          onClick={() => setSheet({ kind: "settings" })}
+        >
+          <Settings className="h-4 w-4" />
+        </button>
         <button
           type="button"
           onClick={() => setSheet({ kind: "editor" })}

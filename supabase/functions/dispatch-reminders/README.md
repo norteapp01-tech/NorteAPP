@@ -1,14 +1,23 @@
 # dispatch-reminders
 
-Despacha como Web Push todo lembrete com `remind_at` vencido e ainda não
-avisado. Não precisa ser chamada pelo app — só pelo agendador da plataforma.
+Despacha Web Push de lembretes vencidos nas últimas 24 horas e ainda não
+avisados. Não é chamada pelo app — só pelo agendador da plataforma.
+Exige a migração **0069_push_delivery_receipts.sql** antes do deploy.
+
+Cada lembrete recebe uma reserva temporária de 5 minutos. Recibos por
+dispositivo evitam reenviar a aparelhos que já aceitaram o push enquanto outro
+aparelho está falhando. Sem aparelho, não marca entrega e tenta novamente em
+uma hora; erros transitórios tentam novamente em um minuto. Um push aceito pelo
+provedor não comprova que a pessoa o leu. Há uma janela inevitável entre enviar
+o push e salvar o recibo; a tag estável permite ao navegador agrupar repetições.
 
 ## Deploy (precisa do Supabase CLI autenticado — não roda daqui)
 
 ```bash
 supabase login
 supabase link --project-ref yorlxyoixeeqlcjrwasf
-supabase db push                      # aplica 0047_reminders_push.sql
+# Confira o histórico do banco e aplique as migrações pendentes revisadas.
+# Não execute db push indiscriminadamente: 0062 também precisa de revisão.
 supabase functions deploy dispatch-reminders
 ```
 
@@ -58,5 +67,12 @@ curl -i -X POST \
   https://yorlxyoixeeqlcjrwasf.functions.supabase.co/dispatch-reminders
 ```
 
-Resposta esperada: `{"sent":0,"errors":[]}` (ou `sent` > 0 se havia lembrete
-vencido). Um 401 indica `CRON_SECRET` errado ou ausente.
+Resposta esperada: `{"sent":0,"failed":0,"noDevice":0}`. Falha parcial retorna
+207 e deixa o lembrete pendente. 401 indica credencial incorreta; 503 indica
+configuração ausente ou inválida. A função exige POST e nunca abre o acesso
+quando CRON_SECRET não está configurado.
+
+Esta função entrega a tabela `reminders`. Não renova, sozinha, a janela de
+ocorrências de hábitos nem executa briefing/fechamento diário; esses trabalhos
+ainda precisam de um agendador de hábitos no servidor. Não considerar o push
+validado até executar um teste real em um aparelho inscrito.

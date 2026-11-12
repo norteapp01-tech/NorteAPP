@@ -8,6 +8,8 @@
 // reenviar nunca duplica.
 // ---------------------------------------------------------------------------
 
+import type { LogInput } from "./store";
+
 export type OutboxOp =
   | {
       kind: "sync";
@@ -18,11 +20,25 @@ export type OutboxOp =
       attempts: number;
       lastError?: string;
     }
-  | { kind: "unsync"; module: string; ref: string; attempts: number; lastError?: string };
+  | { kind: "unsync"; module: string; ref: string; attempts: number; lastError?: string }
+  | {
+      kind: "manual";
+      module: "manual";
+      ref: string;
+      input: LogInput;
+      timeZone: string;
+      attempts: number;
+      lastError?: string;
+    };
 
 export type OutboxStorage = Pick<Storage, "getItem" | "setItem">;
 
 const keyOf = (userId: string) => `norte-habit-outbox:${userId}`;
+const epochOf = (userId: string) => `${keyOf(userId)}:epoch`;
+export function clearOutbox(storage: OutboxStorage, userId: string) {
+  storage.setItem(epochOf(userId), crypto.randomUUID());
+  storage.setItem(keyOf(userId), "[]");
+}
 const sameTarget = (a: OutboxOp, b: OutboxOp) => a.module === b.module && a.ref === b.ref;
 /** Depois disso a operação continua guardada, mas deixa de ser tentada sozinha. */
 export const MAX_AUTO_ATTEMPTS = 8;
@@ -41,7 +57,9 @@ function write(storage: OutboxStorage, userId: string, ops: OutboxOp[]) {
   try {
     storage.setItem(keyOf(userId), JSON.stringify(ops));
   } catch {
-    /* armazenamento cheio/bloqueado: a tentativa imediata ainda acontece */
+    throw new Error(
+      "Não foi possível guardar a sincronização neste aparelho. Libere espaço e tente novamente.",
+    );
   }
 }
 
@@ -50,6 +68,15 @@ export function enqueue(storage: OutboxStorage, userId: string, op: OutboxOp): O
   const next = [...readOutbox(storage, userId).filter((o) => !sameTarget(o, op)), op];
   write(storage, userId, next);
   return next;
+}
+
+/** An acknowledgement must not remove a newer edit/undo queued during a request. */
+export function acknowledge(storage: OutboxStorage, userId: string, op: OutboxOp) {
+  write(
+    storage,
+    userId,
+    readOutbox(storage, userId).filter((item) => JSON.stringify(item) !== JSON.stringify(op)),
+  );
 }
 
 export type Executor = (op: OutboxOp) => Promise<void>;
@@ -66,9 +93,12 @@ export async function flushOutbox(
   opts: { includeStalled?: boolean } = {},
 ): Promise<{ done: number; pending: number }> {
   const snapshot = readOutbox(storage, userId);
+  const epoch = storage.getItem(epochOf(userId));
   let done = 0;
   const failed: OutboxOp[] = [];
   for (const op of snapshot) {
+    if (storage.getItem(epochOf(userId)) !== epoch)
+      return { done, pending: readOutbox(storage, userId).length };
     if (op.attempts >= MAX_AUTO_ATTEMPTS && !opts.includeStalled) {
       failed.push(op);
       continue;
@@ -84,6 +114,8 @@ export async function flushOutbox(
       });
     }
   }
+  if (storage.getItem(epochOf(userId)) !== epoch)
+    return { done, pending: readOutbox(storage, userId).length };
   // Operações enfileiradas durante o envio não podem se perder: relê e funde.
   const during = readOutbox(storage, userId).filter(
     (o) => !snapshot.some((s) => sameTarget(s, o) && JSON.stringify(s) === JSON.stringify(o)),

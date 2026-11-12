@@ -1,86 +1,148 @@
-# Rotinas (hábitos) — estado da implementação
+# Rotinas, comunidade e automações — estado verificável
 
-Atualizado em 2026-11-11. Branch `main`. Fonte do escopo: `PLANO-NORTE-HABITIFY-CLAUDE-CODE.md`.
+Atualizado em 12/11/2026. Este relatório substitui o estado anterior, que ainda
+marcava configurações, exportação, comunidade e API como não implementadas.
+**Não representa paridade completa com o Habitify nem aprovação para lançamento público.**
 
-## Commits
+## Entregue nesta revisão
 
-| Commit | Conteúdo | GitHub |
-|---|---|---|
-| `b3f3ac8` | Modelo de dados (migração 0063) e motor de regras puro | **não enviado** |
-| `0b23b69` | Tela Rotinas, camada de dados, vínculo com módulos, Espelho, ferramentas do agente | **não enviado** |
-| `80d4553` | Lembretes encadeados, toast em portal, ajustes de layout (migração 0064) | **não enviado** |
-| `cd88b40` | Motor de efeitos (cadeia por transição de estado, silêncio, ocorrências de lembrete), fila persistente de módulos, timer/lembretes atômicos (migração 0065) | **não enviado** |
-| `13fe8c9` | Home abre registro rápido/timer no lugar; Espelho separa cumprimento, cobertura e adesão | **não enviado** |
+### 1. Rotinas individuais
 
-O push falhou por falta de autenticação nesta sessão. Comando: `git push origin main` (histórico não foi reescrito; `origin/main` não andou).
+- Preferências com horário silencioso, carregamento, erros e confirmação de gravação.
+- Exportação JSON paginada por usuário: hábitos, versões, registros, pausas,
+  encadeamentos, lembretes, reflexões e preferências. Inclui registros excluídos
+  logicamente; não é um importador/restaurador de backup.
+- Pomodoro configurável: foco, pausas curta/final e número de sessões.
+- Fila persistente também para registros manuais. Conserva chave de idempotência,
+  data, horário original e fuso; informa “aguardando envio”, mostra pendências e
+  permite tentar novamente. Erros de armazenamento não são tratados como sucesso.
+- Métricas só incluem registros confirmados no servidor. Desfazer um registro
+  pendente exige sincronização antes; não promete desfazer algo cuja gravação
+  remota ainda é incerta. O retry reutiliza a mesma chave.
+- Reset limpa a fila da própria conta e invalida operações em voo para que elas
+  não restaurem dados locais apagados.
 
-## Migrações
+**Limite offline:** funciona com a tela já carregada e conserva os pedidos após
+recarregar. Não há cache completo de páginas/dados para iniciar o app sem internet.
+O teste de navegador simula falha da API, não uma PWA totalmente desconectada.
 
-| Migração | Estado verificado |
+### 2. Comunidade — página Juntos
+
+- Grupos privados, nome e descrição; convite por link/código.
+- Aprovação manual ou automática, remoção de participante, transferência da
+  administração, substituição do convite, arquivo, silêncio e saída.
+- Feed paginado, publicação, comentário, reação, menção explícita, denúncia e
+  remoção pelo autor ou administrador. Texto preservado quando o envio falha.
+- Avisos dentro do aplicativo para solicitação, aprovação, menção e apoio.
+- Compartilhamento explícito de rotinas. Resumo de quantidade dos últimos sete
+  dias em UTC, somente desde a autorização. Notas e humor permanecem privados.
+- Descompartilhar, sair ou ser removido revoga o acesso ao progresso.
+- Reset da conta exige transferir grupos com outros participantes ativos. Não
+  apaga silenciosamente um grupo que outras pessoas continuam utilizando.
+
+Não há ainda fotos/capas, amizades fora de grupos, mapa social de 90 dias,
+sequência social, notificações push sociais ou moderação central de denúncias.
+O administrador do grupo vê as denúncias e pode remover a publicação.
+
+### 3. Desafios
+
+- Desafios privados em grupos, com datas, unidade e meta.
+- Meta cooperativa ou comparação individual de quantidades.
+- Adesão voluntária vinculada a uma rotina própria compatível.
+- Contabilização somente após adesão; repetir adesão não altera sua data inicial.
+- Sair do desafio retira os dados da comparação.
+
+**Não confundir com os desafios diários completos do Habitify:** ainda faltam
+meta mínima diária, compromisso pessoal acima dessa meta, dificuldade com
+pontuação, tolerância a dias pulados, escolha das origens permitidas,
+estatísticas diárias/heatmap e encerramento com resultado histórico consolidado.
+O ranking atual mede quantidade; não mede uma pontuação de constância.
+
+### 4. Automações e notificações
+
+- API HTTP por chave, limitada a uma única rotina, com consulta ou consulta+registro.
+- Chave exibida uma vez; somente hash no banco; validade de 90 dias, revogação e
+  limite de requisições. Um usuário não cria/revoga chaves de outro.
+- `request_id` obrigatório para registrar; repetir devolve o mesmo registro.
+- Instruções e exemplo copiável para requisições HTTP no Atalhos do iPhone.
+  Isso não é integração nativa com Siri/App Intents ou um aplicativo Apple Watch.
+- Dispatcher Web Push corrigido: configuração ausente bloqueia acesso; reserva
+  temporária evita dois despachantes simultâneos; recibos por dispositivo evitam
+  repetir aparelhos já atendidos; falhas e falta de aparelho não marcam entrega.
+- Tag estável agrupa repetições no navegador. Não existe garantia de exatamente
+  uma entrega entre envio externo e gravação do recibo.
+
+**Pendente:** publicar a função `dispatch-reminders` e testar em aparelho real.
+A senha do PostgreSQL não concede acesso à publicação de Edge Functions.
+Também falta o agendador servidor que renova ocorrências de hábitos e processa
+encadeamentos para registros recebidos via API. Atualmente a renovação de
+lembretes e os efeitos dos registros do app dependem do cliente.
+
+## Banco de produção
+
+Todas as verificações usaram contas temporárias dentro de transações revertidas.
+As migrações foram aplicadas somente depois dos testes correspondentes.
+
+| Migração | Estado nesta revisão |
 |---|---|
-| 0062_plan_flow | **Não aplicada** no banco de produção (tabelas `plans/plan_phases/plan_steps` ausentes via API; pertence a outra sessão). Não publicar `main` (contém `de290de`) sem aplicá-la. |
-| 0063_habits_core | Aplicada (tabelas e RPCs respondem). |
-| 0064_reminders_habit_origin | Aplicada (inserção com `origin='habit_reminder'` aceita). |
-| **0065_habit_effects** | **Aplicada em 2026-11-11** no banco de produção (`yorlxyoixeeqlcjrwasf`), após dry-run e conferência do catálogo. |
-| **0066_finish_timer_conflict_code** | **Aplicada em 2026-11-11.** Corrige um defeito da 0065 achado no teste: conflito de revisão usava SQLSTATE 40001, que o PostgREST retenta até dar 504. Agora responde 409 `timer_changed`. |
+| 0062_plan_flow | Aplicada e registrada após 7 verificações. A pendência anterior foi resolvida. |
+| 0063–0066 | Já presentes no catálogo antes desta revisão. |
+| 0067_circles | Aplicada após 13 verificações reais de permissões, privacidade e idempotência. |
+| 0068_habit_automation | Aplicada após 11 verificações reais de escopo, revogação e registros idempotentes. |
+| 0069_push_delivery_receipts | Aplicada após 6 verificações reais de reserva, recuperação, recibos e isolamento. |
+| 0070_reset_community_content | Aplicada após 5 verificações reais de reset e preservação dos dados de outras pessoas. |
 
-Aplicada com `apply.mjs` (dry-run, depois real, registrada em `schema_migrations`). É aditiva; não removeu dados. A 0062 continua pendente (outra sessão).
+A migração 0062 altera `executions`; a informação antiga de que dependia de
+tabelas `plans/plan_phases/plan_steps` estava incorreta. O primeiro teste de
+0062 usou o antigo campo `date` e falhou; foi corrigido para o esquema real
+(`due_date`, `agenda_date`, `start_time`) antes da aplicação.
 
-## Decisões
+## Evidências
 
-- Evento de log + versões de meta datadas; o passado nunca é reescrito.
-- Ausência de registro ≠ falha. Espelho agora separa: **cumprimento registrado** (cumpridos ÷ dias com resultado informado), **cobertura** (dias informados ÷ dias avaliáveis) e **adesão ao planejado** (ausência conta como não cumprido; só nomeada assim).
-- Encadeamento "feito" só dispara na **transição** de estado da meta (100 ml de 2 L não dispara; o registro que atinge a meta dispara uma vez). Redução só "conclui" ao fechar o dia. Registro retroativo não cria aviso. Alvo arquivado/pausado/não programado/já resolvido não recebe aviso. Dedupe por (encadeamento, registro de origem, data do alvo).
-- Desfazer/editar cancela avisos **pendentes** gerados pelo registro; avisos já entregues não podem ser recolhidos e a interface informa isso.
-- Lembretes por horário: o app materializa 14 dias à frente em `reminders` (origem `habit_reminder`), recalcula ao abrir e após qualquer mudança; pausa, arquivo, dia não programado, rotina já resolvida hoje e horário silencioso são respeitados. Entrega fica a cargo da Edge Function `dispatch-reminders` (Web Push).
-- Módulos → rotinas: fila persistente por usuário (localStorage), reenvio ao abrir, ao voltar a rede e a cada minuto; edição na origem atualiza o registro derivado; exclusão o remove.
-- Timer: encerrar = gravar registro + remover timer em uma transação com compare-and-set da revisão. A sessão conta no **dia em que foi criada**; a duração é a medida (não o intervalo entre horas).
+- Suíte completa de testes, verificação de tipos e build executados nesta revisão.
+- 42 verificações no banco real: 13 comunidade + 11 automações + 6 push +
+  7 planejamento + 5 reset. Todas passaram; dados temporários revertidos.
+- 14 verificações PostgreSQL isoladas de comunidade e 15 de automações.
+- 40 verificações de navegador para Juntos: 360, 390, 430 e 1280 px, temas
+  claro/escuro, quatro abas, erro de comentário sem perda de texto.
+- Navegador: registro pela interface com API indisponível, aviso de pendência,
+  recarregamento, retorno da conexão e confirmação única com horário preservado.
+- Testes do handler de push com banco e transporte controlados: segredo ausente,
+  autorização inválida, sem aparelho, reserva já ocupada, falha parcial, recibo
+  indisponível e inscrição expirada. Não são testes de entrega externa real.
+- Scripts reproduzíveis em `scripts/check-community.mjs`, `check-habit-offline.mjs`
+  e `verify-*-production.mjs`. Scripts administrativos recebem URL por stdin;
+  não gravam nem imprimem credenciais.
+- `npm run lint` também percorre a pasta externa não rastreada `referencia de saas/`.
+  O lint do app, excluindo essa referência, deve ser usado para esta revisão.
+  A referência não foi alterada nem adicionada ao commit.
 
-## Testes — o que foi realmente executado
+Não executados: testes de todos os módulos do aplicativo em aparelhos reais,
+conversa completa com o agente, Apple Watch, HealthKit, OAuth Strava/Fitbit,
+conflitos de edição entre duas abas/dispositivos e ensaio de carga em produção.
 
-- Unitários: 963 testes verdes (motor, efeitos, fila, espelho, timer, agente, parser).
-- `tsc` e eslint limpos (3 avisos preexistentes de hook/fast-refresh).
-- Verificação de esquema em produção via API (0063/0064 presentes; 0062 ausente; 0065/0066 aplicadas depois, por conexão direta).
-- Rodadas anteriores (antes da 0065): 26 verificações no banco real e 15/15 de navegador (criar, registrar, desfazer, pausar, encadear, timer com recarga).
+## Comparação e trabalho que ainda falta
 
-- **Banco real, 0065 + 0066 (a primeira rodada falhou em 1 de 26 — revisão errada do timer dava 504; corrigido pela 0066 e o caso repetido: 409, nenhum log gravado; as outras 25 passaram):** troca atômica de lembretes preserva os anteriores quando um item é inválido; sincronização de módulo não duplica em retry, propaga edição e remove ao zerar; encerrar timer com revisão errada não grava nada, com revisão certa grava e remove, repetir devolve o mesmo log; lembrete encadeado duplicado (mesma origem+cadeia+data) é recusado; cancelar remove pendentes e só conta os já entregues; outra conta não troca lembretes, não gera log, não vê lembretes nem configurações. Usuários de teste removidos.
+As referências oficiais confirmam que o Habitify possui grupos com gestão de
+entrada e compartilhamento seletivo, incluindo mapa de progresso, meta e
+sequência. O Norte passou a ter a base de grupos, mas seu resumo compartilhado
+ainda é mais simples. [Habitify Circle](https://intercom.help/habitify-app/en/articles/11531803-start-a-habitify-circle-and-share-your-progress)
 
-**Não executado nesta rodada**: navegador com as telas alteradas, entrega real de push, dois dispositivos, falha de rede na fila, meia-noite/fuso em navegador, conversa real com o agente, duas contas via UI, acessibilidade por teclado, desempenho com muitos hábitos, regressão de módulos. Nenhum desses está marcado como passado.
+O Habitify também documenta desafios com metas diárias, fontes de registro,
+dificuldade, pontos e tolerância a dias pulados. Esses itens não estão no ranking
+de quantidade implementado no Norte. [Habitify Challenge](https://intercom.help/habitify-app/en/articles/13156044-create-your-own-habitify-challenge)
 
-## Matriz Habitify × Norte
+| Bloco | Próximo trabalho concreto | Dependência |
+|---|---|---|
+| Hábitos | Agendador servidor; briefing/fechamento; períodos do dia configuráveis; cache offline completo | Implementação adicional e publicação do servidor |
+| Comunidade | Mapas e sequências, capas/fotos protegidas, filtros/moderação, push social | Implementação adicional |
+| Desafios | Regras diárias, pontuação, tolerância, origens, estatísticas e histórico final | Implementação adicional |
+| API | Efeitos servidor por registro; webhooks assinados com retry; conectores específicos | Implementação adicional; contas para homologação externa |
+| Saúde | Apple Health/Health Connect, Watch, widgets e Live Activities | Aplicativos nativos, entitlements, dispositivos e contas de desenvolvedor |
+| Serviços | Strava, Fitbit e outros OAuth | Aplicativos registrados, credenciais e homologação |
+| Qualidade | Entrega push real, agente real, testes entre dispositivos e carga | Ambiente conectado e aparelhos |
 
-Fontes: ficha do app na App Store (id1111447047) e central de ajuda do Habitify (intercom.help/habitify-app), consultadas em 2026-11-11; pesquisa não esgota todas as páginas. Marcação: **C** confirmado em fonte, **I** inferido, **N** não verificado.
-
-| Funcionalidade (fonte) | Norte | Evidência | Estado | Próximo passo |
-|---|---|---|---|---|
-| Hábitos com metas diária/semanal/mensal/anual, unidades (C) | Versões de meta datadas, famílias de unidade | engine.test | Validado (unit + DB) | — |
-| Registro rápido, vários registros/dia, desfazer (C) | `log_habit`, toast com Desfazer, Home abre sheet no lugar | testes; browser (rodada anterior) | Validado (browser parcial) | Rever Home no browser |
-| Timer / foco (C) | Timer por timestamps, cronômetro/contagem/Pomodoro, encerramento atômico | timer.test; RPC real (revisão, idempotência) | Validado no banco; falta teste de 2 aparelhos no navegador | Teste de UI |
-| Pausa individual/área/global (I) | Pausas excluídas das métricas | engine.test; browser | Validado | — |
-| Lembretes por horário (C) | Materialização em `reminders` + dispatch Web Push | effects.test | **Implementado sem validação externa** (RPCs validadas no banco) | Deploy da função `dispatch-reminders`, teste em aparelho |
-| Encadeamento (hábito "depois de") (I) | Cadeias por transição, dedupe, silêncio | effects.test | Implementado; dedupe/cancelamento validados no banco; fluxo de UI pendente | Teste de navegador | |
-| Estatísticas, calendário, histórico (C) | Detalhe + Espelho (cumprimento/cobertura/adesão) | mirror/engine.test | Validado (unit) | Teste visual |
-| Checklist por hábito (I) | Checklist de itens por versão | unit | Implementado | — |
-| Áreas/categorias, ordenação (C) | Áreas, reorder | browser (parcial) | Implementado | Configurações dedicadas |
-| Horário silencioso, períodos do dia, briefing/fechamento | `habit_settings` (0065) | — | **Pendente** (tabela escrita; sem UI) | UI de preferências |
-| Reflexões/humor (I) | Reflexões com busca | browser | Implementado (sem imagens) | Storage protegido p/ imagens |
-| Exportação de dados (I) | — | — | **Pendente** | CSV/JSON por usuário |
-| Offline com fila de registros (I) | Fila só para módulos; registros manuais exigem rede | outbox.test | **Parcial** | Fila genérica de `log_habit` |
-| Agente (Norte-específico) | Ferramentas criar/registrar/pausar/consultar | agent.test | Implementado; conversa real pendente | Teste com OpenAI |
-| Apple Health / Health Connect (C: Apple Health, Google Health/Fit) | — | — | **Bloqueado**: exige app nativo (HealthKit/Health Connect), entitlements e dispositivo | App nativo |
-| Strava, Fitbit (C na ficha; conflito entre fontes sobre Fitbit) | — | — | **Bloqueado**: OAuth com client id/secret e app aprovado | Credenciais dos provedores |
-| Screen Time / RescueTime (C) | — | — | **Bloqueado**: Screen Time é nativo iOS; RescueTime precisa API key | — |
-| Google Calendar (C) | Integração existente da Agenda (não alterada) | regressão não reexecutada | Existente; rotinas não criam eventos | Reexecutar regressão |
-| Apple Calendar / Outlook (C) | — | — | **Pendente/bloqueado** (OAuth Microsoft; CalDAV) | Credenciais |
-| Widgets, Apple Watch, Live Activities, Siri/Atalhos (C widgets/Watch) | — | — | **Bloqueado**: o Norte é web/PWA; exige app nativo | App iOS |
-| NFC, IFTTT, Zapier, API (C) | — | — | **Pendente** (API/webhooks não construídos) | Edge Function + chave por usuário |
-| Compartilhamento/desafios privados (escopo do plano) | — | — | **Pendente** | Tabelas de convite + RLS |
-
-## Pendências externas exatas
-
-1. Aplicar a 0062 (outro trabalho) antes de qualquer publicação.
-2. Autenticação do GitHub para `git push origin main`.
-3. Deploy da Edge Function `dispatch-reminders` atualizada (URL por origem) e confirmação de cron + chaves VAPID.
-4. Integrações nativas e OAuth: contas de desenvolvedor Apple/Google, client id/secret de Strava, Fitbit, Microsoft.
-
-Rotacione os tokens que foram colados em conversas anteriores.
+Não atribuir “100%”, “melhor em todos os requisitos” ou “pronto para público”
+com base apenas nesta revisão. Há ganhos concretos e testados; a lista acima
+contém trabalho real ainda necessário, inclusive itens que não dependem de
+credenciais externas.
