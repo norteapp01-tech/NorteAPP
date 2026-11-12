@@ -21,7 +21,8 @@ O push falhou por falta de autenticação nesta sessão. Comando: `git push orig
 | 0062_plan_flow | **Não aplicada** no banco de produção (tabelas `plans/plan_phases/plan_steps` ausentes via API; pertence a outra sessão). Não publicar `main` (contém `de290de`) sem aplicá-la. |
 | 0063_habits_core | Aplicada (tabelas e RPCs respondem). |
 | 0064_reminders_habit_origin | Aplicada (inserção com `origin='habit_reminder'` aceita). |
-| **0065_habit_effects** | **Aplicada em 2026-11-11** no banco de produção (`yorlxyoixeeqlcjrwasf`), após dry-run e conferência do catálogo. 26 verificações de RPC/RLS passaram (abaixo). |
+| **0065_habit_effects** | **Aplicada em 2026-11-11** no banco de produção (`yorlxyoixeeqlcjrwasf`), após dry-run e conferência do catálogo. |
+| **0066_finish_timer_conflict_code** | **Aplicada em 2026-11-11.** Corrige um defeito da 0065 achado no teste: conflito de revisão usava SQLSTATE 40001, que o PostgREST retenta até dar 504. Agora responde 409 `timer_changed`. |
 
 Aplicada com `apply.mjs` (dry-run, depois real, registrada em `schema_migrations`). É aditiva; não removeu dados. A 0062 continua pendente (outra sessão).
 
@@ -39,10 +40,10 @@ Aplicada com `apply.mjs` (dry-run, depois real, registrada em `schema_migrations
 
 - Unitários: 963 testes verdes (motor, efeitos, fila, espelho, timer, agente, parser).
 - `tsc` e eslint limpos (3 avisos preexistentes de hook/fast-refresh).
-- Verificação de esquema em produção via API (0063/0064 presentes; 0062/0065 ausentes).
+- Verificação de esquema em produção via API (0063/0064 presentes; 0062 ausente; 0065/0066 aplicadas depois, por conexão direta).
 - Rodadas anteriores (antes da 0065): 26 verificações no banco real e 15/15 de navegador (criar, registrar, desfazer, pausar, encadear, timer com recarga).
 
-- **Banco real, 0065 (26/26):** troca atômica de lembretes preserva os anteriores quando um item é inválido; sincronização de módulo não duplica em retry, propaga edição e remove ao zerar; encerrar timer com revisão errada não grava nada, com revisão certa grava e remove, repetir devolve o mesmo log; lembrete encadeado duplicado (mesma origem+cadeia+data) é recusado; cancelar remove pendentes e só conta os já entregues; outra conta não troca lembretes, não gera log, não vê lembretes nem configurações. Usuários de teste removidos.
+- **Banco real, 0065 + 0066 (a primeira rodada falhou em 1 de 26 — revisão errada do timer dava 504; corrigido pela 0066 e o caso repetido: 409, nenhum log gravado; as outras 25 passaram):** troca atômica de lembretes preserva os anteriores quando um item é inválido; sincronização de módulo não duplica em retry, propaga edição e remove ao zerar; encerrar timer com revisão errada não grava nada, com revisão certa grava e remove, repetir devolve o mesmo log; lembrete encadeado duplicado (mesma origem+cadeia+data) é recusado; cancelar remove pendentes e só conta os já entregues; outra conta não troca lembretes, não gera log, não vê lembretes nem configurações. Usuários de teste removidos.
 
 **Não executado nesta rodada**: navegador com as telas alteradas, entrega real de push, dois dispositivos, falha de rede na fila, meia-noite/fuso em navegador, conversa real com o agente, duas contas via UI, acessibilidade por teclado, desempenho com muitos hábitos, regressão de módulos. Nenhum desses está marcado como passado.
 

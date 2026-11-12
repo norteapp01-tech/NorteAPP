@@ -1163,9 +1163,9 @@ export async function finishTimer(
   });
   if (error) {
     await refreshHabits();
-    if (error.code === "40001" || /timer_changed/.test(error.message))
+    if (error.code === "PT409" || /timer_changed/.test(error.message))
       throw new Error("O timer foi alterado em outro aparelho. Mostrando o estado atual.");
-    if (error.code === "P0002" || /timer_not_found/.test(error.message))
+    if (error.code === "PT404" || /timer_not_found/.test(error.message))
       throw new Error("Este timer já foi encerrado em outro aparelho.");
     throw new Error(error.message);
   }
